@@ -3,7 +3,10 @@ description: Правила проекта boom-cmd (Панель управле
 alwaysApply: true
 ---
 
-Канонический контекст — `CLAUDE.md` в корне. Источник истины по дизайну —
+Точка входа — `docs/PROJECT-INSTRUCTIONS-boom-cmd.md` (глобальная инструкция
+уровня проекта: роль, иерархия истины, протокол ответа; тот же текст вставлен
+в Project Instructions Claude-проекта `boom-cmd` на claude.ai). Краткий
+контекст в репо — `CLAUDE.md` в корне. Источник истины по дизайну —
 `docs/DESIGN-STANDARD-boom-cmd.md`.
 
 - Стек: Vue 3 `<script setup>` на JavaScript (НЕ TypeScript) + Vite 8 + Tailwind 3.4
