@@ -4,20 +4,20 @@ import { X } from 'lucide-vue-next'
 import {
   STATUS_RU,
   PRIORITY_RU,
-  ESTIMATE_RU,
   FIELD_RU,
-  STATUS_TOKEN,
   t,
-} from '../../i18n/roadmap.js'
+} from '../../i18n/projects.js'
 import PriorityIcon from './PriorityIcon.vue'
-import LabelTag from './LabelTag.vue'
+import DirectionChip from './DirectionChip.vue'
+import ParkBadge from './ParkBadge.vue'
+import MilestoneMark from './MilestoneMark.vue'
 
-// Модалка деталей карточки — read-only.
-// fixed inset-0 оверлей с центрированной панелью; на мобиле — bottom-sheet.
-// Закрытие: фон / кнопка / Esc. Body-scroll-lock + примитивный focus-trap.
+// Read-only модалка деталей проекта.
+// fixed inset-0 + focus-trap + body-scroll-lock; на мобиле — bottom-sheet,
+// на десктопе (≥sm) — центрированная панель. Закрытие: фон / кнопка / Esc.
 
 const props = defineProps({
-  card: { type: Object, default: null },
+  project: { type: Object, default: null },
 })
 const emit = defineEmits(['close'])
 
@@ -70,14 +70,10 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
 })
 
-const statusRu = computed(() => t(STATUS_RU, props.card?.status))
-const priorityRu = computed(() => t(PRIORITY_RU, props.card?.priority ?? 0))
-const estimateRu = computed(() =>
-  props.card?.estimate ? t(ESTIMATE_RU, props.card.estimate) : null,
-)
-const statusDot = computed(
-  () => STATUS_TOKEN[props.card?.status] || 'var(--text-muted)',
-)
+const statusRu = computed(() => t(STATUS_RU, props.project?.status))
+const priorityRu = computed(() => t(PRIORITY_RU, props.project?.priority ?? 0))
+const directions = computed(() => props.project?.directions || [])
+const items = computed(() => props.project?.items || [])
 </script>
 
 <template>
@@ -90,16 +86,11 @@ const statusDot = computed(
       ref="dialogRef"
       role="dialog"
       aria-modal="true"
-      :aria-label="card?.title || 'Карточка'"
+      :aria-label="project?.title || 'Проект'"
       class="flex max-h-[88svh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-2xl bg-[var(--surface)] shadow-2xl sm:rounded-2xl"
       style="padding-bottom: env(safe-area-inset-bottom)"
     >
       <header class="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-        <span
-          class="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-          :style="{ backgroundColor: statusDot }"
-          aria-hidden="true"
-        />
         <span class="text-[0.875rem] text-[var(--text-muted)]">{{ statusRu }}</span>
         <button
           ref="closeBtnRef"
@@ -113,54 +104,65 @@ const statusDot = computed(
       </header>
 
       <div class="flex-1 overflow-y-auto px-4 py-3">
-        <div class="text-[0.8125rem] text-[var(--text-muted)]">
-          <span>{{ card?.project }}</span>
-          <span v-if="card?.target"> · {{ card.target }}</span>
-        </div>
-        <h2 class="mt-1 text-[1.25rem] font-semibold leading-snug text-[var(--text)]">
-          {{ card?.title }}
+        <h2 class="text-[1.25rem] font-semibold leading-snug text-[var(--text)]">
+          {{ project?.title }}
         </h2>
 
         <dl class="mt-4 grid grid-cols-[7.5rem_1fr] gap-x-3 gap-y-2 text-[0.9375rem]">
           <dt class="text-[var(--text-muted)]">{{ FIELD_RU.priority }}</dt>
           <dd class="flex items-center gap-2 text-[var(--text)]">
-            <PriorityIcon :priority="card?.priority ?? 0" :size="14" />
+            <PriorityIcon :priority="project?.priority ?? 0" :size="14" />
             <span>{{ priorityRu }}</span>
           </dd>
 
-          <template v-if="card?.estimate">
-            <dt class="text-[var(--text-muted)]">{{ FIELD_RU.estimate }}</dt>
-            <dd class="text-[var(--text)]">
-              {{ card.estimate }}
-              <span class="text-[var(--text-secondary)]"> · {{ estimateRu }}</span>
-            </dd>
-          </template>
-
-          <template v-if="card?.assignee">
-            <dt class="text-[var(--text-muted)]">{{ FIELD_RU.assignee }}</dt>
-            <dd class="text-[var(--text)]">{{ card.assignee }}</dd>
-          </template>
-
-          <template v-if="card?.target">
-            <dt class="text-[var(--text-muted)]">{{ FIELD_RU.target }}</dt>
-            <dd class="text-[var(--text)]">{{ card.target }}</dd>
-          </template>
-
-          <template v-if="card?.labels?.length">
-            <dt class="text-[var(--text-muted)]">{{ FIELD_RU.labels }}</dt>
+          <template v-if="directions.length">
+            <dt class="text-[var(--text-muted)]">{{ FIELD_RU.directions }}</dt>
             <dd class="flex flex-wrap gap-1">
-              <LabelTag v-for="l in card.labels" :key="l" :label="l" />
+              <DirectionChip v-for="d in directions" :key="d" :label="d" />
             </dd>
+          </template>
+
+          <dt class="text-[var(--text-muted)]">{{ FIELD_RU.parks }}</dt>
+          <dd class="flex items-center gap-1 text-[var(--text)]">
+            <ParkBadge :parks="project?.parks" :verbose="true" />
+          </dd>
+
+          <template v-if="project?.target">
+            <dt class="text-[var(--text-muted)]">{{ FIELD_RU.target }}</dt>
+            <dd class="text-[var(--text)]">{{ project.target }}</dd>
           </template>
         </dl>
 
-        <section v-if="card?.description" class="mt-5">
+        <section v-if="project?.description" class="mt-5">
           <h3
             class="mb-2 text-[0.8125rem] font-medium uppercase tracking-wide text-[var(--text-muted)]"
           >{{ FIELD_RU.description }}</h3>
           <p
             class="whitespace-pre-wrap text-[1rem] leading-relaxed text-[var(--text-secondary)]"
-          >{{ card.description }}</p>
+          >{{ project.description }}</p>
+        </section>
+
+        <section v-if="items.length" class="mt-5">
+          <h3
+            class="mb-2 text-[0.8125rem] font-medium uppercase tracking-wide text-[var(--text-muted)]"
+          >{{ FIELD_RU.items }}</h3>
+          <ul class="flex flex-col gap-1.5">
+            <li
+              v-for="it in items"
+              :key="it.id"
+              class="flex items-start gap-2 rounded-xl bg-[var(--surface-2)] px-3 py-2"
+            >
+              <MilestoneMark v-if="it.type === 'milestone'" class="mt-[5px]" />
+              <span v-else class="mt-[7px] inline-block h-[5px] w-[5px] shrink-0 rounded-full bg-[var(--text-muted)]" aria-hidden="true" />
+              <div class="flex min-w-0 flex-col">
+                <span class="text-[0.9375rem] leading-snug text-[var(--text)]">{{ it.title }}</span>
+                <span
+                  v-if="it.description"
+                  class="text-[0.8125rem] leading-snug text-[var(--text-muted)]"
+                >{{ it.description }}</span>
+              </div>
+            </li>
+          </ul>
         </section>
       </div>
     </div>

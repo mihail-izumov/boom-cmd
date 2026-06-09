@@ -1,14 +1,13 @@
 <script setup>
 import { computed } from 'vue'
-import { PRIORITY_RU, t } from '../../i18n/roadmap.js'
+import { PRIORITY_RU, t } from '../../i18n/projects.js'
 
-// Иконка приоритета — по DESIGN-STANDARD §3.4:
+// Иконка приоритета — DESIGN-STANDARD §3.4:
 //   0 No priority — серые точки
 //   1 Urgent      — залитый красный квадрат с восклицанием (единственный цветной)
 //   2 High        — 3 столбика, --text
 //   3 Medium      — 2 столбика, --text-muted
 //   4 Low         — 1 столбик, --text-muted
-// Никаких пяти цветов (бриф пере-крыт стандартом).
 
 const props = defineProps({
   priority: { type: Number, default: 0 },
@@ -25,7 +24,6 @@ const label = computed(() => t(PRIORITY_RU, props.priority))
     :aria-label="label"
     :title="label"
   >
-    <!-- 0: No priority — три приглушённые точки -->
     <svg
       v-if="priority === 0"
       :width="size"
@@ -39,7 +37,6 @@ const label = computed(() => t(PRIORITY_RU, props.priority))
       <circle cx="13" cy="8" r="1.1" fill="var(--text-muted)" />
     </svg>
 
-    <!-- 1: Urgent — единственный цветной (красный квадрат с «!») -->
     <svg
       v-else-if="priority === 1"
       :width="size"
@@ -53,7 +50,6 @@ const label = computed(() => t(PRIORITY_RU, props.priority))
       <rect x="7" y="11" width="2" height="2" rx="1" fill="var(--ink-on-color)" />
     </svg>
 
-    <!-- 2: High — 3 столбика, --text -->
     <svg
       v-else-if="priority === 2"
       :width="size"
@@ -67,7 +63,6 @@ const label = computed(() => t(PRIORITY_RU, props.priority))
       <rect x="11" y="3" width="3" height="11" rx="0.6" fill="var(--text)" />
     </svg>
 
-    <!-- 3: Medium — 2 столбика, --text-muted; третий — линия -->
     <svg
       v-else-if="priority === 3"
       :width="size"
@@ -81,7 +76,6 @@ const label = computed(() => t(PRIORITY_RU, props.priority))
       <rect x="11" y="3" width="3" height="11" rx="0.6" fill="var(--line)" />
     </svg>
 
-    <!-- 4: Low — 1 столбик, --text-muted; остальные — линии -->
     <svg
       v-else-if="priority === 4"
       :width="size"
@@ -95,7 +89,6 @@ const label = computed(() => t(PRIORITY_RU, props.priority))
       <rect x="11" y="3" width="3" height="11" rx="0.6" fill="var(--line)" />
     </svg>
 
-    <!-- fallback: неизвестное значение не роняет UI -->
     <svg
       v-else
       :width="size"
