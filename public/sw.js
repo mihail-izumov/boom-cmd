@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boom-cmd-v1';
+const CACHE_NAME = 'boom-cmd-v2';
 const BASE = '/boom-cmd/';
 const STATIC_ASSETS = [
   BASE, BASE + 'index.html', BASE + 'favicon.svg',

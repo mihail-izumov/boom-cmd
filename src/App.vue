@@ -1,11 +1,19 @@
 <script setup>
-import { Sparkles } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { ChartColumnBig, ListChecks, Folder } from 'lucide-vue-next'
+import AppShell from './components/AppShell.vue'
+import AnalyticsScreen from './screens/AnalyticsScreen.vue'
+import TasksScreen from './screens/TasksScreen.vue'
+import MaterialsScreen from './screens/MaterialsScreen.vue'
+
+const tabs = [
+  { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen },
+  { id: 'tasks',     label: 'Задачи',    title: 'Задачи',    icon: ListChecks,     screen: TasksScreen },
+  { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen },
+]
+const active = ref('analytics')
 </script>
 
 <template>
-  <main class="min-h-screen flex flex-col items-center justify-center gap-4 bg-black text-white">
-    <Sparkles class="w-10 h-10" />
-    <h1 class="text-4xl font-bold tracking-tight">Привет!</h1>
-    <p class="text-sm text-neutral-400">Панель управления БумБастик · Фаза 0</p>
-  </main>
+  <AppShell :tabs="tabs" :active="active" @update:active="(id) => (active = id)" />
 </template>

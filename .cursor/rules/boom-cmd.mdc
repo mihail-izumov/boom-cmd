@@ -1,0 +1,19 @@
+---
+description: Правила проекта boom-cmd (Панель управления БумБастик)
+alwaysApply: true
+---
+
+Канонический контекст — `CLAUDE.md` в корне. Источник истины по дизайну —
+`docs/DESIGN-STANDARD-boom-cmd.md`.
+
+- Стек: Vue 3 `<script setup>` на JavaScript (НЕ TypeScript) + Vite 8 + Tailwind 3.4
+  + lucide-vue-next. PWA на GitHub Pages, `base: '/boom-cmd/'`.
+- Mobile-first под iPhone (Apple HIG): tab bar внизу (только навигация), navigation
+  bar с large title вверху, тач-таргеты ≥44pt, safe-area через `env(...)`. На десктопе —
+  мобильная колонка `max-w-[430px]` по центру.
+- Цвета ТОЛЬКО через токены `var(--…)` (определены в `src/styles/main.css`).
+  Хардкод hex в компонентах ЗАПРЕЩЁН. Текст всегда монохромный. Цвет = смысл, не декор.
+- Акцент — жёлтый `--accent #FFC833`, только заливка (с `--accent-ink` поверх).
+- Светлая тема по умолчанию; тёмная — будущий свап `[data-theme="dark"]`.
+- Запрещено: TypeScript, drag-библиотеки, тёмный фон по дефолту, секреты в клиенте,
+  имитация нативного Liquid Glass, ERP/CRM/«OS всего».

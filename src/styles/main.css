@@ -1,3 +1,38 @@
+/* ===== Design tokens — единственное место с hex (DESIGN-STANDARD §3.6) ===== */
+:root {
+  /* нейтрали (светлый холст) */
+  --bg: #F7F6F3;  --surface: #FFFFFF;  --surface-2: #F1F0EC;
+  --line: #E3E1DB;
+  --text: #1C1B18;  --text-secondary: #45433E;  --text-muted: #6F6D66;
+  /* брендовый акцент (жёлтый, только заливка) */
+  --accent: #FFC833;  --accent-ink: #1C1B18;
+  /* чистые сигналы (LEGO) — пригодятся в Фазе 2 */
+  --positive: #2F9E54;  --negative: #D92D20;  --info: #2563EB;  --warning: #FFC833;
+  /* статусы роадмапа — Фаза 2 */
+  --st-backlog: #8A8880;  --st-todo: #6F6D66;  --st-progress: #FFC833;
+  --st-review: #2563EB;  --st-done: #2F9E54;  --st-canceled: #9A968D;
+}
+
+/* тёмная тема — будущий свап (значения предварительные, §3.6) */
+[data-theme="dark"] {
+  --bg: #1C1B18;  --surface: #232220;  --surface-2: #2C2B27;
+  --line: #34322C;
+  --text: #F7F6F3;  --text-secondary: #C9C6BD;  --text-muted: #9A968D;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html { font-size: 100%; }            /* 1rem = 16px; масштаб через rem (HIG) */
+  body {
+    margin: 0;
+    background: var(--surface-2);       /* нейтральный фон-окружение на десктопе */
+    color: var(--text);
+    font-size: 1.0625rem;               /* 17px — базовый body по HIG */
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
