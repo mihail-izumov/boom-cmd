@@ -1,38 +1,49 @@
 import { computed, ref } from 'vue'
 import { PARKS_BY_ID } from '../data/parks.js'
 
-// Глобальный парк-контекст (TZ-3 §3, PRODUCT-PRINCIPLES §7).
-// Модульный reactive-синглтон: top-level ref в модуле = один экземпляр
+// Глобальный парк-контекст (TZ-3.3 §1, чистое разделение Y).
+// Модульный reactive-синглгон: top-level ref в модуле = один экземпляр
 // на всё приложение. Любой компонент, который импортирует useParkContext,
 // читает и пишет в один и тот же стейт.
 //
-// Контекст — reactive ТОЛЬКО на сессию (без localStorage), это сознательное
-// решение из PRODUCT-PRINCIPLES.
+// Контекст — reactive ТОЛЬКО на сессию (без localStorage).
+//
+// Значение `current`:
+//   'network' — режим «Вся сеть» (дефолт): в Проектах показываются только
+//               общесетевые проекты (parks === 'network'). Общесетевые
+//               в виды парков НЕ попадают.
+//   <park id> — режим парка: показываются только проекты, привязанные
+//               к этому парку (Array.isArray(parks) && parks.includes(id)).
+// «Куча всё подряд» в системе больше нет — это решение TZ-3.3.
 
-// Значение: 'all' либо id парка из PARKS_BY_ID.
-const current = ref('all')
+const current = ref('network')
 
-export function setPark(idOrAll) {
-  if (idOrAll === 'all' || PARKS_BY_ID[idOrAll]) {
-    current.value = idOrAll
+export function setPark(idOrNetwork) {
+  // Принимаем 'network' (явно) либо id из справочника парков.
+  // Прежний алиас 'all' маппится на 'network' — на случай старых вызовов
+  // и сохранённых URL/состояний.
+  if (idOrNetwork === 'network' || idOrNetwork === 'all') {
+    current.value = 'network'
+  } else if (PARKS_BY_ID[idOrNetwork]) {
+    current.value = idOrNetwork
   } else {
-    // Неизвестное значение не ломает UI — откатываемся на 'all'.
-    current.value = 'all'
+    // Неизвестное значение не ломает UI — откатываемся на 'network'.
+    current.value = 'network'
   }
 }
 
 export function useParkContext() {
-  const isAll = computed(() => current.value === 'all')
+  const isNetwork = computed(() => current.value === 'network')
   const currentPark = computed(() =>
-    isAll.value ? null : PARKS_BY_ID[current.value] || null,
+    isNetwork.value ? null : PARKS_BY_ID[current.value] || null,
   )
   const currentName = computed(() =>
-    isAll.value ? 'Вся сеть' : currentPark.value?.name || 'Вся сеть',
+    isNetwork.value ? 'Вся сеть' : currentPark.value?.name || 'Вся сеть',
   )
   const currentShort = computed(() =>
-    isAll.value
+    isNetwork.value
       ? 'Вся сеть'
       : currentPark.value?.short || currentPark.value?.name || 'Вся сеть',
   )
-  return { current, isAll, currentPark, currentName, currentShort, setPark }
+  return { current, isNetwork, currentPark, currentName, currentShort, setPark }
 }

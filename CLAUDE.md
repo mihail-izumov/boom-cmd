@@ -32,13 +32,18 @@
 под-страницу `Парки` (некликабельные контейнеры, станут кнопками при
 появлении статы).
 
-Парк-контекст активен: store — `src/composables/useParkContext.js`,
-выбор делается **лёгкой монохромной пилюлей-фильтром** в шапке навигации
-на рабочих разделах (Аналитика/Проекты/Материалы — `parkFilter: true` у
-вкладки). Тап по пилюле открывает bottom-sheet chooser (`ParkPickerSheet.vue`).
+Парк-контекст активен: store — `src/composables/useParkContext.js`. Работает
+по **чистому разделению** (TZ-3.3): `current === 'network'` (дефолт) →
+показываем только общесетевые проекты (`parks === 'network'`); `current` =
+id парка → только проекты этого парка (`Array.isArray(parks) &&
+includes(id)`). Общесетевые в виды парков **не попадают**. Выбор делается
+**лёгкой монохромной пилюлей-фильтром** в шапке навигации на рабочих
+разделах (Аналитика/Проекты/Материалы — `parkFilter: true` у вкладки).
+Тап по пилюле открывает bottom-sheet chooser (`ParkPickerSheet.vue`).
 Имена парков — единый справочник `src/data/parks.js`. На Аналитике и
 Материалах (экраны-заглушки) фильтр сейчас работает «вхолостую» — данные
-подхватят позже.
+подхватят позже. **Парк-бейджей на карточках нет** (scope задаёт фильтр);
+в `ProjectDetail` парки — обычное текст-поле.
 
 ## Стек (зафиксирован — не менять без согласования)
 Vue 3 (`<script setup>`, JS, не TS) · Vite 8 · Tailwind 3.4 + PostCSS + autoprefixer
@@ -131,22 +136,34 @@ Liquid Glass не имитируем.
 - `src/components/parks/ParkCard.vue` — некликабельная справочная карточка
   парка (имя/город/пустой слот). Станет кнопкой, когда появится стата.
 - `src/components/projects/` — карточка/секция/детали проекта, PriorityIcon,
-  DirectionChip, ParkBadge, MilestoneMark.
+  DirectionChip, MilestoneMark. (ParkBadge удалён в TZ-3.3 — scope задаёт фильтр.)
 - `src/screens/{Home,Analytics,Projects,Materials,Parks}Screen.vue` — экраны.
 - `src/composables/useAppNav.js` — модульный reactive-синглгон навигации:
   `active` (вкладка) + `subView` (`null | 'parks'`) + `setActive`/`setSubView`/
   `clearSubView`. Без router-библиотеки.
 - `src/composables/useParkContext.js` — модульный reactive-синглгон парк-контекста
-  (`current`, `isAll`, `currentName`, `currentShort`, `setPark`). Reactive на сессию,
-  **без localStorage**.
+  (`current` ∈ {`'network'`, id парка}, `isNetwork`, `currentName`,
+  `currentShort`, `setPark`). Reactive на сессию, **без localStorage**.
 - `src/composables/useProjects.js` — **единственная** точка работы с источником.
   Фаза 4 заменит тело `load()` на fetch к gated Apps Script — сигнатура не меняется.
 - `src/data/parks.js` — **единый справочник парков** (id/name/short/city,
   PARKS_BY_ID, PARKS_BY_CITY, CITY_ORDER). Имена больше нигде не дублируются.
 - `src/data/projects.mock.json` — мок проектов (модель из `PRODUCT-PRINCIPLES §5`).
 - `src/i18n/projects.js` — словари EN→RU; `PARK_RU`/`PARK_SHORT` строятся из `parks.js`;
-  `pluralRu`, `t()`, `parkLabelForCard`/`parkLabelForDetail`.
+  `pluralRu`, `t()`, `parkLabelForDetail`. (`parkLabelForCard` и `PARKS_PLURAL`
+  удалены в TZ-3.3 — карточки без парк-бейджей.)
 - `src/styles/main.css` — токены `:root` + светлый холст + base.
+
+## PWA / Service Worker (TZ-3.3 §5)
+`public/sw.js` — рукописный. CACHE_NAME содержит build-id (плейсхолдер
+`__BUILD_ID__` заменяется на `Date.now()` хуком `closeBundle` в
+`vite.config.js`). Стратегии: навигации — network-first с обновлением
+кэшированного `index.html`; GET-ассеты с хешированным именем — cache-first.
+`skipWaiting` + `clients.claim` + чистка старых кэшей. `postMessage`
+клиентам после активации — канал на будущее (auto-reload не делаем).
+Регистрация SW — **только в `import.meta.env.PROD`**: на dev SW не нужен
+(не биться с HMR). Кнопка hard-reload на Главной — страховка для
+задеплоенной сборки. Подробнее — `docs/00_NAVIGATOR-boom-cmd.md §6`.
 
 ## Команды
 `npm install` · `npm run dev` · `npm run build` · `npm run preview`

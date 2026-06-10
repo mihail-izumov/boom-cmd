@@ -7,15 +7,15 @@ import { useParkContext } from '../../composables/useParkContext.js'
 // Bottom-sheet chooser выбора парка.
 // Controlled: открытием/закрытием управляет родитель через prop `open` и emit `close`.
 // fixed inset-0 + focus-trap + body-scroll-lock + Esc/фон/кнопка.
-// Группы «Москва» / «Санкт-Петербург»; «Все парки» сверху.
-// Выбор помечен Check (--text), не цветом (DESIGN-STANDARD §3.4).
+// Группы «Москва» / «Санкт-Петербург»; «Вся сеть» сверху (TZ-3.3 §3).
+// Выбор помечен Check (--text), не цветом.
 
 const props = defineProps({
   open: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close'])
 
-const { current, isAll, setPark } = useParkContext()
+const { current, isNetwork, setPark } = useParkContext()
 
 const dialogRef = ref(null)
 const firstItemRef = ref(null)
@@ -122,11 +122,11 @@ onBeforeUnmount(() => {
             type="button"
             class="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left active:bg-[var(--surface-2)]"
             style="min-height: 44px"
-            @click="choose('all')"
+            @click="choose('network')"
           >
-            <span class="text-[1rem] text-[var(--text)]">Все парки</span>
+            <span class="text-[1rem] text-[var(--text)]">Вся сеть</span>
             <Check
-              v-if="isAll"
+              v-if="isNetwork"
               class="ml-auto h-5 w-5 text-[var(--text)]"
               :stroke-width="2.25"
               aria-label="Выбрано"

@@ -2,14 +2,17 @@
 import { computed } from 'vue'
 import PriorityIcon from './PriorityIcon.vue'
 import DirectionChip from './DirectionChip.vue'
-import ParkBadge from './ParkBadge.vue'
 import { pluralRu, TASKS_PLURAL } from '../../i18n/projects.js'
 
-// Карточка проекта — спокойная, монохромная (TZ-2-Projects §5).
-// Верх: до 2 направлений (+N) | парк-бейдж только для парк-специфичных.
+// Карточка проекта — спокойная, монохромная.
+// TZ-3.3 §2: парк-бейджей на карточках больше нет — scope задаёт сам
+// активный фильтр (Вся сеть / парк), поэтому имя парка/«Вся сеть» дублировать
+// на каждой карточке незачем.
+//
+// Верх: до 2 направлений (+N).
 // Тело: заголовок проекта.
 // Низ:  иконка приоритета + счётчик задач серым.
-// БЕЗ estimate, БЕЗ срок-бейджа.
+// БЕЗ estimate, БЕЗ срок-бейджа, БЕЗ парк-бейджа.
 
 const props = defineProps({
   project: { type: Object, required: true },
@@ -35,12 +38,11 @@ const itemsLabel = computed(() =>
     @click="$emit('open', project)"
   >
     <div
-      v-if="visibleDirections.length || extraDirections > 0 || project.parks !== 'all'"
+      v-if="visibleDirections.length || extraDirections > 0"
       class="flex flex-wrap items-center gap-1"
     >
       <DirectionChip v-for="d in visibleDirections" :key="d" :label="d" />
       <span v-if="extraDirections > 0" class="text-[0.75rem] text-[var(--text-muted)]">+{{ extraDirections }}</span>
-      <ParkBadge v-if="project.parks !== 'all'" :parks="project.parks" class="ml-auto" />
     </div>
 
     <h3 class="text-[1rem] font-medium leading-snug text-[var(--text)]">

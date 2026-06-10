@@ -5,11 +5,11 @@ import {
   STATUS_RU,
   PRIORITY_RU,
   FIELD_RU,
+  parkLabelForDetail,
   t,
 } from '../../i18n/projects.js'
 import PriorityIcon from './PriorityIcon.vue'
 import DirectionChip from './DirectionChip.vue'
-import ParkBadge from './ParkBadge.vue'
 import MilestoneMark from './MilestoneMark.vue'
 
 // Read-only модалка деталей проекта.
@@ -74,6 +74,9 @@ const statusRu = computed(() => t(STATUS_RU, props.project?.status))
 const priorityRu = computed(() => t(PRIORITY_RU, props.project?.priority ?? 0))
 const directions = computed(() => props.project?.directions || [])
 const items = computed(() => props.project?.items || [])
+// TZ-3.3 §2: scope теперь текст-поле (не бейдж). «Вся сеть» или имена парков
+// через «·» — формируется единым хелпером.
+const parksLabel = computed(() => parkLabelForDetail(props.project?.parks))
 </script>
 
 <template>
@@ -123,9 +126,7 @@ const items = computed(() => props.project?.items || [])
           </template>
 
           <dt class="text-[var(--text-muted)]">{{ FIELD_RU.parks }}</dt>
-          <dd class="flex items-center gap-1 text-[var(--text)]">
-            <ParkBadge :parks="project?.parks" :verbose="true" />
-          </dd>
+          <dd class="text-[var(--text)]">{{ parksLabel }}</dd>
 
           <template v-if="project?.target">
             <dt class="text-[var(--text-muted)]">{{ FIELD_RU.target }}</dt>

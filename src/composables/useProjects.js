@@ -18,13 +18,18 @@ function normalizeItem(it) {
 }
 
 function normalizeParks(parks) {
-  if (parks === 'all') return 'all'
+  // Чистое разделение scope (TZ-3.3 §1):
+  //   'network' — общесетевой проект (виден только в фильтре «Вся сеть»);
+  //   [ids]     — парк-специфичный (виден только в виде каждого из этих парков).
+  // Старое значение 'all' оставлено как фолбэк-алиас на 'network' (на случай
+  // оставшихся данных в источниках/моках до миграции).
+  if (parks === 'network' || parks === 'all') return 'network'
   if (Array.isArray(parks)) {
     const list = parks.map((p) => String(p).trim()).filter(Boolean)
-    return list.length ? list : 'all'
+    return list.length ? list : 'network'
   }
-  // null/undefined/строка — трактуем как общесетевой
-  return 'all'
+  // null/undefined/строка/мусор — трактуем как общесетевой
+  return 'network'
 }
 
 function normalizeProject(p) {

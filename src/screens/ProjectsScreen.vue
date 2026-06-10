@@ -13,19 +13,21 @@ import ProjectSection from '../components/projects/ProjectSection.vue'
 import ProjectDetail from '../components/projects/ProjectDetail.vue'
 
 const { projects, loading, error, reload } = useProjects()
-const { current: parkCtx, isAll, currentName } = useParkContext()
+const { current: parkCtx, isNetwork, currentName } = useParkContext()
 
-// Фильтр по глобальному парк-контексту (TZ-3 §6):
-//   'all'       → показываем всё;
-//   id парка    → проекты с parks === 'all' (общесетевые) ИЛИ массив parks включает id.
+// Фильтр по глобальному парк-контексту — чистое разделение (TZ-3.3 §1):
+//   isNetwork === true → только общесетевые (parks === 'network');
+//   id парка           → только проекты, привязанные к этому парку
+//                        (Array.isArray(parks) && parks.includes(id)).
+// Никакого «всё подряд» / смешивания общесетевых с парк-специфичными.
 const visibleProjects = computed(() => {
-  if (isAll.value) return projects.value
+  if (isNetwork.value) {
+    return projects.value.filter((p) => p.parks === 'network')
+  }
   const id = parkCtx.value
-  return projects.value.filter((p) => {
-    if (p.parks === 'all') return true
-    if (Array.isArray(p.parks)) return p.parks.includes(id)
-    return false
-  })
+  return projects.value.filter(
+    (p) => Array.isArray(p.parks) && p.parks.includes(id),
+  )
 })
 
 // Группировка по статусу + сортировка внутри группы:
@@ -107,14 +109,18 @@ function close() {
       </p>
     </div>
 
-    <!-- empty: под выбранный парк нет проектов -->
+    <!-- empty: под выбранный scope нет проектов -->
     <div
       v-else-if="!visibleProjects.length"
       class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
     >
-      <p class="text-[1.0625rem] text-[var(--text)]">Под «{{ currentName }}» проектов нет</p>
+      <p class="text-[1.0625rem] text-[var(--text)]">
+        <template v-if="isNetwork">В разделе «Вся сеть» проектов нет</template>
+        <template v-else>В парке «{{ currentName }}» проектов нет</template>
+      </p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">
-        Выберите другой парк или «Вся сеть» в селекторе сверху.
+        <template v-if="isNetwork">Сейчас нет общесетевых проектов. Парк-специфичные смотрите по конкретному парку в фильтре сверху.</template>
+        <template v-else>Выберите другой парк или «Вся сеть» в фильтре сверху.</template>
       </p>
     </div>
 
