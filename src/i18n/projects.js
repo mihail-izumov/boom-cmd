@@ -32,11 +32,20 @@ export const FIELD_RU = {
   priority: 'Приоритет',
   directions: 'Направления',
   parks: 'Парки',
-  target: 'Ориентир',
+  target: 'Запуск',
   description: 'Описание',
   items: 'Задачи и вехи',
   tasks: 'Задачи',
   milestones: 'Вехи',
+}
+
+// Цветовой маркер статуса (точка в бедже деталей). Только токены --st-* из
+// main.css; текст беджа остаётся монохромным (DESIGN-STANDARD §3.5).
+export const STATUS_DOT = {
+  Backlog: 'var(--st-backlog)',
+  Planned: 'var(--st-todo)',
+  'In Progress': 'var(--st-progress)',
+  Done: 'var(--st-done)',
 }
 
 // Производные словари из единого справочника парков.

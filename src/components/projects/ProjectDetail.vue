@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { X } from 'lucide-vue-next'
 import {
   STATUS_RU,
+  STATUS_DOT,
   PRIORITY_RU,
   FIELD_RU,
   parkLabelForDetail,
@@ -71,6 +72,9 @@ onBeforeUnmount(() => {
 })
 
 const statusRu = computed(() => t(STATUS_RU, props.project?.status))
+const statusColor = computed(
+  () => STATUS_DOT[props.project?.status] || 'var(--text-muted)',
+)
 const priorityRu = computed(() => t(PRIORITY_RU, props.project?.priority ?? 0))
 const directions = computed(() => props.project?.directions || [])
 const items = computed(() => props.project?.items || [])
@@ -97,7 +101,16 @@ const parksLabel = computed(() => parkLabelForDetail(props.project?.parks))
       style="padding-bottom: env(safe-area-inset-bottom)"
     >
       <header class="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-        <span class="text-[0.875rem] text-[var(--text-muted)]">{{ statusRu }}</span>
+        <span
+          class="inline-flex items-center gap-2 rounded-full bg-[var(--surface-2)] px-3 py-1.5 text-[0.9375rem] font-medium text-[var(--text)]"
+        >
+          <span
+            class="h-2.5 w-2.5 shrink-0 rounded-full"
+            :style="{ backgroundColor: statusColor }"
+            aria-hidden="true"
+          />
+          {{ statusRu }}
+        </span>
         <button
           ref="closeBtnRef"
           type="button"
