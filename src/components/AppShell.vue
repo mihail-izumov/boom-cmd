@@ -2,14 +2,14 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import NavigationBar from './NavigationBar.vue'
 import TabBar from './TabBar.vue'
-import ParkFilterBadge from './navigation/ParkFilterBadge.vue'
 
 // Оболочка приложения.
 // Принимает таб-бар-конфиг (tabs[]), активную вкладку (active) и опциональную
-// под-страницу (subView + subViews). Под-страница имеет приоритет над вкладкой
-// (TZ-3.1 §3).
-// Шапка — центрированная, статичная (TZ-3.1 §4); большой H1-large-title убран.
-// Бедж парк-фильтра рендерится в belowTitle, если у текущего экрана parkFilter=true.
+// под-страницу (subView + subViews). Под-страница имеет приоритет над вкладкой.
+//
+// TZ-3.2: возврат механики Ф1 — `collapsed` + `@scroll` (порог 28px).
+// При смене активного экрана (вкладка или под-страница) скролл возвращается
+// к верху и large-title снова раскрывается.
 
 const props = defineProps({
   tabs: { type: Array, required: true },
@@ -31,13 +31,19 @@ const current = computed(() => {
 })
 
 const scrollEl = ref(null)
+const collapsed = ref(false)
+const COLLAPSE_AT = 28 // px прокрутки, после которых large title сворачивается
 
-// При смене активного экрана возвращаем скролл к верху — старое поведение.
+function onScroll(e) {
+  collapsed.value = e.target.scrollTop > COLLAPSE_AT
+}
+
 watch(
   () => [props.active, props.subView],
   async () => {
     await nextTick()
     if (scrollEl.value) scrollEl.value.scrollTop = 0
+    collapsed.value = false
   },
 )
 </script>
@@ -46,22 +52,20 @@ watch(
   <div
     class="mx-auto flex h-[100dvh] w-full max-w-[430px] flex-col overflow-hidden bg-[var(--bg)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:border-x md:border-[var(--line)]"
   >
-    <!-- Скролл-область: navigation bar + экран -->
+    <!-- Скролл-область: navigation bar (large title + пилюля в потоке) + экран -->
     <div
       ref="scrollEl"
       class="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain"
+      @scroll="onScroll"
     >
       <NavigationBar
         :title="current.title"
+        :collapsed="collapsed"
         :show-back="!!current.showBack"
         :back-label="current.backLabel || ''"
+        :park-filter="!!current.parkFilter"
         @back="emit('back')"
-      >
-        <template v-if="current.parkFilter" #belowTitle>
-          <ParkFilterBadge />
-        </template>
-      </NavigationBar>
-
+      />
       <component :is="current.screen" />
     </div>
 
