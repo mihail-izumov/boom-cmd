@@ -1,40 +1,18 @@
 import { ref } from 'vue'
+import { useAccessKey } from './useAccessKey.js'
 
 // Источник данных проектов — единственная точка, знающая, откуда они приходят.
 // Фаза 2 (мок): встроенный JSON.
 // Фаза 4 (сейчас): живой read-only источник — gated Apps Script
 //   (см. AUTH-AppsScript-boom-cmd.md). URL — из import.meta.env.VITE_PROJECTS_API,
-//   парольная фраза — из localStorage (в код/бандл/env не попадает).
-//   normalize() и публичный API (projects/loading/error/reload) не меняются;
-//   гейт добавлен аддитивно (needsKey/keyError/submitKey).
+//   парольная фраза — из localStorage через useAccessKey (в код/бандл/env не попадает).
+//   normalize() и публичный API (projects/loading/error/reload) не меняются.
+//   Гейт — на ВЕСЬ вход (useAccessKey + App.vue); здесь только берём фразу и
+//   при unauthorized в рантайме бросаем приложение на экран входа (logout()).
 //
 // Правило источника (R2 — фейк не должен уехать в прод под видом live):
 //   • dev + пустой URL  → фолбэк на мок (ленивый импорт, в прод-бандл не попадает);
 //   • prod + пустой URL → ГРОМКАЯ ошибка «источник не настроен», НИКОГДА не мок.
-
-const STORAGE_KEY = 'boom-cmd:access-key'
-
-function readKey() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) || ''
-  } catch {
-    return ''
-  }
-}
-function writeKey(v) {
-  try {
-    localStorage.setItem(STORAGE_KEY, v)
-  } catch {
-    /* приватный режим / нет доступа — игнорируем */
-  }
-}
-function clearKey() {
-  try {
-    localStorage.removeItem(STORAGE_KEY)
-  } catch {
-    /* noop */
-  }
-}
 
 function normalizeItem(it) {
   const type = it?.type === 'milestone' ? 'milestone' : 'task'
@@ -91,11 +69,8 @@ export function useProjects() {
   const projects = ref([])
   const loading = ref(false)
   const error = ref(null)
-  // Гейт (аддитивно к публичному API):
-  //   needsKey — нет/сброшена фраза, нужно показать форму ввода;
-  //   keyError — последняя попытка дала unauthorized (неверная фраза).
-  const needsKey = ref(false)
-  const keyError = ref(false)
+  // Фраза доступа и сброс на логин — у синглтона гейта (гейт на весь вход).
+  const { getKey, logout } = useAccessKey()
 
   const isDev =
     typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
@@ -147,12 +122,12 @@ export function useProjects() {
         throw new Error('Источник данных не настроен')
       }
 
-      // Живой источник: фраза доступа — из localStorage, к коду/бандлу не привязана.
-      const key = readKey()
+      // Живой источник: фраза доступа — из общего гейта (localStorage).
+      const key = getKey()
       if (!key) {
+        // На гейте-на-весь-вход сюда без фразы не попадаем; страховка — на логин.
+        logout()
         projects.value = []
-        keyError.value = false
-        needsKey.value = true
         return
       }
 
@@ -167,16 +142,13 @@ export function useProjects() {
       const data = await res.json()
 
       if (data && data.error === 'unauthorized') {
-        clearKey()
-        keyError.value = true
-        needsKey.value = true
+        // Фраза перестала подходить — выбрасываем на экран входа.
+        logout()
         projects.value = []
         return
       }
 
       projects.value = normalize(data?.projects)
-      needsKey.value = false
-      keyError.value = false
     } catch (e) {
       error.value = e?.message || 'Не удалось загрузить проекты'
       projects.value = []
@@ -185,17 +157,7 @@ export function useProjects() {
     }
   }
 
-  // Сохранить введённую фразу и перезагрузить. Фраза живёт только в localStorage.
-  function submitKey(phrase) {
-    const v = String(phrase ?? '').trim()
-    if (!v) return undefined
-    writeKey(v)
-    keyError.value = false
-    needsKey.value = false
-    return load()
-  }
-
   load()
 
-  return { projects, loading, error, reload: load, needsKey, keyError, submitKey }
+  return { projects, loading, error, reload: load }
 }

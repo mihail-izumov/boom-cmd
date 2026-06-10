@@ -7,7 +7,9 @@ import ProjectsScreen from './screens/ProjectsScreen.vue'
 import MaterialsScreen from './screens/MaterialsScreen.vue'
 import ParksScreen from './screens/ParksScreen.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
+import AccessKeyForm from './components/AccessKeyForm.vue'
 import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
+import { useAccessKey } from './composables/useAccessKey.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
 // активного парк-фильтра (TZ-3.1 §5). Сейчас только Проекты — на Аналитике
@@ -33,10 +35,33 @@ const subViews = {
 }
 
 const { active, subView } = useAppNav()
+
+// Гейт на весь вход: пока фраза не подтверждена — экран входа вместо оболочки.
+const { authed, ready, checking, keyError, netError, init, submitKey } = useAccessKey()
+init()
 </script>
 
 <template>
+  <!-- стартовая проверка фразы — чтобы не мигать формой входа -->
+  <div
+    v-if="!ready"
+    class="flex min-h-[100svh] items-center justify-center bg-[var(--bg)]"
+    aria-busy="true"
+  >
+    <p class="text-[0.9375rem] text-[var(--text-muted)]">Загрузка…</p>
+  </div>
+
+  <!-- гейт на весь вход: без подтверждённой фразы оболочка не показывается -->
+  <AccessKeyForm
+    v-else-if="!authed"
+    :error="keyError"
+    :loading="checking"
+    :net-error="netError"
+    @submit="submitKey"
+  />
+
   <AppShell
+    v-else
     :tabs="tabs"
     :active="active"
     :sub-view="subView"
