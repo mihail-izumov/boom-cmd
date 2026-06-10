@@ -97,7 +97,7 @@ const parksLabel = computed(() => parkLabelForDetail(props.project?.parks))
       role="dialog"
       aria-modal="true"
       :aria-label="project?.title || 'Проект'"
-      class="flex max-h-[88svh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-2xl bg-[var(--surface)] shadow-2xl sm:rounded-2xl"
+      class="bc-fade-in flex max-h-[88svh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-2xl bg-[var(--surface)] shadow-2xl sm:rounded-2xl"
       style="padding-bottom: env(safe-area-inset-bottom)"
     >
       <header class="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">

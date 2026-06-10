@@ -80,12 +80,12 @@ function close() {
       aria-label="Загрузка"
     >
       <div v-for="i in 3" :key="i" class="flex flex-col gap-2">
-        <div class="h-4 w-40 rounded bg-[var(--surface-2)]" />
+        <div class="bc-skeleton h-4 w-40 rounded" />
         <div class="flex flex-col gap-2">
           <div
             v-for="j in 2"
             :key="j"
-            class="h-20 rounded-2xl border border-[var(--line)] bg-[var(--surface)]"
+            class="bc-skeleton h-20 rounded-2xl border border-[var(--line)]"
           />
         </div>
       </div>
@@ -124,12 +124,13 @@ function close() {
 
     <!-- data: рендерим только непустые статус-группы (TZ-3.4 §1) -->
     <template v-else>
-      <p class="px-1 text-[0.8125rem] text-[var(--text-muted)]">
+      <p class="bc-fade-in px-1 text-[0.8125rem] text-[var(--text-muted)]">
         Всего {{ total }} {{ pluralRu(total, PROJECTS_PLURAL) }}
       </p>
       <ProjectSection
         v-for="s in visibleStatuses"
         :key="s"
+        class="bc-fade-in"
         :status="s"
         :projects="grouped[s]"
         :open="openMap[s]"

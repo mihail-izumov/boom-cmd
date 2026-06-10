@@ -67,7 +67,12 @@ watch(
         :leading-action="current.leadingAction || null"
         @back="emit('back')"
       />
-      <component :is="current.screen" />
+      <!-- keep-alive: экраны не размонтируются при переключении вкладок —
+           содержимое и загруженные данные сохраняются, без повторной загрузки.
+           При ре-логине AppShell пересоздаётся → кэш сбрасывается → свежая загрузка. -->
+      <keep-alive>
+        <component :is="current.screen" />
+      </keep-alive>
     </div>
 
     <!-- Tab bar: фиксирован под скроллом, не уезжает со страницей -->
