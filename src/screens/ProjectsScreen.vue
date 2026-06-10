@@ -44,7 +44,16 @@ const grouped = computed(() => {
   return map
 })
 
+// Видимые группы (TZ-3.4): рендерим только статусы с ≥1 проектом.
+// Порядок STATUS_ORDER сохраняется.
+const visibleStatuses = computed(() =>
+  STATUS_ORDER.filter((s) => grouped.value[s].length > 0),
+)
+
 // Состояние сворачивания — reactive на сессию, без localStorage.
+// При смене scope не сбрасываем: user-state по статусу сохраняется,
+// «оживший» статус в новом scope откроется в том виде, в котором юзер
+// оставил его в прошлый раз (TZ-3.4 §2 — watcher не добавляем).
 const openMap = reactive({ ...STATUS_DEFAULT_OPEN })
 function toggle(status) {
   openMap[status] = !openMap[status]
@@ -98,18 +107,7 @@ function close() {
       >Повторить</button>
     </div>
 
-    <!-- empty: совсем нет проектов -->
-    <div
-      v-else-if="!projects.length"
-      class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
-    >
-      <p class="text-[1.0625rem] text-[var(--text)]">Пока пусто</p>
-      <p class="text-[0.9375rem] text-[var(--text-muted)]">
-        Проекты появятся здесь, когда команда их добавит.
-      </p>
-    </div>
-
-    <!-- empty: под выбранный scope нет проектов -->
+    <!-- empty: под выбранный scope нет проектов (TZ-3.4 §1 — единый empty-state) -->
     <div
       v-else-if="!visibleProjects.length"
       class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
@@ -124,13 +122,13 @@ function close() {
       </p>
     </div>
 
-    <!-- data -->
+    <!-- data: рендерим только непустые статус-группы (TZ-3.4 §1) -->
     <template v-else>
       <p class="px-1 text-[0.8125rem] text-[var(--text-muted)]">
         Всего {{ total }} {{ pluralRu(total, PROJECTS_PLURAL) }}
       </p>
       <ProjectSection
-        v-for="s in STATUS_ORDER"
+        v-for="s in visibleStatuses"
         :key="s"
         :status="s"
         :projects="grouped[s]"

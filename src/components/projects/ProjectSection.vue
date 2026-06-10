@@ -9,9 +9,13 @@ import {
 } from '../../i18n/projects.js'
 import ProjectCard from './ProjectCard.vue'
 
-// Сворачиваемая группа-статус (TZ-2-Projects §4).
-// Цветной точки статуса нет (DESIGN-STANDARD §3.4): статус несёт заголовок+позиция.
-// Шапка — кнопка ≥44pt, тап → свернуть/развернуть.
+// Сворачиваемая группа-статус. Цветной точки статуса нет: статус несёт
+// заголовок + позиция группы (DESIGN-STANDARD §3.4). Шапка — кнопка ≥44pt.
+//
+// TZ-3.4: пустые группы вообще не рендерим. ProjectsScreen передаёт сюда
+// только непустые projects (visibleStatuses), но root-level v-if держим
+// как страховку от регрессии — если кто-то в будущем забудет отфильтровать,
+// пустая секция всё равно не появится.
 
 const props = defineProps({
   status: { type: String, required: true },
@@ -29,7 +33,7 @@ const countLabel = computed(() => {
 </script>
 
 <template>
-  <section class="flex flex-col gap-2">
+  <section v-if="projects.length" class="flex flex-col gap-2">
     <button
       type="button"
       class="flex items-center gap-2 rounded-xl px-1 py-1 text-left active:bg-[var(--surface-2)]"
@@ -49,18 +53,12 @@ const countLabel = computed(() => {
     </button>
 
     <div v-show="open" :id="`section-${status}`" class="flex flex-col gap-2">
-      <template v-if="projects.length">
-        <ProjectCard
-          v-for="project in projects"
-          :key="project.id"
-          :project="project"
-          @open="$emit('open-project', $event)"
-        />
-      </template>
-      <p
-        v-else
-        class="rounded-2xl border border-dashed border-[var(--line)] px-3 py-2 text-[0.875rem] text-[var(--text-muted)]"
-      >Пока пусто</p>
+      <ProjectCard
+        v-for="project in projects"
+        :key="project.id"
+        :project="project"
+        @open="$emit('open-project', $event)"
+      />
     </div>
   </section>
 </template>
