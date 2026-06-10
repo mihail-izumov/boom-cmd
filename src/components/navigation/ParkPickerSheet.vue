@@ -1,34 +1,27 @@
 <script setup>
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Check, ChevronDown, MapPin, X } from 'lucide-vue-next'
+import { Check, X } from 'lucide-vue-next'
 import { CITY_ORDER, PARKS_BY_CITY } from '../../data/parks.js'
 import { useParkContext } from '../../composables/useParkContext.js'
 
-// Селектор глобального парк-контекста.
-// Компактный режим (compact=true): только иконка MapPin + точка-индикатор
-// при выбранном конкретном парке. Полное имя — только когда compact=false
-// (TZ-3 §4, развилка 7).
-//
-// Chooser — bottom-sheet (то же поведение, что у ProjectDetail):
+// Bottom-sheet chooser выбора парка.
+// Controlled: открытием/закрытием управляет родитель через prop `open` и emit `close`.
 // fixed inset-0 + focus-trap + body-scroll-lock + Esc/фон/кнопка.
-// Группы — Москва / Санкт-Петербург; «Вся сеть» сверху. Выбор помечен
-// галочкой (Check) — не цветом (TZ-3 §4, DESIGN-STANDARD §3.4).
+// Группы «Москва» / «Санкт-Петербург»; «Все парки» сверху.
+// Выбор помечен Check (--text), не цветом (DESIGN-STANDARD §3.4).
 
-defineProps({
-  compact: { type: Boolean, default: false },
+const props = defineProps({
+  open: { type: Boolean, default: false },
 })
+const emit = defineEmits(['close'])
 
-const { current, isAll, currentShort, setPark } = useParkContext()
+const { current, isAll, setPark } = useParkContext()
 
-const open = ref(false)
 const dialogRef = ref(null)
 const firstItemRef = ref(null)
 
-function show() {
-  open.value = true
-}
 function hide() {
-  open.value = false
+  emit('close')
 }
 function choose(id) {
   setPark(id)
@@ -45,7 +38,7 @@ function focusables() {
 }
 
 function onKey(e) {
-  if (!open.value) return
+  if (!props.open) return
   if (e.key === 'Escape') {
     e.preventDefault()
     hide()
@@ -71,21 +64,24 @@ function onKey(e) {
 }
 
 let prevOverflow = ''
-watch(open, async (v) => {
-  if (v) {
-    prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', onKey)
-    await nextTick()
-    firstItemRef.value?.focus?.()
-  } else {
-    document.body.style.overflow = prevOverflow
-    document.removeEventListener('keydown', onKey)
-  }
-})
+watch(
+  () => props.open,
+  async (v) => {
+    if (v) {
+      prevOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      document.addEventListener('keydown', onKey)
+      await nextTick()
+      firstItemRef.value?.focus?.()
+    } else {
+      document.body.style.overflow = prevOverflow
+      document.removeEventListener('keydown', onKey)
+    }
+  },
+)
 
 onBeforeUnmount(() => {
-  if (open.value) {
+  if (props.open) {
     document.body.style.overflow = prevOverflow
     document.removeEventListener('keydown', onKey)
   }
@@ -93,31 +89,6 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <button
-    type="button"
-    class="flex min-h-[44px] items-center gap-1 rounded-lg px-1.5 text-[var(--text)] active:bg-[var(--surface-2)]"
-    style="min-width: 44px"
-    :aria-label="`Парк: ${isAll ? 'Вся сеть' : currentShort}`"
-    aria-haspopup="dialog"
-    :aria-expanded="open"
-    @click="show"
-  >
-    <span class="relative inline-flex h-5 w-5 items-center justify-center">
-      <MapPin class="h-5 w-5 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
-      <span
-        v-if="!isAll"
-        class="absolute -right-0.5 -top-0.5 inline-block h-2 w-2 rounded-full bg-[var(--text)]"
-        aria-hidden="true"
-      />
-    </span>
-    <template v-if="!compact">
-      <span class="whitespace-nowrap text-[0.9375rem] font-medium leading-none">
-        {{ isAll ? 'Вся сеть' : currentShort }}
-      </span>
-      <ChevronDown class="h-4 w-4 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
-    </template>
-  </button>
-
   <Teleport to="body">
     <div
       v-if="open"
@@ -153,7 +124,7 @@ onBeforeUnmount(() => {
             style="min-height: 44px"
             @click="choose('all')"
           >
-            <span class="text-[1rem] text-[var(--text)]">Вся сеть</span>
+            <span class="text-[1rem] text-[var(--text)]">Все парки</span>
             <Check
               v-if="isAll"
               class="ml-auto h-5 w-5 text-[var(--text)]"
