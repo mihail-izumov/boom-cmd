@@ -1,7 +1,11 @@
 // i18n для раздела «Проекты».
 // Принцип: данные на английском (status — EN-enum), UI по-русски.
-// Направления (`directions`) — свободный пользовательский вокабуляр на русском прямо в данных,
-// словаря для них нет (см. PRODUCT-PRINCIPLES §5, TZ-2-Projects §2/§9).
+// Направления (`directions`) — свободный пользовательский вокабуляр на русском
+// прямо в данных, словаря для них нет (см. PRODUCT-PRINCIPLES §5, TZ-2-Projects §2/§9).
+// Имена парков — единый источник в `src/data/parks.js`; PARK_RU / PARK_SHORT
+// строятся отсюда, чтобы не было двух правд (TZ-3 §2).
+
+import { PARKS } from '../data/parks.js'
 
 export const STATUS_RU = {
   Backlog: 'Бэклог',
@@ -29,15 +33,11 @@ export const FIELD_RU = {
   items: 'Задачи и вехи',
 }
 
-// Справочник парков сети (PRODUCT-PRINCIPLES §2).
-export const PARK_RU = {
-  mari: 'MARI',
-  ohta: 'Охта',
-  piterland: 'Питерленд',
-  iyun: 'Июнь',
-}
+// Производные словари из единого справочника.
+export const PARK_RU = Object.fromEntries(PARKS.map((p) => [p.id, p.name]))
+export const PARK_SHORT = Object.fromEntries(PARKS.map((p) => [p.id, p.short || p.name]))
 
-// Порядок групп: актуальное сверху (TZ-2-Projects §4).
+// Порядок групп проектов: актуальное сверху (TZ-2-Projects §4).
 export const STATUS_ORDER = ['In Progress', 'Planned', 'Backlog', 'Done']
 
 // Дефолт-сворачивание по статусу: true = развёрнуто.
@@ -48,7 +48,7 @@ export const STATUS_DEFAULT_OPEN = {
   Done: false,
 }
 
-// Сортировка проектов внутри группы (по решению владельца):
+// Сортировка проектов внутри группы (решение владельца):
 // Urgent(1) → High(2) → Medium(3) → Low(4) → None(0) в конце; при равенстве — порядок мока.
 const PRIORITY_RANK = { 1: 0, 2: 1, 3: 2, 4: 3, 0: 4 }
 export function priorityRank(p) {
@@ -72,21 +72,20 @@ export const TASKS_PLURAL = ['задача', 'задачи', 'задач']
 export const PROJECTS_PLURAL = ['проект', 'проекта', 'проектов']
 export const PARKS_PLURAL = ['парк', 'парка', 'парков']
 
-// Подпись парк-бейджа по правилу владельца:
-//   "all"      → 'Вся сеть'
-//   [a]        → имя парка
-//   [a, b]     → 'MARI · Охта'
-//   [a, b, c+] → '3 парка(а/ов)'
-// Возвращает null, если бейдж не нужен показывать на карточке (parks === 'all').
+// Подпись парк-бейджа на карточке проекта:
+//   "all"      → null (бейдж не показываем, чтобы не шуметь общесетевыми)
+//   [a]        → short(a)
+//   [a, b]     → 'short(a) · short(b)'
+//   [a, b, c+] → 'N парк(а/ов)'
 export function parkLabelForCard(parks) {
   if (!parks || parks === 'all') return null
   if (!Array.isArray(parks) || parks.length === 0) return null
-  if (parks.length === 1) return t(PARK_RU, parks[0])
-  if (parks.length === 2) return `${t(PARK_RU, parks[0])} · ${t(PARK_RU, parks[1])}`
+  if (parks.length === 1) return t(PARK_SHORT, parks[0])
+  if (parks.length === 2) return `${t(PARK_SHORT, parks[0])} · ${t(PARK_SHORT, parks[1])}`
   return `${parks.length} ${pluralRu(parks.length, PARKS_PLURAL)}`
 }
 
-// Полная подпись парков для модалки (включая «Вся сеть»).
+// Полная подпись парков для модалки/детали (полные имена; «Вся сеть» — явно).
 export function parkLabelForDetail(parks) {
   if (!parks || parks === 'all') return 'Вся сеть'
   if (!Array.isArray(parks) || parks.length === 0) return 'Вся сеть'

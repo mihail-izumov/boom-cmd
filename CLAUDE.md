@@ -22,9 +22,11 @@
 
 **Информационная архитектура — 4 вкладки** + **глобальный парк-контекст**
 (`Вся сеть / MARI / Охта Молл / Питерленд / Июнь`):
-**Home** (обзор сети) · **Аналитика** (Pulse) · **Проекты** (Initiatives) ·
-**Материалы** (Library). Глобальный парк-контекст и Home — Фаза 3 (сейчас в
-оболочке 3 вкладки, четвёртая добавится тогда же).
+**Главная** (обзор сети — стартовая) · **Аналитика** (Pulse) · **Проекты**
+(Initiatives) · **Материалы** (Library). Глобальный парк-контекст активен:
+селектор в правом слоте navigation bar, store — `src/composables/useParkContext.js`,
+имена парков — единый справочник `src/data/parks.js`. На Home сейчас — слоты
+парк-карточек без статистики (источник — Ф5+). Аналитика/Материалы — заглушки.
 
 ## Стек (зафиксирован — не менять без согласования)
 Vue 3 (`<script setup>`, JS, не TS) · Vite 8 · Tailwind 3.4 + PostCSS + autoprefixer
@@ -80,23 +82,34 @@ Liquid Glass не имитируем.
 
 ## Фазы (канон — `docs/PRODUCT-PRINCIPLES-boom-cmd.md §8`)
 0. ✅ Каркас + деплой Pages.
-1. ✅ Оболочка + iOS-навигация (светлая, токены). IA вырастет до 4 вкладок в Ф3.
-2. ⏳ **Проекты:** статус-группы без %, спокойные монохромные карточки, парк-бейдж
-   только для парк-специфичных, детали по тапу — на моке. ← текущая.
-3. Глобальный парк-контекст + **Home** (карточки парков, каркас, без статы) + 4-я вкладка.
-4. Авторизация + источник (gated Apps Script): данные проектов и парков.
-5+. Аналитика, статистика парков, глубина Материалов, AI-слой.
+1. ✅ Оболочка + iOS-навигация (светлая, токены).
+2. ✅ **Проекты:** статус-группы без %, спокойные монохромные карточки, парк-бейдж
+   только для парк-специфичных, детали по тапу — на моке.
+3. ✅ **Главная + глобальный парк-контекст + 4-я вкладка** (стартовая = Главная);
+   фильтр Проектов по парку. Слот статистики парков — пустой стейт.
+4. ⏳ Авторизация + источник (gated Apps Script): данные проектов и парков. ← следующая.
+5+. Статистика парков (источник 1С/ручной лист — открыто), глубина Аналитики и
+    Материалов, AI-слой.
 
-## Структура кода (актуально для Фазы 2)
-- `src/App.vue` — список вкладок, активная вкладка.
-- `src/components/AppShell.vue` · `NavigationBar.vue` · `TabBar.vue` — оболочка iOS.
-- `src/screens/{Analytics,Projects,Materials}Screen.vue` — экраны.
+## Структура кода (актуально для Фазы 3)
+- `src/App.vue` — 4 вкладки (Главная/Аналитика/Проекты/Материалы), стартовая `home`.
+- `src/components/AppShell.vue` · `NavigationBar.vue` (slot `trailing`) · `TabBar.vue` — оболочка iOS.
+- `src/components/navigation/ParkSelector.vue` — селектор парк-контекста в навбаре
+  (bottom-sheet chooser; компактный режим = иконка + точка-индикатор).
+- `src/components/home/ParkCard.vue` — карточка парка на Главной (слот статы пустой).
 - `src/components/projects/` — карточка/секция/детали проекта, PriorityIcon,
   DirectionChip, ParkBadge, MilestoneMark.
+- `src/screens/{Home,Analytics,Projects,Materials}Screen.vue` — экраны.
+- `src/composables/useParkContext.js` — модульный reactive-синглтон парк-контекста
+  (`current`, `isAll`, `currentName`, `currentShort`, `setPark`). Reactive на сессию,
+  **без localStorage**.
 - `src/composables/useProjects.js` — **единственная** точка работы с источником.
   Фаза 4 заменит тело `load()` на fetch к gated Apps Script — сигнатура не меняется.
+- `src/data/parks.js` — **единый справочник парков** (id/name/short/city,
+  PARKS_BY_ID, PARKS_BY_CITY, CITY_ORDER). Имена больше нигде не дублируются.
 - `src/data/projects.mock.json` — мок проектов (модель из `PRODUCT-PRINCIPLES §5`).
-- `src/i18n/projects.js` — словари EN→RU, справочник парков, `pluralRu`, `t()`.
+- `src/i18n/projects.js` — словари EN→RU; `PARK_RU`/`PARK_SHORT` строятся из `parks.js`;
+  `pluralRu`, `t()`, `parkLabelForCard`/`parkLabelForDetail`.
 - `src/styles/main.css` — токены `:root` + светлый холст + base.
 
 ## Команды

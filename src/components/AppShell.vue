@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import NavigationBar from './NavigationBar.vue'
 import TabBar from './TabBar.vue'
+import ParkSelector from './navigation/ParkSelector.vue'
 
 const props = defineProps({
   tabs: { type: Array, required: true },
@@ -42,7 +43,11 @@ watch(
       class="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain"
       @scroll="onScroll"
     >
-      <NavigationBar :title="current.title" :collapsed="collapsed" />
+      <NavigationBar :title="current.title" :collapsed="collapsed">
+        <template #trailing="{ collapsed: isCollapsed }">
+          <ParkSelector :compact="isCollapsed" />
+        </template>
+      </NavigationBar>
       <component :is="current.screen" />
     </div>
 

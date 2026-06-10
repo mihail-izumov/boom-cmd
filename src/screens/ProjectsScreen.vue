@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useProjects } from '../composables/useProjects.js'
+import { useParkContext } from '../composables/useParkContext.js'
 import {
   STATUS_ORDER,
   STATUS_DEFAULT_OPEN,
@@ -12,14 +13,27 @@ import ProjectSection from '../components/projects/ProjectSection.vue'
 import ProjectDetail from '../components/projects/ProjectDetail.vue'
 
 const { projects, loading, error, reload } = useProjects()
+const { current: parkCtx, isAll, currentName } = useParkContext()
 
-// Группировка по статусу.
-// Сортировка внутри группы (по решению владельца):
+// Фильтр по глобальному парк-контексту (TZ-3 §6):
+//   'all'       → показываем всё;
+//   id парка    → проекты с parks === 'all' (общесетевые) ИЛИ массив parks включает id.
+const visibleProjects = computed(() => {
+  if (isAll.value) return projects.value
+  const id = parkCtx.value
+  return projects.value.filter((p) => {
+    if (p.parks === 'all') return true
+    if (Array.isArray(p.parks)) return p.parks.includes(id)
+    return false
+  })
+})
+
+// Группировка по статусу + сортировка внутри группы:
 //   Urgent(1) → High(2) → Medium(3) → Low(4) → None(0) в конце;
 //   при равенстве — стабильный порядок мока (Array.prototype.sort стабилен в V8).
 const grouped = computed(() => {
   const map = Object.fromEntries(STATUS_ORDER.map((s) => [s, []]))
-  for (const p of projects.value) {
+  for (const p of visibleProjects.value) {
     if (p.status in map) map[p.status].push(p)
   }
   for (const s of STATUS_ORDER) {
@@ -28,14 +42,13 @@ const grouped = computed(() => {
   return map
 })
 
-// Состояние сворачивания — reactive на сессию, без localStorage
-// (PRODUCT-PRINCIPLES + явное решение владельца).
+// Состояние сворачивания — reactive на сессию, без localStorage.
 const openMap = reactive({ ...STATUS_DEFAULT_OPEN })
 function toggle(status) {
   openMap[status] = !openMap[status]
 }
 
-const total = computed(() => projects.value.length)
+const total = computed(() => visibleProjects.value.length)
 
 const openProject = ref(null)
 function open(project) {
@@ -83,7 +96,7 @@ function close() {
       >Повторить</button>
     </div>
 
-    <!-- empty -->
+    <!-- empty: совсем нет проектов -->
     <div
       v-else-if="!projects.length"
       class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
@@ -91,6 +104,17 @@ function close() {
       <p class="text-[1.0625rem] text-[var(--text)]">Пока пусто</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">
         Проекты появятся здесь, когда команда их добавит.
+      </p>
+    </div>
+
+    <!-- empty: под выбранный парк нет проектов -->
+    <div
+      v-else-if="!visibleProjects.length"
+      class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
+    >
+      <p class="text-[1.0625rem] text-[var(--text)]">Под «{{ currentName }}» проектов нет</p>
+      <p class="text-[0.9375rem] text-[var(--text-muted)]">
+        Выберите другой парк или «Вся сеть» в селекторе сверху.
       </p>
     </div>
 

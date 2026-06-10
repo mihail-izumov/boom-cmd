@@ -40,7 +40,10 @@ defineEmits(['back'])
         <span class="text-[1.0625rem] font-semibold text-[var(--text)]">{{ title }}</span>
       </div>
 
-      <div class="min-h-[44px] min-w-[44px]" aria-hidden="true"></div>
+      <!-- правый слот: trailing-actions (Ф3: парк-селектор) -->
+      <div class="ml-auto flex min-h-[44px] min-w-[44px] items-center justify-end pr-1">
+        <slot name="trailing" :collapsed="collapsed" />
+      </div>
     </div>
   </header>
 
