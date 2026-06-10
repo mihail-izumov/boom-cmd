@@ -1,11 +1,12 @@
 <script setup>
-import { ChartColumnBig, Folder, House, Layers } from 'lucide-vue-next'
+import { ChartColumnBig, Folder, Layers } from 'lucide-vue-next'
 import AppShell from './components/AppShell.vue'
 import HomeScreen from './screens/HomeScreen.vue'
 import AnalyticsScreen from './screens/AnalyticsScreen.vue'
 import ProjectsScreen from './screens/ProjectsScreen.vue'
 import MaterialsScreen from './screens/MaterialsScreen.vue'
 import ParksScreen from './screens/ParksScreen.vue'
+import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
@@ -14,7 +15,7 @@ import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
 // `parkFilter: true` у рабочих разделов (TZ-3.2 §2): Аналитика/Проекты/Материалы.
 // На Home и под-странице «Парки» фильтра нет.
 const tabs = [
-  { id: 'home',      label: 'Главная',   title: 'Главная',   icon: House,          screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
+  { id: 'home',      label: 'Главная',   title: 'Главная',   icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
   { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
   { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },
