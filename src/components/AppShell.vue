@@ -64,6 +64,7 @@ watch(
         :show-back="!!current.showBack"
         :back-label="current.backLabel || ''"
         :park-filter="!!current.parkFilter"
+        :leading-action="current.leadingAction || null"
         @back="emit('back')"
       />
       <component :is="current.screen" />

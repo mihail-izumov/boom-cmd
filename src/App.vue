@@ -14,7 +14,7 @@ import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
 // `parkFilter: true` у рабочих разделов (TZ-3.2 §2): Аналитика/Проекты/Материалы.
 // На Home и под-странице «Парки» фильтра нет.
 const tabs = [
-  { id: 'home',      label: 'Главная',   title: 'Главная',   icon: House,          screen: HomeScreen,      parkFilter: false },
+  { id: 'home',      label: 'Главная',   title: 'Главная',   icon: House,          screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
   { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
   { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },
