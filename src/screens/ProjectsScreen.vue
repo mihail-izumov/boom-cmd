@@ -11,8 +11,10 @@ import {
 } from '../i18n/projects.js'
 import ProjectSection from '../components/projects/ProjectSection.vue'
 import ProjectDetail from '../components/projects/ProjectDetail.vue'
+import AccessKeyForm from '../components/AccessKeyForm.vue'
 
-const { projects, loading, error, reload } = useProjects()
+const { projects, loading, error, reload, needsKey, keyError, submitKey } =
+  useProjects()
 const { current: parkCtx, isNetwork, currentName } = useParkContext()
 
 // Фильтр по глобальному парк-контексту — чистое разделение (TZ-3.3 §1):
@@ -91,6 +93,13 @@ function close() {
       </div>
       <p class="px-1 text-[0.875rem] text-[var(--text-muted)]">Загрузка…</p>
     </div>
+
+    <!-- нужен ключ: форма ввода фразы доступа (Фаза 4, гейт источника) -->
+    <AccessKeyForm
+      v-else-if="needsKey"
+      :error="keyError"
+      @submit="submitKey"
+    />
 
     <!-- error -->
     <div
