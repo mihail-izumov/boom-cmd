@@ -4,7 +4,7 @@
 
 export const ACCESS_RU = {
   brand: 'БУМБАСТИК',
-  section: 'Управление',
+  section: 'Мастерплан',
   placeholder: 'пароль',
   submit: 'Войти',
   checking: 'Проверяем…',

@@ -1,7 +1,7 @@
 {
-  "name": "Панель управления БумБастик",
-  "short_name": "БумБастик",
-  "description": "Внутренний BizOps-пульт БумБастик",
+  "name": "БУМБАСТИК – Мастерплан",
+  "short_name": "Мастерплан",
+  "description": "Внутренний BizOps-пульт сети БумБастик",
   "start_url": "/boom-cmd/",
   "display": "standalone",
   "background_color": "#F7F6F3",

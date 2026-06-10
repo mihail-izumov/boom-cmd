@@ -34,7 +34,7 @@ function onSubmit() {
           {{ ACCESS_RU.brand }}
         </h1>
         <span
-          class="rounded-full bg-[var(--surface-2)] px-3 py-1 text-[0.8125rem] font-medium text-[var(--text-secondary)]"
+          class="rounded-full bg-[var(--surface-2)] px-4 py-2 text-[1.1875rem] font-medium text-[var(--text-secondary)]"
         >{{ ACCESS_RU.section }}</span>
       </div>
 
