@@ -5,7 +5,8 @@ import { useAccessKey } from './useAccessKey.js'
 // Фаза 2 (мок): встроенный JSON.
 // Фаза 4 (сейчас): живой read-only источник — gated Apps Script
 //   (см. AUTH-AppsScript-boom-cmd.md). URL — из import.meta.env.VITE_PROJECTS_API,
-//   парольная фраза — из localStorage через useAccessKey (в код/бандл/env не попадает).
+//   парольная фраза — из useAccessKey (только в памяти вкладки; не на диске,
+//   не в коде/бандле/env).
 //   normalize() и публичный API (projects/loading/error/reload) не меняются.
 //   Гейт — на ВЕСЬ вход (useAccessKey + App.vue); здесь только берём фразу и
 //   при unauthorized в рантайме бросаем приложение на экран входа (logout()).
@@ -122,7 +123,7 @@ export function useProjects() {
         throw new Error('Источник данных не настроен')
       }
 
-      // Живой источник: фраза доступа — из общего гейта (localStorage).
+      // Живой источник: фраза доступа — из общего гейта (память вкладки).
       const key = getKey()
       if (!key) {
         // На гейте-на-весь-вход сюда без фразы не попадаем; страховка — на логин.
@@ -142,8 +143,8 @@ export function useProjects() {
       const data = await res.json()
 
       if (data && data.error === 'unauthorized') {
-        // Фраза перестала подходить — выбрасываем на экран входа.
-        logout()
+        // Фраза перестала подходить (напр. сменили ACCESS_KEY) — на экран входа.
+        logout('unauthorized')
         projects.value = []
         return
       }

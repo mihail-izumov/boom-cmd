@@ -74,6 +74,9 @@ const statusRu = computed(() => t(STATUS_RU, props.project?.status))
 const priorityRu = computed(() => t(PRIORITY_RU, props.project?.priority ?? 0))
 const directions = computed(() => props.project?.directions || [])
 const items = computed(() => props.project?.items || [])
+// Задачи и вехи — отдельными группами, не одной кучей.
+const tasks = computed(() => items.value.filter((i) => i.type !== 'milestone'))
+const milestones = computed(() => items.value.filter((i) => i.type === 'milestone'))
 // TZ-3.3 §2: scope теперь текст-поле (не бейдж). «Вся сеть» или имена парков
 // через «·» — формируется единым хелпером.
 const parksLabel = computed(() => parkLabelForDetail(props.project?.parks))
@@ -143,18 +146,39 @@ const parksLabel = computed(() => parkLabelForDetail(props.project?.parks))
           >{{ project.description }}</p>
         </section>
 
-        <section v-if="items.length" class="mt-5">
+        <section v-if="tasks.length" class="mt-5">
           <h3
             class="mb-2 text-[0.8125rem] font-medium uppercase tracking-wide text-[var(--text-muted)]"
-          >{{ FIELD_RU.items }}</h3>
+          >{{ FIELD_RU.tasks }}</h3>
           <ul class="flex flex-col gap-1.5">
             <li
-              v-for="it in items"
+              v-for="it in tasks"
               :key="it.id"
               class="flex items-start gap-2 rounded-xl bg-[var(--surface-2)] px-3 py-2"
             >
-              <MilestoneMark v-if="it.type === 'milestone'" class="mt-[5px]" />
-              <span v-else class="mt-[7px] inline-block h-[5px] w-[5px] shrink-0 rounded-full bg-[var(--text-muted)]" aria-hidden="true" />
+              <span class="mt-[7px] inline-block h-[5px] w-[5px] shrink-0 rounded-full bg-[var(--text-muted)]" aria-hidden="true" />
+              <div class="flex min-w-0 flex-col">
+                <span class="text-[0.9375rem] leading-snug text-[var(--text)]">{{ it.title }}</span>
+                <span
+                  v-if="it.description"
+                  class="text-[0.8125rem] leading-snug text-[var(--text-muted)]"
+                >{{ it.description }}</span>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <section v-if="milestones.length" class="mt-5">
+          <h3
+            class="mb-2 text-[0.8125rem] font-medium uppercase tracking-wide text-[var(--text-muted)]"
+          >{{ FIELD_RU.milestones }}</h3>
+          <ul class="flex flex-col gap-1.5">
+            <li
+              v-for="it in milestones"
+              :key="it.id"
+              class="flex items-start gap-2 rounded-xl bg-[var(--surface-2)] px-3 py-2"
+            >
+              <MilestoneMark class="mt-[5px]" />
               <div class="flex min-w-0 flex-col">
                 <span class="text-[0.9375rem] leading-snug text-[var(--text)]">{{ it.title }}</span>
                 <span

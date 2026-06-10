@@ -37,7 +37,8 @@ const subViews = {
 const { active, subView } = useAppNav()
 
 // Гейт на весь вход: пока фраза не подтверждена — экран входа вместо оболочки.
-const { authed, ready, checking, keyError, netError, init, submitKey } = useAccessKey()
+const { authed, ready, checking, keyError, netError, notice, init, submitKey } =
+  useAccessKey()
 init()
 </script>
 
@@ -57,6 +58,7 @@ init()
     :error="keyError"
     :loading="checking"
     :net-error="netError"
+    :notice="notice"
     @submit="submitKey"
   />
 

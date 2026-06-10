@@ -35,6 +35,8 @@ export const FIELD_RU = {
   target: 'Ориентир',
   description: 'Описание',
   items: 'Задачи и вехи',
+  tasks: 'Задачи',
+  milestones: 'Вехи',
 }
 
 // Производные словари из единого справочника парков.

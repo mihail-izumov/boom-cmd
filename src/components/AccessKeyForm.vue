@@ -13,6 +13,7 @@ const props = defineProps({
   error: { type: Boolean, default: false }, // неверная фраза
   loading: { type: Boolean, default: false }, // идёт проверка
   netError: { type: String, default: null }, // нет связи с источником
+  notice: { type: String, default: null }, // сессия истекла / доступ изменился
 })
 const emit = defineEmits(['submit'])
 
@@ -50,7 +51,7 @@ function onSubmit() {
         style="min-height: 44px"
       />
 
-      <!-- Фидбэк: цвет — только в иконке-заливке (функция), текст монохром -->
+      <!-- Ошибка (неверная фраза / нет связи): цвет только в иконке, текст монохром -->
       <p
         v-if="error || netError"
         class="flex items-center justify-center gap-1.5 text-[0.875rem] text-[var(--text-secondary)]"
@@ -63,6 +64,12 @@ function onSubmit() {
         />
         <span>{{ netError || ACCESS_RU.wrong }}</span>
       </p>
+
+      <!-- Информация (сессия истекла / доступ изменился) — нейтрально, без значка-ошибки -->
+      <p
+        v-else-if="notice"
+        class="text-center text-[0.875rem] text-[var(--text-muted)]"
+      >{{ notice }}</p>
 
       <button
         type="submit"
