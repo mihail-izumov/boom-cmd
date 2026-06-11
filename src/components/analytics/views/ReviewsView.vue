@@ -33,10 +33,6 @@ const cGrowth = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.va
 
 <template>
   <div class="flex flex-col gap-3">
-    <p class="px-1 text-[0.8125rem] text-[var(--text-muted)]">
-      Без слоёв — три метрики сразу
-    </p>
-
     <MetricCard
       title="Средняя оценка площадок"
       value="—"

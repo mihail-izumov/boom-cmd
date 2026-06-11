@@ -92,11 +92,6 @@ const nonTicketLoop = computed(() => {
       emphasis
     />
 
-    <!-- Layer 2 -->
-    <p class="px-1 pt-1 text-[0.75rem] uppercase tracking-wide text-[var(--text-muted)]">
-      Слой 2 · сводный отчёт
-    </p>
-
     <MetricCard
       title="Тикетный vs безтикетный контур"
       :completeness="cTicketLoop"

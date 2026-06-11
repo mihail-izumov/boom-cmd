@@ -70,11 +70,6 @@ const STRUCT_LABEL = { cashless: 'Безнал', cash: 'Нал', website: 'Са�
       </p>
     </MetricCard>
 
-    <!-- Layer 2 -->
-    <p class="px-1 pt-1 text-[0.75rem] uppercase tracking-wide text-[var(--text-muted)]">
-      Слой 2 · сводный отчёт
-    </p>
-
     <MetricCard
       title="Структура: безнал · нал · сайт"
       :completeness="cCashStruct"

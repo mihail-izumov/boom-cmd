@@ -9,7 +9,7 @@ import { DOMAIN_ORDER, DOMAIN_RU } from '../../i18n/analytics.js'
 // Тач-таргеты ≥44pt; при выборе подкручиваем вкладку в зону видимости.
 
 const TABS = ['home', ...DOMAIN_ORDER]
-const LABEL = { home: 'Главный экран', ...DOMAIN_RU }
+const LABEL = { home: 'Сводный', ...DOMAIN_RU }
 
 const props = defineProps({
   modelValue: { type: String, required: true },

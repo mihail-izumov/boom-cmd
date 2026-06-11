@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-vue-next'
 import ParkFilterPill from './navigation/ParkFilterPill.vue'
 import ParkPickerSheet from './navigation/ParkPickerSheet.vue'
 import SyncIcon from './icons/SyncIcon.vue'
+import { useNavCaption } from '../composables/useNavCaption.js'
 
 // Шапка навигации (TZ-3.2 + правка по запросу владельца):
 //   - sticky compact-bar сверху: back / leading-action слева, центрированный
@@ -29,6 +30,8 @@ defineProps({
   leadingAction: { type: String, default: null }, // null | 'hardReload'
 })
 defineEmits(['back'])
+
+const { caption } = useNavCaption()
 
 const pickerOpen = ref(false)
 function openPicker() {
@@ -115,6 +118,10 @@ async function hardReload() {
 
   <!-- Крупный центрированный заголовок — в потоке скролла -->
   <div class="px-4 pb-3 pt-2 text-center">
+    <p
+      v-if="caption"
+      class="mb-1 text-[0.75rem] leading-none text-[var(--text-muted)]"
+    >{{ caption }}</p>
     <h1 class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
       {{ title }}
     </h1>

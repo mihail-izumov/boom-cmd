@@ -152,9 +152,6 @@ const kpiReviews = computed(() => {
 
 <template>
   <div class="flex flex-col gap-3">
-    <p class="px-1 text-[0.8125rem] text-[var(--text-muted)]">
-      Ключевые показатели за период · клик по плитке ведёт на её вкладку
-    </p>
     <div class="grid grid-cols-2 gap-2">
       <KpiTile
         title="Игровая выручка"

@@ -76,17 +76,18 @@ export const UNIT = {
 }
 
 // Период — для сегмент-переключателя и сводок.
+// Подписи компактные: «Месяц» (дефолт; на UI подменяется именем текущего
+// месяца), «3 мес», «12 мес» — по запросу владельца.
 export const PERIODS = [
   { id: 'month', label: 'Месяц', months: 1 },
-  { id: 'q', label: '3 месяца', months: 3 },
-  { id: 'year', label: 'Год', months: 12 },
+  { id: 'q', label: '3 мес', months: 3 },
+  { id: 'year', label: '12 мес', months: 12 },
 ]
 
-// Подпись окна периода у заголовка / бейджа.
 export const PERIOD_LABEL = {
   month: 'Месяц',
-  q: '3 месяца',
-  year: 'Год',
+  q: '3 мес',
+  year: '12 мес',
 }
 
 // Производный словарь имён парков (через единый справочник).
@@ -119,6 +120,17 @@ export function monthLabel(ym) {
   const mi = Number(m)
   if (!Number.isFinite(mi) || mi < 1 || mi > 12) return ym
   return `${MONTH_RU_SHORT[mi - 1]} ${y}`
+}
+
+// 'YYYY-MM' → короткое имя месяца с большой буквы («Май») — для подписи
+// переключателя периода «Месяц», когда хотим конкретный месяц.
+export function monthShortCap(ym) {
+  if (typeof ym !== 'string') return ''
+  const [, m] = ym.split('-')
+  const mi = Number(m)
+  if (!Number.isFinite(mi) || mi < 1 || mi > 12) return ''
+  const w = MONTH_RU_SHORT[mi - 1]
+  return w.charAt(0).toUpperCase() + w.slice(1)
 }
 
 // 'YYYY-MM' → 'YYYY' (для бейджей y/y и подписей).

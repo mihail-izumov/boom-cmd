@@ -94,11 +94,6 @@ function fmtAvgVisits(v) {
       <MultiDateNotice :by-park="[...points.byPark, ...tickets.byPark]" />
     </MetricCard>
 
-    <!-- Layer 2 -->
-    <p class="px-1 pt-1 text-[0.75rem] uppercase tracking-wide text-[var(--text-muted)]">
-      Слой 2 · сводный отчёт
-    </p>
-
     <MetricCard
       title="Карт в системе (последний месяц)"
       :value="formatInt(cardsInSys.value)"

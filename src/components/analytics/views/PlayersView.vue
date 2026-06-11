@@ -95,11 +95,6 @@ const shareReturning = computed(() => {
       </p>
     </MetricCard>
 
-    <!-- Layer 2 -->
-    <p class="px-1 pt-1 text-[0.75rem] uppercase tracking-wide text-[var(--text-muted)]">
-      Слой 2 · сводный отчёт
-    </p>
-
     <MetricCard title="Всего / новые / повторные">
       <div class="flex flex-col gap-1.5">
         <div class="flex items-baseline justify-between gap-3">

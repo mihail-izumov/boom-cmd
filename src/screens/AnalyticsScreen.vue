@@ -1,9 +1,10 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useAnalytics } from '../composables/useAnalytics.js'
 import { useParkContext } from '../composables/useParkContext.js'
+import { useNavCaption } from '../composables/useNavCaption.js'
 import { computeContext } from '../composables/analyticsAggregate.js'
-import { PERIODS, PERIOD_LABEL, monthLabel } from '../i18n/analytics.js'
+import { PERIODS, monthLabel, monthShortCap } from '../i18n/analytics.js'
 
 import PeriodSegmented from '../components/analytics/PeriodSegmented.vue'
 import SectionTabs from '../components/analytics/SectionTabs.vue'
@@ -18,15 +19,19 @@ import ReviewsView from '../components/analytics/views/ReviewsView.vue'
 
 // Экран «Аналитика». 4 состояния (loading/error/empty/data) + локальная
 // навигация секции: переключатель периода + лента вкладок (home + 6 доменов).
-// Парк-фильтр — глобальный через ParkFilterPill в шапке (uses useParkContext).
+// Парк-фильтр — глобальный через ParkFilterPill в шапке (useParkContext).
 //
-// Local state (таб + период) НЕ персистится. keep-alive держит экран живым
-// между переключениями вкладок App-уровня (AppShell), так что выбор сохраняется.
+// «данные от …» уходит мелкой подписью НАД крупным заголовком «Аналитика»
+// через useNavCaption — экран сам ставит её при активации и чистит при
+// уходе. Период (диапазон месяцев) — отдельной строкой по центру под
+// переключателем; слово «3 мес» / «12 мес» / имя месяца дублирует кнопку
+// и потому в строке не пишется.
 
 const { data, loading, error, reload } = useAnalytics()
 const { current: parkCtx } = useParkContext()
+const { setCaption, clearCaption } = useNavCaption()
 
-const period = ref('q') // 'month' | 'q' | 'year' — стартуем с 3 месяцев (типовой обзор)
+const period = ref('q') // 'month' | 'q' | 'year' — стартуем с 3 месяцев
 const tab = ref('home')
 
 const periodMonths = computed(() => {
@@ -38,22 +43,39 @@ const ctx = computed(() =>
   computeContext(data.value, { park: parkCtx.value, periodMonths: periodMonths.value }),
 )
 
-// Бейдж периода / парка / даты обновления — над контентом.
-const headBadge = computed(() => {
-  const parts = [PERIOD_LABEL[period.value] || '—']
+// Подмена лейбла кнопки «Месяц» именем текущего месяца (например «Май»),
+// чтобы кнопка всегда отражала актуальный период.
+const periodLabels = computed(() => {
   const ax = ctx.value.axis
-  if (ax.length > 0) parts.push(`${monthLabel(ax[0])} – ${monthLabel(ax[ax.length - 1])}`)
-  return parts.join(' · ')
+  const lastYm = ax.length ? ax[ax.length - 1] : null
+  return { month: lastYm ? monthShortCap(lastYm) : 'Месяц' }
+})
+
+// Диапазон месяцев под переключателем («апр 2025 – июн 2025»).
+const rangeLabel = computed(() => {
+  const ax = ctx.value.axis
+  if (!ax.length) return ''
+  if (ax.length === 1) return monthLabel(ax[0])
+  return `${monthLabel(ax[0])} – ${monthLabel(ax[ax.length - 1])}`
 })
 
 const updatedLabel = computed(() => {
   const u = data.value?.updated
   if (!u || typeof u !== 'string') return null
-  // 'YYYY-MM-DD...' → берём дату.
   const m = u.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!m) return null
   return `данные от ${m[3]}.${m[2]}.${m[1]}`
 })
+
+// Caption над H1 в шапке — только пока экран активен (keep-alive).
+let isActive = false
+function syncCaption() {
+  if (isActive) setCaption(updatedLabel.value)
+}
+onMounted(() => { isActive = true; syncCaption() })
+onActivated(() => { isActive = true; syncCaption() })
+onDeactivated(() => { isActive = false; clearCaption() })
+watch(updatedLabel, () => syncCaption())
 
 // Контент по активной вкладке.
 const ActiveView = computed(() => {
@@ -72,10 +94,7 @@ function openDomain(id) {
   tab.value = id
 }
 
-// Есть ли какие-то строки вообще для выбранного scope?
-const hasAnyData = computed(() => {
-  return ctx.value.axis.length > 0
-})
+const hasAnyData = computed(() => ctx.value.axis.length > 0)
 </script>
 
 <template>
@@ -121,13 +140,13 @@ const hasAnyData = computed(() => {
 
     <!-- data -->
     <template v-else>
-      <PeriodSegmented v-model="period" class="bc-fade-in" />
-      <SectionTabs v-model="tab" class="bc-fade-in" />
+      <PeriodSegmented v-model="period" :labels="periodLabels" class="bc-fade-in" />
+      <p
+        v-if="rangeLabel"
+        class="bc-fade-in -mt-1 px-1 text-center text-[0.75rem] text-[var(--text-muted)]"
+      >{{ rangeLabel }}</p>
 
-      <div class="bc-fade-in flex items-center justify-between gap-3 px-1">
-        <p class="text-[0.75rem] text-[var(--text-muted)]">{{ headBadge }}</p>
-        <p v-if="updatedLabel" class="text-[0.75rem] text-[var(--text-muted)]">{{ updatedLabel }}</p>
-      </div>
+      <SectionTabs v-model="tab" class="bc-fade-in" />
 
       <component :is="ActiveView" class="bc-fade-in" :data="data" :ctx="ctx" @open-domain="openDomain" />
     </template>

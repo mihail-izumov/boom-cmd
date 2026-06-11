@@ -69,11 +69,6 @@ const series = computed(() => monthlySeries({ rows: rows.value, ctx: ctx.value, 
       emphasis
     />
 
-    <!-- Layer 2 -->
-    <p class="px-1 pt-1 text-[0.75rem] uppercase tracking-wide text-[var(--text-muted)]">
-      Слой 2 · сводный отчёт
-    </p>
-
     <MetricCard
       title="Призов выдано"
       :value="formatInt(given.value)"
