@@ -105,6 +105,15 @@ const STRUCT_LABEL = { cashless: 'Безнал', cash: 'Нал', website: 'Са�
       :completeness="cReceipts"
     />
 
+    <!-- Чертёж: «Покупка очков vs гостевые карты». В API контракте этого
+         разбиения нет (см. DATA-CONTRACT §2). Показываем явный плейсхолдер,
+         чтобы не врать (PRODUCT-PRINCIPLES §6). -->
+    <MetricCard
+      title="Покупка очков vs гостевые карты"
+      value="—"
+      sub="нет в текущем источнике; появится с раздельным учётом каналов оплаты"
+    />
+
     <MetricCard title="Помесячный тренд пополнений">
       <MonthlyTrend :series="series" variant="bar" :format="formatRubCompact" />
     </MetricCard>

@@ -114,6 +114,24 @@ function fmtAvgVisits(v) {
       :completeness="cAvgVisits"
     />
 
+    <!-- Чертёж: в L2 повторяются «Непогашенные очки-деньги ₽» и
+         «Невыкупленные тикеты шт» как отдельные карточки drill-down. -->
+    <MetricCard
+      title="Непогашенные очки-деньги (последний месяц)"
+      :value="formatRub(points.value)"
+      :completeness="cPoints"
+    >
+      <MultiDateNotice :by-park="points.byPark" />
+    </MetricCard>
+
+    <MetricCard
+      title="Невыкупленные тикеты (последний месяц)"
+      :value="tickets.value !== null ? `${formatInt(tickets.value)} шт` : '—'"
+      :completeness="cTickets"
+    >
+      <MultiDateNotice :by-park="tickets.byPark" />
+    </MetricCard>
+
     <MetricCard
       title="Макс. разовый платёж (VIP)"
       :value="formatRub(maxPay.value)"

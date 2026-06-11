@@ -25,8 +25,9 @@ const yandexLast = computed(() => lastInPeriod({ rows: rows.value, ctx: ctx.valu
 const twogisLast = computed(() => lastInPeriod({ rows: rows.value, ctx: ctx.value, field: 'twogis_total' }))
 const growth = computed(() => sumField({ rows: rows.value, ctx: ctx.value, field: 'yandex_growth' }))
 
+// Бейдж неполноты на объединённой карточке «Отзывы (всего)» опираем на
+// yandex_total — это основной источник для общей суммы (2ГИС часто пуст).
 const cYandex = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'yandex_total' }))
-const cTwogis = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'twogis_total' }))
 const cGrowth = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'yandex_growth' }))
 </script>
 
@@ -42,20 +43,22 @@ const cGrowth = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.va
       sub="нет в текущем источнике; появится с подключением источника отзывов"
     />
 
+    <!-- Чертёж: «Отзывы Яндекс Карты + 2ГИС (всего)» — одна метрика парой. -->
     <MetricCard
-      title="Отзывы Яндекс Карты (всего, последний месяц)"
-      :value="formatInt(yandexLast.value)"
+      title="Отзывы (всего, последний месяц)"
       :completeness="cYandex"
     >
-      <MultiDateNotice :by-park="yandexLast.byPark" />
-    </MetricCard>
-
-    <MetricCard
-      title="Отзывы 2ГИС (всего, последний месяц)"
-      :value="formatInt(twogisLast.value)"
-      :completeness="cTwogis"
-    >
-      <MultiDateNotice :by-park="twogisLast.byPark" />
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Яндекс Карты</span>
+          <span class="text-[1rem] font-semibold text-[var(--text)]">{{ formatInt(yandexLast.value) }}</span>
+        </div>
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">2ГИС</span>
+          <span class="text-[1rem] font-semibold text-[var(--text)]">{{ formatInt(twogisLast.value) }}</span>
+        </div>
+      </div>
+      <MultiDateNotice :by-park="[...yandexLast.byPark, ...twogisLast.byPark]" />
     </MetricCard>
 
     <MetricCard

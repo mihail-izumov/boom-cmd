@@ -55,6 +55,22 @@ const cBonus = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.val
 const cRev = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'game_revenue' }))
 
 const series = computed(() => monthlySeries({ rows: rows.value, ctx: ctx.value, field: 'game_revenue' }))
+
+// Выручка по контурам = Σgame_revenue × ticket_loop_weighted (тикетный)
+// и × (100 − ticket_loop_weighted) (безтикетный). Контракт даёт только
+// один процент тикетного контура — расщепляем суммарную выручку по нему.
+const ticketRevenue = computed(() => {
+  if (gameRev.value.value === null || ticketLoop.value.value === null) return null
+  return gameRev.value.value * (ticketLoop.value.value / 100)
+})
+const nonTicketRevenue = computed(() => {
+  if (gameRev.value.value === null || ticketLoop.value.value === null) return null
+  return gameRev.value.value * (1 - ticketLoop.value.value / 100)
+})
+const nonTicketLoop = computed(() => {
+  if (ticketLoop.value.value === null) return null
+  return 100 - ticketLoop.value.value
+})
 </script>
 
 <template>
@@ -82,10 +98,47 @@ const series = computed(() => monthlySeries({ rows: rows.value, ctx: ctx.value, 
     </p>
 
     <MetricCard
-      title="Тикетный контур"
-      :value="formatPct(ticketLoop.value)"
-      sub="взвешено по игровой выручке"
+      title="Тикетный vs безтикетный контур"
       :completeness="cTicketLoop"
+      sub="взвешено по игровой выручке"
+    >
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Тикетный</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatPct(ticketLoop.value) }}</span>
+        </div>
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Безтикетный</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatPct(nonTicketLoop) }}</span>
+        </div>
+      </div>
+    </MetricCard>
+
+    <MetricCard title="Выручка по контурам">
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Тикетный</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">
+            {{ formatRubCompact(ticketRevenue) }}
+            <span class="ml-1 text-[var(--text-muted)]">· {{ formatPct(ticketLoop.value, 0) }}</span>
+          </span>
+        </div>
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Безтикетный</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">
+            {{ formatRubCompact(nonTicketRevenue) }}
+            <span class="ml-1 text-[var(--text-muted)]">· {{ formatPct(nonTicketLoop, 0) }}</span>
+          </span>
+        </div>
+      </div>
+    </MetricCard>
+
+    <!-- Чертёж: «Средняя цена игры по контурам». В контракте нет разбиения
+         games по контурам, только сводный avg_game_price (L1). Плейсхолдер. -->
+    <MetricCard
+      title="Средняя цена игры по контурам"
+      value="—"
+      sub="нет в текущем источнике; нужно games-by-loop разбиение в API"
     />
 
     <MetricCard title="Объёмы за период">

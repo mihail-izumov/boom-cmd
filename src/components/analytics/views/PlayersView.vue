@@ -54,6 +54,18 @@ const returningTotal = computed(() => {
   const n = sumNew.value.value
   return (v === null || n === null) ? null : Math.max(0, v - n)
 })
+
+// Доли «новые / повторные» от Σvisitors_total для строки L2 «всего / новые / повторные + доли».
+const shareNew = computed(() => {
+  const v = sumVisitors.value.value
+  const n = sumNew.value.value
+  return (v && n !== null) ? (n / v) * 100 : null
+})
+const shareReturning = computed(() => {
+  const v = sumVisitors.value.value
+  const r = returningTotal.value
+  return (v && r !== null) ? (r / v) * 100 : null
+})
 </script>
 
 <template>
@@ -88,15 +100,25 @@ const returningTotal = computed(() => {
       Слой 2 · сводный отчёт
     </p>
 
-    <MetricCard title="Структура: новые · повторные">
+    <MetricCard title="Всего / новые / повторные">
       <div class="flex flex-col gap-1.5">
-        <div class="flex items-baseline justify-between">
-          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Новые</span>
-          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatInt(sumNew.value) }}</span>
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Всего</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatInt(sumVisitors.value) }}</span>
         </div>
-        <div class="flex items-baseline justify-between">
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">Новые</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">
+            {{ formatInt(sumNew.value) }}
+            <span class="ml-1 text-[var(--text-muted)]">· {{ formatPct(shareNew, 0) }}</span>
+          </span>
+        </div>
+        <div class="flex items-baseline justify-between gap-3">
           <span class="text-[0.9375rem] text-[var(--text-secondary)]">Повторные</span>
-          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatInt(returningTotal) }}</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">
+            {{ formatInt(returningTotal) }}
+            <span class="ml-1 text-[var(--text-muted)]">· {{ formatPct(shareReturning, 0) }}</span>
+          </span>
         </div>
       </div>
     </MetricCard>
