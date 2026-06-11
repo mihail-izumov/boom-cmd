@@ -34,7 +34,7 @@ const items = computed(() =>
       type="button"
       role="radio"
       :aria-checked="modelValue === p.id"
-      class="flex flex-1 items-center justify-center rounded-full px-3 text-[0.9375rem] transition-colors"
+      class="flex flex-1 items-center justify-center rounded-full px-3 pb-[2px] text-[0.9375rem] transition-colors"
       :class="modelValue === p.id
         ? 'bg-[var(--surface)] font-semibold text-[var(--text)] shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
         : 'font-medium text-[var(--text-muted)] active:text-[var(--text)]'"
