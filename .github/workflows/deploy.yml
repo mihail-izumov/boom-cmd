@@ -25,6 +25,7 @@ jobs:
           # URL gated Apps Script — не секрет (виден в бандле как endpoint),
           # держим как repo Variable. Парольная фраза сюда НЕ попадает.
           VITE_PROJECTS_API: ${{ vars.VITE_PROJECTS_API }}
+          VITE_ANALYTICS_API: ${{ vars.VITE_ANALYTICS_API }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

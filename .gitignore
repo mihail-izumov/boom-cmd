@@ -12,8 +12,9 @@ dist
 dist-ssr
 *.local
 
-# Локальные env: URL источника (VITE_PROJECTS_API). Фраза доступа здесь НЕ хранится
-# (она только в localStorage). Покрыто *.local выше — дублируем явно для ясности.
+# Локальные env: URL источников (VITE_PROJECTS_API, VITE_ANALYTICS_API).
+# Фраза доступа здесь НЕ хранится (она только в localStorage).
+# Покрыто *.local выше — дублируем явно для ясности.
 .env.local
 .env*.local
 
