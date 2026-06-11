@@ -1,21 +1,23 @@
 <script setup>
 import { computed } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
-import { formatGrowth, DASH } from '../../i18n/analytics.js'
+import { formatGrowth } from '../../i18n/analytics.js'
 import CompletenessBadge from './CompletenessBadge.vue'
 import MonthlyTrend from './MonthlyTrend.vue'
 
-// KPI-плитка на главном экране Аналитики (Слой 0 → клик ведёт на вкладку
-// домена). Спокойная карточка: --surface + рамка --line; жёлтую заливку
-// здесь НЕ используем (она зарезервирована за активным состоянием § дизайна).
+// KPI-плитка на Сводном экране Аналитики. Спокойная карточка: --surface
+// + рамка --line; цвет в марках не используется (жёлтое — для актив.
+// состояний tab bar).
 //
-// Состав:
+// Состав (по запросу владельца — бейдж в фикс. месте, шапка):
 //   • title — заголовок плитки;
-//   • value — крупное основное значение (форматированная строка);
-//   • sub   — вторая метрика рядом (опц.);
-//   • growth — число прироста к прошлому периоду (опц., null → не показ.);
-//   • completeness — объект для бейджа неполноты (опц., null → не показ.);
-//   • series — массив { month, value } для крошечной sparkline (опц.);
+//   • badge — пилюля неполноты, СРАЗУ под заголовком (фикс. позиция);
+//   • value — крупное основное значение;
+//   • sub — вторая метрика рядом (опц.);
+//   • note — мелкая подпись (опц., разные даты по паркам и т.п.);
+//   • growth — рост к прошлому периоду (опц., цвет осмысленный);
+//   • series — массив { month, value } для крошечной line-sparkline (опц.,
+//     тонкая полилиния, не «прогрессбар»).
 //   • interactive (default true) — кликабельность.
 
 const props = defineProps({
@@ -50,6 +52,7 @@ const growthTone = computed(() => {
     style="min-height: 96px"
     @click="interactive && $emit('open')"
   >
+    <!-- Шапка: заголовок занимает строку, chevron справа. -->
     <div class="flex items-start gap-2">
       <span class="flex-1 text-[0.8125rem] font-medium uppercase tracking-wide text-[var(--text-muted)]">
         {{ title }}
@@ -59,6 +62,13 @@ const growthTone = computed(() => {
         class="h-4 w-4 shrink-0 text-[var(--text-muted)]"
         :stroke-width="2"
       />
+    </div>
+
+    <!-- Бейдж неполноты — фикс. место под шапкой; пустая зона
+         резервируется (min-height) даже если бейджа нет, чтобы плитки
+         не «прыгали» по высоте в сетке 2×N. -->
+    <div class="flex min-h-[1.25rem] items-center">
+      <CompletenessBadge v-if="completeness" :completeness="completeness" />
     </div>
 
     <div class="flex items-baseline gap-2">
@@ -77,9 +87,7 @@ const growthTone = computed(() => {
       v-if="series && series.length"
       :series="series"
       variant="sparkline"
-      :height="32"
+      :height="28"
     />
-
-    <CompletenessBadge v-if="completeness" :completeness="completeness" />
   </component>
 </template>

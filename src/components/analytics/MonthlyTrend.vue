@@ -3,27 +3,31 @@ import { computed } from 'vue'
 import { monthLabel } from '../../i18n/analytics.js'
 
 // Помесячный мини-чарт на чистом SVG (без зависимостей; ответ владельца №1).
-// Поддерживает три вида: 'bar' (столбики), 'line' (полилиния), 'sparkline'
-// (компактный, без подписей — для KPI-плиток).
-// Цвета — только токены: --text/--text-secondary для марок, --text-muted
-// для подписей, --line для placeholder’ов пустых месяцев. Монохром по §3.5
-// (цвет в марках появится в Слое 3, когда будет содержательный сигнал).
+// Варианты:
+//   • 'bar'      — столбики, тонкие grid-линии, hatched ghost-плейсхолдеры
+//                  для null (фантомный бар диагональной штриховкой);
+//   • 'line'     — полилиния с РАЗРЫВАМИ на null (никаких «точек-пустышек»);
+//   • 'sparkline'— тонкая линия без подписей и шкалы (для KPI-плиток).
 //
-// Пустой период (null значение) рисуется НЕ как пустой слот, а явным
-// плейсхолдером (как в BI-дашбордах): тонкая риска у baseline + маленькая
-// полупрозрачная точка над ней. Видно, что слот существует, но данных нет.
+// Цвета — только токены: --text-secondary (марки), --text-muted (подписи),
+// --line (рамки/grid/штриховка), --surface-2 (фон штриховки).
+// Монохром по §3.5 (цвет в марках — только в Слое 3, когда будет сигнал).
 
 const props = defineProps({
   series: { type: Array, required: true }, // [{ month: 'YYYY-MM', value: number|null }]
   variant: { type: String, default: 'bar' }, // 'bar' | 'line' | 'sparkline'
   height: { type: Number, default: 96 },
-  // подпись Y (формат), по умолчанию без неё
-  format: { type: Function, default: null },
+  format: { type: Function, default: null }, // подпись макс. оси Y (только bar)
 })
 
 const W = 320
 const PADX = 8
 const PADY_TOP = 8
+
+// Уникальный id паттерна для штриховки — чтобы несколько чартов на одной
+// странице не схлопывали свои <defs>.
+const uid = Math.random().toString(36).slice(2, 9)
+const hatchId = `mt-hatch-${uid}`
 
 const innerW = computed(() => W - PADX * 2)
 const innerH = computed(() => {
@@ -60,7 +64,9 @@ function yFor(v) {
   return PADY_TOP + innerH.value * (1 - norm)
 }
 
-const NULL_BAR_H = 3 // высота риски-плейсхолдера у baseline
+// Фантомный бар «нет данных» — фиксированная доля высоты (читаемо, но
+// явно ниже реальных значений, чтобы не путать с маленьким значением).
+const NULL_BAR_FRACTION = 0.35
 
 const bars = computed(() => {
   const n = props.series.length
@@ -72,16 +78,20 @@ const bars = computed(() => {
     const xCenter = PADX + slot * (i + 0.5)
     const x = xCenter - bw / 2
     const isNull = p.value === null || !Number.isFinite(p.value)
-    const y = isNull ? baselineY.value - NULL_BAR_H : yFor(p.value)
-    const h = isNull ? NULL_BAR_H : baselineY.value - y
-    // точка-плейсхолдер выше риски (для bar; на sparkline только риска).
-    const dotY = isNull && props.variant !== 'sparkline'
-      ? baselineY.value - NULL_BAR_H - 6
-      : null
-    return { x, y, w: bw, h, xCenter, dotY, month: p.month, value: p.value, isNull }
+    let y
+    let h
+    if (isNull) {
+      h = Math.max(10, innerH.value * NULL_BAR_FRACTION)
+      y = baselineY.value - h
+    } else {
+      y = yFor(p.value)
+      h = baselineY.value - y
+    }
+    return { x, y, w: bw, h, xCenter, month: p.month, value: p.value, isNull }
   })
 })
 
+// Полилиния с разрывами на null.
 const linePath = computed(() => {
   const n = props.series.length
   if (n === 0) return ''
@@ -90,7 +100,7 @@ const linePath = computed(() => {
   for (let i = 0; i < n; i++) {
     const p = props.series[i]
     if (p.value === null || !Number.isFinite(p.value)) {
-      started = false // линия разрывается на пропусках
+      started = false
       continue
     }
     const x = xFor(i, n)
@@ -101,33 +111,34 @@ const linePath = computed(() => {
   return d.trim()
 })
 
+// Точки линии (только для non-null) — лёгкий маркер на каждом значении
+// в line-варианте. На sparkline маркеров не делаем (тонкая линия).
 const linePoints = computed(() => {
+  if (props.variant !== 'line') return []
   const n = props.series.length
-  return props.series.map((p, i) => {
-    const x = xFor(i, n)
-    const isNull = p.value === null || !Number.isFinite(p.value)
-    return {
-      x,
-      y: isNull ? baselineY.value : yFor(p.value),
-      isNull,
-      month: p.month,
-      value: p.value,
-    }
-  })
+  return props.series
+    .map((p, i) => {
+      if (p.value === null || !Number.isFinite(p.value)) return null
+      return { x: xFor(i, n), y: yFor(p.value), month: p.month, value: p.value }
+    })
+    .filter(Boolean)
 })
 
 const monthTicks = computed(() => {
   const n = props.series.length
   if (n === 0) return []
-  // показываем подпись первого, последнего и через раз между ними, чтобы не наезжали
   const step = n <= 4 ? 1 : n <= 8 ? 2 : 3
   return props.series.map((p, i) => ({
-    label: monthLabel(p.month).split(' ')[0], // короткий месяц без года
+    label: monthLabel(p.month).split(' ')[0],
     x: xFor(i, n),
     show: i === 0 || i === n - 1 || i % step === 0,
     isNull: p.value === null || !Number.isFinite(p.value),
   }))
 })
+
+// Грид-линии для bar-варианта (макс и середина).
+const showGrid = computed(() => props.variant === 'bar' && !allNull.value)
+const midY = computed(() => PADY_TOP + innerH.value / 2)
 
 const yLabel = computed(() => {
   if (allNull.value || !props.format) return null
@@ -144,72 +155,77 @@ const yLabel = computed(() => {
       role="img"
       :aria-label="`Помесячный тренд за ${series.length} мес`"
     >
-      <!-- Baseline-нить для контекста (видна, если есть пропуски). -->
+      <defs v-if="variant === 'bar'">
+        <!-- Диагональная штриховка для «нет данных» — фантомный бар. -->
+        <pattern
+          :id="hatchId"
+          patternUnits="userSpaceOnUse"
+          width="6" height="6"
+          patternTransform="rotate(45)"
+        >
+          <rect width="6" height="6" fill="var(--surface-2)" />
+          <line
+            x1="0" y1="0" x2="0" y2="6"
+            stroke="var(--line)" stroke-width="1.5"
+          />
+        </pattern>
+      </defs>
+
+      <!-- Грид: макс / середина / baseline. Только в bar. -->
+      <template v-if="showGrid">
+        <line
+          :x1="PADX" :x2="W - PADX"
+          :y1="PADY_TOP" :y2="PADY_TOP"
+          stroke="var(--line)" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"
+        />
+        <line
+          :x1="PADX" :x2="W - PADX"
+          :y1="midY" :y2="midY"
+          stroke="var(--line)" stroke-width="1" stroke-dasharray="2 3" opacity="0.4"
+        />
+      </template>
       <line
         :x1="PADX" :x2="W - PADX"
         :y1="baselineY" :y2="baselineY"
         stroke="var(--line)" stroke-width="1"
       />
 
-      <!-- бары / sparkline -->
-      <template v-if="variant === 'bar' || variant === 'sparkline'">
+      <!-- bar / sparkline-bars: больше не используем bars для sparkline. -->
+      <template v-if="variant === 'bar'">
         <template v-for="(b, i) in bars" :key="i">
           <rect
             :x="b.x"
             :y="b.y"
             :width="b.w"
             :height="b.h"
-            :fill="b.isNull ? 'var(--line)' : 'var(--text-secondary)'"
-            :opacity="b.isNull ? 0.75 : 1"
-            :rx="variant === 'sparkline' ? 1 : 2"
-          />
-          <!-- маленькая точка-маркер «нет данных» (только bar, не sparkline) -->
-          <circle
-            v-if="b.isNull && b.dotY !== null"
-            :cx="b.xCenter"
-            :cy="b.dotY"
-            r="1.6"
-            fill="var(--text-muted)"
-            opacity="0.55"
+            :fill="b.isNull ? `url(#${hatchId})` : 'var(--text-secondary)'"
+            rx="2"
           />
         </template>
       </template>
 
-      <!-- линия с разрывами на пропусках -->
-      <template v-if="variant === 'line'">
+      <!-- sparkline и line: тонкая полилиния, разрывы на null. -->
+      <template v-if="variant === 'line' || variant === 'sparkline'">
         <path
           v-if="linePath"
           :d="linePath"
           fill="none"
           stroke="var(--text-secondary)"
-          stroke-width="1.5"
+          :stroke-width="variant === 'sparkline' ? 1.5 : 1.8"
           stroke-linecap="round"
           stroke-linejoin="round"
         />
-        <template v-for="(pt, i) in linePoints" :key="i">
-          <!-- реальная точка -->
-          <circle
-            v-if="!pt.isNull"
-            :cx="pt.x"
-            :cy="pt.y"
-            r="2.6"
-            fill="var(--text)"
-          />
-          <!-- плейсхолдер «нет данных» на baseline -->
-          <circle
-            v-else
-            :cx="pt.x"
-            :cy="baselineY"
-            r="2.6"
-            fill="none"
-            stroke="var(--text-muted)"
-            stroke-width="1"
-            opacity="0.65"
-          />
-        </template>
+        <circle
+          v-for="(pt, i) in linePoints"
+          :key="i"
+          :cx="pt.x"
+          :cy="pt.y"
+          r="2.4"
+          fill="var(--text)"
+        />
       </template>
 
-      <!-- подписи месяцев (не для sparkline) -->
+      <!-- Подписи месяцев — не для sparkline. -->
       <template v-if="variant !== 'sparkline'">
         <text
           v-for="t in monthTicks.filter((x) => x.show)"
@@ -217,10 +233,20 @@ const yLabel = computed(() => {
           :x="t.x"
           :y="height - 4"
           text-anchor="middle"
-          :fill="t.isNull ? 'color-mix(in srgb, var(--text-muted) 70%, transparent)' : 'var(--text-muted)'"
+          :fill="t.isNull ? 'color-mix(in srgb, var(--text-muted) 65%, transparent)' : 'var(--text-muted)'"
           font-size="10"
         >{{ t.label }}</text>
       </template>
+
+      <!-- Empty-state: все null → подпись в центре. -->
+      <text
+        v-if="allNull && variant !== 'sparkline'"
+        :x="W / 2"
+        :y="PADY_TOP + innerH / 2 + 4"
+        text-anchor="middle"
+        fill="var(--text-muted)"
+        font-size="12"
+      >нет данных за период</text>
     </svg>
     <p v-if="yLabel" class="mt-0.5 text-right text-[0.6875rem] text-[var(--text-muted)]">макс. {{ yLabel }}</p>
   </div>
