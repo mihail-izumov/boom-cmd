@@ -1,7 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Check, X } from 'lucide-vue-next'
-import { CITY_ORDER, PARKS_BY_CITY } from '../../data/parks.js'
+import { CITY_ORDER, PARKS_VISIBLE_BY_CITY as PARKS_BY_CITY } from '../../data/parks.js'
 import { useParkContext } from '../../composables/useParkContext.js'
 
 // Bottom-sheet chooser выбора парка.

@@ -1,0 +1,957 @@
+{
+ "updated": "2025-07-01T00:00:00Z",
+ "revenue": [
+  {
+   "park": "ohta",
+   "month": "2025-01",
+   "total_revenue": 5418280,
+   "cashless": 2860025,
+   "cash": 865017,
+   "website": 14464,
+   "receipts": 10276
+  },
+  {
+   "park": "ohta",
+   "month": "2025-02",
+   "total_revenue": 5530098,
+   "cashless": null,
+   "cash": null,
+   "website": 18438,
+   "receipts": 6460
+  },
+  {
+   "park": "ohta",
+   "month": "2025-03",
+   "total_revenue": 4155913,
+   "cashless": 4012852,
+   "cash": 715921,
+   "website": 13976,
+   "receipts": 9809
+  },
+  {
+   "park": "ohta",
+   "month": "2025-04",
+   "total_revenue": 5134824,
+   "cashless": 3329057,
+   "cash": 1053559,
+   "website": 26188,
+   "receipts": 6335
+  },
+  {
+   "park": "ohta",
+   "month": "2025-05",
+   "total_revenue": 5917457,
+   "cashless": 4475534,
+   "cash": 904150,
+   "website": 13109,
+   "receipts": 11468
+  },
+  {
+   "park": "ohta",
+   "month": "2025-06",
+   "total_revenue": 4509783,
+   "cashless": 3022590,
+   "cash": 758029,
+   "website": 26949,
+   "receipts": 9560
+  },
+  {
+   "park": "piterland",
+   "month": "2025-01",
+   "total_revenue": 5921384,
+   "cashless": 4551356,
+   "cash": 1021736,
+   "website": 0,
+   "receipts": 11554
+  },
+  {
+   "park": "piterland",
+   "month": "2025-02",
+   "total_revenue": 4635603,
+   "cashless": 4124897,
+   "cash": 1197642,
+   "website": 0,
+   "receipts": 9640
+  },
+  {
+   "park": "piterland",
+   "month": "2025-03",
+   "total_revenue": 6085120,
+   "cashless": 4185645,
+   "cash": 1122743,
+   "website": 0,
+   "receipts": 6547
+  },
+  {
+   "park": "piterland",
+   "month": "2025-04",
+   "total_revenue": 4183694,
+   "cashless": 3494531,
+   "cash": 747875,
+   "website": 0,
+   "receipts": 7557
+  },
+  {
+   "park": "piterland",
+   "month": "2025-05",
+   "total_revenue": 3803004,
+   "cashless": 3467136,
+   "cash": 1081410,
+   "website": 0,
+   "receipts": 8270
+  },
+  {
+   "park": "piterland",
+   "month": "2025-06",
+   "total_revenue": 4610542,
+   "cashless": 3302816,
+   "cash": 860186,
+   "website": 0,
+   "receipts": 11357
+  },
+  {
+   "park": "mari",
+   "month": "2025-01",
+   "total_revenue": 5444106,
+   "cashless": 4261914,
+   "cash": 802683,
+   "website": 24582,
+   "receipts": 7182
+  },
+  {
+   "park": "mari",
+   "month": "2025-02",
+   "total_revenue": 4638366,
+   "cashless": 5174856,
+   "cash": 1083999,
+   "website": 21138,
+   "receipts": 9996
+  },
+  {
+   "park": "mari",
+   "month": "2025-03",
+   "total_revenue": 6028555,
+   "cashless": 4662399,
+   "cash": 837428,
+   "website": 10642,
+   "receipts": 8003
+  },
+  {
+   "park": "mari",
+   "month": "2025-04",
+   "total_revenue": 4303222,
+   "cashless": 3306358,
+   "cash": 1265745,
+   "website": 27527,
+   "receipts": 7999
+  },
+  {
+   "park": "mari",
+   "month": "2025-05",
+   "total_revenue": 5466315,
+   "cashless": 3749516,
+   "cash": 1248728,
+   "website": 19177,
+   "receipts": 7730
+  },
+  {
+   "park": "mari",
+   "month": "2025-06",
+   "total_revenue": 4239882,
+   "cashless": 4147283,
+   "cash": 857644,
+   "website": 21691,
+   "receipts": 11148
+  }
+ ],
+ "players": [
+  {
+   "park": "ohta",
+   "month": "2025-01",
+   "visitors_total": 4137,
+   "new_visitors": 2411,
+   "new_share_pct": 68.0,
+   "capture_rate_pct": 0.3
+  },
+  {
+   "park": "ohta",
+   "month": "2025-02",
+   "visitors_total": 3027,
+   "new_visitors": 1686,
+   "new_share_pct": 57.0,
+   "capture_rate_pct": 0.33
+  },
+  {
+   "park": "ohta",
+   "month": "2025-03",
+   "visitors_total": 5551,
+   "new_visitors": 3404,
+   "new_share_pct": 57.0,
+   "capture_rate_pct": 0.27
+  },
+  {
+   "park": "ohta",
+   "month": "2025-04",
+   "visitors_total": 6286,
+   "new_visitors": 3956,
+   "new_share_pct": 68.0,
+   "capture_rate_pct": 0.39
+  },
+  {
+   "park": "ohta",
+   "month": "2025-05",
+   "visitors_total": 2741,
+   "new_visitors": 1803,
+   "new_share_pct": 64.0,
+   "capture_rate_pct": 0.31
+  },
+  {
+   "park": "ohta",
+   "month": "2025-06",
+   "visitors_total": 3660,
+   "new_visitors": 2364,
+   "new_share_pct": 57.0,
+   "capture_rate_pct": 0.28
+  },
+  {
+   "park": "piterland",
+   "month": "2025-01",
+   "visitors_total": 4333,
+   "new_visitors": 3003,
+   "new_share_pct": 67.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-02",
+   "visitors_total": 3648,
+   "new_visitors": 2280,
+   "new_share_pct": 58.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-03",
+   "visitors_total": 5985,
+   "new_visitors": 4073,
+   "new_share_pct": 60.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-04",
+   "visitors_total": 5000,
+   "new_visitors": 3206,
+   "new_share_pct": 58.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-05",
+   "visitors_total": 5445,
+   "new_visitors": 3435,
+   "new_share_pct": 65.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-06",
+   "visitors_total": 4609,
+   "new_visitors": 2535,
+   "new_share_pct": 60.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-01",
+   "visitors_total": 2770,
+   "new_visitors": 1909,
+   "new_share_pct": 67.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-02",
+   "visitors_total": 5693,
+   "new_visitors": 3393,
+   "new_share_pct": 57.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-03",
+   "visitors_total": 5860,
+   "new_visitors": 4055,
+   "new_share_pct": 57.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-04",
+   "visitors_total": 4449,
+   "new_visitors": 2493,
+   "new_share_pct": 65.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-05",
+   "visitors_total": 5457,
+   "new_visitors": 3106,
+   "new_share_pct": 62.0,
+   "capture_rate_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-06",
+   "visitors_total": 4679,
+   "new_visitors": 2759,
+   "new_share_pct": 67.0,
+   "capture_rate_pct": null
+  }
+ ],
+ "cards": [
+  {
+   "park": "ohta",
+   "month": "2025-01",
+   "cards_in_system": 7631,
+   "returning_pct": 15.4,
+   "avg_visits": 1.35,
+   "outstanding_points_rub": 300000,
+   "unredeemed_tickets_qty": 2000000,
+   "max_payment_rub": 50000
+  },
+  {
+   "park": "ohta",
+   "month": "2025-02",
+   "cards_in_system": 9068,
+   "returning_pct": 16.3,
+   "avg_visits": 1.29,
+   "outstanding_points_rub": 370738,
+   "unredeemed_tickets_qty": 2463561,
+   "max_payment_rub": 55000
+  },
+  {
+   "park": "ohta",
+   "month": "2025-03",
+   "cards_in_system": 9765,
+   "returning_pct": 13.5,
+   "avg_visits": 1.32,
+   "outstanding_points_rub": 417328,
+   "unredeemed_tickets_qty": 2998556,
+   "max_payment_rub": 60000
+  },
+  {
+   "park": "ohta",
+   "month": "2025-04",
+   "cards_in_system": 10613,
+   "returning_pct": 16.2,
+   "avg_visits": 1.24,
+   "outstanding_points_rub": 561081,
+   "unredeemed_tickets_qty": 4188404,
+   "max_payment_rub": 65000
+  },
+  {
+   "park": "ohta",
+   "month": "2025-05",
+   "cards_in_system": 11607,
+   "returning_pct": 12.6,
+   "avg_visits": 1.34,
+   "outstanding_points_rub": 531988,
+   "unredeemed_tickets_qty": 3870528,
+   "max_payment_rub": 70000
+  },
+  {
+   "park": "ohta",
+   "month": "2025-06",
+   "cards_in_system": 14676,
+   "returning_pct": 15.6,
+   "avg_visits": 1.29,
+   "outstanding_points_rub": 709770,
+   "unredeemed_tickets_qty": 5553490,
+   "max_payment_rub": 75000
+  },
+  {
+   "park": "piterland",
+   "month": "2025-01",
+   "cards_in_system": 6513,
+   "returning_pct": 14.4,
+   "avg_visits": 1.28,
+   "outstanding_points_rub": 300000,
+   "unredeemed_tickets_qty": 2000000,
+   "max_payment_rub": 50000
+  },
+  {
+   "park": "piterland",
+   "month": "2025-02",
+   "cards_in_system": 7796,
+   "returning_pct": 19.4,
+   "avg_visits": 1.22,
+   "outstanding_points_rub": 365910,
+   "unredeemed_tickets_qty": 2542148,
+   "max_payment_rub": 55000
+  },
+  {
+   "park": "piterland",
+   "month": "2025-03",
+   "cards_in_system": 9259,
+   "returning_pct": 12.7,
+   "avg_visits": 1.24,
+   "outstanding_points_rub": 435682,
+   "unredeemed_tickets_qty": 3143754,
+   "max_payment_rub": 60000
+  },
+  {
+   "park": "piterland",
+   "month": "2025-04",
+   "cards_in_system": 9792,
+   "returning_pct": 12.7,
+   "avg_visits": 1.39,
+   "outstanding_points_rub": 502833,
+   "unredeemed_tickets_qty": 4190255,
+   "max_payment_rub": 65000
+  },
+  {
+   "park": "piterland",
+   "month": "2025-05",
+   "cards_in_system": 11409,
+   "returning_pct": 11.0,
+   "avg_visits": 1.4,
+   "outstanding_points_rub": 636452,
+   "unredeemed_tickets_qty": 5075352,
+   "max_payment_rub": 70000
+  },
+  {
+   "park": "piterland",
+   "month": "2025-06",
+   "cards_in_system": 13533,
+   "returning_pct": 18.1,
+   "avg_visits": 1.23,
+   "outstanding_points_rub": 646980,
+   "unredeemed_tickets_qty": 4484745,
+   "max_payment_rub": 75000
+  },
+  {
+   "park": "mari",
+   "month": "2025-01",
+   "cards_in_system": 7524,
+   "returning_pct": 13.9,
+   "avg_visits": 1.4,
+   "outstanding_points_rub": 300000,
+   "unredeemed_tickets_qty": 2000000,
+   "max_payment_rub": 50000
+  },
+  {
+   "park": "mari",
+   "month": "2025-02",
+   "cards_in_system": 8702,
+   "returning_pct": 14.3,
+   "avg_visits": 1.4,
+   "outstanding_points_rub": 390807,
+   "unredeemed_tickets_qty": 2620076,
+   "max_payment_rub": 55000
+  },
+  {
+   "park": "mari",
+   "month": "2025-03",
+   "cards_in_system": 10132,
+   "returning_pct": 11.9,
+   "avg_visits": 1.26,
+   "outstanding_points_rub": 479370,
+   "unredeemed_tickets_qty": 3257008,
+   "max_payment_rub": 60000
+  },
+  {
+   "park": "mari",
+   "month": "2025-04",
+   "cards_in_system": 11184,
+   "returning_pct": 17.2,
+   "avg_visits": 1.21,
+   "outstanding_points_rub": 520605,
+   "unredeemed_tickets_qty": 3803078,
+   "max_payment_rub": 65000
+  },
+  {
+   "park": "mari",
+   "month": "2025-05",
+   "cards_in_system": 13000,
+   "returning_pct": 11.9,
+   "avg_visits": 1.4,
+   "outstanding_points_rub": 509456,
+   "unredeemed_tickets_qty": 3947584,
+   "max_payment_rub": 70000
+  },
+  {
+   "park": "mari",
+   "month": "2025-06",
+   "cards_in_system": 13749,
+   "returning_pct": 16.6,
+   "avg_visits": 1.24,
+   "outstanding_points_rub": 570175,
+   "unredeemed_tickets_qty": 5702515,
+   "max_payment_rub": 75000
+  }
+ ],
+ "game_econ": [
+  {
+   "park": "ohta",
+   "month": "2025-01",
+   "games": 79697,
+   "avg_game_price": 43.65,
+   "game_revenue": 3478774,
+   "tickets_issued": 2191010,
+   "bonus_points": 1403069,
+   "ticket_loop_pct": 57.0,
+   "payout_share_pct": 4.09
+  },
+  {
+   "park": "ohta",
+   "month": "2025-02",
+   "games": 134776,
+   "avg_game_price": 40.97,
+   "game_revenue": 5521772,
+   "tickets_issued": 2345906,
+   "bonus_points": 1186423,
+   "ticket_loop_pct": 53.0,
+   "payout_share_pct": 4.69
+  },
+  {
+   "park": "ohta",
+   "month": "2025-03",
+   "games": 83999,
+   "avg_game_price": 41.74,
+   "game_revenue": 3506118,
+   "tickets_issued": 2402983,
+   "bonus_points": 987051,
+   "ticket_loop_pct": 54.0,
+   "payout_share_pct": 5.99
+  },
+  {
+   "park": "ohta",
+   "month": "2025-04",
+   "games": 139687,
+   "avg_game_price": 40.06,
+   "game_revenue": 5595861,
+   "tickets_issued": 1541046,
+   "bonus_points": 1218240,
+   "ticket_loop_pct": 65.0,
+   "payout_share_pct": 5.52
+  },
+  {
+   "park": "ohta",
+   "month": "2025-05",
+   "games": 130341,
+   "avg_game_price": 42.1,
+   "game_revenue": 5487356,
+   "tickets_issued": 1452394,
+   "bonus_points": 1900493,
+   "ticket_loop_pct": 59.0,
+   "payout_share_pct": 4.45
+  },
+  {
+   "park": "ohta",
+   "month": "2025-06",
+   "games": 138978,
+   "avg_game_price": 44.06,
+   "game_revenue": 6123370,
+   "tickets_issued": 1212516,
+   "bonus_points": 1880524,
+   "ticket_loop_pct": 51.0,
+   "payout_share_pct": 4.65
+  },
+  {
+   "park": "piterland",
+   "month": "2025-01",
+   "games": 135114,
+   "avg_game_price": 40.48,
+   "game_revenue": 5469414,
+   "tickets_issued": 1384685,
+   "bonus_points": 1028443,
+   "ticket_loop_pct": 56.0,
+   "payout_share_pct": 3.09
+  },
+  {
+   "park": "piterland",
+   "month": "2025-02",
+   "games": 108386,
+   "avg_game_price": 44.5,
+   "game_revenue": 4823177,
+   "tickets_issued": 1525755,
+   "bonus_points": 1661085,
+   "ticket_loop_pct": 50.0,
+   "payout_share_pct": 3.95
+  },
+  {
+   "park": "piterland",
+   "month": "2025-03",
+   "games": 132426,
+   "avg_game_price": 45.38,
+   "game_revenue": 6009491,
+   "tickets_issued": 1347677,
+   "bonus_points": 1408290,
+   "ticket_loop_pct": 50.0,
+   "payout_share_pct": 2.01
+  },
+  {
+   "park": "piterland",
+   "month": "2025-04",
+   "games": 121689,
+   "avg_game_price": 43.94,
+   "game_revenue": 5347014,
+   "tickets_issued": 1619128,
+   "bonus_points": 1789477,
+   "ticket_loop_pct": 56.0,
+   "payout_share_pct": 3.71
+  },
+  {
+   "park": "piterland",
+   "month": "2025-05",
+   "games": 60773,
+   "avg_game_price": 40.08,
+   "game_revenue": 2435781,
+   "tickets_issued": 2612970,
+   "bonus_points": 1984714,
+   "ticket_loop_pct": 56.0,
+   "payout_share_pct": 5.34
+  },
+  {
+   "park": "piterland",
+   "month": "2025-06",
+   "games": 106600,
+   "avg_game_price": 40.58,
+   "game_revenue": 4325828,
+   "tickets_issued": 1403912,
+   "bonus_points": 1269910,
+   "ticket_loop_pct": 64.0,
+   "payout_share_pct": 5.18
+  },
+  {
+   "park": "mari",
+   "month": "2025-01",
+   "games": 128856,
+   "avg_game_price": 45.74,
+   "game_revenue": 5893873,
+   "tickets_issued": 1536122,
+   "bonus_points": 1199435,
+   "ticket_loop_pct": 46.0,
+   "payout_share_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-02",
+   "games": 122409,
+   "avg_game_price": 45.64,
+   "game_revenue": 5586746,
+   "tickets_issued": 1850203,
+   "bonus_points": 1644793,
+   "ticket_loop_pct": 47.0,
+   "payout_share_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-03",
+   "games": 134390,
+   "avg_game_price": 45.51,
+   "game_revenue": 6116088,
+   "tickets_issued": 2761929,
+   "bonus_points": 1872926,
+   "ticket_loop_pct": 63.0,
+   "payout_share_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-04",
+   "games": 61982,
+   "avg_game_price": 44.63,
+   "game_revenue": 2766256,
+   "tickets_issued": 1731496,
+   "bonus_points": 2016979,
+   "ticket_loop_pct": 62.0,
+   "payout_share_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-05",
+   "games": 129125,
+   "avg_game_price": 45.14,
+   "game_revenue": 5828702,
+   "tickets_issued": 1626889,
+   "bonus_points": 1844849,
+   "ticket_loop_pct": 46.0,
+   "payout_share_pct": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-06",
+   "games": 129773,
+   "avg_game_price": 45.47,
+   "game_revenue": 5900778,
+   "tickets_issued": 1555893,
+   "bonus_points": 1879903,
+   "ticket_loop_pct": 54.0,
+   "payout_share_pct": null
+  }
+ ],
+ "prizes": [
+  {
+   "park": "ohta",
+   "month": "2025-01",
+   "prizes_given": 4642,
+   "prize_cost": 222529,
+   "profitability_pct": 83.1,
+   "payout_target_pct": 16.9,
+   "payout_share_pct": 2.09
+  },
+  {
+   "park": "ohta",
+   "month": "2025-02",
+   "prizes_given": 4149,
+   "prize_cost": 155269,
+   "profitability_pct": 87.5,
+   "payout_target_pct": 12.5,
+   "payout_share_pct": 5.87
+  },
+  {
+   "park": "ohta",
+   "month": "2025-03",
+   "prizes_given": 4528,
+   "prize_cost": 200373,
+   "profitability_pct": 84.3,
+   "payout_target_pct": 15.7,
+   "payout_share_pct": 5.92
+  },
+  {
+   "park": "ohta",
+   "month": "2025-04",
+   "prizes_given": 5659,
+   "prize_cost": 243250,
+   "profitability_pct": 82.4,
+   "payout_target_pct": 17.6,
+   "payout_share_pct": 5.88
+  },
+  {
+   "park": "ohta",
+   "month": "2025-05",
+   "prizes_given": 4085,
+   "prize_cost": 246604,
+   "profitability_pct": 83.4,
+   "payout_target_pct": 16.6,
+   "payout_share_pct": 2.43
+  },
+  {
+   "park": "ohta",
+   "month": "2025-06",
+   "prizes_given": 5212,
+   "prize_cost": 212910,
+   "profitability_pct": 83.7,
+   "payout_target_pct": 16.3,
+   "payout_share_pct": 4.42
+  },
+  {
+   "park": "piterland",
+   "month": "2025-01",
+   "prizes_given": 5550,
+   "prize_cost": 163468,
+   "profitability_pct": 85.5,
+   "payout_target_pct": 14.5,
+   "payout_share_pct": 3.02
+  },
+  {
+   "park": "piterland",
+   "month": "2025-02",
+   "prizes_given": 6418,
+   "prize_cost": 108243,
+   "profitability_pct": 87.9,
+   "payout_target_pct": 12.1,
+   "payout_share_pct": 4.15
+  },
+  {
+   "park": "piterland",
+   "month": "2025-03",
+   "prizes_given": 6465,
+   "prize_cost": 214840,
+   "profitability_pct": 86.2,
+   "payout_target_pct": 13.8,
+   "payout_share_pct": 3.46
+  },
+  {
+   "park": "piterland",
+   "month": "2025-04",
+   "prizes_given": 3607,
+   "prize_cost": 203650,
+   "profitability_pct": 83.8,
+   "payout_target_pct": 16.2,
+   "payout_share_pct": 3.26
+  },
+  {
+   "park": "piterland",
+   "month": "2025-05",
+   "prizes_given": 7031,
+   "prize_cost": 211644,
+   "profitability_pct": 83.6,
+   "payout_target_pct": 16.4,
+   "payout_share_pct": 3.24
+  },
+  {
+   "park": "piterland",
+   "month": "2025-06",
+   "prizes_given": 5096,
+   "prize_cost": 165945,
+   "profitability_pct": 83.6,
+   "payout_target_pct": 16.4,
+   "payout_share_pct": 2.51
+  },
+  {
+   "park": "mari",
+   "month": "2025-01"
+  },
+  {
+   "park": "mari",
+   "month": "2025-02"
+  },
+  {
+   "park": "mari",
+   "month": "2025-03"
+  },
+  {
+   "park": "mari",
+   "month": "2025-04"
+  },
+  {
+   "park": "mari",
+   "month": "2025-05"
+  },
+  {
+   "park": "mari",
+   "month": "2025-06"
+  }
+ ],
+ "reviews": [
+  {
+   "park": "ohta",
+   "month": "2025-01",
+   "yandex_total": 349,
+   "twogis_total": 132,
+   "yandex_growth": 64
+  },
+  {
+   "park": "ohta",
+   "month": "2025-02",
+   "yandex_total": 412,
+   "twogis_total": 143,
+   "yandex_growth": 63
+  },
+  {
+   "park": "ohta",
+   "month": "2025-03",
+   "yandex_total": 448,
+   "twogis_total": 153,
+   "yandex_growth": 36
+  },
+  {
+   "park": "ohta",
+   "month": "2025-04",
+   "yandex_total": 470,
+   "twogis_total": 149,
+   "yandex_growth": 22
+  },
+  {
+   "park": "ohta",
+   "month": "2025-05",
+   "yandex_total": 511,
+   "twogis_total": 185,
+   "yandex_growth": 41
+  },
+  {
+   "park": "ohta",
+   "month": "2025-06",
+   "yandex_total": 562,
+   "twogis_total": 192,
+   "yandex_growth": 51
+  },
+  {
+   "park": "piterland",
+   "month": "2025-01",
+   "yandex_total": null,
+   "twogis_total": null,
+   "yandex_growth": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-02",
+   "yandex_total": null,
+   "twogis_total": null,
+   "yandex_growth": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-03",
+   "yandex_total": null,
+   "twogis_total": null,
+   "yandex_growth": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-04",
+   "yandex_total": null,
+   "twogis_total": null,
+   "yandex_growth": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-05",
+   "yandex_total": null,
+   "twogis_total": null,
+   "yandex_growth": null
+  },
+  {
+   "park": "piterland",
+   "month": "2025-06",
+   "yandex_total": null,
+   "twogis_total": null,
+   "yandex_growth": null
+  },
+  {
+   "park": "mari",
+   "month": "2025-01",
+   "yandex_total": 352,
+   "twogis_total": null,
+   "yandex_growth": 50
+  },
+  {
+   "park": "mari",
+   "month": "2025-02",
+   "yandex_total": 389,
+   "twogis_total": null,
+   "yandex_growth": 37
+  },
+  {
+   "park": "mari",
+   "month": "2025-03",
+   "yandex_total": 448,
+   "twogis_total": null,
+   "yandex_growth": 59
+  },
+  {
+   "park": "mari",
+   "month": "2025-04",
+   "yandex_total": 504,
+   "twogis_total": null,
+   "yandex_growth": 56
+  },
+  {
+   "park": "mari",
+   "month": "2025-05",
+   "yandex_total": 556,
+   "twogis_total": null,
+   "yandex_growth": 52
+  },
+  {
+   "park": "mari",
+   "month": "2025-06",
+   "yandex_total": 588,
+   "twogis_total": null,
+   "yandex_growth": 32
+  }
+ ]
+}
