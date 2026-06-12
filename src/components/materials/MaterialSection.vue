@@ -40,7 +40,7 @@ const label = computed(() => typeGroupLabel(props.type))
       />
       <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ label }}</h2>
       <span
-        class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 text-[0.8125rem] font-medium leading-none text-[var(--text-secondary)]"
+        class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--line)] px-1.5 text-[0.8125rem] font-medium leading-none text-[var(--text-secondary)]"
       >{{ materials.length }}</span>
     </button>
 

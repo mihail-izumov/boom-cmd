@@ -1,16 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
-import {
-  STATUS_RU,
-  t,
-  pluralRu,
-  PROJECTS_PLURAL,
-} from '../../i18n/projects.js'
+import { STATUS_RU, t } from '../../i18n/projects.js'
 import ProjectCard from './ProjectCard.vue'
 
 // Сворачиваемая группа-статус. Цветной точки статуса нет: статус несёт
 // заголовок + позиция группы (DESIGN-STANDARD §3.4). Шапка — кнопка ≥44pt.
+// Счётчик — круглый бейдж с цифрой после заголовка (ревизия 12.06.2026,
+// единый стиль с MaterialSection; фон --line, чтобы не сливался с --bg).
 //
 // TZ-3.4: пустые группы вообще не рендерим. ProjectsScreen передаёт сюда
 // только непустые projects (visibleStatuses), но root-level v-if держим
@@ -26,10 +23,6 @@ const props = defineProps({
 defineEmits(['toggle', 'open-project'])
 
 const ru = computed(() => t(STATUS_RU, props.status))
-const countLabel = computed(() => {
-  const n = props.projects.length
-  return `${n} ${pluralRu(n, PROJECTS_PLURAL)}`
-})
 </script>
 
 <template>
@@ -49,7 +42,9 @@ const countLabel = computed(() => {
         aria-hidden="true"
       />
       <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ ru }}</h2>
-      <span class="text-[0.875rem] text-[var(--text-muted)]">· {{ countLabel }}</span>
+      <span
+        class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--line)] px-1.5 text-[0.8125rem] font-medium leading-none text-[var(--text-secondary)]"
+      >{{ projects.length }}</span>
     </button>
 
     <div v-show="open" :id="`section-${status}`" class="flex flex-col gap-2">

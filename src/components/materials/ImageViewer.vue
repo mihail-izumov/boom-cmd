@@ -109,9 +109,12 @@ async function toggleZoom(e) {
       />
     </div>
 
-    <!-- оверлей-слой: НЕ скроллится вместе с картинкой -->
+    <!-- оверлей-слой: НЕ скроллится вместе с картинкой.
+         Подсказка без плашки (ревизия владельца): белый текст на тёмном
+         скриме — это «белый на тёмной заливке» по DESIGN-STANDARD §3.5,
+         drop-shadow страхует читаемость на светлых участках фото. -->
     <span
-      class="pointer-events-none absolute left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 text-[0.8125rem] font-medium text-[var(--text-secondary)] shadow-lg"
+      class="pointer-events-none absolute left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 text-[0.8125rem] font-medium text-[var(--ink-on-color)] drop-shadow-md"
       style="top: calc(env(safe-area-inset-top) + 0.875rem)"
     >
       <component :is="hintIcon" class="h-4 w-4 shrink-0" :stroke-width="2" aria-hidden="true" />

@@ -56,9 +56,11 @@ export const PARK_SHORT = Object.fromEntries(PARKS.map((p) => [p.id, p.short || 
 export const STATUS_ORDER = ['In Progress', 'Planned', 'Backlog', 'Done']
 
 // Дефолт-сворачивание по статусу: true = развёрнуто.
+// Ревизия 12.06.2026 (владелец, вслед за Материалами): по дефолту
+// ВСЕ группы свёрнуты — экран открывается компактной сводкой.
 export const STATUS_DEFAULT_OPEN = {
-  'In Progress': true,
-  Planned: true,
+  'In Progress': false,
+  Planned: false,
   Backlog: false,
   Done: false,
 }
