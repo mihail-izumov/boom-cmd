@@ -372,6 +372,101 @@ export function lastInPeriod({ rows, ctx, field }) {
   }
 }
 
+// --- БАЛАНС+Δ (§3 контракта, тип «БАЛАНС+Δ») ---------------------------
+
+// Арифметика месяцев 'YYYY-MM' со сдвигом delta, включая переход через
+// год: monthAdd('2026-01', -1) → '2025-12'.
+function monthAdd(ym, delta) {
+  const [y, m] = ym.split('-').map(Number)
+  const t = y * 12 + (m - 1) + delta
+  const ny = Math.floor(t / 12)
+  const nm = ((t % 12) + 12) % 12
+  return `${ny}-${String(nm + 1).padStart(2, '0')}`
+}
+
+/**
+ * Δ за период для балансовых полей (§3, тип «БАЛАНС+Δ» — расширение
+ * «ПОСЛЕДНИЙ»). Балансовая часть карточки остаётся на lastInPeriod —
+ * здесь считается ТОЛЬКО дельта.
+ *
+ *   Δ(парка) = value(pick.month) − value(prevMonth), где:
+ *     • pick — тот же выбор, что в lastInPeriod (последний месяц axis,
+ *       где у парка есть не-null);
+ *     • prevMonth — календарный месяц непосредственно ПЕРЕД axis[0],
+ *       одна точка отсчёта для всех парков. Никакого поиска «последнего
+ *       значения где-то до окна» — это растянуло бы Δ за пределы
+ *       периода (§4: N/A честные, не интерполируем).
+ *
+ *   Правило полноты Δ (§4): Δ определена ⟺ есть не-null И в pick.month,
+ *   И ровно в prevMonth.
+ *
+ *   network: Δ = сумма Δ только тех парков, где Δ определена;
+ *   contribParks / totalParks — для бейджа «k из n парков».
+ *
+ *   span: если pick.month ≠ последний месяц axis, Δ покрывает усечённый
+ *   диапазон {from: prevMonth+1 (= axis[0]), to: pick.month} — UI
+ *   показывает диапазон в подписи. Разные диапазоны у парков →
+ *   multipleSpans=true (UI — паттерн «разные периоды», как
+ *   MultiDateNotice, утверждено владельцем).
+ *
+ * Возвращает { value, byPark: [{park, month, prevMonth, delta}],
+ *   contribParks, totalParks, span: {from, to} | null, multipleSpans,
+ *   prevMonth } — prevMonth добавлен для подписи «нет данных на …».
+ */
+export function balanceDelta({ rows, ctx, field }) {
+  const { axis, parksInScope, park } = ctx
+  const totalParks = parksInScope.length
+  if (axis.length === 0) {
+    return {
+      value: null, byPark: [], contribParks: 0, totalParks,
+      span: null, multipleSpans: false, prevMonth: null,
+    }
+  }
+  const prevMonth = monthAdd(axis[0], -1)
+  const lastAxisMonth = axis[axis.length - 1]
+  const idx = indexByParkMonth(rows)
+
+  const byPark = []
+  for (const p of parksInScope) {
+    // pick — тот же проход, что в lastInPeriod: по axis с конца.
+    let pick = null
+    for (let i = axis.length - 1; i >= 0; i--) {
+      const r = idx.get(`${p}|${axis[i]}`)
+      if (r && isNum(r[field])) {
+        pick = { month: axis[i], value: r[field] }
+        break
+      }
+    }
+    if (!pick) continue // парк без баланса в окне — как в lastInPeriod
+    const rPrev = idx.get(`${p}|${prevMonth}`)
+    const delta = rPrev && isNum(rPrev[field]) ? pick.value - rPrev[field] : null
+    byPark.push({ park: p, month: pick.month, prevMonth, delta })
+  }
+
+  const defined = byPark.filter((x) => x.delta !== null)
+  const contribParks = defined.length
+
+  // span — только по паркам с определённой Δ; усечён = to ≠ конец axis.
+  const pickMonths = [...new Set(defined.map((x) => x.month))]
+  const multipleSpans = pickMonths.length > 1
+  let span = null
+  if (pickMonths.length === 1 && pickMonths[0] !== lastAxisMonth) {
+    span = { from: axis[0], to: pickMonths[0] }
+  }
+
+  if (park !== 'network') {
+    const only = byPark[0] || null
+    return {
+      value: only && only.delta !== null ? only.delta : null,
+      byPark, contribParks, totalParks, span, multipleSpans, prevMonth,
+    }
+  }
+  return {
+    value: contribParks > 0 ? defined.reduce((a, x) => a + x.delta, 0) : null,
+    byPark, contribParks, totalParks, span, multipleSpans, prevMonth,
+  }
+}
+
 // --- Помесячный ряд (для трендов слоя 2) -------------------------------
 
 /**

@@ -66,10 +66,9 @@ const STRUCT_LABEL = { cashless: 'Безнал', cash: 'Нал', website: 'Са�
     >
       <p v-if="growth !== null" class="text-[0.875rem]">
         <span class="text-[var(--text-muted)]">рост к прошлому периоду:</span>
-        <span
-          class="ml-1 font-medium"
-          :class="growth > 0 ? 'text-[var(--positive)]' : growth < 0 ? 'text-[var(--negative)]' : 'text-[var(--text-secondary)]'"
-        >{{ formatGrowth(growth) }}</span>
+        <!-- Монохром (DESIGN-STANDARD): знак направления — в самом
+             тексте (+/−), цветом не дублируем. -->
+        <span class="ml-1 font-medium text-[var(--text-secondary)]">{{ formatGrowth(growth) }}</span>
       </p>
       <p v-else class="text-[0.875rem] text-[var(--text-muted)]">
         рост к прошлому периоду: — (нужны два полных периода)

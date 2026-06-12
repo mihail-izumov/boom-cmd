@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import {
   lastInPeriod,
+  balanceDelta,
   maxField,
   weightedRatioCross,
   fieldCompleteness,
@@ -9,6 +10,8 @@ import {
 } from '../../../composables/analyticsAggregate.js'
 import {
   formatRub, formatInt, formatPct,
+  formatRubSigned, formatQtySigned,
+  balanceTitle, deltaRowLabel, BALANCE_LABELS,
 } from '../../../i18n/analytics.js'
 import MetricCard from '../MetricCard.vue'
 import MonthlyTrend from '../MonthlyTrend.vue'
@@ -16,8 +19,8 @@ import MultiDateNotice from '../MultiDateNotice.vue'
 import Layer3Stub from '../Layer3Stub.vue'
 
 // Вкладка «Карты» (cards).
-// Слой 1: % вернувшихся (взвеш.) + Непогашенные обязательства (очки/тикеты, последний месяц, разделено).
-// Слой 2: avg_visits (взвеш.) · cards_in_system (последний) · outstanding_points (последний) · unredeemed_tickets (последний) · max_payment (max).
+// Слой 1: % вернувшихся (взвеш.) + Непогашенные обязательства (очки/тикеты, баланс на дату + Δ за период).
+// Слой 2: avg_visits (взвеш.) · cards_in_system (баланс) · outstanding_points (баланс) · unredeemed_tickets (баланс) · max_payment (max).
 // Слой 3: stub.
 
 const props = defineProps({
@@ -55,6 +58,33 @@ const cAvgVisits = computed(() => fieldCompleteness({ rows: cards.value, ctx: ct
 const maxPay = computed(() => maxField({ rows: cards.value, ctx: ctx.value, field: 'max_payment_rub' }))
 const cMaxPay = computed(() => fieldCompleteness({ rows: cards.value, ctx: ctx.value, field: 'max_payment_rub' }))
 
+// --- БАЛАНС+Δ (контракт §3, вариант B — утверждён владельцем) ----------
+// Балансовые значения остаются на lastInPeriod; balanceDelta считает
+// только Δ за период. Текст строго монохромный (DESIGN-STANDARD).
+const dPoints = computed(() => balanceDelta({ rows: cards.value, ctx: ctx.value, field: 'outstanding_points_rub' }))
+const dTickets = computed(() => balanceDelta({ rows: cards.value, ctx: ctx.value, field: 'unredeemed_tickets_qty' }))
+
+// Заголовки «{Название} · баланс на {DD.MM.YYYY}» — через i18n.
+const titleObligations = computed(() => balanceTitle('obligations', [...points.value.dates, ...tickets.value.dates]))
+const titleCardsInSys = computed(() => balanceTitle('cards_in_system', cardsInSys.value.dates))
+const titlePoints = computed(() => balanceTitle('outstanding_points', points.value.dates))
+const titleTickets = computed(() => balanceTitle('unredeemed_tickets', tickets.value.dates))
+
+// Строка Δ — только в карточке «Непогашенные обязательства».
+const deltaLabel = computed(() => deltaRowLabel(dPoints.value, dTickets.value))
+const deltaAvailable = computed(() => dPoints.value.value !== null || dTickets.value.value !== null)
+const deltaValue = computed(() => `${formatRubSigned(dPoints.value.value)} · ${formatQtySigned(dTickets.value.value)}`)
+const deltaNoData = computed(() => BALANCE_LABELS.deltaNoData(dPoints.value.prevMonth ?? dTickets.value.prevMonth))
+// Бейдж «k из n парков» — network, Δ определена не у всех парков.
+// k/n берём по основному полю (очки-деньги): оба поля живут в одних
+// строках домена cards, расхождение покрытий на практике не возникает.
+const deltaParksBadge = computed(() => {
+  if (ctx.value.park !== 'network') return null
+  const d = dPoints.value
+  if (d.value === null || d.contribParks >= d.totalParks) return null
+  return BALANCE_LABELS.deltaParks(d.contribParks, d.totalParks)
+})
+
 function fmtAvgVisits(v) {
   if (v === null || !Number.isFinite(v)) return '—'
   return `≈ ${v.toFixed(2).replace('.', ',')} виз./карту`
@@ -75,7 +105,7 @@ function fmtAvgVisits(v) {
     </MetricCard>
 
     <MetricCard
-      title="Непогашенные обязательства (последний месяц)"
+      :title="titleObligations"
       :completeness="cPoints"
     >
       <div class="flex flex-col gap-1.5">
@@ -90,12 +120,22 @@ function fmtAvgVisits(v) {
             <template v-else>—</template>
           </span>
         </div>
+        <!-- Δ за период (вариант B). Знак всегда явный; текст монохромный —
+             никаких цветных дельт (DESIGN-STANDARD). -->
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="text-[0.9375rem] text-[var(--text-secondary)]">{{ deltaLabel }}</span>
+          <span v-if="deltaAvailable" class="text-[1rem] font-semibold text-[var(--text)]">{{ deltaValue }}</span>
+          <span v-else class="text-[0.9375rem] text-[var(--text-secondary)]">{{ deltaNoData }}</span>
+        </div>
+        <div v-if="deltaParksBadge" class="flex justify-end">
+          <span class="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-1 text-[0.75rem] leading-none text-[var(--text-muted)]">{{ deltaParksBadge }}</span>
+        </div>
       </div>
       <MultiDateNotice :by-park="[...points.byPark, ...tickets.byPark]" />
     </MetricCard>
 
     <MetricCard
-      title="Карт в системе (последний месяц)"
+      :title="titleCardsInSys"
       :value="formatInt(cardsInSys.value)"
       :completeness="cCardsInSys"
     >
@@ -110,9 +150,11 @@ function fmtAvgVisits(v) {
     />
 
     <!-- Чертёж: в L2 повторяются «Непогашенные очки-деньги ₽» и
-         «Невыкупленные тикеты шт» как отдельные карточки drill-down. -->
+         «Невыкупленные тикеты шт» как отдельные карточки drill-down.
+         Подписи — «баланс на дату» (вариант B), Δ здесь НЕ показываем:
+         строка Δ — только в карточке «Непогашенные обязательства». -->
     <MetricCard
-      title="Непогашенные очки-деньги (последний месяц)"
+      :title="titlePoints"
       :value="formatRub(points.value)"
       :completeness="cPoints"
     >
@@ -120,7 +162,7 @@ function fmtAvgVisits(v) {
     </MetricCard>
 
     <MetricCard
-      title="Невыкупленные тикеты (последний месяц)"
+      :title="titleTickets"
       :value="tickets.value !== null ? `${formatInt(tickets.value)} шт` : '—'"
       :completeness="cTickets"
     >

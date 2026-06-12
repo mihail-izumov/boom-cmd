@@ -220,3 +220,91 @@ export function formatIntCompact(n) {
   if (abs >= 1_000) return `${Math.round(v / 1_000)}${NBSP}тыс`
   return formatInt(v)
 }
+
+// === Балансовые карточки (вариант B, утверждён владельцем) =============
+// Подписи «баланс на {дата}» + строка «Δ за период». Текст СТРОГО
+// монохромный (DESIGN-STANDARD: цветного текста нет, никаких
+// зелёных/красных дельт) — форматтеры отдают только строку, окраской
+// не управляют.
+
+// 'YYYY-MM' → 'DD.MM.YYYY' последнего дня месяца (подпись «баланс на …»).
+export function lastDayLabel(ym) {
+  if (typeof ym !== 'string' || !/^\d{4}-\d{2}$/.test(ym)) return DASH
+  const [y, m] = ym.split('-').map(Number)
+  if (!Number.isFinite(m) || m < 1 || m > 12) return DASH
+  const d = new Date(y, m, 0).getDate() // день 0 след. месяца = последний день этого
+  return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`
+}
+
+// Названия балансовых карточек (данные — английские ключи, UI — русский).
+export const BALANCE_TITLES = {
+  obligations: 'Непогашенные обязательства',
+  cards_in_system: 'Карт в системе',
+  outstanding_points: 'Непогашенные очки-деньги',
+  unredeemed_tickets: 'Невыкупленные тикеты',
+}
+
+export const BALANCE_LABELS = {
+  onDate: (ym) => `баланс на ${lastDayLabel(ym)}`,
+  onVariousDates: 'баланс на разные даты',
+  delta: 'Δ за период',
+  deltaVariousSpans: 'Δ за разные периоды',
+  deltaSpan: (from, to) =>
+    from === to ? `Δ за ${monthLabel(from)}` : `Δ за ${monthLabel(from)}–${monthLabel(to)}`,
+  // Локализованный месяц («дек 2025»), не сырой YYYY-MM — решение владельца.
+  deltaNoData: (prevYm) => `нет данных за ${monthLabel(prevYm)}`,
+  deltaParks: (k, n) => `${k} из ${n} парков`,
+}
+
+// Заголовок балансовой карточки: «{Название} · баланс на 31.05.2026».
+// dates — выход lastInPeriod().dates (одного или нескольких полей);
+// разные даты у парков → существующий паттерн «на разные даты»
+// (детали по паркам — MultiDateNotice).
+export function balanceTitle(key, dates) {
+  const base = t(BALANCE_TITLES, key)
+  const uniq = [...new Set((dates || []).filter(Boolean))]
+  if (uniq.length === 1) return `${base} · ${BALANCE_LABELS.onDate(uniq[0])}`
+  if (uniq.length > 1) return `${base} · ${BALANCE_LABELS.onVariousDates}`
+  return base
+}
+
+// Рубли со знаком: +12 345 ₽ / −6 789 ₽ / 0 ₽ / — (минус U+2212).
+export function formatRubSigned(n) {
+  const s = formatIntSigned(n)
+  return s === DASH ? DASH : `${s}${NBSP}₽`
+}
+
+// Штуки со знаком: +3 шт / −6 789 шт / 0 шт / —.
+export function formatQtySigned(n) {
+  const s = formatIntSigned(n)
+  return s === DASH ? DASH : `${s}${NBSP}шт`
+}
+
+// Подпись строки Δ: обычная / усечённый диапазон / «разные периоды
+// у парков» (паттерн MultiDateNotice — без перечисления, решение
+// владельца). dRub/dQty — выходы balanceDelta().
+export function deltaRowLabel(dRub, dQty) {
+  if ((dRub && dRub.multipleSpans) || (dQty && dQty.multipleSpans)) {
+    return BALANCE_LABELS.deltaVariousSpans
+  }
+  const span = (dRub && dRub.span) || (dQty && dQty.span)
+  if (span) return BALANCE_LABELS.deltaSpan(span.from, span.to)
+  return BALANCE_LABELS.delta
+}
+
+// Однострочная версия для KPI-плитки Сводного экрана:
+//   «Δ за период: +12 345 ₽ · −6 789 шт» (+ « · 2 из 3 парков» на сети
+//   при частичной Δ) / «Δ за период: нет данных за дек 2025».
+export function deltaLine(dRub, dQty, { network = false } = {}) {
+  const vRub = dRub ? dRub.value : null
+  const vQty = dQty ? dQty.value : null
+  if (vRub === null && vQty === null) {
+    const prev = (dRub && dRub.prevMonth) || (dQty && dQty.prevMonth) || null
+    return `${BALANCE_LABELS.delta}: ${BALANCE_LABELS.deltaNoData(prev)}`
+  }
+  let line = `${deltaRowLabel(dRub, dQty)}: ${formatRubSigned(vRub)} · ${formatQtySigned(vQty)}`
+  if (network && dRub && vRub !== null && dRub.contribParks < dRub.totalParks) {
+    line += ` · ${BALANCE_LABELS.deltaParks(dRub.contribParks, dRub.totalParks)}`
+  }
+  return line
+}

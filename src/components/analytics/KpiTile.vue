@@ -15,7 +15,7 @@ import MonthlyTrend from './MonthlyTrend.vue'
 //   • value — крупное основное значение;
 //   • sub — вторая метрика рядом (опц.);
 //   • note — мелкая подпись (опц., разные даты по паркам и т.п.);
-//   • growth — рост к прошлому периоду (опц., цвет осмысленный);
+//   • growth — рост к прошлому периоду (опц., текст монохромный);
 //   • series — массив { month, value } для крошечной line-sparkline (опц.,
 //     тонкая полилиния, не «прогрессбар»).
 //   • interactive (default true) — кликабельность.
@@ -33,13 +33,15 @@ const props = defineProps({
 defineEmits(['open'])
 
 const growthLabel = computed(() => formatGrowth(props.growth))
+// Тон тренда — МОНОХРОМ (DESIGN-STANDARD: текст всегда монохромный;
+// вариант B, утверждён владельцем — единообразно со строкой «Δ за
+// период»). Направление несёт сам текст: знак +/− всегда явный в
+// formatGrowth (минус типографский U+2212). Цветом не дублируем.
 const growthTone = computed(() => {
   if (props.growth === null || props.growth === undefined || !Number.isFinite(props.growth)) {
     return 'text-[var(--text-muted)]'
   }
-  if (props.growth > 0) return 'text-[var(--positive)]'
-  if (props.growth < 0) return 'text-[var(--negative)]'
-  return 'text-[var(--text-muted)]'
+  return 'text-[var(--text-secondary)]'
 })
 </script>
 

@@ -7,6 +7,7 @@ import {
   weightedRatio,
   weightedRatioCross,
   lastInPeriod,
+  balanceDelta,
   growthVsPrev,
   fieldCompleteness,
   monthlySeries,
@@ -19,6 +20,8 @@ import {
   formatIntCompact,
   formatIntSigned,
   formatPct,
+  balanceTitle,
+  deltaLine,
 } from '../../../i18n/analytics.js'
 import KpiTile from '../KpiTile.vue'
 
@@ -31,7 +34,7 @@ import KpiTile from '../KpiTile.vue'
 //   4. Пополнения ₽ (Σtotal_revenue) + рост к прошлому периоду
 //   5. Посетителей всего (Σvisitors_total) + доля новых (Σnew/Σvisitors)
 //   6. % вернувшихся (взвешено по visitors_total, пометка «≈»)
-//   7. Непогашенные обязательства (очки ₽ + тикеты шт, последний месяц)
+//   7. Непогашенные обязательства (очки ₽ + тикеты шт, баланс на дату + Δ)
 //   8. Прирост отзывов (Σ yandex_growth)
 
 const props = defineProps({
@@ -130,15 +133,21 @@ const kpiReturning = computed(() => {
   }
 })
 
-// --- 7. Непогашенные обязательства (последний месяц) ------------------
+// --- 7. Непогашенные обязательства (баланс на дату + Δ за период) ------
+// Вариант B (утверждён владельцем): заголовок «… · баланс на {дата}»,
+// в note — строка «Δ за период: …». Текст монохромный (DESIGN-STANDARD).
+// Прежняя note «на разные даты по паркам» переехала в заголовок
+// («баланс на разные даты»); детали по паркам — на вкладке «Карты».
 const kpiObligations = computed(() => {
   const pts = lastInPeriod({ rows: cards.value, ctx: ctx.value, field: 'outstanding_points_rub' })
   const tix = lastInPeriod({ rows: cards.value, ctx: ctx.value, field: 'unredeemed_tickets_qty' })
-  const multi = pts.multipleDates || tix.multipleDates
+  const dPts = balanceDelta({ rows: cards.value, ctx: ctx.value, field: 'outstanding_points_rub' })
+  const dTix = balanceDelta({ rows: cards.value, ctx: ctx.value, field: 'unredeemed_tickets_qty' })
   return {
+    title: balanceTitle('obligations', [...pts.dates, ...tix.dates]),
     value: formatRubCompact(pts.value),
     sub: `тикеты ${formatIntCompact(tix.value)}${tix.value !== null ? ' шт' : ''}`,
-    note: multi ? 'на разные даты по паркам' : null,
+    note: deltaLine(dPts, dTix, { network: ctx.value.park === 'network' }),
     completeness: fieldCompleteness({ rows: cards.value, ctx: ctx.value, field: 'outstanding_points_rub' }),
   }
 })
@@ -205,7 +214,7 @@ const kpiReviews = computed(() => {
         @open="emit('open-domain', 'cards')"
       />
       <KpiTile
-        title="Непогашенные обязательства"
+        :title="kpiObligations.title"
         :value="kpiObligations.value"
         :sub="kpiObligations.sub"
         :note="kpiObligations.note"
