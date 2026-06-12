@@ -528,16 +528,92 @@ export function growthVsPrev({ rows, data, ctx, field }) {
   return ((curr - prev) / prev) * 100
 }
 
+// --- Симметричные суммы по общим парк-месяцам (§4.3 контракта) -------
+//
+// Σ по каждому полю списка ТОЛЬКО по тем парк-месяцам, где ВСЕ перечисленные
+// поля не-null. Это то же правило, что у ПЕРЕСЧЁТА (recalcRatio), но
+// расширенное на произвольное число полей. Применение:
+//   • shareOfTotal (баг 3): чтобы доли безнал/нал/сайт считались от
+//     одного и того же подмножества месяцев и не было перекоса, когда
+//     одно из полей появилось позже других;
+//   • PlayersView (баг 2): Σvisitors и Σnew, чтобы производные «повторные»
+//     и «доля новых» совпадали с recalcRatio и сводным экраном.
+//
+// Возвращает { sums: { [field]: number|null }, contribMonths }.
+// Если ни одного общего месяца не нашлось — все sums = null.
+
+export function sumOverCommonMonths({ rows, ctx, fields }) {
+  const { axis, parksInScope } = ctx
+  const idx = indexByParkMonth(rows)
+  const sums = Object.fromEntries(fields.map((f) => [f, 0]))
+  let contrib = 0
+  for (const p of parksInScope) {
+    for (const m of axis) {
+      const r = idx.get(`${p}|${m}`)
+      if (!r) continue
+      if (fields.every((f) => isNum(r[f]))) {
+        for (const f of fields) sums[f] += r[f]
+        contrib++
+      }
+    }
+  }
+  if (contrib === 0) for (const f of fields) sums[f] = null
+  return { sums, contribMonths: contrib }
+}
+
+// Бейдж полноты для метрики, опирающейся на НЕСКОЛЬКО полей.
+// «Заполнен» = парк-месяц, где ВСЕ перечисленные поля не-null. Семантика
+// бейджа полностью совпадает с fieldCompleteness, но обобщена на список.
+// Применять там, где значение производное: visitors+new, cashless+cash+website,
+// game_revenue+games (средняя цена игры), и т.п.
+export function pairCompleteness({ rows, ctx, fields }) {
+  const { park, axis, target, parksInScope } = ctx
+  const idx = indexByParkMonth(rows)
+  const allPresent = (r) => r && fields.every((f) => isNum(r[f]))
+
+  if (park === 'network') {
+    let have = 0
+    const wantParkMonths = parksInScope.length * target
+    for (const p of parksInScope) {
+      for (const m of axis) {
+        if (allPresent(idx.get(`${p}|${m}`))) have++
+      }
+    }
+    const parksWithData = parksInScope.filter((p) =>
+      axis.some((m) => allPresent(idx.get(`${p}|${m}`))),
+    ).length
+    return {
+      kind: 'network',
+      haveParkMonths: have,
+      wantParkMonths,
+      monthsHave: axis.length,
+      monthsWant: target,
+      parksCount: parksInScope.length,
+      parksWithData,
+    }
+  }
+
+  let have = 0
+  for (const m of axis) {
+    if (allPresent(idx.get(`${park}|${m}`))) have++
+  }
+  return { kind: 'park', have, want: target, axisLength: axis.length }
+}
+
 // --- Структура (доля от Σ) -----------------------------------
-// Для секции «безнал / нал» и т.п. Возвращает массив долей по списку полей.
+// Для секции «безнал / нал / сайт» и т.п. Возвращает массив долей по списку
+// полей. ВАЖНО (баг 3): суммы каждого поля берутся ТОЛЬКО по общим месяцам,
+// где ВСЕ поля не-null — иначе компонента, появившаяся позже остальных,
+// смещает свою долю. Семантика синхронизирована с recalcRatio §4.3.
 
 export function shareOfTotal({ rows, ctx, fields }) {
-  const sums = fields.map((f) => sumField({ rows, ctx, field: f }))
-  const total = sums.reduce((acc, s) => acc + (s.value || 0), 0)
-  return fields.map((f, i) => ({
+  const { sums, contribMonths } = sumOverCommonMonths({ rows, ctx, fields })
+  const total = fields.reduce((acc, f) => acc + (isNum(sums[f]) ? sums[f] : 0), 0)
+  return fields.map((f) => ({
     field: f,
-    value: sums[i].value,
-    share: total > 0 && isNum(sums[i].value) ? (sums[i].value / total) * 100 : null,
+    value: sums[f],
+    share: total > 0 && isNum(sums[f]) ? (sums[f] / total) * 100 : null,
+    contribMonths,
   }))
 }
 

@@ -5,6 +5,7 @@ import {
   recalcRatio,
   growthVsPrev,
   fieldCompleteness,
+  pairCompleteness,
   monthlySeries,
   shareOfTotal,
 } from '../../../composables/analyticsAggregate.js'
@@ -32,7 +33,12 @@ const ctx = computed(() => props.ctx)
 const sumTotal = computed(() => sumField({ rows: rows.value, ctx: ctx.value, field: 'total_revenue' }))
 const growth = computed(() => growthVsPrev({ rows: rows.value, data: props.data, ctx: ctx.value, field: 'total_revenue' }))
 const cTotal = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'total_revenue' }))
-const cCashStruct = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'cashless' }))
+// Бейдж структуры (баг 3): полнота по тройке полей, а не только по cashless.
+// shareOfTotal теперь тоже считает Σ только по общим месяцам, так что и
+// бейдж, и абсолюты, и доли согласованы друг с другом.
+const cCashStruct = computed(() => pairCompleteness({
+  rows: rows.value, ctx: ctx.value, fields: ['cashless', 'cash', 'website'],
+}))
 
 const series = computed(() => monthlySeries({ rows: rows.value, ctx: ctx.value, field: 'total_revenue' }))
 

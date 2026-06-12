@@ -1,11 +1,12 @@
 <script setup>
 import { computed } from 'vue'
 import {
-  sumField,
   recalcRatio,
   weightedRatio,
   growthVsPrev,
   fieldCompleteness,
+  pairCompleteness,
+  sumOverCommonMonths,
   monthlySeries,
   monthlyWeightedSeries,
 } from '../../../composables/analyticsAggregate.js'
@@ -17,9 +18,15 @@ import MonthlyTrend from '../MonthlyTrend.vue'
 import Layer3Stub from '../Layer3Stub.vue'
 
 // Вкладка «Игроки» (players).
-// Слой 1: Σvisitors_total + рост + доля новых.
-// Слой 2: новые / повторные суммарно, capture_rate (взвеш.), тренд.
+// Слой 1: Σvisitors_total (по общим месяцам) + рост + доля новых.
+// Слой 2: всего/новые/повторные с долями, capture_rate (взвеш.), тренд.
 // Слой 3: stub.
+//
+// ВАЖНО (баг 2): все три величины — Σvisitors, Σnew, производные
+// (повторные, доли) — считаются ТОЛЬКО по парк-месяцам, где не-null ОБА
+// поля (visitors_total + new_visitors). Так производные совпадают с
+// recalcRatio (доля новых) и со Сводным экраном, а бейдж «N из M мес»
+// явно показывает покрытие. См. analyticsAggregate.sumOverCommonMonths.
 
 const props = defineProps({
   data: { type: Object, required: true },
@@ -29,15 +36,47 @@ const props = defineProps({
 const rows = computed(() => props.data.players || [])
 const ctx = computed(() => props.ctx)
 
-const sumVisitors = computed(() => sumField({ rows: rows.value, ctx: ctx.value, field: 'visitors_total' }))
-const sumNew = computed(() => sumField({ rows: rows.value, ctx: ctx.value, field: 'new_visitors' }))
+const PAIR = ['visitors_total', 'new_visitors']
+
+// Симметричные суммы по общим месяцам — единственная точка истины
+// для всех видимых чисел на вкладке.
+const paired = computed(() =>
+  sumOverCommonMonths({ rows: rows.value, ctx: ctx.value, fields: PAIR }),
+)
+const sumVisitors = computed(() => paired.value.sums.visitors_total)
+const sumNew = computed(() => paired.value.sums.new_visitors)
+const returningTotal = computed(() => {
+  // Симметрия снимает «отрицательные повторные» как симптом — Math.max
+  // больше не нужен.
+  if (sumVisitors.value === null || sumNew.value === null) return null
+  return sumVisitors.value - sumNew.value
+})
+const shareNew = computed(() => {
+  const v = sumVisitors.value
+  const n = sumNew.value
+  return v && n !== null ? (n / v) * 100 : null
+})
+const shareReturning = computed(() => {
+  const v = sumVisitors.value
+  const r = returningTotal.value
+  return v && r !== null ? (r / v) * 100 : null
+})
+
+// Доля новых отдельно через recalcRatio — для проверки сходимости со
+// Сводным экраном. Должна совпадать с shareNew побитово (на общих
+// месяцах sumOverCommonMonths и recalcRatio считают одно и то же).
 const newShare = computed(() => recalcRatio({
   rows: rows.value, ctx: ctx.value, num: 'new_visitors', den: 'visitors_total',
 }))
+
 const growth = computed(() => growthVsPrev({
   rows: rows.value, data: props.data, ctx: ctx.value, field: 'visitors_total',
 }))
-const cVisitors = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'visitors_total' }))
+
+// Бейдж — на ПАРУ полей: «есть оба, иначе пропуск».
+const cPair = computed(() => pairCompleteness({
+  rows: rows.value, ctx: ctx.value, fields: PAIR,
+}))
 
 const capture = computed(() => weightedRatio({
   rows: rows.value, ctx: ctx.value, valueField: 'capture_rate_pct', weightField: 'visitors_total',
@@ -48,24 +87,6 @@ const series = computed(() => monthlySeries({ rows: rows.value, ctx: ctx.value, 
 const captureSeries = computed(() => monthlyWeightedSeries({
   rows: rows.value, ctx: ctx.value, valueField: 'capture_rate_pct', weightField: 'visitors_total',
 }))
-
-const returningTotal = computed(() => {
-  const v = sumVisitors.value.value
-  const n = sumNew.value.value
-  return (v === null || n === null) ? null : Math.max(0, v - n)
-})
-
-// Доли «новые / повторные» от Σvisitors_total для строки L2 «всего / новые / повторные + доли».
-const shareNew = computed(() => {
-  const v = sumVisitors.value.value
-  const n = sumNew.value.value
-  return (v && n !== null) ? (n / v) * 100 : null
-})
-const shareReturning = computed(() => {
-  const v = sumVisitors.value.value
-  const r = returningTotal.value
-  return (v && r !== null) ? (r / v) * 100 : null
-})
 </script>
 
 <template>
@@ -73,13 +94,13 @@ const shareReturning = computed(() => {
     <!-- Layer 1 -->
     <MetricCard
       title="Посетителей за период"
-      :value="formatInt(sumVisitors.value)"
-      :completeness="cVisitors"
+      :value="formatInt(sumVisitors)"
+      :completeness="cPair"
       emphasis
     >
       <p class="text-[0.875rem]">
         <span class="text-[var(--text-muted)]">из них новых:</span>
-        <span class="ml-1 text-[var(--text)]">{{ formatInt(sumNew.value) }}</span>
+        <span class="ml-1 text-[var(--text)]">{{ formatInt(sumNew) }}</span>
         <span class="ml-1 text-[var(--text-muted)]">·</span>
         <span class="ml-1 text-[var(--text)]">{{ formatPct(newShare.value, 0) }}</span>
       </p>
@@ -95,16 +116,19 @@ const shareReturning = computed(() => {
       </p>
     </MetricCard>
 
-    <MetricCard title="Всего / новые / повторные">
+    <MetricCard
+      title="Всего / новые / повторные"
+      :completeness="cPair"
+    >
       <div class="flex flex-col gap-1.5">
         <div class="flex items-baseline justify-between gap-3">
           <span class="text-[0.9375rem] text-[var(--text-secondary)]">Всего</span>
-          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatInt(sumVisitors.value) }}</span>
+          <span class="text-[0.9375rem] text-[var(--text)]">{{ formatInt(sumVisitors) }}</span>
         </div>
         <div class="flex items-baseline justify-between gap-3">
           <span class="text-[0.9375rem] text-[var(--text-secondary)]">Новые</span>
           <span class="text-[0.9375rem] text-[var(--text)]">
-            {{ formatInt(sumNew.value) }}
+            {{ formatInt(sumNew) }}
             <span class="ml-1 text-[var(--text-muted)]">· {{ formatPct(shareNew, 0) }}</span>
           </span>
         </div>

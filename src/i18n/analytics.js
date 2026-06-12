@@ -200,6 +200,17 @@ export function formatRubCompact(n) {
   return `${formatInt(v)}${NBSP}₽`
 }
 
+// Целое со знаком: +172 / −172 / 0 / —. Минус — типографский U+2212.
+// Применять для дельта-метрик в штуках (например, прирост отзывов —
+// может быть отрицательным, когда Яндекс модерирует/удаляет отзывы).
+export function formatIntSigned(n) {
+  const v = safeNum(n)
+  if (v === null) return DASH
+  if (v === 0) return formatInt(0)
+  const sign = v > 0 ? '+' : '−'
+  return `${sign}${formatInt(Math.abs(v))}`
+}
+
 // Компактные количества: 12 тыс / 1,2 млн.
 export function formatIntCompact(n) {
   const v = safeNum(n)

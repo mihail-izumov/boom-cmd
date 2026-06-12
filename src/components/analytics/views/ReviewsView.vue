@@ -5,7 +5,7 @@ import {
   lastInPeriod,
   fieldCompleteness,
 } from '../../../composables/analyticsAggregate.js'
-import { formatInt } from '../../../i18n/analytics.js'
+import { formatInt, formatIntSigned } from '../../../i18n/analytics.js'
 import MetricCard from '../MetricCard.vue'
 import MultiDateNotice from '../MultiDateNotice.vue'
 
@@ -59,7 +59,7 @@ const cGrowth = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.va
 
     <MetricCard
       title="Прирост отзывов за период (Яндекс)"
-      :value="growth.value === null ? '—' : `+${formatInt(growth.value)}`"
+      :value="formatIntSigned(growth.value)"
       :completeness="cGrowth"
     />
   </div>

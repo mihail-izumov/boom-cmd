@@ -17,6 +17,9 @@ import {
   maxField,
   lastInPeriod,
   fieldCompleteness,
+  pairCompleteness,
+  sumOverCommonMonths,
+  shareOfTotal,
   isFullyComplete,
 } from '../src/composables/analyticsAggregate.js'
 
@@ -112,6 +115,94 @@ const netRevC = fieldCompleteness({ rows: data.revenue, ctx: ctxNet, field: 'tot
 console.log(`  axis = ${ctxNet.axis.join(',')};  Σ total_revenue (network) = ${netRev.value}`)
 console.log(`  completeness = ${JSON.stringify(netRevC)}`)
 
+// === Синтетический кейс асимметрии (баги 2 и 3) ======================
+// «Поле A есть, поле B = null в части месяцев» — главный регресс-класс
+// после фикса. Тестируется на инлайн-данных: настоящая фикстура
+// ohta/2025-02 имеет такую пару (cashless null, total_revenue не null),
+// но для чистого юнит-теста удобнее изолированный мини-набор.
+
+console.log('\n=== Синтетика: симметричные суммы по общим месяцам ===')
+const synth = {
+  updated: '2025-09-01T00:00:00Z',
+  // 8 месяцев у «x»: 5 общих, 3 — только new_visitors (visitors_total = null).
+  players: [
+    { park: 'x', month: '2025-01', visitors_total: 100, new_visitors: 60 },
+    { park: 'x', month: '2025-02', visitors_total: 110, new_visitors: 70 },
+    { park: 'x', month: '2025-03', visitors_total: 120, new_visitors: 80 },
+    { park: 'x', month: '2025-04', visitors_total: 130, new_visitors: 90 },
+    { park: 'x', month: '2025-05', visitors_total: 140, new_visitors: 100 },
+    { park: 'x', month: '2025-06', visitors_total: null, new_visitors: 50 },
+    { park: 'x', month: '2025-07', visitors_total: null, new_visitors: 55 },
+    { park: 'x', month: '2025-08', visitors_total: null, new_visitors: 60 },
+  ],
+  // Доходы: «website» появляется только последние 3 месяца, безнал/нал —
+  // все 6. shareOfTotal должен считать доли по общим 3 месяцам.
+  revenue: [
+    { park: 'x', month: '2025-01', cashless: 1000, cash: 200, website: null, total_revenue: 1200, receipts: 10 },
+    { park: 'x', month: '2025-02', cashless: 1100, cash: 220, website: null, total_revenue: 1320, receipts: 11 },
+    { park: 'x', month: '2025-03', cashless: 1200, cash: 240, website: null, total_revenue: 1440, receipts: 12 },
+    { park: 'x', month: '2025-04', cashless: 1300, cash: 260, website: 50,   total_revenue: 1610, receipts: 13 },
+    { park: 'x', month: '2025-05', cashless: 1400, cash: 280, website: 60,   total_revenue: 1740, receipts: 14 },
+    { park: 'x', month: '2025-06', cashless: 1500, cash: 300, website: 70,   total_revenue: 1870, receipts: 15 },
+  ],
+  cards: [], game_econ: [], prizes: [], reviews: [],
+}
+
+const synthCtxP = computeContext(synth, { park: 'x', periodMonths: 8 })
+const paired = sumOverCommonMonths({
+  rows: synth.players, ctx: synthCtxP, fields: ['visitors_total', 'new_visitors'],
+})
+const pairC = pairCompleteness({
+  rows: synth.players, ctx: synthCtxP, fields: ['visitors_total', 'new_visitors'],
+})
+// Common months = 5; Σvisitors = 600, Σnew = 400; share = 66.67%.
+const expSv = 600
+const expSn = 400
+const expCommon = 5
+console.log(`  Σvisitors (common) = ${paired.sums.visitors_total}  (ожидаем ${expSv})`)
+console.log(`  Σnew (common)      = ${paired.sums.new_visitors}  (ожидаем ${expSn})`)
+console.log(`  contribMonths       = ${paired.contribMonths}  (ожидаем ${expCommon})`)
+console.log(`  pairCompleteness    = have:${pairC.have} want:${pairC.want}`)
+const shareNewSynth = (paired.sums.new_visitors / paired.sums.visitors_total) * 100
+const shareRecalc = recalcRatio({
+  rows: synth.players, ctx: synthCtxP, num: 'new_visitors', den: 'visitors_total',
+}).value
+console.log(`  shareNew (pair)    = ${shareNewSynth.toFixed(2)}%`)
+console.log(`  shareNew (recalc)  = ${shareRecalc.toFixed(2)}%  ← должно совпасть`)
+const okPair =
+  paired.sums.visitors_total === expSv &&
+  paired.sums.new_visitors === expSn &&
+  paired.contribMonths === expCommon &&
+  pairC.have === 5 &&
+  pairC.want === 8 &&
+  Math.abs(shareNewSynth - shareRecalc) < 1e-9
+console.log(okPair ? '  ✓ симметричные суммы и доля сходятся с recalcRatio' : '  ✗ баг 2 не закрыт')
+
+console.log('\n=== Синтетика: shareOfTotal без перекоса (баг 3) ===')
+const synthCtxR = computeContext(synth, { park: 'x', periodMonths: 6 })
+const struct = shareOfTotal({
+  rows: synth.revenue, ctx: synthCtxR, fields: ['cashless', 'cash', 'website'],
+})
+// Общие месяцы = 3 (apr/may/jun): Σcashless=4200, Σcash=840, Σwebsite=180,
+// total = 5220 → cashless 80.46%, cash 16.09%, website 3.45%.
+const get = (f) => struct.find((s) => s.field === f)
+const sCashless = get('cashless')
+const sCash = get('cash')
+const sWebsite = get('website')
+console.log(`  Σcashless = ${sCashless.value}  (ожидаем 4200)`)
+console.log(`  Σcash     = ${sCash.value}  (ожидаем 840)`)
+console.log(`  Σwebsite  = ${sWebsite.value}  (ожидаем 180)`)
+console.log(`  share website = ${sWebsite.share.toFixed(2)}%  (ожидаем 3.45)`)
+console.log(`  contribMonths = ${sCashless.contribMonths}  (ожидаем 3)`)
+const okShare =
+  sCashless.value === 4200 &&
+  sCash.value === 840 &&
+  sWebsite.value === 180 &&
+  sCashless.contribMonths === 3 &&
+  Math.abs(sWebsite.share - (180 / 5220) * 100) < 1e-9
+console.log(okShare ? '  ✓ shareOfTotal на общих месяцах, перекоса нет' : '  ✗ баг 3 не закрыт')
+
 console.log('\n=== Итого ===')
-console.log(allOk && okPit && okCash && okMari && okYear ? 'ВСЁ ОК' : 'ЕСТЬ ОШИБКИ')
-process.exit(allOk && okPit && okCash && okMari && okYear ? 0 : 1)
+const overall = allOk && okPit && okCash && okMari && okYear && okPair && okShare
+console.log(overall ? 'ВСЁ ОК' : 'ЕСТЬ ОШИБКИ')
+process.exit(overall ? 0 : 1)

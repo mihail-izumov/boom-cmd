@@ -6,6 +6,7 @@ import {
   weightedRatio,
   recalcRatioCross,
   fieldCompleteness,
+  pairCompleteness,
   monthlySeries,
 } from '../../../composables/analyticsAggregate.js'
 import {
@@ -32,7 +33,13 @@ const ctx = computed(() => props.ctx)
 const avgPrice = computed(() => recalcRatio({
   rows: rows.value, ctx: ctx.value, num: 'game_revenue', den: 'games', scale: 1,
 }))
-const cPrice = computed(() => fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'avg_game_price' }))
+// Замечание оркестратора: значение считается из пары game_revenue+games,
+// поэтому полнота должна опираться на ту же пару, а не на отдельное
+// поле avg_game_price (поля сейчас ходят парой в данных, но при
+// рассинхроне бейдж совра́т).
+const cPrice = computed(() => pairCompleteness({
+  rows: rows.value, ctx: ctx.value, fields: ['game_revenue', 'games'],
+}))
 
 const payoutShare = computed(() => recalcRatioCross({
   rowsNum: prizes.value, rowsDen: rows.value, ctx: ctx.value,

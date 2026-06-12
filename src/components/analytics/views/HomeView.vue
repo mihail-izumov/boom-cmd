@@ -17,6 +17,7 @@ import {
   formatRub,
   formatInt,
   formatIntCompact,
+  formatIntSigned,
   formatPct,
 } from '../../../i18n/analytics.js'
 import KpiTile from '../KpiTile.vue'
@@ -50,8 +51,11 @@ const reviews = computed(() => props.data.reviews || [])
 // --- 1. Игровая выручка ₽ + ср. цена игры -----------------------------
 const kpiGameRev = computed(() => {
   const sum = sumField({ rows: game_econ.value, ctx: ctx.value, field: 'game_revenue' })
+  // ВАЖНО: scale: 1 (рубли, не проценты). Дефолт recalcRatio — scale=100
+  // для процентных метрик (new_share_pct и т.п.); avg_game_price = ₽,
+  // поэтому единичный масштаб обязателен (баг ×100 правился именно здесь).
   const price = recalcRatio({
-    rows: game_econ.value, ctx: ctx.value, num: 'game_revenue', den: 'games',
+    rows: game_econ.value, ctx: ctx.value, num: 'game_revenue', den: 'games', scale: 1,
   })
   return {
     value: formatRubCompact(sum.value),
@@ -140,10 +144,12 @@ const kpiObligations = computed(() => {
 })
 
 // --- 8. Прирост отзывов (Σ yandex_growth) ------------------------------
+// Знак — через formatIntSigned: прирост может быть отрицательным
+// (модерация/удаление). Раньше всегда писали «+N» → при <0 получалось «+−N».
 const kpiReviews = computed(() => {
   const sum = sumField({ rows: reviews.value, ctx: ctx.value, field: 'yandex_growth' })
   return {
-    value: sum.value === null ? '—' : `+${formatInt(sum.value)}`,
+    value: formatIntSigned(sum.value),
     sub: 'Яндекс Карты',
     completeness: fieldCompleteness({ rows: reviews.value, ctx: ctx.value, field: 'yandex_growth' }),
   }
