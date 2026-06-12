@@ -17,7 +17,9 @@ import { useAccessKey } from './composables/useAccessKey.js'
 // `parkFilter: true` у рабочих разделов (TZ-3.2 §2): Аналитика/Проекты/Материалы.
 // На Home и под-странице «Парки» фильтра нет.
 const tabs = [
-  { id: 'home',      label: 'Главная',   title: 'Главная',   icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
+  // title Home — «БУМБАСТИК» (ревизия 12.06.2026): бренд в шапке,
+  // label вкладки в таб-баре остаётся «Главная».
+  { id: 'home',      label: 'Главная',   title: 'БУМБАСТИК', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
   { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
   { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },
