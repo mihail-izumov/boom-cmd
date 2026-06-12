@@ -178,6 +178,21 @@ const okPair =
   Math.abs(shareNewSynth - shareRecalc) < 1e-9
 console.log(okPair ? '  ✓ симметричные суммы и доля сходятся с recalcRatio' : '  ✗ баг 2 не закрыт')
 
+// Standalone «новых» (Вариант B, 12.06): своя полнота, не из пары.
+// На тех же 8 месяцах новых = 60+70+80+90+100+50+55+60 = 565, полнота 8/8.
+console.log('\n=== Standalone «новых» (Вариант B) — независимая полнота ===')
+const synthSumNew = sumField({ rows: synth.players, ctx: synthCtxP, field: 'new_visitors' })
+const synthCNew = fieldCompleteness({ rows: synth.players, ctx: synthCtxP, field: 'new_visitors' })
+console.log(`  standalone Σnew = ${synthSumNew.value}  (ожидаем 565)`)
+console.log(`  standalone fieldC = have:${synthCNew.have} want:${synthCNew.want}  (ожидаем 8 / 8)`)
+console.log(`  пара (для сравнения) = have:${pairC.have} want:${pairC.want}  (ожидаем 5 / 8)`)
+const okStandalone =
+  synthSumNew.value === 565 &&
+  synthCNew.have === 8 &&
+  synthCNew.want === 8 &&
+  pairC.have !== synthCNew.have
+console.log(okStandalone ? '  ✓ standalone новых читается отдельно от пары' : '  ✗ standalone сломан')
+
 console.log('\n=== Синтетика: shareOfTotal без перекоса (баг 3) ===')
 const synthCtxR = computeContext(synth, { park: 'x', periodMonths: 6 })
 const struct = shareOfTotal({
@@ -203,6 +218,6 @@ const okShare =
 console.log(okShare ? '  ✓ shareOfTotal на общих месяцах, перекоса нет' : '  ✗ баг 3 не закрыт')
 
 console.log('\n=== Итого ===')
-const overall = allOk && okPit && okCash && okMari && okYear && okPair && okShare
+const overall = allOk && okPit && okCash && okMari && okYear && okPair && okStandalone && okShare
 console.log(overall ? 'ВСЁ ОК' : 'ЕСТЬ ОШИБКИ')
 process.exit(overall ? 0 : 1)

@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import {
+  sumField,
   recalcRatio,
   weightedRatio,
   growthVsPrev,
@@ -17,16 +18,20 @@ import MetricCard from '../MetricCard.vue'
 import MonthlyTrend from '../MonthlyTrend.vue'
 import Layer3Stub from '../Layer3Stub.vue'
 
-// Вкладка «Игроки» (players).
-// Слой 1: Σvisitors_total (по общим месяцам) + рост + доля новых.
-// Слой 2: всего/новые/повторные с долями, capture_rate (взвеш.), тренд.
-// Слой 3: stub.
+// Вкладка «Игроки» (players). Решение владельца 12.06 — Вариант B:
+//   new_visitors — самодостаточная метрика, показывается ОТДЕЛЬНОЙ карточкой
+//   c sumField(new_visitors) и собственным fieldCompleteness; всё парное
+//   (всего, повторные, обе доли) — только из sumOverCommonMonths и его
+//   pairCompleteness. Деление новых на «всего» из других месяцев запрещено.
 //
-// ВАЖНО (баг 2): все три величины — Σvisitors, Σnew, производные
-// (повторные, доли) — считаются ТОЛЬКО по парк-месяцам, где не-null ОБА
-// поля (visitors_total + new_visitors). Так производные совпадают с
-// recalcRatio (доля новых) и со Сводным экраном, а бейдж «N из M мес»
-// явно показывает покрытие. См. analyticsAggregate.sumOverCommonMonths.
+// Карточки PlayersView:
+//   Слой 1 (emphasis): «Посетителей за период» — пара (Σvisitors, sub
+//     «из них новых X · Y%» только когда пара непуста).
+//   Слой 2 «Новых за период» — standalone, своя полнота.
+//   Слой 2 «Структура: всего · новые · повторные» — пара, 3 строки + 2 доли.
+//   Слой 2 «Capture rate» — weighted, как было.
+//   Слой 2 «Помесячный тренд» — visitors_total, как было.
+//   Слой 3 — заглушка.
 
 const props = defineProps({
   data: { type: Object, required: true },
@@ -38,22 +43,19 @@ const ctx = computed(() => props.ctx)
 
 const PAIR = ['visitors_total', 'new_visitors']
 
-// Симметричные суммы по общим месяцам — единственная точка истины
-// для всех видимых чисел на вкладке.
+// === Пара (visitors+new) — единственный источник для всего парного ===
 const paired = computed(() =>
   sumOverCommonMonths({ rows: rows.value, ctx: ctx.value, fields: PAIR }),
 )
 const sumVisitors = computed(() => paired.value.sums.visitors_total)
-const sumNew = computed(() => paired.value.sums.new_visitors)
+const sumNewPair = computed(() => paired.value.sums.new_visitors)
 const returningTotal = computed(() => {
-  // Симметрия снимает «отрицательные повторные» как симптом — Math.max
-  // больше не нужен.
-  if (sumVisitors.value === null || sumNew.value === null) return null
-  return sumVisitors.value - sumNew.value
+  if (sumVisitors.value === null || sumNewPair.value === null) return null
+  return sumVisitors.value - sumNewPair.value
 })
 const shareNew = computed(() => {
   const v = sumVisitors.value
-  const n = sumNew.value
+  const n = sumNewPair.value
   return v && n !== null ? (n / v) * 100 : null
 })
 const shareReturning = computed(() => {
@@ -61,21 +63,30 @@ const shareReturning = computed(() => {
   const r = returningTotal.value
   return v && r !== null ? (r / v) * 100 : null
 })
+const cPair = computed(() => pairCompleteness({
+  rows: rows.value, ctx: ctx.value, fields: PAIR,
+}))
 
-// Доля новых отдельно через recalcRatio — для проверки сходимости со
-// Сводным экраном. Должна совпадать с shareNew побитово (на общих
-// месяцах sumOverCommonMonths и recalcRatio считают одно и то же).
-const newShare = computed(() => recalcRatio({
+// === Standalone «Новых» — независимая метрика ===
+// sumField(new_visitors) считает по месяцам, где есть new_visitors, не
+// зависит от полноты visitors_total. Так у Питерленда-2026 на коротких
+// окнах standalone закроет дыру, когда пара пуста (см. приёмку).
+const sumNewStandalone = computed(() =>
+  sumField({ rows: rows.value, ctx: ctx.value, field: 'new_visitors' }),
+)
+const cNewStandalone = computed(() =>
+  fieldCompleteness({ rows: rows.value, ctx: ctx.value, field: 'new_visitors' }),
+)
+
+// === Прочее ===
+// Доля новых отдельно через recalcRatio — для сверки с сводным экраном.
+// Должна совпадать с shareNew побитово.
+const newShareCheck = computed(() => recalcRatio({
   rows: rows.value, ctx: ctx.value, num: 'new_visitors', den: 'visitors_total',
 }))
 
 const growth = computed(() => growthVsPrev({
   rows: rows.value, data: props.data, ctx: ctx.value, field: 'visitors_total',
-}))
-
-// Бейдж — на ПАРУ полей: «есть оба, иначе пропуск».
-const cPair = computed(() => pairCompleteness({
-  rows: rows.value, ctx: ctx.value, fields: PAIR,
 }))
 
 const capture = computed(() => weightedRatio({
@@ -87,22 +98,26 @@ const series = computed(() => monthlySeries({ rows: rows.value, ctx: ctx.value, 
 const captureSeries = computed(() => monthlyWeightedSeries({
   rows: rows.value, ctx: ctx.value, valueField: 'capture_rate_pct', weightField: 'visitors_total',
 }))
+
+// Условие отображения sub-строки «из них новых …» в L1: только когда пара
+// непуста (иначе показывать % было бы делением на чужие месяцы).
+const pairHasData = computed(() => sumVisitors.value !== null && sumNewPair.value !== null)
 </script>
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Layer 1 -->
+    <!-- Layer 1: пара (всего за период) -->
     <MetricCard
       title="Посетителей за период"
       :value="formatInt(sumVisitors)"
       :completeness="cPair"
       emphasis
     >
-      <p class="text-[0.875rem]">
+      <p v-if="pairHasData" class="text-[0.875rem]">
         <span class="text-[var(--text-muted)]">из них новых:</span>
-        <span class="ml-1 text-[var(--text)]">{{ formatInt(sumNew) }}</span>
+        <span class="ml-1 text-[var(--text)]">{{ formatInt(sumNewPair) }}</span>
         <span class="ml-1 text-[var(--text-muted)]">·</span>
-        <span class="ml-1 text-[var(--text)]">{{ formatPct(newShare.value, 0) }}</span>
+        <span class="ml-1 text-[var(--text)]">{{ formatPct(newShareCheck.value, 0) }}</span>
       </p>
       <p v-if="growth !== null" class="text-[0.875rem]">
         <span class="text-[var(--text-muted)]">рост к прошлому периоду:</span>
@@ -116,8 +131,20 @@ const captureSeries = computed(() => monthlyWeightedSeries({
       </p>
     </MetricCard>
 
+    <!-- Layer 2: «Новых за период» — STANDALONE, не зависит от пары.
+         Бейдж — fieldCompleteness(new_visitors), отдельный от парного. -->
     <MetricCard
-      title="Всего / новые / повторные"
+      title="Новых за период"
+      :value="formatInt(sumNewStandalone.value)"
+      :completeness="cNewStandalone"
+      sub="самостоятельная метрика — независимая полнота от «всего»"
+    />
+
+    <!-- Layer 2: парная структура. Бейдж — pairCompleteness; всё внутри
+         считается на общих месяцах. Это та самая «пара», от которой
+         standalone-новых сознательно отделён выше. -->
+    <MetricCard
+      title="Всего · новые · повторные (по общим месяцам)"
       :completeness="cPair"
     >
       <div class="flex flex-col gap-1.5">
@@ -128,7 +155,7 @@ const captureSeries = computed(() => monthlyWeightedSeries({
         <div class="flex items-baseline justify-between gap-3">
           <span class="text-[0.9375rem] text-[var(--text-secondary)]">Новые</span>
           <span class="text-[0.9375rem] text-[var(--text)]">
-            {{ formatInt(sumNew) }}
+            {{ formatInt(sumNewPair) }}
             <span class="ml-1 text-[var(--text-muted)]">· {{ formatPct(shareNew, 0) }}</span>
           </span>
         </div>
