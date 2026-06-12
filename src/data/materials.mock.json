@@ -1,0 +1,290 @@
+{
+  "materials": [
+    {
+      "id": "DOC-001",
+      "directions": "b00m.fun",
+      "parks": "ohta",
+      "title": "Оферта",
+      "description": "Юридическая информация на сайте",
+      "type": "PDF",
+      "last_updated": "05.02.2026",
+      "status": "Работает",
+      "link": "https://drive.google.com/file/d/1bo-3BAeBiytj6qRP8uvTyzdDTsDXWiQd/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-002",
+      "directions": "b00m.fun",
+      "parks": "network",
+      "title": "Политика конфиденциальности",
+      "description": "Юридическая информация на сайте",
+      "type": "PDF",
+      "last_updated": "05.02.2026",
+      "status": "Работает",
+      "link": "https://drive.google.com/file/d/1EJzl5rharTXBhd708Zkzb-C4Gm02Hfx7/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-003",
+      "directions": "b00m.fun",
+      "parks": "network",
+      "title": "Согласие на данные",
+      "description": "Юридическая информация на сайте",
+      "type": "PDF",
+      "last_updated": "05.02.2026",
+      "status": "Работает",
+      "link": "https://drive.google.com/file/d/1RxqxbMgbrj6Zd4WTnSM7268EQN91sp_R/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-004",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Конкуренты 2 км",
+      "description": "Раздел комплексного анализа посещаемости парка в Охта Молл/трафик ТЦ за 2025 год",
+      "type": "PDF",
+      "last_updated": "20.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/1DvFjXAVsH0GxkJjbeP9DWLCcJ20tX99h/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-005",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Посещаемость ТЦ/Парк",
+      "description": "Раздел комплексного анализа посещаемости парка в Охта Молл/трафик ТЦ за 2025 год; Перекрестный анализ",
+      "type": "PDF",
+      "last_updated": "20.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/1TPYrHFkWJT2TrznhvT4uLVtHacbiaCdI/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-006",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Полный Список Развлечений Охта Молл",
+      "description": "Раздел комплексного анализа посещаемости парка в Охта Молл/трафик ТЦ за 2025 год; Детальный Анализ",
+      "type": "PDF",
+      "last_updated": "20.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/18sdhBS6o0NAnLfyogE28DO-yFI0YjBXy/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-007",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Посещаемость ТЦ/Парк за 2025 год",
+      "description": "Раздел комплексного анализа посещаемости парка в Охта Молл/трафик ТЦ за 2025 год; Аналитическая справка",
+      "type": "PDF",
+      "last_updated": "20.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/162MKwPyw2f4y8c2S-cmhrd3TuP1KU-G5/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-008",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Система призотеки",
+      "description": "Комплесная система призотеки с аналитикой, симуляциями и системой работы",
+      "type": "Папка",
+      "last_updated": "16.02.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/drive/folders/1ivcBLuRSGY5LzYDk2aAbOs9Q1E3W2xyw?usp=drive_link"
+    },
+    {
+      "id": "DOC-009",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Stranger Things – Франшиза",
+      "description": "Стандарт добавления/работы с франшизой внутри призотеки",
+      "type": "Папка",
+      "last_updated": "20.03.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/drive/folders/1z2k5G1mPlYKnVG8VBO2NUYYKk1Hnjj9W?usp=drive_link"
+    },
+    {
+      "id": "DOC-010",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Целевая аудитория",
+      "description": "Глубокий анализ сценариев посещения каждог опарка + сравнение друг с другом",
+      "type": "Папка",
+      "last_updated": "03.02.2026",
+      "status": "Работает",
+      "link": "https://drive.google.com/drive/folders/1m8mzjPZbq07_Ttb9gU-YenT1IWPW96h9?usp=drive_link"
+    },
+    {
+      "id": "DOC-011",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Контактные данные игроков",
+      "description": "Аналитическая справка",
+      "type": "PDF",
+      "last_updated": "22.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/11R79pWpJlYuy_jjjDcX8SsckqzhhM7Z0/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-012",
+      "directions": "Маркетинг",
+      "parks": "piterland",
+      "title": "Контактные данные игроков",
+      "description": "Аналитическая справка",
+      "type": "PDF",
+      "last_updated": "22.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/1bSm_U9e2tZMpPzhmzpNzMIZROLPVqO_K/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-013",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Система управления доступностью парка",
+      "description": "Система управления игровыми аппаратами",
+      "type": "PDF",
+      "last_updated": "22.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/1-A-JJW8QSGKHghLKDz33iNoxzBtVmKBr/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-014",
+      "directions": "Маркетинг",
+      "parks": "ohta",
+      "title": "Комментарии администратора парка",
+      "description": "Сводная справка",
+      "type": "PDF",
+      "last_updated": "26.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/1qY08Z_m5jUzHDvnhyWcsB99zohuo13iO/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-015",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Критичность накопления остатков",
+      "description": "Аналитическая справка",
+      "type": "PDF",
+      "last_updated": "26.01.2026",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/file/d/1a_XzQUMm9Vkp6ykEmLQxNBwfyXiYaQAC/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-016",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Стратегия позиционирования",
+      "description": "Единственный источник правды для всей рекламы и сайта",
+      "type": "PDF",
+      "last_updated": "26.01.2026",
+      "status": "Работает",
+      "link": "https://drive.google.com/file/d/1AQGY31rENQmtcHj_r8GrZHeGIRWas0S9/view?usp=drive_link"
+    },
+    {
+      "id": "DOC-017",
+      "directions": "Маркетинг",
+      "parks": "iyun",
+      "title": "ТЦ Июнь - Рекламное оформление",
+      "description": "Варианты вывесок и оформления призотеки",
+      "type": "Папка",
+      "last_updated": "17.06.2025",
+      "status": "На согласовании",
+      "link": "https://drive.google.com/drive/folders/11RGCXW1Ej3WZEQyHMZFu00JG7IIlOvgG?usp=drive_link"
+    },
+    {
+      "id": "DOC-018",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Рекламное оформление зоны призотеки",
+      "description": "4 цвета на выбор; размещение POS на витрине",
+      "type": "Изображение",
+      "last_updated": "30.03.2026",
+      "status": "В процессе",
+      "link": "materials/advertising_design_concept_v1.jpg"
+    },
+    {
+      "id": "DOC-019",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Иконка Б00М!",
+      "description": "Используется на картах для усчиления, если нельзя использовать лого и/или в дополнение",
+      "type": "Изображение",
+      "last_updated": "16.05.2026",
+      "status": "Работает",
+      "link": "materials/b00m-icon.jpg"
+    },
+    {
+      "id": "DOC-020",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Концепция Б00М!",
+      "description": "Рождение новой айдентики; Почему Б00М!; культурный код разных групп ЦА",
+      "type": "Изображение",
+      "last_updated": "10.02.2026",
+      "status": "В процессе",
+      "link": "materials/boom-concept.jpg"
+    },
+    {
+      "id": "DOC-021",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Игровая карта",
+      "description": "Новый дизайн в 4х цветах",
+      "type": "Изображение",
+      "last_updated": "24.03.2026",
+      "status": "В процессе",
+      "link": "materials/new-game-card_v2.jpg"
+    },
+    {
+      "id": "DOC-022",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Иконка для чата",
+      "description": "Используетсяпо назначению",
+      "type": "Изображение",
+      "last_updated": "19.02.2026",
+      "status": "Работает",
+      "link": "materials/shark-eyes-button-icon.jpg"
+    },
+    {
+      "id": "DOC-023",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Иконка pwa-приложения управления парками",
+      "description": "Панель управления работает как мобильное приложение",
+      "type": "Изображение",
+      "last_updated": "09.06.2026",
+      "status": "Работает",
+      "link": "materials/shark-eyes-cmd-icon-512.png"
+    },
+    {
+      "id": "DOC-024",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Table-Tent, QR на Личный кабинет",
+      "description": "Работает в зоне кассы",
+      "type": "Изображение",
+      "last_updated": "30.03.2026",
+      "status": "В процессе",
+      "link": "materials/table-tent-1_v1.jpg"
+    },
+    {
+      "id": "DOC-025",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Table-Tent, Призотека на сайте",
+      "description": "Работает в зоне кассы",
+      "type": "Изображение",
+      "last_updated": "31.03.2026",
+      "status": "В процессе",
+      "link": "materials/table-tent-2_v1.jpg"
+    },
+    {
+      "id": "DOC-026",
+      "directions": "Маркетинг",
+      "parks": "network",
+      "title": "Table-Tent, Заряди карту (тарифы)",
+      "description": "Работает в зоне кассы",
+      "type": "Изображение",
+      "last_updated": "01.04.2026",
+      "status": "В процессе",
+      "link": "materials/table-tent-3_v1.jpg"
+    }
+  ]
+}
