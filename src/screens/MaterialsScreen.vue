@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useMaterials } from '../composables/useMaterials.js'
 import { useParkContext } from '../composables/useParkContext.js'
 import { pluralRu } from '../i18n/projects.js'
@@ -54,6 +54,14 @@ const grouped = computed(() => {
 const visibleTypes = computed(() => orderTypeGroups(Object.keys(grouped.value)))
 
 const total = computed(() => visibleMaterials.value.length)
+
+// Сворачивание групп (решение владельца): по дефолту ВСЕ свёрнуты —
+// отсутствие ключа в openMap читается как false. State живёт сессию,
+// при смене scope не сбрасываем (как ProjectsScreen / TZ-3.4 §2).
+const openMap = reactive({})
+function toggle(type) {
+  openMap[type] = !openMap[type]
+}
 
 const openMaterial = ref(null)
 function open(material) {
@@ -133,6 +141,8 @@ function close() {
         class="bc-fade-in"
         :type="type"
         :materials="grouped[type]"
+        :open="!!openMap[type]"
+        @toggle="toggle"
         @open-material="open"
       />
     </template>

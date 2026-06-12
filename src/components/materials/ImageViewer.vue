@@ -1,11 +1,14 @@
 <script setup>
+import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
 
 // Полноэкранный просмотр локального изображения ВНУТРИ PWA (решение
 // владельца к TZ-5.2: изображения смотрим внутри, не в новой вкладке).
-// Презентационный слой без своего state: ключи/скролл-лок держит родитель
-// (MaterialDetail). Закрытие — тап по фону или крестик. Без pinch-zoom —
-// отдельной задачей при необходимости (без новых зависимостей).
+// Пока картинка грузится — bc-skeleton-перелив по центру; затем картинка
+// проявляется целиком (opacity-свап по @load).
+// Презентационный слой без ключей/скролл-лока — их держит родитель
+// (MaterialDetail). Закрытие — тап по фону/картинке или крестик.
+// Без pinch-zoom — отдельной задачей (без новых зависимостей).
 
 defineProps({
   href: { type: String, required: true },
@@ -13,6 +16,8 @@ defineProps({
 })
 
 defineEmits(['close'])
+
+const loaded = ref(false)
 </script>
 
 <template>
@@ -23,10 +28,17 @@ defineEmits(['close'])
     :aria-label="alt || 'Просмотр изображения'"
     @click.self="$emit('close')"
   >
+    <span
+      v-if="!loaded"
+      class="bc-skeleton absolute h-[50svh] w-[80%] max-w-[430px] rounded-2xl"
+      aria-hidden="true"
+    />
     <img
       :src="href"
       :alt="alt"
-      class="bc-fade-in max-h-[100svh] max-w-full object-contain"
+      class="max-h-[100svh] max-w-full object-contain transition-opacity duration-200"
+      :class="loaded ? 'opacity-100' : 'opacity-0'"
+      @load="loaded = true"
       @click.self="$emit('close')"
     />
     <button
