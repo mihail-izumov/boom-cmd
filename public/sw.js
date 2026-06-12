@@ -18,7 +18,7 @@
 
 const BUILD_ID = '__BUILD_ID__'; // подменяется на Date.now() в closeBundle
 const CACHE_NAME = 'boom-cmd-' + BUILD_ID;
-const BASE = '/boom-cmd/';
+const BASE = '/';
 const SHELL_URL = BASE + 'index.html';
 const PRECACHE = [
   BASE,

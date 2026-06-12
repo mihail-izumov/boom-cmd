@@ -10,7 +10,7 @@ alwaysApply: true
 `docs/DESIGN-STANDARD-boom-cmd.md`.
 
 - Стек: Vue 3 `<script setup>` на JavaScript (НЕ TypeScript) + Vite 8 + Tailwind 3.4
-  + lucide-vue-next. PWA на GitHub Pages, `base: '/boom-cmd/'`.
+  + lucide-vue-next. PWA на GitHub Pages, домен `b00m-cmd.ru`, `base: '/'`.
 - Mobile-first под iPhone (Apple HIG): tab bar внизу (только навигация), navigation
   bar с large title вверху, тач-таргеты ≥44pt, safe-area через `env(...)`. На десктопе —
   мобильная колонка `max-w-[430px]` по центру.

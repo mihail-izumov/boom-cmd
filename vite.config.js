@@ -43,5 +43,5 @@ function swBuildIdPlugin() {
 
 export default defineConfig({
   plugins: [vue(), swBuildIdPlugin()],
-  base: '/boom-cmd/',   // ← синхронизировано с именем репозитория
+  base: '/',   // ← корень собственного домена b00m-cmd.ru (CNAME в public/CNAME)
 })

@@ -62,9 +62,11 @@ Vue 3 (`<script setup>`, JS, не TS) · Vite 8 · Tailwind 3.4 + PostCSS + auto
 Apps Script (логин/пароль, read-only JSON). Бэкенда нет.
 
 ## Жёсткие параметры
-- Репозиторий `boom-cmd`; **`base: '/boom-cmd/'`**. При смене домена на `b00m-cmd.ru`
-  → `base: '/'` + `public/CNAME`. `base` прошит в: `vite.config.js`, `public/manifest.json`,
-  `public/sw.js`, `index.html`. Внутренние пути — через `import.meta.env.BASE_URL`.
+- Репозиторий `boom-cmd`; собственный домен `b00m-cmd.ru`; **`base: '/'`**
+  (CNAME — `public/CNAME`). `base` прошит синхронно в: `vite.config.js`,
+  `public/manifest.json`, `public/sw.js`, `index.html`. Внутренние пути —
+  через `import.meta.env.BASE_URL`. До переезда был `base: '/boom-cmd/'`
+  под GitHub Pages URL `mihail-izumov.github.io/boom-cmd/`.
 - **Платформа: mobile-first под iPhone, Apple HIG.** ПК не целевой — на десктопе
   мобильная колонка `max-w-[430px]` по центру. Tab bar внизу (только навигация),
   navigation bar с large title вверху, тач-таргеты ≥44pt, safe-area через `env(...)`.
