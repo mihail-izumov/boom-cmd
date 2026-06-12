@@ -7,9 +7,13 @@ import { typeIcon, pickDirection } from '../../i18n/materials.js'
 // --surface-2; справа — заголовок / описание / мета-чипы.
 // Превью: пока не загрузилось — bc-skeleton-перелив, затем картинка
 // проявляется целиком (opacity-свап по @load), не «кусочками».
-// Мета — чипы в стиле DirectionChip: направление / статус / дата, все
-// серые без цветового кодирования (DESIGN-STANDARD §3.4). Тип задаёт группа.
-// Парк-бейджа нет (TZ-3.3 §2). Тап по карточке → модалка деталей.
+// Мета — три РАЗНЫХ обработки, чтобы не сливались (ревизия владельца),
+// при этом всё монохромно (DESIGN-STANDARD §3.4, цвет по смыслу запрещён):
+//   направление — чип с обводкой (--line, фон прозрачный) — «тег»;
+//   статус      — залитый чип --surface-2 — «состояние»;
+//   дата        — просто текст --text-muted, без бабла.
+// Тип задаёт группа. Парк-бейджа нет (TZ-3.3 §2).
+// Тап по карточке → модалка деталей.
 
 const props = defineProps({
   material: { type: Object, required: true },
@@ -30,9 +34,12 @@ const showThumb = computed(
 )
 const Icon = computed(() => typeIcon(props.material.type))
 
-const chips = computed(() =>
-  [pickDirection(props.material), props.material.status, props.material.last_updated]
-    .filter(Boolean),
+const direction = computed(() => pickDirection(props.material))
+const hasMeta = computed(
+  () =>
+    !!direction.value ||
+    !!props.material.status ||
+    !!props.material.last_updated,
 )
 </script>
 
@@ -74,12 +81,19 @@ const chips = computed(() =>
         v-if="material.description"
         class="line-clamp-2 text-[0.9375rem] leading-snug text-[var(--text-secondary)]"
       >{{ material.description }}</span>
-      <span v-if="chips.length" class="mt-0.5 flex flex-wrap items-center gap-1">
+      <span v-if="hasMeta" class="mt-0.5 flex flex-wrap items-center gap-1.5">
         <span
-          v-for="c in chips"
-          :key="c"
+          v-if="direction"
+          class="inline-flex items-center rounded-full border border-[var(--line)] px-2 py-0.5 text-[0.75rem] font-medium leading-tight text-[var(--text-secondary)]"
+        >{{ direction }}</span>
+        <span
+          v-if="material.status"
           class="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[0.75rem] font-medium leading-tight text-[var(--text-secondary)]"
-        >{{ c }}</span>
+        >{{ material.status }}</span>
+        <span
+          v-if="material.last_updated"
+          class="text-[0.75rem] leading-tight text-[var(--text-muted)]"
+        >{{ material.last_updated }}</span>
       </span>
     </span>
   </button>

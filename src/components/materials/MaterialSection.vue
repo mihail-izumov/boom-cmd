@@ -1,13 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
-import { pluralRu } from '../../i18n/projects.js'
-import { MATERIALS_PLURAL, typeGroupLabel } from '../../i18n/materials.js'
+import { typeGroupLabel } from '../../i18n/materials.js'
 import MaterialCard from './MaterialCard.vue'
 
 // Группа-тип витрины материалов. Сворачиваемая (решение владельца после
 // первого прогона UI, отменяет упрощение TZ-5.2 §2.3): шапка — кнопка ≥44pt
-// с шевроном (механика = ProjectSection), счётчик — бейдж-пилюля справа.
+// с шевроном (механика = ProjectSection), счётчик — круглый бейдж с цифрой
+// сразу после заголовка (ревизия: без слова «материалов», не справа).
 // По дефолту все группы свёрнуты (state держит MaterialsScreen).
 // Пустые группы не рендерим (root v-if — страховка, как в ProjectSection).
 
@@ -20,10 +20,6 @@ const props = defineProps({
 defineEmits(['toggle', 'open-material'])
 
 const label = computed(() => typeGroupLabel(props.type))
-const countLabel = computed(() => {
-  const n = props.materials.length
-  return `${n} ${pluralRu(n, MATERIALS_PLURAL)}`
-})
 </script>
 
 <template>
@@ -44,8 +40,8 @@ const countLabel = computed(() => {
       />
       <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ label }}</h2>
       <span
-        class="ml-auto inline-flex items-center rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-[0.8125rem] font-medium leading-tight text-[var(--text-secondary)]"
-      >{{ countLabel }}</span>
+        class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 text-[0.8125rem] font-medium leading-none text-[var(--text-secondary)]"
+      >{{ materials.length }}</span>
     </button>
 
     <div v-show="open" :id="`materials-${type}`" class="flex flex-col gap-2">

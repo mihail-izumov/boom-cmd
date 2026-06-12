@@ -1,6 +1,6 @@
 <script setup>
-import { nextTick, ref } from 'vue'
-import { X } from 'lucide-vue-next'
+import { computed, nextTick, ref } from 'vue'
+import { X, ZoomIn, ZoomOut } from 'lucide-vue-next'
 
 // Полноэкранный просмотр локального изображения ВНУТРИ PWA (решение
 // владельца к TZ-5.2: изображения смотрим внутри, не в новой вкладке).
@@ -8,12 +8,17 @@ import { X } from 'lucide-vue-next'
 // Зум — вариант A (принят владельцем): двойной тап ×2.5 к точке тапа,
 // панорамирование — нативный скролл контейнера (с инерцией iOS), двойной
 // тап ещё раз — обратно. Pinch-zoom (вариант B) — в бэклоге
-// (docs/BACKLOG-boom-cmd.md), без новых зависимостей здесь не делаем.
+// (docs/BACKLOG-boom-cmd.md). Сверху — подсказка-пилюля «Двойной тап …»
+// с иконкой лупы (ревизия владельца: жест неочевиден, pinch привычнее).
 //
-// Закрытие: тап по фону или крестик (тап по самой картинке НЕ закрывает —
-// он занят детекцией двойного тапа). Esc/скролл-лок держит родитель
-// (MaterialDetail). Пока картинка грузится — bc-skeleton-перелив, затем
-// проявление целиком (opacity-свап по @load).
+// Структура из двух слоёв (фикс бага «кнопка уезжает при панорамировании»):
+// backdrop-filter на скролл-контейнере делает его containing block для
+// fixed-потомков, поэтому кнопка закрытия и подсказка живут НЕ внутри
+// скролл-слоя, а сиблингами в корневом fixed-диве.
+//
+// Закрытие: тап по фону или крестик (тап по картинке занят детекцией
+// двойного тапа). Esc/скролл-лок держит родитель (MaterialDetail).
+// Пока картинка грузится — bc-skeleton-перелив, проявление целиком.
 
 defineProps({
   href: { type: String, required: true },
@@ -26,6 +31,11 @@ const loaded = ref(false)
 const zoomed = ref(false)
 const scrollRef = ref(null)
 const imgRef = ref(null)
+
+const hintIcon = computed(() => (zoomed.value ? ZoomOut : ZoomIn))
+const hintText = computed(() =>
+  zoomed.value ? 'Двойной тап — уменьшить' : 'Двойной тап — увеличить',
+)
 
 // Ручная детекция двойного тапа: dblclick на iOS-тачах срабатывает
 // нестабильно, поэтому два click-а в окне 300мс.
@@ -62,40 +72,54 @@ async function toggleZoom(e) {
 
 <template>
   <div
-    ref="scrollRef"
-    class="fixed inset-0 z-[60] bg-[var(--scrim)] backdrop-blur-md"
-    :class="
-      zoomed
-        ? 'overflow-auto overscroll-contain'
-        : 'flex items-center justify-center overflow-hidden'
-    "
+    class="fixed inset-0 z-[60]"
     role="dialog"
     aria-modal="true"
     :aria-label="alt || 'Просмотр изображения'"
-    @click.self="$emit('close')"
   >
-    <span
-      v-if="!loaded"
-      class="bc-skeleton absolute h-[50svh] w-[80%] max-w-[430px] rounded-2xl"
-      aria-hidden="true"
-    />
-    <img
-      ref="imgRef"
-      :src="href"
-      :alt="alt"
-      class="transition-opacity duration-200"
-      :class="[
-        loaded ? 'opacity-100' : 'opacity-0',
+    <!-- скролл-слой: scrim + blur + картинка. Панорамирование живёт тут. -->
+    <div
+      ref="scrollRef"
+      class="absolute inset-0 bg-[var(--scrim)] backdrop-blur-md"
+      :class="
         zoomed
-          ? 'w-[250vw] max-w-none cursor-zoom-out'
-          : 'max-h-[100svh] max-w-full object-contain cursor-zoom-in',
-      ]"
-      @load="loaded = true"
-      @click="onImgClick"
-    />
+          ? 'overflow-auto overscroll-contain'
+          : 'flex items-center justify-center overflow-hidden'
+      "
+      @click.self="$emit('close')"
+    >
+      <span
+        v-if="!loaded"
+        class="bc-skeleton absolute h-[50svh] w-[80%] max-w-[430px] rounded-2xl"
+        aria-hidden="true"
+      />
+      <img
+        ref="imgRef"
+        :src="href"
+        :alt="alt"
+        class="transition-opacity duration-200"
+        :class="[
+          loaded ? 'opacity-100' : 'opacity-0',
+          zoomed
+            ? 'w-[250vw] max-w-none cursor-zoom-out'
+            : 'max-h-[100svh] max-w-full object-contain cursor-zoom-in',
+        ]"
+        @load="loaded = true"
+        @click="onImgClick"
+      />
+    </div>
+
+    <!-- оверлей-слой: НЕ скроллится вместе с картинкой -->
+    <span
+      class="pointer-events-none absolute left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 text-[0.8125rem] font-medium text-[var(--text-secondary)] shadow-lg"
+      style="top: calc(env(safe-area-inset-top) + 0.875rem)"
+    >
+      <component :is="hintIcon" class="h-4 w-4 shrink-0" :stroke-width="2" aria-hidden="true" />
+      {{ hintText }}
+    </span>
     <button
       type="button"
-      class="fixed right-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--text-secondary)] shadow-lg active:bg-[var(--surface-2)]"
+      class="absolute right-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--text-secondary)] shadow-lg active:bg-[var(--surface-2)]"
       style="top: calc(env(safe-area-inset-top) + 0.75rem)"
       aria-label="Закрыть просмотр"
       @click="$emit('close')"
