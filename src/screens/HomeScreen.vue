@@ -1,6 +1,7 @@
 <script setup>
 import { ChartColumnBig, ExternalLink, Folder, Layers } from 'lucide-vue-next'
 import SectionBanner from '../components/home/SectionBanner.vue'
+import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { setActive } from '../composables/useAppNav.js'
 
 // Home — командная дека (TZ-3.1 §1, ревизия 12.06.2026):
@@ -32,5 +33,7 @@ function goMaterials() { setActive('materials') }
       <span class="text-[1.0625rem] font-semibold">b00m.fun</span>
       <ExternalLink class="ml-auto h-5 w-5" :stroke-width="2" aria-hidden="true" />
     </a>
+
+    <InstallPwaBanner />
   </section>
 </template>

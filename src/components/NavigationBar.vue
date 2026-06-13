@@ -116,11 +116,14 @@ async function hardReload() {
     </div>
   </header>
 
-  <!-- Крупный центрированный заголовок — в потоке скролла -->
-  <div class="px-4 pb-3 pt-2 text-center">
+  <!-- Крупный центрированный заголовок — в потоке скролла.
+       caption ('данные от …') позиционируется absolute НАД заголовком,
+       чтобы не сдвигать h1 вниз: позиция заголовка одинакова на всех
+       разделах, с подписью и без (ревизия 12.06.2026). -->
+  <div class="relative px-4 pb-3 pt-2 text-center">
     <p
       v-if="caption"
-      class="mb-1 text-[0.75rem] leading-none text-[var(--text-muted)]"
+      class="pointer-events-none absolute inset-x-0 -top-2 text-[0.75rem] leading-none text-[var(--text-muted)]"
     >{{ caption }}</p>
     <h1 class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
       {{ title }}
