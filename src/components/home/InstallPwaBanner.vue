@@ -84,27 +84,28 @@ const steps = [
     <div
       class="relative flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3"
     >
-      <img
-        :src="appIcon"
-        alt=""
-        class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-2xl border border-[var(--line)]"
-      />
-      <div class="flex min-w-0 flex-1 flex-col gap-1.5 pr-8">
-        <span class="text-[1rem] font-semibold leading-snug text-[var(--text)]">
+      <span
+        class="relative block h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-2xl border border-[var(--line)]"
+      >
+        <img :src="appIcon" alt="" class="h-full w-full" />
+        <span class="bc-shine" aria-hidden="true" />
+      </span>
+      <div class="flex min-w-0 flex-1 flex-col gap-1 pr-8">
+        <span class="text-[0.9375rem] font-semibold leading-[1.15] text-[var(--text)]">
           Откройте БУМБАСТИК<br />как приложение
         </span>
         <button
           type="button"
-          class="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--text)] px-3 py-1 text-[0.8125rem] font-medium text-[var(--ink-on-color)] active:opacity-90"
+          class="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--text)] px-2.5 py-0.5 text-[0.75rem] font-medium text-[var(--ink-on-color)] active:opacity-90"
           @click="openModal"
         >
           Подробнее
-          <ChevronDown class="h-4 w-4" :stroke-width="2" aria-hidden="true" />
+          <ChevronDown class="h-3.5 w-3.5" :stroke-width="2" aria-hidden="true" />
         </button>
       </div>
       <button
         type="button"
-        class="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] active:bg-[var(--surface-2)]"
+        class="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] active:bg-[var(--surface-2)]"
         aria-label="Скрыть баннер"
         @click="dismiss"
       >
@@ -174,3 +175,38 @@ const steps = [
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Периодический «блик» по иконке (запрос владельца): диагональная полоса
+   света проходит раз в ~6с, остальное время — за кадром. Цвет блика — из
+   токена --ink-on-color (белый) через color-mix, без хардкода. */
+.bc-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    color-mix(in srgb, var(--ink-on-color) 55%, transparent) 50%,
+    transparent 62%
+  );
+  transform: translateX(-120%);
+  animation: bc-shine-sweep 6s ease-in-out infinite;
+}
+@keyframes bc-shine-sweep {
+  0%,
+  72% {
+    transform: translateX(-120%);
+  }
+  88%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-shine {
+    animation: none;
+    opacity: 0;
+  }
+}
+</style>
