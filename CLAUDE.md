@@ -140,32 +140,73 @@ Liquid Glass не имитируем.
     `src/composables/analyticsAggregate.js`.
 5b. ⏳ Интеграция Аналитики (gated Apps Script `?action=analytics`):
     URL — `VITE_ANALYTICS_API` (фолбэк на `VITE_PROJECTS_API`), фраза
-    доступа — из общего гейта. ← следующая, делает владелец на деплое.
+    доступа — из общего гейта. ← делает владелец на деплое.
+5-Materials. ✅ **Материалы — источник + UI витрины** (отдельный gated
+    Apps Script, `VITE_MATERIALS_API`, 26 записей). Этап 1: `useMaterials()`.
+    Этап 2 (TZ-5.2, реализован с отклонениями по решениям владельца):
+    группировка **по типу** (не по directions), сворачиваемые группы
+    (по дефолту свёрнуты), счётчик — цифра в круглом бейдже; детали — в
+    **модалке** (`MaterialDetail`, как Проекты), сырые URL не показываем
+    (кнопка действия: «Открыть ссылку» для PDF/Папок в новом окне /
+    «Смотреть» для локальных изображений); полноэкранный просмотр
+    изображений **внутри PWA** (`ImageViewer`) с зумом двойным тапом
+    (вариант A; pinch-zoom = вариант B в `docs/BACKLOG-boom-cmd.md`).
 6+. Статистика парков (источник 1С/ручной лист — открыто), глубина
     Материалов, AI-слой.
 
-## Структура кода (актуально для Фазы 5a)
+## Структура кода (актуально для Фаз 5a + 5-Materials)
 - `src/App.vue` — конфиг 4 вкладок (Главная стартовая) + конфиг под-страниц
   (сейчас `parks`). Флаг `parkFilter: true` у вкладки → пилюля активного
-  парк-фильтра в шапке.
+  парк-фильтра в шапке. **title вкладки Home = «БУМБАСТИК»** (бренд в шапке;
+  label в таб-баре остаётся «Главная»).
 - `src/components/AppShell.vue` · `NavigationBar.vue` · `TabBar.vue` — оболочка.
   `AppShell` держит `collapsed`/`onScroll` (порог 28px), сброс при смене
   вкладки/под-страницы. `NavigationBar` рендерит крупный центрированный
   заголовок в потоке + компактную стики-панель, и сам кладёт пилюлю
   парк-фильтра в обе позиции (центр большой / справа компактная) — если
-  у текущего экрана `parkFilter: true`. Под заголовком — опциональный
+  у текущего экрана `parkFilter: true`. Над заголовком — опциональный
   caption (мелкая строка типа «данные от 11.06.2026»), управляется
-  модульным синглтоном `useNavCaption`.
+  модульным синглтоном `useNavCaption`; рендерится `absolute` НАД H1,
+  чтобы не сдвигать заголовок (позиция H1 одинакова на всех разделах).
+  **`backdrop-blur` и фон шапки — только при `collapsed`** (на самом
+  верху шапка полностью прозрачна, иначе невидимый блюр-слой размывал
+  caption — фикс 13.06.2026).
 - `src/components/navigation/ParkFilterPill.vue` — лёгкая монохромная пилюля
   с шевроном; поддерживает `compact` режим для стики-панели.
 - `src/components/navigation/ParkPickerSheet.vue` — bottom-sheet chooser
   (выбор парка). Ходит через `PARKS_VISIBLE_BY_CITY`, чтобы парки с
   `enabled:false` (Июнь до открытия) не показывались.
-- `src/components/home/SectionBanner.vue` — крупный баннер деки на Главной.
+- `src/components/home/SectionBanner.vue` — крупный баннер-кнопка раздела на
+  Главной: иконка + заголовок + крупный серый шеврон (аффорданс). Плейсхолдер
+  цифр убран; слот под ключевые цифры вернётся с данными (Ф6).
+- `src/components/home/InstallPwaBanner.vue` — баннер «Откройте БУМБАСТИК как
+  приложение» + модалка-инструкция (установка на домашний экран iPhone).
+  Скрыт в standalone-PWA; закрытие живёт только в памяти (после reload снова
+  виден — без storage-персиста). Иконка с периодическим бликом
+  (scoped keyframe `bc-shine-sweep`, цвет из `--ink-on-color`, уважает
+  `prefers-reduced-motion`).
 - `src/components/parks/ParkCard.vue` — некликабельная справочная карточка
-  парка (имя/город/пустой слот).
+  парка (имя/город/пустой слот). **Вход на под-страницу «Парки» из UI убран**
+  (кнопку на Главной заменил баннер b00m.fun); `ParksScreen`/`subView:'parks'`
+  остаются в коде, вернутся со статистикой парков (Ф6).
 - `src/components/projects/` — карточка/секция/детали проекта, PriorityIcon,
-  DirectionChip, MilestoneMark.
+  DirectionChip, MilestoneMark. `ProjectSection` — счётчик цифрой в круглом
+  бейдже (фон `--line`), все статус-группы по дефолту свёрнуты
+  (`STATUS_DEFAULT_OPEN` = всё `false`).
+- `src/components/materials/` — раздел Материалов (Фаза 5-Materials):
+  - `MaterialSection.vue` — сворачиваемая группа-тип (шеврон + круглый
+    бейдж-счётчик), по дефолту свёрнута;
+  - `MaterialCard.vue` — карточка: превью 64×64 для локальных изображений
+    (`bc-skeleton` до загрузки + opacity-fade, `loading="lazy"`) или иконка
+    типа; мета — три разных формы (направление — чип с обводкой, статус —
+    залитый чип, дата — текст), всё монохромное;
+  - `MaterialDetail.vue` — модалка деталей (паттерн `ProjectDetail`:
+    focus-trap, Esc, scroll-lock, bottom-sheet); кнопка действия по типу,
+    сырых URL нет;
+  - `ImageViewer.vue` — полноэкранный просмотр локального изображения внутри
+    PWA; зум двойным тапом к точке тапа + панорамирование нативным скроллом;
+    два слоя (скролл + оверлей-сиблинг), т.к. `backdrop-filter` делал
+    скролл-слой containing block для fixed-кнопки.
 - `src/components/analytics/` — секция Аналитики (Фаза 5a):
   - `PeriodSegmented.vue` — сегмент-переключатель «Месяц/3 мес/12 мес»
     (лейбл `month` подменяется именем актуального месяца);
@@ -192,12 +233,22 @@ Liquid Glass не имитируем.
 - `src/screens/{Home,Analytics,Projects,Materials,Parks}Screen.vue` — экраны.
   `AnalyticsScreen` держит локальное состояние period + tab, ставит
   caption через `useNavCaption` на activate/deactivate (keep-alive).
+  **Дата caption Аналитики — фикс-константа `DATA_AS_OF` в `AnalyticsScreen`,
+  правится вручную** (раньше бралась из `data.updated` и подставлялась
+  текущая дата — баг, фикс 13.06.2026). `MaterialsScreen` — витрина: 4
+  состояния + парк-фильтр (чистое разделение) + группировка по типу.
 - `src/composables/useAppNav.js` — модульный синглтон навигации.
 - `src/composables/useParkContext.js` — модульный синглтон парк-контекста
   (`current` ∈ {`'network'`, id парка}).
 - `src/composables/useNavCaption.js` — модульный синглтон для caption
   над H1 в шапке. Экраны ставят/чистят на activate/deactivate.
 - `src/composables/useProjects.js` — точка работы с источником проектов.
+  `formatTarget()` приводит дату запуска (ISO или JS-`toString` из Apps
+  Script) к `DD.MM.YYYY`; свободный текст (`Q3`/`Август`) — как есть.
+- `src/composables/useMaterials.js` — точка работы с источником Материалов
+  (паттерн = useProjects; отдельный Web App, `VITE_MATERIALS_API`, без
+  `?action=`; `normalize()` + `resolveLink()` → `href`/`external`).
+  Данные RU (type/status/directions) — согласованное отклонение от §5.
 - `src/composables/useAnalytics.js` — точка работы с источником аналитики
   (паттерн = useProjects; `?action=analytics`; `VITE_ANALYTICS_API` →
   фолбэк `VITE_PROJECTS_API`; dev-fallback на мок, prod без env =
@@ -214,7 +265,11 @@ Liquid Glass не имитируем.
   `PARKS_BY_ID` для маппинга данных.
 - `src/data/projects.mock.json` — мок проектов.
 - `src/data/analytics.mock.json` — мок аналитики (форма = контракту).
+- `src/data/materials.mock.json` — мок Материалов (26 записей, форма = live).
 - `src/i18n/projects.js` — словари EN→RU для Проектов.
+- `src/i18n/materials.js` — порядок групп-типов (`MATERIALS_TYPE_ORDER`),
+  иконография типов, `pickDirection`/`parseDateRu`/`sortByDateDesc`,
+  `isLocalImage`. Словарей перевода нет — данные уже RU.
 - `src/i18n/analytics.js` — словари EN→RU для Аналитики (по §2
   контракта) + форматтеры (formatRub/Rub2/Pct/Growth/Compact и др.).
 - `src/styles/main.css` — токены `:root` + светлый холст + base.
@@ -238,8 +293,11 @@ Liquid Glass не имитируем.
 (деплой — автоматически через GitHub Actions при push в `main`).
 
 ## Открытые вопросы (НЕ решать молча — спросить владельца)
-1. Отображаемое имя продукта (сейчас «Командный центр БумБастик»).
+1. ✅ РЕШЕНО (13.06.2026): отображаемое имя продукта — **«БУМБАСТИК»**
+   (title шапки Home + PWA-имя в `index.html` `apple-mobile-web-app-title`
+   и `manifest.json` `name`/`short_name`).
 2. Источник статистики парков (1С / ручной лист) — для карточек Home (Ф3/6).
+   С ним же вернётся вход на под-страницу «Парки» (сейчас входа из UI нет).
 3. Тёмная тема: когда включать, нужен ли `prefers-color-scheme`.
 4. Когда открываем парк «Июнь» — снять `enabled:false` в `parks.js`.
 5. Поля, которые сейчас плейсхолдеры в Аналитике, и которых нет в текущем
@@ -247,6 +305,9 @@ Liquid Glass не имитируем.
    цена игры по контурам»; Rep flat «Средняя оценка площадок»). При
    расширении API контракт правится **только архитектором**, фронт
    подхватит автоматически.
+6. Pinch-zoom в просмотре изображений (вариант B) — в
+   `docs/BACKLOG-boom-cmd.md`; поднять, если двойного тапа мало.
+7. Дата `DATA_AS_OF` в Аналитике обновляется вручную при свежей выгрузке.
 
 ## Приватность
 `docs/` (внутренние брифы, включая `PRODUCT-PRINCIPLES` и текущие ТЗ) — в

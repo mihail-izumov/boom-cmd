@@ -1,6 +1,6 @@
 {
-  "name": "БУМБАСТИК – Мастерплан",
-  "short_name": "Мастерплан",
+  "name": "БУМБАСТИК",
+  "short_name": "БУМБАСТИК",
   "description": "Внутренний BizOps-пульт сети БумБастик",
   "start_url": "/",
   "display": "standalone",
