@@ -59,13 +59,12 @@ const rangeLabel = computed(() => {
   return `${monthLabel(ax[0])} – ${monthLabel(ax[ax.length - 1])}`
 })
 
-const updatedLabel = computed(() => {
-  const u = data.value?.updated
-  if (!u || typeof u !== 'string') return null
-  const m = u.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (!m) return null
-  return `данные от ${m[3]}.${m[2]}.${m[1]}`
-})
+// Дата актуальности данных Аналитики — ФИКСИРОВАННАЯ, правится ВРУЧНУЮ
+// владельцем при обновлении выгрузки (ревизия 13.06.2026). Раньше бралась
+// из data.updated и подставлялась текущая дата автоматически — это баг.
+// ↓↓↓ менять здесь при обновлении данных ↓↓↓
+const DATA_AS_OF = '11.06.2026'
+const updatedLabel = computed(() => `данные от ${DATA_AS_OF}`)
 
 // Caption над H1 в шапке — только пока экран активен (keep-alive).
 let isActive = false

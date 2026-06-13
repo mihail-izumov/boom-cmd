@@ -82,7 +82,7 @@ const steps = [
 <template>
   <div v-if="visible" class="mt-2">
     <div
-      class="relative flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3"
+      class="relative flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-lg"
     >
       <span
         class="relative block h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-2xl border border-[var(--line)]"

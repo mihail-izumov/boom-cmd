@@ -40,6 +40,29 @@ function normalizeParks(parks) {
   return 'network'
 }
 
+// Дата запуска (`target`). Источник может прислать:
+//   • ISO-строку `2026-06-25T07:00:00Z` (Sheets-дата через JSON);
+//   • JS-toString `Thu Jun 25 2026 11:00:00 GMT+0400 (…)` — так Apps Script
+//     сериализует ячейку-Date через String(), это и попадало в UI «как есть»;
+//   • свободный текст: `Q3`, `Август`, `К сентябрю` — это НЕ дата, оставляем.
+// Машинные форматы приводим к `DD.MM.YYYY`, парся части прямо из строки
+// (без new Date — чтобы таймзона не сдвинула день). Прочее — отдаём как есть.
+const MONTHS_EN = {
+  Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+  Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
+}
+function formatTarget(raw) {
+  const s = String(raw ?? '').trim()
+  if (!s) return null
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[3]}.${iso[2]}.${iso[1]}`
+  const js = s.match(/^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/)
+  if (js && MONTHS_EN[js[1]]) {
+    return `${String(js[2]).padStart(2, '0')}.${MONTHS_EN[js[1]]}.${js[3]}`
+  }
+  return s
+}
+
 function normalizeProject(p) {
   const priorityNum = Number(p?.priority)
   return {
@@ -54,7 +77,7 @@ function normalizeProject(p) {
           .map((s) => s.trim())
           .filter(Boolean),
     parks: normalizeParks(p?.parks),
-    target: p?.target ? String(p.target).trim() : null,
+    target: formatTarget(p?.target),
     description: String(p?.description ?? ''),
     items: Array.isArray(p?.items) ? p.items.map(normalizeItem).filter((i) => i.id && i.title) : [],
   }
