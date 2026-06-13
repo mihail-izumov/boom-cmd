@@ -67,9 +67,9 @@ async function hardReload() {
 <template>
   <!-- Sticky compact-bar: липкий вверху, стекло появляется на скролле -->
   <header
-    class="sticky top-0 z-20 pt-[env(safe-area-inset-top)] backdrop-blur transition-colors duration-200"
+    class="sticky top-0 z-20 pt-[env(safe-area-inset-top)] transition-colors duration-200"
     :class="collapsed
-      ? 'bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] border-b border-[var(--line)]'
+      ? 'backdrop-blur bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] border-b border-[var(--line)]'
       : 'bg-transparent border-b border-transparent'"
   >
     <div class="relative h-11 w-full">

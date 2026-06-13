@@ -6,13 +6,11 @@ import { ChevronDown, Share, X } from 'lucide-vue-next'
 // Иконка приложения слева, заголовок, пилюля «Подробнее ↓» → модалка-инструкция
 // по установке PWA на домашний экран iPhone; крестик — закрыть.
 //
-// Логика показа (по требованию владельца):
+// Логика показа (ревизия 13.06.2026):
 //   • уже запущено как установленное PWA (standalone) → НЕ показываем вовсе;
-//   • закрыли крестиком → прячем до конца СЕССИИ (sessionStorage — переживает
-//     навигацию/перезагрузку вкладки, очищается при закрытии; тот же механизм,
-//     что useAccessKey). Новый запуск (вышел/зашёл) → баннер снова виден.
-
-const DISMISS_KEY = 'bc_pwa_banner_dismissed'
+//   • закрыли крестиком → прячем только в памяти текущего просмотра.
+//     Перезагрузка / новый запуск → баннер снова виден (владелец: после
+//     reload должен появляться). Персист в storage НЕ делаем.
 
 const appIcon = `${import.meta.env.BASE_URL}icon-192.png`
 
@@ -30,26 +28,10 @@ function detectStandalone() {
   return !!(mm || iosStandalone)
 }
 
-function readDismissed() {
-  try {
-    return sessionStorage.getItem(DISMISS_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-const visible = computed(
-  () => !standalone.value && !dismissed.value,
-)
+const visible = computed(() => !standalone.value && !dismissed.value)
 
 function dismiss() {
   dismissed.value = true
-  try {
-    sessionStorage.setItem(DISMISS_KEY, '1')
-  } catch {
-    // приватный режим / заблокированный storage — баннер просто закроется
-    // на время жизни компонента, это допустимо.
-  }
 }
 
 // ——— модалка-инструкция ———
@@ -84,7 +66,6 @@ function closeModal() {
 
 onMounted(() => {
   standalone.value = detectStandalone()
-  dismissed.value = readDismissed()
 })
 onBeforeUnmount(() => {
   if (modalOpen.value) unlockScroll()
@@ -101,20 +82,20 @@ const steps = [
 <template>
   <div v-if="visible" class="mt-2">
     <div
-      class="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3"
+      class="relative flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3"
     >
       <img
         :src="appIcon"
         alt=""
-        class="h-12 w-12 shrink-0 rounded-2xl border border-[var(--line)]"
+        class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-2xl border border-[var(--line)]"
       />
-      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div class="flex min-w-0 flex-1 flex-col gap-1.5 pr-8">
         <span class="text-[1rem] font-semibold leading-snug text-[var(--text)]">
-          Откройте БУМБАСТИК как приложение
+          Откройте БУМБАСТИК<br />как приложение
         </span>
         <button
           type="button"
-          class="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--accent)] px-3 py-1 text-[0.8125rem] font-medium text-[var(--accent-ink)] active:opacity-90"
+          class="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--text)] px-3 py-1 text-[0.8125rem] font-medium text-[var(--ink-on-color)] active:opacity-90"
           @click="openModal"
         >
           Подробнее
@@ -123,7 +104,7 @@ const steps = [
       </div>
       <button
         type="button"
-        class="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-full text-[var(--text-muted)] active:bg-[var(--surface-2)]"
+        class="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] active:bg-[var(--surface-2)]"
         aria-label="Скрыть баннер"
         @click="dismiss"
       >
