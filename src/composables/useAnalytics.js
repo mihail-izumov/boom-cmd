@@ -112,7 +112,10 @@ export function useAnalytics() {
       // GET без кастомных заголовков (без CORS-preflight); ?action=analytics —
       // маршрутизация на бэке (PATTERNS §1.2).
       const url = `${API}?key=${encodeURIComponent(key)}&action=analytics`
-      const res = await fetch(url)
+      // no-store: не отдавать из HTTP-кэша браузера. Свежесть данных важнее
+      // (источник = живая Google-таблица, читаемая в рантайме). SW этот
+      // запрос уже не перехватывает (кросс-ориджин, см. public/sw.js).
+      const res = await fetch(url, { cache: 'no-store' })
       if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)
       const json = await res.json()
 

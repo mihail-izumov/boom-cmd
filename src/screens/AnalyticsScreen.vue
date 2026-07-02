@@ -3,8 +3,8 @@ import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue
 import { useAnalytics } from '../composables/useAnalytics.js'
 import { useParkContext } from '../composables/useParkContext.js'
 import { useNavCaption } from '../composables/useNavCaption.js'
-import { computeContext } from '../composables/analyticsAggregate.js'
-import { PERIODS, monthLabel, monthShortCap } from '../i18n/analytics.js'
+import { computeContext, DOMAIN_KEYS } from '../composables/analyticsAggregate.js'
+import { PERIODS, monthLabel, monthShortCap, lastDayLabel } from '../i18n/analytics.js'
 
 import PeriodSegmented from '../components/analytics/PeriodSegmented.vue'
 import SectionTabs from '../components/analytics/SectionTabs.vue'
@@ -59,12 +59,25 @@ const rangeLabel = computed(() => {
   return `${monthLabel(ax[0])} – ${monthLabel(ax[ax.length - 1])}`
 })
 
-// Дата актуальности данных Аналитики — ФИКСИРОВАННАЯ, правится ВРУЧНУЮ
-// владельцем при обновлении выгрузки (ревизия 13.06.2026). Раньше бралась
-// из data.updated и подставлялась текущая дата автоматически — это баг.
-// ↓↓↓ менять здесь при обновлении данных ↓↓↓
-const DATA_AS_OF = '30.06.2026'
-const updatedLabel = computed(() => `данные от ${DATA_AS_OF}`)
+// Дата актуальности данных Аналитики — выводится ИЗ САМИХ ДАННЫХ:
+// это самый поздний месяц по всем доменам (последний день месяца).
+// Обновляется автоматически, как только в источник (Google-таблица →
+// Apps Script) добавляется новый месяц — ручная константа больше не нужна.
+// NB: раньше это была фикс-константа DATA_AS_OF (правилась вручную) — она
+// «отставала» от данных; ещё раньше брали data.updated = текущая дата
+// (тоже баг). Триггер = максимум по data.<domain>[].month, а не «сегодня».
+const latestMonth = computed(() => {
+  let max = null
+  for (const k of DOMAIN_KEYS) {
+    for (const r of data.value?.[k] || []) {
+      if (r?.month && (max === null || r.month > max)) max = r.month
+    }
+  }
+  return max
+})
+const updatedLabel = computed(() =>
+  latestMonth.value ? `данные от ${lastDayLabel(latestMonth.value)}` : '',
+)
 
 // Caption над H1 в шапке — только пока экран активен (keep-alive).
 let isActive = false

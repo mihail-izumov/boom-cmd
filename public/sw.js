@@ -8,12 +8,14 @@
 //   - activate: clients.claim + чистка любых кэшей, не равных текущему;
 //                postMessage клиентам ({ type: 'SW_ACTIVATED', cacheName }) —
 //                канал на будущее, страница сейчас auto-reload не делает.
-//   - fetch:
+//   - fetch (ТОЛЬКО same-origin — кросс-ориджин источник данных не трогаем):
 //       * навигации (request.mode === 'navigate') → network-first:
 //         идём в сеть, при успехе обновляем кэшированный index.html, при
 //         оффлайне — отдаём кэшированный index.html;
 //       * GET ассеты (имеют хешированное имя при сборке) → cache-first:
 //         если в кэше — отдаём из кэша; иначе fetch и кладём в кэш;
+//       * кросс-ориджин (gated Apps Script — данные) → НЕ перехватываем,
+//         сеть напрямую, чтобы обновления Google-таблицы долетали сразу;
 //       * остальные методы (POST/PUT/…) — не перехватываем.
 
 const BUILD_ID = '__BUILD_ID__'; // подменяется на Date.now() в closeBundle
@@ -59,6 +61,20 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
+
+  // Только SAME-ORIGIN (аппшелл + собранные ассеты). Кросс-ориджин запросы
+  // НЕ перехватываем — они уходят в сеть напрямую. Это критично для
+  // ИСТОЧНИКА ДАННЫХ (gated Apps Script: Projects / Analytics / Materials):
+  // раньше он попадал в ветку «любой GET → cache-first» и залипал —
+  // обновления Google-таблицы не долетали до PWA, пока не сменится build-id.
+  // Данные должны читаться из сети в рантайме, поэтому их не кэшируем.
+  let sameOrigin = true;
+  try {
+    sameOrigin = new URL(request.url).origin === self.location.origin;
+  } catch (e) {
+    sameOrigin = true;
+  }
+  if (!sameOrigin) return;
 
   // Навигация (HTML страница) — network-first с обновлением кэша.
   if (request.mode === 'navigate') {

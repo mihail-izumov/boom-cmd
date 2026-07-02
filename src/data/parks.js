@@ -14,7 +14,7 @@ export const PARKS = [
   { id: 'mari',      name: 'MARI',      short: 'MARI',      city: 'Москва',           enabled: true  },
   { id: 'ohta',      name: 'Охта Молл', short: 'Охта',      city: 'Санкт-Петербург',  enabled: true  },
   { id: 'piterland', name: 'Питерленд', short: 'Питерленд', city: 'Санкт-Петербург',  enabled: true  },
-  { id: 'iyun',      name: 'Июнь',      short: 'Июнь',      city: 'Санкт-Петербург',  enabled: false },
+  { id: 'iyun',      name: 'Июнь',      short: 'Июнь',      city: 'Санкт-Петербург',  enabled: true  },
 ]
 
 export const PARKS_BY_ID = Object.fromEntries(PARKS.map((p) => [p.id, p]))
