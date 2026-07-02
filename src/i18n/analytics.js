@@ -133,6 +133,37 @@ export function monthShortCap(ym) {
   return w.charAt(0).toUpperCase() + w.slice(1)
 }
 
+// Полные имена месяцев (для подписи «данные за июнь 2026»).
+const MONTH_RU_FULL = [
+  'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',
+]
+// 'YYYY-MM' → 'июнь 2026' — период данных в подписи Аналитики.
+export function monthYearFull(ym) {
+  if (typeof ym !== 'string') return ''
+  const [y, m] = ym.split('-')
+  const mi = Number(m)
+  if (!Number.isFinite(mi) || mi < 1 || mi > 12) return ym
+  return `${MONTH_RU_FULL[mi - 1]} ${y}`
+}
+
+// Реальная дата обновления источника → 'DD.MM.YYYY'. На вход — поле `updated`
+// из ответа Apps Script (дата последнего изменения Google-таблицы). Принимаем
+// ISO ('2026-07-02' / '2026-07-02T21:00:00Z') и произвольную дату-строку.
+// Возвращает null, если распарсить нельзя (тогда подпись покажет только период).
+export function updatedDateLabel(s) {
+  if (typeof s !== 'string' || !s) return null
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[3]}.${iso[2]}.${iso[1]}`
+  const d = new Date(s)
+  if (!Number.isNaN(d.getTime())) {
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}.${mm}.${d.getFullYear()}`
+  }
+  return null
+}
+
 // 'YYYY-MM' → 'YYYY' (для бейджей y/y и подписей).
 export function yearOf(ym) {
   return typeof ym === 'string' ? ym.slice(0, 4) : ''
