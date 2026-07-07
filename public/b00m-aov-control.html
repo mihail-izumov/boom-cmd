@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>b00m · Заряди карту + Стратегия</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#1c1a3e; --bg-card:#222050; --bg-night:#0D1421;
+    --lime:#C5F946; --cyan:#00D4FF; --magenta:#FF0080; --yellow:#FFD60A; --orange:#FF6B00; --green:#00FF88;
+    --text:#F0F4FF; --text2:#7A8BA8; --muted:rgba(255,255,255,.45); --line:rgba(74,90,173,.30);
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
+  body{margin:0; background:var(--bg-deep); color:var(--text); font-family:Inter,system-ui,sans-serif; line-height:1.6; font-size:16px; -webkit-font-smoothing:antialiased;}
+  .mono{font-family:'Space Mono',monospace;}
+  nav{position:sticky; top:0; z-index:10; background:rgba(20,18,50,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line);}
+  .nav-in{margin:0; display:flex; align-items:center; gap:6px; padding:12px 24px; flex-wrap:wrap;}
+  .brand{font-family:Montserrat,sans-serif; font-weight:900; font-size:16px; margin-right:14px;} .brand b{color:var(--lime);}
+  .nav-in button{background:transparent; border:1px solid transparent; color:var(--text2); font-family:'Space Mono',monospace; font-size:13px; text-transform:uppercase; letter-spacing:.05em; padding:7px 14px; border-radius:8px; cursor:pointer;}
+  .nav-in button:hover{color:var(--text);} .nav-in button.on{background:var(--lime); color:#1a1840;}
+  /* Протокол и Вопросы — мета-страницы, не контуры: нейтральный активный цвет, чтобы не путались с лаймом «Гипотез» */
+  .nav-in button[data-pg="protocol"].on, .nav-in button[data-pg="questions"].on{background:rgba(240,244,255,.16); color:var(--text);}
+  .navgrp{position:relative;}
+  .navgrp>.grp{background:transparent; border:1px solid transparent; font-family:'Space Mono',monospace; font-size:13px; text-transform:uppercase; letter-spacing:.05em; padding:7px 14px; border-radius:8px; cursor:pointer;}
+  .navgrp[data-c="real"]>.grp{color:var(--cyan);}
+  .navgrp[data-c="hyp"]>.grp{color:var(--lime);}
+  .navgrp[data-c="mk"]>.grp{color:var(--magenta);}
+  .navgrp>.grp:hover{border-color:var(--line);}
+  .navgrp.active[data-c="real"]>.grp{background:rgba(0,212,255,.15);}
+  .navgrp.active[data-c="hyp"]>.grp{background:rgba(197,249,70,.15);}
+  .navgrp.active[data-c="mk"]>.grp{background:rgba(255,0,128,.15);}
+  .navgrp .menu{display:none; position:absolute; top:calc(100% + 6px); left:0; min-width:172px; background:rgba(22,20,52,.98); backdrop-filter:blur(12px); border:1px solid var(--line); border-radius:10px; padding:6px; z-index:30; flex-direction:column; gap:2px;}
+  .navgrp.open .menu{display:flex;}
+  .navgrp .menu button{width:100%; text-align:left; white-space:nowrap;}
+  .wrap{max-width:1000px; margin:0 auto; padding:34px 20px 80px;}
+  .page{display:none;} .page.on{display:block;}
+  h1{font-family:Montserrat,sans-serif; font-weight:900; font-size:26px; margin:0 0 4px;}
+  .lead{color:var(--text2); font-size:14px; margin:0 0 24px;}
+  p{margin:0 0 12px;} .sub{color:var(--text2); font-size:14px;}
+  h3{font-size:16px; font-weight:600; margin:28px 0 8px;}
+
+  /* MACKET */
+  .hero{font-family:Montserrat,sans-serif; font-weight:900; font-size:40px; line-height:1.02; margin:6px 0 4px; letter-spacing:.01em;}
+  .tagline{font-family:'Space Mono',monospace; font-size:13px; text-transform:uppercase; letter-spacing:.14em; color:var(--lime); margin-bottom:18px;}
+  .switch{display:flex; gap:6px; margin-bottom:20px;}
+  .switch button{background:transparent; border:1px solid var(--line); color:var(--text2); font-family:'Space Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:.06em; padding:6px 14px; border-radius:8px; cursor:pointer;}
+  .switch button.on{background:var(--cyan); color:#06283a; border-color:var(--cyan);}
+  .pick{font-family:'Space Mono',monospace; font-size:13px; text-transform:uppercase; letter-spacing:.1em; color:var(--text2); margin:6px 0 12px;}
+
+  .entry{display:flex; align-items:center; gap:14px; background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:14px;}
+  .entry .lab{font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--text2);}
+  .entry .pr{font-family:Montserrat,sans-serif; font-weight:900; font-size:22px; min-width:96px;}
+  .entry .vb{margin-left:auto;}
+
+  .deal{display:flex; gap:14px; align-items:stretch;}
+  .opt{flex:1; background:var(--bg-card); border:1px solid var(--line); border-radius:16px; padding:20px 16px 18px; text-align:center; position:relative;}
+  .opt.def{border:2px solid var(--lime);}
+  .badge-sz{display:inline-block; font-family:Montserrat,sans-serif; font-weight:900; font-size:15px; letter-spacing:.05em; background:var(--bg-night); border:1px solid var(--line); color:var(--text); width:34px; height:34px; line-height:32px; border-radius:9px;}
+  .opt.def .badge-sz{background:var(--lime); color:#1a1840; border-color:var(--lime);}
+  .intent{font-family:Montserrat,sans-serif; font-weight:700; font-size:18px; margin:10px 0 12px;}
+  .pr{font-family:Montserrat,sans-serif; font-weight:900; font-size:32px; line-height:1;}
+  .star{position:absolute; top:-11px; left:50%; transform:translateX(-50%); font-family:'Space Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em; background:var(--lime); color:#1a1840; padding:3px 11px; border-radius:5px;}
+  .vb{display:inline-block; font-family:'Space Mono',monospace; font-size:12px; color:var(--cyan); background:rgba(0,212,255,.1); border:1px solid rgba(0,212,255,.25); border-radius:7px; padding:4px 10px; margin-top:12px;}
+  .tk{display:inline-block; font-family:'Space Mono',monospace; font-weight:700; font-size:13px; color:var(--yellow); background:rgba(255,214,10,.12); border:1px solid rgba(255,214,10,.3); border-radius:7px; padding:4px 11px;}
+
+  .prizes{margin-top:18px; background:var(--bg-night); border:1px solid rgba(255,214,10,.3); border-radius:14px; padding:16px;}
+  .prizes .ph{font-family:Montserrat,sans-serif; font-weight:800; font-size:clamp(17px,4vw,23px); color:var(--yellow); margin:0 0 14px; display:flex; align-items:center; justify-content:center; gap:10px;}
+  .qmark.inq{position:static; display:inline-flex; vertical-align:middle; margin-left:10px;}
+  .pgrid{display:flex; gap:12px;}
+  .pcard{flex:1; background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:14px; text-align:center;}
+  .pcard .pr{font-size:24px;}
+  .keep{margin-top:16px; text-align:center; font-family:'Space Mono',monospace; font-size:12px; color:var(--text2);}
+  .mk-head{font-family:Montserrat,sans-serif; font-weight:800; font-size:clamp(17px,4vw,23px); color:var(--lime); text-align:center; margin:22px 0 14px;}
+  .battle{margin:0 0 22px;}
+  .bttl{font-family:'Space Mono',monospace; font-weight:700; color:var(--cyan); font-size:15px; margin:0 0 8px; letter-spacing:.03em;}
+  .lever{margin-top:8px; padding:10px 13px; background:rgba(197,249,70,.08); border-left:3px solid var(--lime); border-radius:8px; font-size:14px; line-height:1.5;}
+  h4.dir{font-family:'Space Mono',monospace; color:var(--cyan); font-size:14px; text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px;}
+  ul.ck{list-style:none; padding-left:0; margin:0 0 6px;}
+  ul.ck li{position:relative; padding-left:26px; margin:7px 0; line-height:1.45;}
+  ul.ck li:before{content:'☐'; position:absolute; left:0; color:var(--text2);}
+  ul.ck li.done:before{content:'✅';}
+  ul.ck li.prog:before{content:'🔄';}
+  ul.ck li.done{color:var(--text2); text-decoration:line-through;}
+  ol.qn{padding-left:22px; margin:8px 0 6px;} ol.qn li{margin:8px 0; line-height:1.45;}
+  /* ТТ-1 полноширинная сцена: макет (слева) + полоса-тултип (справа, 1/4, 100vh) */
+  .tt1-stage{width:100vw; margin-left:calc(50% - 50vw); margin-top:-34px; min-height:100vh; display:flex; align-items:stretch; background:var(--bg-deep);}
+  .tt1-board{flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; padding:26px clamp(20px,4vw,64px) 40px;}
+  .tt1-board .hero{text-align:center; margin:6px 0 12px;}
+  .tt1-panel{flex:0 0 25vw; width:25vw; background:var(--bg-night); border:none; padding:26px 28px; display:flex; flex-direction:column; justify-content:flex-start; overflow-y:auto; box-sizing:border-box; font-size:15px; line-height:1.62; color:var(--text);}
+  .tt1-panel h5{margin:0 0 14px; font-family:Montserrat,sans-serif; font-weight:800; font-size:18px; line-height:1.25; color:var(--cyan);}
+  .tt1-panel p{margin:0 0 11px;}
+  .tt1-panel p:last-child{margin-bottom:0;}
+  .tt1-panel ul{margin:6px 0 0; padding-left:20px;}
+  .tt1-panel li{margin:7px 0; line-height:1.5;}
+  .tt1-panel b{color:var(--cyan);}
+  .tt1-panel .q{color:var(--yellow); font-weight:700;}
+  .tt1-tasks{width:100vw; margin-left:calc(50% - 50vw); background:var(--bg-card); border-top:1px solid var(--line); padding:26px clamp(20px,4vw,64px) 34px;}
+  .qmark{position:absolute; top:8px; right:8px; width:23px; height:23px; border-radius:50%; border:1px solid var(--cyan); color:var(--cyan); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; background:var(--bg-night); z-index:6; line-height:1;}
+  .qmark:hover{background:rgba(0,212,255,.15);}
+  .qmark.active{background:var(--cyan); color:var(--bg-deep);}
+  @media(max-width:760px){
+    .tt1-stage{flex-direction:column; min-height:0;}
+    .tt1-board{order:1; padding:24px 18px;}
+    .tt1-panel{order:2; flex:auto; width:100%;}
+    .tt1-tasks{padding:22px 18px 30px;}
+  }
+  .keep i{color:var(--green);}
+
+  /* tables / strategy */
+  .principle{background:var(--bg-card); border-left:3px solid var(--lime); padding:13px 18px; margin:0 0 18px;}
+  .principle .k{font-family:Montserrat,sans-serif; font-weight:700; font-size:17px;}
+  table{width:100%; border-collapse:collapse; margin:8px 0 18px; font-size:13.5px;}
+  th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top;}
+  th{font-family:'Space Mono',monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text2); font-weight:700;}
+  .rc{font-family:'Space Mono',monospace; font-weight:700;}
+  .c-prot{color:var(--text2);} .c-tgt{color:var(--lime);} .c-up{color:var(--yellow);}
+  .up{color:var(--green);} .down{color:var(--magenta);} .tag{font-family:'Space Mono',monospace; font-size:10px; color:var(--cyan);}
+  .zones{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:10px 0;}
+  .zc{background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:14px;}
+  .zc.def{border-color:rgba(197,249,70,.4);}
+  .zc h4{margin:0 0 2px; font-size:14px;} .zc .r{font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; color:var(--text2); margin-bottom:8px;}
+  .zc ul{margin:0; padding:0; list-style:none;} .zc li{font-size:12.5px; padding:5px 0; border-top:1px solid var(--line); line-height:1.4;} .zc li:first-child{border-top:none;}
+  .ends{display:flex; gap:12px; margin:6px 0;}
+  .end{flex:1; background:var(--bg-night); border:1px solid var(--line); border-radius:10px; padding:11px 13px; font-size:12.5px; color:var(--text2);} .end b{color:var(--text);}
+  .foot{margin-top:50px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; font-family:'Space Mono',monospace;}
+  @media(max-width:720px){
+    .deal{flex-direction:column;} .hero{font-size:30px;} .zones{grid-template-columns:1fr;} .pgrid{flex-direction:column;} .ends{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+
+<nav><div class="nav-in">
+  <span class="brand">Контроль чека</span>
+  <button data-pg="protocol">Протокол</button>
+  <div class="navgrp" data-c="real">
+    <button class="grp">Сейчас ▾</button>
+    <div class="menu">
+      <button data-pg="data">Данные</button>
+      <button data-pg="tariffs">Тарифы</button>
+      <button data-pg="request">Запрос</button>
+    </div>
+  </div>
+  <div class="navgrp" data-c="hyp">
+    <button class="grp">Гипотезы ▾</button>
+    <div class="menu">
+      <button data-pg="plan">План / Контроль</button>
+      <button data-pg="loyalty">Лояльность</button>
+      <button data-pg="strategy">Стратегия</button>
+      <button data-pg="sml">S/M/L</button>
+      <button data-pg="scenarios">Сценарии</button>
+      <button data-pg="battles">Батлы</button>
+    </div>
+  </div>
+  <div class="navgrp" data-c="mk">
+    <button class="grp">Макеты ▾</button>
+    <div class="menu">
+      <button data-pg="macket">ТТ-1</button>
+      <button data-pg="charges">ТТ-2</button>
+      <button data-pg="tt3">ТТ-3</button>
+    </div>
+  </div>
+  <button data-pg="questions">Вопросы</button>
+</div></nav>
+
+<div class="wrap">
+
+  <!-- PROTOCOL -->
+  <section class="page on" id="protocol">
+    <h1>Протокол — как читать и менять документ</h1>
+    <p class="lead">Чтобы вся команда и ИИ-ассистенты в других чатах одинаково понимали, что здесь факт, а что гипотеза, и не ломали документ правками. Цвет в навигации = статус: <span style="color:var(--cyan);">циан — сейчас (как есть)</span>, <span style="color:var(--lime);">лайм — гипотезы</span>, <span style="color:var(--magenta);">маджента — макеты</span>.</p>
+
+    <h3>Три контура — по статусу правды</h3>
+    <div class="zones">
+      <div class="zc" style="border-color:rgba(0,212,255,.45);">
+        <h4 style="color:var(--cyan);">① Сейчас</h4>
+        <div class="r">как есть · только сверяемся</div>
+        <ul>
+          <li><b>Данные</b> — реальные пополнения, чек, остатки</li>
+          <li><b>Тарифы</b> — источник правды по числам (Факт). Здесь же Конструктор — как считаем макет</li>
+          <li><b>Запрос</b> — что кассиры реально говорят, о чём спрашивают гости</li>
+        </ul>
+      </div>
+      <div class="zc" style="border-color:rgba(197,249,70,.45);">
+        <h4 style="color:var(--lime);">② Гипотезы</h4>
+        <div class="r">наша интерпретация данных</div>
+        <ul>
+          <li><b>Стратегия</b> — куда и почему двигаем чек</li>
+          <li><b>S/M/L</b> — стержень: роли тиров</li>
+          <li><b>Сценарии</b> — типы загрузок, разница парков</li>
+          <li><b>Батлы</b> — аргументы апселла по тирам</li>
+        </ul>
+      </div>
+      <div class="zc" style="border-color:rgba(255,0,128,.45);">
+        <h4 style="color:var(--magenta);">③ Макеты</h4>
+        <div class="r">выход гипотез — гостю и кассиру</div>
+        <ul>
+          <li><b>ТТ-1</b> — «Заряди карту» (продажа)</li>
+          <li><b>ТТ-2</b> — «Заряды» (валюта)</li>
+          <li><b>ТТ-3</b> — онбординг / FAQ</li>
+        </ul>
+      </div>
+    </div>
+    <p class="sub">Отдельно — <b>Вопросы</b>: открытые решения A–G, которые финализирует Михаил Изюмов.</p>
+
+    <div class="principle">
+      <div class="k">Зачем документ</div>
+      <p class="sub" style="margin:6px 0 0;">Поднять средний чек на тирах <b>1500/2000</b> максимально проверенным путём. Это гипотезы — но реалистичность на основе данных должна быть максимальной. Не креативим ради креатива: каждое изменение решает задачу роста чека.</p>
+    </div>
+
+    <h3>Поток изменения макета — всегда в этом порядке</h3>
+    <ol class="qn">
+      <li>Считаем в <b>Конструкторе</b> (числа берём только из «Тарифы · Факт»).</li>
+      <li>Прогоняем чек-лист ниже — ищем противоречия с другими страницами.</li>
+      <li>Только если чисто → выносим на <b>макет</b> (ТТ-1/2/3).</li>
+      <li>Если осталось допущение или открытый пункт → фиксируем в <b>«Вопросы»</b>, не выдаём гостю за факт.</li>
+    </ol>
+
+    <h3>Чек-лист перед запуском на макет</h3>
+    <p class="sub">Каждый пункт должен пройти. Если хоть один не проходит — на макет не выносим.</p>
+    <h4 class="dir">Числа и источник</h4>
+    <ul class="ck">
+      <li>Все числа — из <b>«Тарифы · Факт»</b>, ничего не выдумано</li>
+      <li>Игры считаны по стандарту <b>65 зар/игра</b> (честная середина 33–100); если показываем иначе — помечено «допущение»</li>
+      <li>Тикеты числом — только подтверждённое (<b>+200 @ 1000, Питер, налом</b>); выше — без числа</li>
+      <li>Курс % = подарок ÷ пополнение — сходится с табличкой</li>
+    </ul>
+    <h4 class="dir">Непротиворечивость</h4>
+    <ul class="ck">
+      <li>Не спорит с <b>«Данными»</b> (реальное распределение и чек)</li>
+      <li>Не спорит с <b>«Запросом»</b> (что кассиры говорят, о чём спрашивают гости)</li>
+      <li>Не спорит со <b>«Стратегией / S/M/L»</b> (двигает к 1500/2000, не ломает роли тиров)</li>
+      <li>Не спорит с другими макетами (заряды, два счёта, бессрочная карта — формулировки едины)</li>
+      <li><b>«Конструктор» = макет</b> число-в-число (нет рассинхрона вроде 56/65)</li>
+    </ul>
+    <h4 class="dir">Задача и интегритет</h4>
+    <ul class="ck">
+      <li>Изменение решает рост чека 1500/2000, а не «просто красивее»</li>
+      <li>Объём для гостя сокращается, не растёт</li>
+      <li>Кассир может объяснить каждую цифру (тултип-провенанс заполнен)</li>
+      <li>Правка касается открытого решения A–G → не финалю без Михаила Изюмова</li>
+    </ul>
+
+    <h3>Инструкция для ИИ-ассистентов и команды</h3>
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">Прежде чем вносить любое изменение — проверь себя по этому протоколу</div>
+      <p class="sub" style="margin:6px 0 0;">Относится к работе в этом и любом другом чате/ассистенте, который правит этот документ или макеты.</p>
+    </div>
+    <ol class="qn">
+      <li><b>Определи контур.</b> Что меняешь — «Сейчас», Гипотезу или Макет? Данные / Тарифы-Факт / Запрос (контур «Сейчас») не переписываем под удобную картинку — только сверяем.</li>
+      <li><b>Возьми числа из источника правды.</b> Тарифы (Факт) — по тарифам, Запрос — по кассирам. Не из памяти и не «по аналогии».</li>
+      <li><b>Посчитай в Конструкторе</b> и сверь с макетом и соседними страницами.</li>
+      <li><b>Прогони чек-лист выше.</b> Любой непройденный пункт = стоп.</li>
+      <li><b>Помечай статус.</b> Факт — как факт; экстраполяция — «допущение»; неподтверждённое числом не обещаем.</li>
+      <li><b>Спорное — в «Вопросы», не в макет.</b> Открытые решения (A–G) финализирует Михаил Изюмов; без его слова не закрываем.</li>
+      <li><b>Меняешь много — собери одним заходом</b> и проверь баланс тегов и скрипта, прежде чем отдавать файл.</li>
+    </ol>
+    <h4 class="dir">Как строить макеты ТТ — единая структура</h4>
+    <p class="sub">Все тейбл-тенты собираются по одному каркасу — чтобы кассир и гость не переучивались между ТТ. Эталон — ТТ-1.</p>
+    <ul class="ck">
+      <li><b>Сцена:</b> слева — макет, справа — панель-инструкция кассиру на всю высоту со скроллом.</li>
+      <li><b>Иконки «?»</b> на блоках, которые требуют разъяснения: клик меняет текст правой панели (Игроку / Когда / Ход / Аргументы) — это интерактивное обучение кассира.</li>
+      <li><b>Каждая цифра в панели — с провенансом</b> (откуда взялась, почему правдива). Неподтверждённое числом не обещаем.</li>
+      <li><b>Внизу макета — чек-лист задач этого ТТ</b>, согласованный с другими страницами (Стратегия, Батлы, Данные, Запрос). Не выдумывать в отрыве от них.</li>
+      <li><b>Соответствие проверяем по «Покрытию вопросов источниками»</b> (вкладка «Вопросы») — это единый трекер «закрыто / пробел». Отдельный дублирующий чек-лист не заводим, чтобы источники не расходились.</li>
+      <li><b>Единый визуальный язык:</b> цвета, шрифты, бейджи — из существующего стиля; новых не плодим. Объём для гостя сокращаем, не наращиваем.</li>
+    </ul>
+    <p class="sub">Короткое правило: <b>сначала Конструктор и сверка → потом макет.</b> Факт и гипотеза не смешиваются; гость не видит неподтверждённое как факт.</p>
+  </section>
+
+  <!-- MACKET -->
+  <section class="page" id="macket">
+    <div class="switch" id="tt1sw">
+      <button class="on" data-tt="ohta">Охта</button>
+      <button data-tt="piter">Питерлэнд</button>
+    </div>
+    <p class="sub" id="tt1note" style="color:var(--muted); margin-top:-8px;"></p>
+    <div class="tt1-stage">
+      <div class="tt1-board" id="tt1board"></div>
+      <div class="tt1-panel" id="tt1panel">
+        <h5>Инструкция кассиру</h5>
+        <p>Нажми <b>?</b> на элементе макета — здесь появится, что он говорит игроку и как подать по шагам.</p>
+        <p><span class="q">?</span> у аргумента = нужна точная цифра (см. вкладку «Вопросы»).</p>
+      </div>
+    </div>
+
+    <div class="tt1-tasks">
+      <h4 class="dir" style="margin-top:0;">Задачи ТТ-1 <span class="tag">актуально 06.26</span></h4>
+      <ul class="ck">
+        <li class="done">Отзеркалить: ₽ → заряды, направление однозначно <span class="tag">кассиры</span></li>
+        <li class="done">Цена игры = 65 (честно); число игр на бейджах <span class="tag">аналитика</span></li>
+        <li class="done">«+тикеты» числом только 1000 (Питер, налом) = реплика кассы, не бейдж; Охта — без обещания <span class="tag">аналитика</span></li>
+        <li class="done">Два тента + переключатель (Охта S/M/L · Питер 1500/докидка/компании/VIP) <span class="tag">аналитика</span></li>
+        <li class="done">Бейджи 3000/5000: масса = «много игры», VIP = «приз» (G закрыт) <span class="tag">аналитика</span></li>
+        <li class="done">Панель-инструкция кассиру park-aware (? на элементах) <span class="tag">аналитика</span></li>
+        <li>Показать два счёта (заряды/тикеты) явной сноской на тенте <span class="tag">аналитика</span></li>
+        <li>«Единый платёж» / «карта бессрочная» — короткой сноской → или в ТТ-3</li>
+        <li>«Сайт +500» / «ДР от 6 карт» как офферы → план ТТ-3</li>
+      </ul>
+      <p class="sub" style="margin-top:10px;">Тарифные числа — со страницы <b>«Тарифы»</b> (источник правды). Планы редистрибуции и метрики — «План». Открытые эксперименты — «Вопросы».</p>
+    </div>
+  </section>
+
+  <!-- DATA -->
+  <section class="page" id="data">
+    <h1>Данные · как реально пополняют</h1>
+    <p class="lead">Поведение пополнений + средний чек по модели проекта (<b>выручка ÷ receipts</b>). Источник чисел — <b>boom-cmd-analytics.xlsx</b> (приватный). Распределение по суммам — за июнь 2026 (факт); помесячный чек — все месяцы из xlsx.</p>
+
+    <!-- ===== DATA BLOCK · ФАКТЫ ПО ЧЕКУ · синк из boom-cmd-analytics.xlsx ===== -->
+    <div class="principle" style="border-left-color:var(--cyan);">
+      <div class="k">Средний чек = чек/пополнение = выручка ÷ receipts</div>
+      <p class="sub" style="margin:6px 0 0;">Канон проекта (дашборд, планировщик, xlsx): чек = Σвыручка ÷ Σreceipts. «Средний чек» здесь = <b>чек/пополнение</b> — то же имя, что в планировщиках (единый словарь: чек/пополнение · чек/визит · чек/уник · доля пакетов ≥1500). По нему парки <b>разные</b>. Ниже — модель (на пополнение) + контекст (на визит и на уникального гостя). <b>Headline — свежее окно</b> (~6–8 мес, без разгона Охты сент-2025); <b>помесячные массивы ниже — все месяцы</b>.</p>
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <tr><th>Метрика</th><th>Охта</th><th>Питер</th><th>Mari</th></tr>
+      <tr><td class="c-tgt">чек ÷ пополнение <span class="tag">модель</span></td><td class="mono">~1 090</td><td class="mono down">~680</td><td class="mono">~960</td></tr>
+      <tr><td>пополнений ÷ визит</td><td class="mono">~1.1</td><td class="mono up">~1.65</td><td class="mono">~1.07</td></tr>
+      <tr><td>чек ÷ визит</td><td class="mono">~1 200</td><td class="mono">~1 120</td><td class="mono">~1 075</td></tr>
+      <tr><td>чек ÷ уник. посетителя</td><td class="mono">~1 620</td><td class="mono">~1 300</td><td class="mono">~1 450</td></tr>
+    </table>
+    </div>
+    <p class="sub"><b>Главный тезис (вместо «парки сошлись»):</b> на <b>пополнение</b> Питер ниже (~680 vs ~1090); на <b>визит</b> парки похожи (~1100–1200). Разница — <b>поведение</b>: питерский гость докидывает (~1.65 пополнения/визит ≈ 2.0 на уникального гостя), охтинский кладёт один раз (~1.1). Не «у Питера маленький чек», а «Питер дробит визит на два пополнения». Подпись таблицы: чек — модель на пополнение; для контекста — на визит и на уникального гостя.</p>
+    <!-- ===== END DATA BLOCK ===== -->
+
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">Июнь-2026 (факт) = baseline. План июль — во вкладке «План»</div>
+      <p class="sub" style="margin:6px 0 0;">Числа этого раздела — точка отсчёта (факт июнь). План июня признан невнедрённым (тенты/скрипт кассира не выкатывались) — <b>хвост не тянем</b>. Редистрибуция «июль план» по обоим паркам (откуда убыло / куда прибыло, +292к Охта / +350к Питер) и метрики контроля — на вкладке <b>«План / Контроль»</b>.</p>
+    </div>
+
+    <div class="switch" id="dsw">
+      <button class="on" data-d="ohta">Охта Молл</button>
+      <button data-d="piter">Питерлэнд</button>
+    </div>
+    <div id="d-body"></div>
+
+    <h3>Распределение по суммам — похоже; чек — нет</h3>
+    <table>
+      <tr><th>Тир</th><th>Охта</th><th>Питер</th></tr>
+      <tr><td class="mono">≤300</td><td class="mono">19%</td><td class="mono">21%</td></tr>
+      <tr><td class="mono">500</td><td class="mono">28%</td><td class="mono">28%</td></tr>
+      <tr><td class="mono">1 000</td><td class="mono">27%</td><td class="mono">29%</td></tr>
+      <tr><td class="mono">1 500</td><td class="mono">10%</td><td class="mono">7%</td></tr>
+      <tr><td class="mono">2 000</td><td class="mono">9%</td><td class="mono">8%</td></tr>
+      <tr><td class="mono">3 000+</td><td class="mono">7%</td><td class="mono">8%</td></tr>
+    </table>
+    <div class="principle">
+      <div class="k">500 + 1000 ≈ 55–57% пополнений, а 1500+ ≈ 23–26%. В обоих парках.</div>
+      <p class="sub" style="margin:6px 0 0;">Похожи именно <b>распределения сумм</b>. Но <b>средний чек различается</b> (Питер ~680 vs Охта ~1090) — из-за разного числа receipts на визит (Питер докидывает), а не из-за разных сумм пополнения. Headroom для роста 1500/2000 одинаковый.</p>
+    </div>
+
+    <h3>Чек по модели = выручка ÷ receipts</h3>
+    <div class="principle" style="border-left-color:var(--cyan);">
+      <div class="k">receipts — это и есть знаменатель чека. Не «завышенный счётчик».</div>
+      <p class="sub" style="margin:6px 0 0;">Канон проекта: средний чек = выручка ÷ receipts (так считают дашборд, планировщик и xlsx). По нему <b>Питер ~680 ₽</b> (2026: 696→735→705→709→699), <b>Охта ~1 090 ₽</b>. Это не «маленький чек Питера», а другое поведение: на визит у Питера ~1.65 пополнения (докидывание), у Охты ~1.1 — при близкой выручке на визит receipts у Питера больше, а чек/пополнение ниже.</p>
+    </div>
+    <div class="principle" style="border-left-color:var(--yellow);">
+      <div class="k">Откуда брался «чек Питера ~1039» <span class="tag">A10</span></div>
+      <p class="sub" style="margin:6px 0 0;">1039 — «Средний чек» из сводного отчёта Выручка, посчитанный на <b>другом, меньшем счётчике</b> (≈5 935 операций), он отличается от receipts (8 828). Что именно считает счётчик 5 935 (фискальные чеки? сессии?) — открытый вопрос <b>A10</b> (уточняется у Game-Keeper), макет не блокирует. До смены поля receipts владельцем канон: чек = выручка ÷ receipts. 1039 показываем только здесь, как сверку другого счётчика, не как основной чек.</p>
+    </div>
+    <div id="d-months"></div>
+
+    <h3>Туристы vs повторные — почему цифры обманчивы</h3>
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">«Новых карт» ≠ новых людей. По словам администраторов истинно новых ≤30%.</div>
+      <p class="sub" style="margin:6px 0 0;">Гости часто берут <b>свежую карту каждый визит и обнуляют её</b>, поэтому повторный считается «новой картой» снова и снова. Отсюда и гигантские остатки: 19 тыс (Охта) / 267 тыс (Питер) карт — это не уникальные люди, а накопленные обнулённые карты. «Новых карт» по запискам ~44%, «+50» в распределении ~27% — оба завышают туристов и между собой не сходятся, так что <b>отделить туриста от повторного по пополнениям нельзя</b>. Реальная доля новых ≈30% — со слов парков.</p>
+    </div>
+
+    <h3>Переходящие остатки = обнуление и брошенные карты</h3>
+    <table>
+      <tr><th>Парк (конец мая 2026)</th><th>Карт с остатком</th><th>Заряды (сред/карту)</th><th>Тикеты (сред/карту)</th><th>Внесено за всё время</th></tr>
+      <tr><td>Охта Молл</td><td class="mono">19 106</td><td class="mono">~1,14 млн (59)</td><td class="mono">~8,96 млн (469)</td><td class="mono">~39,8 млн ₽</td></tr>
+      <tr><td>Питерлэнд</td><td class="mono">267 477</td><td class="mono">~12,8 млн (48)</td><td class="mono">~48,8 млн (182)</td><td class="mono">~391 млн ₽</td></tr>
+    </table>
+    <p class="sub">Тикеты почти не выкупают на призы: Охта в ноябре выдала 4 015 призов на 1,87 млн тикетов, в декабре 3 058 на 1,55 млн — а на картах застряло 8,96 млн (~469 на карту). Заряды обнуляют в играх, тикеты бросают. Главный потенциал возврата — недополученные призовые тикеты, но люди за ними не приходят.</p>
+
+    <h3>Паттерны пополнений (корреляции, 20 мес Питера)</h3>
+    <table>
+      <tr><th>Паттерн</th><th>Что видно в данных</th></tr>
+      <tr><td>Round-number якорь</td><td>Зона 500–1000 = ~60% пополнений <b>каждый месяц 2 года</b> (59–63%). Решение = круглое число, не расчёт.</td></tr>
+      <tr><td>Сезонная подпись казуала</td><td>Поток ↑ (лето) → чек/пополнение ↓ (Питер лето-2024 ~511–541), ≤300 ↑, 1500+ ↓, новых карт больше. Зима → крупнее. Туристы грузят мельче, ядро крупнее.</td></tr>
+      <tr><td>«+50» ≠ новые карты</td><td>+50 на ~27% пополнений vs ~44% «новых карт» — метка ловит лишь ~60% новых. Разделить нельзя.</td></tr>
+      <tr><td>Секулярный рост</td><td>Чек/пополнение Питер ~511 (2024 лето) → ~700 (2026); Охта ~1056–1107. ≤300 27%→21%, 1500+ 13%→23% (тариф + сдвиг вверх).</td></tr>
+    </table>
+
+    <h3>Три разных счётчика — не путать <span class="tag">A10</span></h3>
+    <table>
+      <tr><th>Счётчик</th><th>Откуда</th><th>Питер, май</th><th>Что считает</th></tr>
+      <tr><td class="c-tgt">receipts</td><td>xlsx · транзакционный</td><td class="mono">8 828</td><td><b>Знаменатель чека по модели.</b> Чек = выручка ÷ receipts ≈ 700 ₽.</td></tr>
+      <tr><td>Счётчик сводного отчёта</td><td>отчёт Выручка / распределение</td><td class="mono">≈5 935</td><td>Меньший счётчик; даёт «чек 1039». Что именно считает — открытый <b>A10</b>. Не основной.</td></tr>
+      <tr><td>Новые карты / посет.</td><td>Записка</td><td class="mono">2 642</td><td>Первичные карты за месяц — повторные берут новые карты тоже, ≠ новые люди.</td></tr>
+    </table>
+
+    <h3>Что синхронизировать, чтобы увидеть само решение</h3>
+    <p class="sub">Всё даёт один датасет — <b>журнал по картам с таймстемпами</b> (id, дата-время, тип: покупка/пополнение/игра/обнуление, сумма, остаток). С ним сходятся 4 связки решения:</p>
+    <table>
+      <tr><th>Синхронизировать</th><th>Что покажет</th></tr>
+      <tr><td>Первая загрузка визита × докидывание в нём</td><td>Как выбирают стартовую сумму и когда добавляют.</td></tr>
+      <tr><td>Новая карта vs существующая × сумма</td><td>Грузит ли турист иначе, чем повторный → что кому показывать.</td></tr>
+      <tr><td>Остаток зарядов на выходе × остаток тикетов</td><td>Подтверждение обнуления и брошенных тикетов.</td></tr>
+      <tr><td>Интервал между визитами одной карты</td><td>Кто реально повторный (а не «новая карта каждый раз»).</td></tr>
+    </table>
+    <p class="sub">Если полный журнал тяжёл — почти закрывают вопрос два отчёта: <b>распределение пополнений по новым и существующим картам</b> и <b>когортный возврат</b> (карты мая в июне–июле). Главный вывод для макета: туристов большинство и без остатка → «грузи сразу больше + сохрани карту». Уточнение к D: «докинуть к остатку <b>между визитами</b>» — для меньшинства; но <b>докидывание В ВИЗИТЕ — норма Питера</b> (~1.65 пополнения/визит), и именно его ведём к 1500.</p>
+
+    <h3>Кто и зачем кладёт (поведенческая сигнатура)</h3>
+    <table>
+      <tr><th>Тир</th><th>Кто (профиль ЦА)</th><th>Зачем</th></tr>
+      <tr><td class="mono">≤300</td><td>Дети/подростки без родителей, импульс</td><td>Убить время, микро-проба.</td></tr>
+      <tr><td class="mono">500</td><td>Первый заход + докидывающие</td><td>Попробовать или докинуть.</td></tr>
+      <tr><td class="mono">1 000</td><td>Семейное ядро, регуляры с бюджетом</td><td>Понятный круглый заход — самый частый «осознанный» чек.</td></tr>
+      <tr><td class="mono">1 500</td><td>Семьи на призы, пары</td><td>Наиграться нормально.</td></tr>
+      <tr><td class="mono">2 000</td><td>Компании (одна карта), туристы «на максимум»</td><td>С запасом / на группу.</td></tr>
+      <tr><td class="mono">3 000+</td><td>VIP-семьи, ДР-группы, киты</td><td>Максимум игры и призов.</td></tr>
+    </table>
+    <p class="sub" style="color:var(--muted);">«Кто» — вероятный профиль по сегментам ЦА (Охта v1.1 / Питер v2.1), не пер-чековый факт.</p>
+  </section>
+
+  <!-- REQUEST 06.26 -->
+  <section class="page" id="request">
+    <h1>Запрос 06.26 — что сказали кассиры и админы</h1>
+    <p class="lead">Единый источник правды. Всё, что прислали с касс и от управляющих 24.06.2026, перенесено дословно по смыслу: частые вопросы гостей и ответы кассиров (Охта — Елизавета · Питер — таблица Q&amp;A), новые вопросы из-за нового дизайна, и сообщение администратора Питера (Екатерина / Михаил) о росте чека.</p>
+
+    <h3>Охта Молл · частые вопросы гостей и ответы кассира <span class="tag">Елизавета</span></h3>
+    <table>
+      <tr><th>Вопрос гостя</th><th>Что отвечает кассир</th></tr>
+      <tr><td>1. Как поиграть?</td><td>Купить специальную карту, пополнить баланс — и картой играть в любую игру парка. Удобнее оформить через наш сайт (доп. функции) — тогда +500 в подарок.</td></tr>
+      <tr><td>2. Сколько стоят сами игры / автоматы?</td><td>От 33 до 100 ₽. (*В Охта Молл есть один аппарат за 200 ₽.)</td></tr>
+      <tr><td>3. Сколько положить на карту, чтобы «наиграться»?</td><td>Зависит от числа игроков. На такую компанию — частые пополнения + рекомендация кассира + ссылка на бонусное пополнение с объяснением выгоды.</td></tr>
+      <tr><td>4. Сколько обычно кладут люди?</td><td>Индивидуально, но обычно берут бонусное пополнение — так выгоднее (+ объяснение, в чём выгода).</td></tr>
+      <tr><td>5. Потом карту можно пополнить?</td><td>Да, в любой момент, даже дистанционно через сайт. Остаток на балансе не сгорает — можно прийти в любое другое время.</td></tr>
+      <tr><td>6. Можно потом вернуть карту полностью (больше не нужна)?</td><td>Вернуть нельзя, но можно сохранить себе: карта бессрочная, средства не сгорают, а выигранные тикеты можно копить и менять на призы.</td></tr>
+      <tr><td>7. Есть абонемент по времени / безлимит?</td><td>Безлимита по времени нет, но есть выгодные бонусные пополнения. На 5000 будет 8000 — этого хватит очень надолго.</td></tr>
+      <tr><td>8. На сколько хватит по времени?</td><td>Точно сказать сложно. Игры стоят в основном от 33 до 100 ₽, дальше — рекомендация про бонусное пополнение и общая информация о парке и картах.</td></tr>
+    </table>
+
+    <h3>Питерлэнд · частые вопросы гостей и ответы кассира <span class="tag">таблица Q&amp;A</span></h3>
+    <table>
+      <tr><th>Вопрос гостя</th><th>Что отвечает кассир</th></tr>
+      <tr><td>1. Сколько стоят игры?</td><td>От 33 до 100 ₽, на каждом аппарате цена указана.</td></tr>
+      <tr><td>2. Объясните, как у вас играть?</td><td>Покупаете карту за 30 ₽, пополняете и ею запускаете игры. По ходу зарабатываете тикеты — их нужно зачислить на эту же карту через станцию, чтобы потом обменять на призы. Либо копить. Карта остаётся у вас, баланс несгораемый.</td></tr>
+      <tr><td>3. На сколько пополнить, чтобы ребёнка на часик оставить?</td><td>Есть выгодные пополнения, ориентируйтесь на них. Чем больше положите — тем больше добавим в подарок.</td></tr>
+      <tr><td>4. Сколько люди кладут обычно?</td><td>По-разному, выгоднее всего — с бонусом. (Дальше уточняем, сколько по времени планируют играть, и предлагаем сумму.)</td></tr>
+      <tr><td>5. Безлимит есть?</td><td>Безлимита нет. У каждого аппарата своя цена, в среднем 60–70 ₽. Можно воспользоваться выгодным пополнением.</td></tr>
+      <tr><td>6. Карту возвращать надо?</td><td>Карта остаётся у вас, она накопительная, баланс не сгорает.</td></tr>
+      <tr><td>7. Можем докинуть 12 ₽ до ещё одной игры?</td><td>Минимальное пополнение — 33 ₽.</td></tr>
+      <tr><td>8. Все автоматы по 33 ₽?</td><td>Игры от 33 до 100 ₽. По будням до 12 и во вторник большинство аппаратов по 33 ₽, кроме исключений. Актуальная цена указана на каждом аппарате.</td></tr>
+      <tr><td>9. Скидки многодетным / инвалидам / участникам СВО?</td><td>Есть бонусы при пополнении; тикеты при оплате наличными при пополнении от 1000 ₽; по будням до 12 большинство игр по 33 ₽, а во вторник — весь день.</td></tr>
+      <tr><td>10. Если тикеты на карту внесём, деньги не пропадут?</td><td>Нет. На карте два раздельных счёта: один — для оплаты игр, другой — для тикетов (чтобы менять на призы).</td></tr>
+      <tr><td>11. Можем в другой день потратить?</td><td>Да, в любой день. Карта бессрочная, остаётся у вас.</td></tr>
+      <tr><td>12. Можем 1200 наличкой + 300 картой, чтобы 525 в подарок?</td><td>Так не получится — нужно единым платежом. Но в ТЦ есть банкоматы, возможно так будет удобно.</td></tr>
+      <tr><td>13. Можем потом остаток забрать (наиграемся)?</td><td>Карта бессрочная, баланс не сгорает, можно доиграть в любой другой день («и через год работать будет?» — да). Бывают ситуации вынужденного возврата: ребёнку дали купюру и он положил всю / не успевают дотратить и надо уезжать / не местные.</td></tr>
+      <tr><td>14. Скидка в день рождения есть?</td><td>Да — более выгодный тариф на пополнение при покупке от 6 карт. (Дальше объясняем условия.)</td></tr>
+      <tr><td>15. У вас 500 минимальное?</td><td>Нет, минимальное пополнение — 33 ₽. От 500 ₽ добавляем бонусные 125 ₽.</td></tr>
+    </table>
+
+    <h3>Новые вопросы из-за нового дизайна <span class="tag">Охта · Елизавета</span></h3>
+    <p class="sub">Раньше этих вопросов не было вообще — появились именно с новым макетом:</p>
+    <ul class="ck" style="margin-bottom:14px;">
+      <li style="padding-left:0;">Что такое заряды?</li>
+      <li style="padding-left:0;">Один заряд — это одна игра?</li>
+      <li style="padding-left:0;">Одна игра стоит 33 рубля?</li>
+      <li style="padding-left:0;">Бонус-игры — это что?</li>
+      <li style="padding-left:0;">Некоторые старые посетители замечают, что макет поменяли, и уточняют: не поменялись ли условия акции?</li>
+    </ul>
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">Акцию часто читают наоборот</div>
+      <p class="sub" style="margin:6px 0 0;">Цитата Елизаветы: посетители считывают «1300 настоящих рублей = 1000 игровых очков». Привычнее читать слева направо — она спрашивает, не стоит ли <b>отзеркалить макет</b>, или это сделано специально.</p>
+    </div>
+
+    <h3>Факты-операционка (вытащено для сверки с данными)</h3>
+    <table>
+      <tr><th>Факт</th><th>Деталь</th></tr>
+      <tr><td>Цена игры</td><td>33–100 ₽, в среднем 60–70 (Питер); указана на каждом аппарате. Один аппарат в Охте — 200 ₽.</td></tr>
+      <tr><td>Окно 33 ₽</td><td>Будни до 12 и весь вторник — большинство аппаратов по 33 ₽ (кроме исключений).</td></tr>
+      <tr><td>Карта</td><td>Покупка 30 ₽ (Питер). Через сайт +500 в подарок (Охта).</td></tr>
+      <tr><td>Пополнение</td><td>Минимум 33 ₽. Бонус — от 500 ₽ (+125). Чем больше — тем больше подарок. Только единым платежом.</td></tr>
+      <tr><td>Тикеты-подарок</td><td>При оплате наличными, от 1000 ₽ (Питер, в ответе про льготы).</td></tr>
+      <tr><td>Два счёта на карте</td><td>Отдельно: заряды (игры) и тикеты (призы).</td></tr>
+      <tr><td>Карта бессрочная</td><td>Накопительная, баланс и тикеты не сгорают; вернуть карту нельзя.</td></tr>
+      <tr><td>ДР</td><td>Более выгодный тариф при покупке от 6 карт.</td></tr>
+      <tr><td>Возвраты</td><td>Бывают вынужденные (ребёнок внёс всю купюру / не успели дотратить / не местные).</td></tr>
+      <tr><td>Сайт</td><td>Доп. функции + 500 в подарок при оформлении (Охта).</td></tr>
+    </table>
+
+    <h3>Сообщение администратора Питера <span class="tag">Екатерина / Михаил</span></h3>
+    <p class="sub">На вопрос «почему средний чек стал больше 1000 в 2026?» — версии «девочек» (кассиров):</p>
+    <ol class="qn">
+      <li>Люди поняли, что выгоднее пополнять на большие суммы, чтобы получить бонус.</li>
+      <li>Увеличилось количество постоянных посетителей.</li>
+      <li>Стало приходить больше компаний — ДР / отдых вместе / выпускные и т.д.</li>
+      <li>После зимы люди хотят чаще выходить из дома и проводить время семьёй (погода).</li>
+      <li>Персонал обращает внимание людей на выгодные пополнения на бо́льшие суммы ради бонуса.</li>
+    </ol>
+    <p class="sub">Уточнения в переписке (Михаил ↔ Екатерина): <b>кассиры те же</b>, «стабильный штат» — новых с активными продажами нет. Компании по ДР приходят либо на кассе, либо на входящих по рабочим номерам. По п.2: <b>постоянные пополняют суммой больше — условно на 5000, тратят за 1–2 захода и затем снова закидывают такую же крупную сумму.</b></p>
+
+    <h3>Разбор сообщения админа <span class="tag">аналитика</span></h3>
+    <p class="sub"><b>Важно про какой чек речь:</b> «чек стал больше 1000» у админа — это чек <b>сводного отчёта Выручка</b> (счётчик ≈5 935, A10), не модель проекта. По модели (выручка ÷ receipts) Питер ~700. Рос и тот, и тот: чек/пополнение Питер ~511→700 за 2 года; счётчик-отчёта ~760→1039. Причины бьются неравномерно.</p>
+    <table>
+      <tr><th>Версия админа</th><th>Проверка по данным</th></tr>
+      <tr><td>1. Поняли: грузить крупнее = бонус</td><td class="up">частично ✓ — микс сместился вверх (≤300 27%→21%, 1500+ 13%→23%). «Понимание» недоказуемо.</td></tr>
+      <tr><td>2. Больше постоянных</td><td>не проверить — когорт нет; «новых карт» ~44% = карто-визиты, не люди.</td></tr>
+      <tr><td>3. Больше компаний</td><td>не проверить из пополнений; 1500+ вырос — мог включать группы. Слабо.</td></tr>
+      <tr><td>4. После зимы выходят чаще (погода)</td><td class="down">разрыв — в данных пик потока (лето) даёт чек НИЖЕ. Рост чека секулярный, не сезонный.</td></tr>
+      <tr><td>5. Персонал обращает внимание на бонус</td><td class="down">разрыв — сама же: «стабильный штат», активных продаж нет; равновесие сложилось без них.</td></tr>
+      <tr><td>Постоянные грузят крупно (~5000) на 1–2 захода и снова крупно</td><td class="up">✓ сходится со сдвигом вверх + низким числом пополнений на визит + остатками. Самый содержательный пункт.</td></tr>
+    </table>
+    <p class="sub"><b>Чего админ не называет, а это вероятный главный драйвер:</b> тарифные/ценовые изменения за 2 года — секулярный рост чека механически объясняется ростом цен. <b>В долг (вопросы):</b> менялся ли тариф / мин. пороги в конце 2025 — начале 2026? Есть ли выгрузка по картам для когорт?</p>
+
+    <h3>Паттерны: общее и по паркам <span class="tag">аналитика</span></h3>
+    <table>
+      <tr><th>Слой</th><th>Что сюда</th></tr>
+      <tr><td class="c-tgt">Общее (оба парка)</td><td>Объяснить «заряды»; отзеркалить ₽→заряды; два счёта; единый платёж; «условия не менялись»; карта бессрочная + копи тикеты; «сколько класть» → бонус; цена игры варьируется.</td></tr>
+      <tr><td>Питер</td><td>Тикеты налом от 1000; окно 33 (вторник / будни до 12); карта 30 ₽; ДР от 6 карт; возвраты артикулированы.</td></tr>
+      <tr><td>Охта</td><td>Фидбэк по новому дизайну (отсюда); один аппарат 200 ₽; сайт +500; список аппаратов-исключений.</td></tr>
+    </table>
+    <p class="sub">Елизавета: вопросы в парках «примерно одинаковые» — большинство общее, парки отличаются деталями.</p>
+  </section>
+
+  <!-- QUESTIONS (для Михаила Изюмова) -->
+  <section class="page" id="questions">
+    <h1>Вопросы</h1>
+    <p class="lead">Это вопросы <b>к тебе</b> (не кассирам) — что нужно уточнить, чтобы доделать таблички. Отдельно от кассирского запроса.</p>
+
+    <ol class="qn">
+      <li>Цена на аппарате — в зарядах или в рублях? От этого зависит счёт игр на ТТ-1.</li>
+      <li>Реальный средний расход зарядов на игру по машинам — чем заменить «60–70»?</li>
+      <li>Тикет-промо: только Питер? Условия точно — налом, от 1000, «+200 фикс» или «200 за 1000»? Вводим ли в Охте?</li>
+      <li>Карта стоит 30 ₽ в обоих парках или по-разному?</li>
+      <li>Сайт +500 — разово при регистрации? в зарядах? оба парка?</li>
+      <li>ДР «от 6 карт» — точные условия тарифа?</li>
+      <li>Окно 33 (вторник / будни до 12) — есть в обоих парках, насколько влияет на поток?</li>
+      <li>Какой % пополнений идёт налом vs картой (от этого зависит охват тикет-промо)?</li>
+      <li>Аппарат 200 ₽ и список исключений — какие машины дороже 33 и почему?</li>
+    </ol>
+
+    <h3>Покрытие вопросов источниками</h3>
+    <p class="sub">Карта: где каждый частый вопрос гостя (из «Запроса») закрыт — на каком макете и/или в тултипе кассиру. Рабочий список: смотрим последнюю колонку и добиваем пробелы. <span class="up">✓</span> — закрыто сейчас · план — в scope ТТ-3 (макета пока нет, только задачи) · <span class="down">пробел</span> — нигде, нужна реплика/задача.</p>
+    <div style="overflow-x:auto;">
+    <table>
+      <tr><th>Вопрос гостя <span class="tag">из Запроса</span></th><th>ТТ-1</th><th>ТТ-2</th><th>ТТ-3</th><th>Тултип кассиру</th><th>Статус / что сделать</th></tr>
+      <tr><td>Как играть (по шагам)?</td><td>—</td><td class="up">✓</td><td>план</td><td>—</td><td>план — ядро ТТ-3</td></tr>
+      <tr><td>Что такое заряды?</td><td>—</td><td class="up">✓</td><td>—</td><td>—</td><td class="up">✓ готово (ТТ-2)</td></tr>
+      <tr><td>Сколько стоят игры (33–100)?</td><td>—</td><td class="up">✓</td><td>план</td><td class="up">✓</td><td class="up">✓ готово; ТТ-3 закрепит</td></tr>
+      <tr><td>Сколько класть, чтоб наиграться?</td><td class="up">✓ тиры</td><td>—</td><td>—</td><td class="up">✓</td><td class="up">✓ готово</td></tr>
+      <tr><td>В чём выгода бонуса (курс %)?</td><td class="up">✓ курс</td><td>—</td><td>—</td><td class="up">✓</td><td class="up">✓ готово</td></tr>
+      <tr><td>Карта бессрочная / вернуть?</td><td class="up">✓ «не сгорают»</td><td>—</td><td>план</td><td>—</td><td class="c-up">частично → добить в ТТ-3</td></tr>
+      <tr><td>Два счёта — деньги не пропадут?</td><td class="up">✓ намёк</td><td class="up">✓</td><td>план</td><td>—</td><td class="up">✓ готово (ТТ-2)</td></tr>
+      <tr><td>Тикеты — как зачислить, на что?</td><td class="up">✓ +200/база</td><td class="up">✓ ≈¼</td><td>план</td><td class="up">✓</td><td class="up">✓ готово; промо числом только 1000</td></tr>
+      <tr><td>Безлимит / на сколько хватит?</td><td class="up">✓ игр N</td><td>—</td><td>—</td><td class="up">✓</td><td class="up">✓ готово</td></tr>
+      <tr><td>Докинуть / минимум 33 ₽?</td><td>—</td><td>—</td><td>план</td><td>—</td><td class="down">пробел → в ТТ-3</td></tr>
+      <tr><td>Единый платёж (нал+карта)?</td><td>—</td><td>—</td><td>план</td><td>—</td><td class="down">пробел → сноска ТТ-1 / ТТ-3</td></tr>
+      <tr><td>Скидки / окно 33 / вторник?</td><td>—</td><td>—</td><td>план</td><td>—</td><td>план (ТТ-3)</td></tr>
+      <tr><td>ДР — от 6 карт?</td><td>—</td><td>—</td><td>план</td><td>—</td><td>план (ТТ-3)</td></tr>
+      <tr><td>Сайт +500?</td><td>—</td><td>—</td><td>план</td><td>—</td><td>план (ТТ-3)</td></tr>
+      <tr><td>Условия не поменялись?</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="down">пробел — нужна реплика кассиру</td></tr>
+    </table>
+    </div>
+    <p class="sub">Источник вопросов — «Запрос» (Q&amp;A кассиров). ТТ-3 пока без макета — колонка показывает запланированный охват. Правило: <b>пробел в последней колонке = задача</b>, гостю как закрытое не выдаём.</p>
+
+    <h3>Открытые решения (на согласование с Михаилом Изюмовым) <span class="tag">аналитика</span></h3>
+    <table>
+      <tr><th>#</th><th>Что решить</th></tr>
+      <tr><td class="mono">A</td><td><span class="up">✓ решено:</span> «Мост к макету» вынесен в отдельный блок <b>S/M/L</b> (Гипотезы) и обновлён под ТТ-1 (1000/1500/2000 + 3000/5000). Из «Сценариев» убран.</td></tr>
+      <tr><td class="mono">B</td><td><span class="up">✓ решено:</span> оставляем как есть — числом только <b>+200 @ 1000</b> (Питер, налом); тиры выше = «не подтверждено», гостю числом не обещаем (отражено в тултипах ТТ-1 и Конструкторе).</td></tr>
+      <tr><td class="mono">C</td><td><span class="up">✓ решено:</span> цена игры = <b>65</b> зар/игра (честно). ТТ-1 приведён к 65 — совпадает с Тарифами/Конструктором; в Конструкторе добавлена колонка «Бейдж ТТ-1» (реально / что показываем). <span class="sub">(было: макет на 56)</span></td></tr>
+      <tr><td class="mono">D</td><td><span class="up">✓ решено:</span> разведено по оси времени — <b>в визите</b> карта = кошелёк (докидывание 1.65); <b>между визитами</b> регуляры грузят на 1–2 захода, но накопительная лояльность гасится одноразовыми картами. Модель работает на чек/<b>визит</b>.</td></tr>
+      <tr><td class="mono">E</td><td><span class="up">✓ решено:</span> тикеты <b>выигранные</b> (~¼ от зарядов) и <b>промо</b> (+200 @ 1000 налом) разведены в «Данных»; в макет числом — только промо.</td></tr>
+      <tr><td class="mono">F</td><td><span class="up">✓ решено:</span> старые «целевые полки» (Охта 1500/2000, Питер 1000/1500) убраны из «Данных» — распределения совпадают, чек различается из-за receipts.</td></tr>
+      <tr><td class="mono">G</td><td><span class="up">✓ решено:</span> 3000/5000 — для <b>массы</b> «много игры» (тикеты не выкупают), для <b>VIP-папы (Питер 5000)</b> — «тикеты на топ-приз» (выкупает). 1500 = «норм визита». Бейджи адресные: масса = игры, VIP = приз.</td></tr>
+    </table>
+    <p class="sub">A–G закрыты. D, E — закрыты по ходу сессии (модель чека развела счётчики и потоки тикетов). Не менять без согласования.</p>
+
+    <h3>Эксперименты и гейты <span class="tag">сессия 06.2026</span></h3>
+    <table>
+      <tr><th>#</th><th>Гипотеза / гейт</th><th>Что различить</th></tr>
+      <tr><td class="mono">X1</td><td>докинг «добавит / заменит»</td><td>оба парка; кассовый A/B — читаем попол/визит + чек/визит</td></tr>
+      <tr><td class="mono">X2</td><td>пол 1500 (Питер)</td><td>риск только на визитах &gt;1500 — размер без журнала не знаем</td></tr>
+      <tr><td class="mono">C-гейт</td><td>бонус за сумму ВИЗИТА</td><td>умеет ли касса (сессия, не lifetime, сразу) — к Game-Keeper</td></tr>
+      <tr><td class="mono">A10</td><td>счётчик ≈5 935 vs receipts 8 828</td><td>что считает (фискальные чеки? сессии?) — к Game-Keeper; макет не блокирует</td></tr>
+      <tr><td class="mono">J</td><td>журнал по картам (per-visit total)</td><td>без него X1/X2 проверяются только грубо (агрегаты по парку)</td></tr>
+    </table>
+    <p class="sub">Полный план редистрибуции и метрики контроля — вкладка <b>«План»</b>.</p>
+  </section>
+
+  <!-- SCENARIOS -->
+  <section class="page" id="scenarios">
+    <h1>Сценарии пополнений</h1>
+    <p class="lead">Какие решения о сумме реально принимают и чем различаются парки. Маппинг сценариев на слоты макета вынесен в блок <b>S/M/L</b> (Гипотезы).</p>
+
+    <h3>Что точно знаем (первопринципы)</h3>
+    <ul style="padding-left:20px; margin:8px 0 20px;">
+      <li style="margin:7px 0;"><b>Карта = кошелёк на один визит</b>, не накопительный счёт: её обнуляют и берут новую. Почти каждая загрузка — свежий «бюджет визита», а «докинуть к остатку <b>между визитами</b>» практически не существует. <b>Но в самом визите докидывание — норма Питера</b> (~1.65 пополнения/визит): кошелёк визита часто пополняют дважды. Отсюда — вести визит к 1500 по докидке, а не давить первое.</li>
+      <li style="margin:7px 0;"><b>Решение = круглое число.</b> Зона 500–1000 держит ~55% пополнений каждый месяц два года подряд.</li>
+      <li style="margin:7px 0;"><b>Один раз за визит.</b> Пополнений на посетителя ≈ 1.0–1.5 (Охта) → стартовая сумма и есть почти всё решение; докидывание — хвост ~10–33%, растёт в праздники.</li>
+      <li style="margin:7px 0;"><b>Доли тиров стабильны:</b> ≤300 ~20% · 500 ~28% · 1000 ~27% · 1500+ ~25%.</li>
+    </ul>
+
+    <h3>Шесть сценариев пополнения</h3>
+    <table>
+      <tr><th>Сценарий</th><th>Что это</th><th>Где в цифрах</th></tr>
+      <tr><td class="rc">Старт-бюджет визита</td><td>Открывающая загрузка «сколько на поиграть» — главное решение</td><td class="mono">round 500–2000 · ~80% операций</td></tr>
+      <tr><td class="rc">Микро-проба</td><td>«Чуть-чуть / убить время», импульс</td><td class="mono">≤300 · ~20%</td></tr>
+      <tr><td class="rc">Докидывание в визите</td><td>Заряды кончились, играем ещё (тот же визит)</td><td class="mono">часть 500/1000-reload · хвост 10–33%</td></tr>
+      <tr><td class="rc">Новая карта + загрузка</td><td>Берут свежую карту и грузят</td><td class="mono">«+50» ~27%</td></tr>
+      <tr><td class="rc">Компанейская одна карта</td><td>Грузят крупно на группу</td><td class="mono">2000/3000</td></tr>
+      <tr><td class="rc">Догруз под сумму</td><td>До конкретного баланса / нестандарт</td><td class="mono">нестандартные ~5–9%</td></tr>
+    </table>
+    <p class="sub">Сценарии <b>посещения</b> (в Стратегии) ложатся на эти шесть многие-к-одному: разные сегменты сходятся в одни и те же загрузки. Поэтому сценарий нужен на тип загрузки, а не на сегмент.</p>
+
+    <h3>Общее и разница по паркам (доли загрузок, май)</h3>
+    <table>
+      <tr><th>Тип загрузки</th><th>Охта</th><th>Питер</th><th></th></tr>
+      <tr><td>Старт / round (кратно 500)</td><td class="mono">51%</td><td class="mono">45%</td><td class="up">общее</td></tr>
+      <tr><td>Микро ≤300</td><td class="mono">18%</td><td class="mono">21%</td><td class="up">общее</td></tr>
+      <tr><td>Новая карта (+50)</td><td class="mono">24%</td><td class="mono">26%</td><td class="up">общее</td></tr>
+      <tr><td>Крупные 1500+ (группа)</td><td class="mono">25%</td><td class="mono">22%</td><td class="up">общее</td></tr>
+      <tr><td>Догруз / нестандарт</td><td class="mono">6%</td><td class="mono">8%</td><td class="up">общее</td></tr>
+    </table>
+    <div class="principle">
+      <div class="k">Структура сценариев одинакова — разница в поведении, не в суммах</div>
+      <p class="sub" style="margin:6px 0 0;"><b>Общее:</b> round-логика, набор сценариев, доминанта старт-бюджета, близкий <b>чек/визит</b> (~1100–1200). <b>Разница — в дроблении визита</b> (тождество <b>чек/визит = чек/попол × попол/визит</b>): чек/пополнение расходится (Охта ~1090 / Питер ~680), потому что Питер докидывает (~1.65 пополнения/визит против ~1.1 у Охты). Питер лояльнее (ЦА 66% «средних» / 22% «туристов» против Охты 56% / 34%), старше и больше (267 тыс карт против 19 тыс). Не «у Питера меньше чек», а «Питер делит визит на два пополнения».</p>
+    </div>
+
+    <h3>Мост к макету</h3>
+    <p class="sub">Маппинг «сценарий загрузки → слот макета» вынесен в отдельный блок <b>S/M/L</b> (вкладка «Гипотезы»), где он обновлён под текущий ТТ-1 (1000/1500/2000 + 3000/5000).</p>
+  </section>
+
+  <!-- S/M/L -->
+  <section class="page" id="sml">
+    <h1>S/M/L — стержень макета</h1>
+    <p class="lead">Почему документ вообще существует: понимание реальности + ввод системы S/M/L превратили «плакат с тарифами» в инструмент роста чека. Три осмысленные роли вместо плоского списка сумм.</p>
+
+    <div class="principle">
+      <div class="k">S/M/L — каркас Охты; Питер из него вышел</div>
+      <p class="sub" style="margin:6px 0 0;">«Защитная S» — это конструкт <b>одного платежа</b> (Охта). У Питера визит = первый + докидывание, поэтому единый S/M/L не ложится: там <b>три поведенческих сегмента</b>. Числа лестницы (тарифные пороги) общие; <b>роли и раскладка — разные</b>.</p>
+    </div>
+
+    <h3>Охта — одна лестница S/M/L</h3>
+    <table>
+      <tr><th>Слот</th><th>Сумма</th><th>Роль</th><th>Кому / когда</th></tr>
+      <tr><td class="rc c-prot">S</td><td class="mono">1 000</td><td class="c-prot">защитная</td><td>одному; куда откатываются — контрольная точка</td></tr>
+      <tr><td class="rc c-tgt">M</td><td class="mono">1 500</td><td class="c-tgt">целевая</td><td>одному вдоволь; <b>главный апселл с 1000 (движок)</b></td></tr>
+      <tr><td class="rc c-up">L</td><td class="mono">2 000</td><td class="c-up">дожим / на двоих</td><td>пара; компания больше двух — выше</td></tr>
+    </table>
+    <p class="sub">Сверху 3000/5000 — «<b>Максимум игры</b>» (масса не выкупает тикеты → продаём игру, не «копи на приз»). 500 на тент <b>не выносим</b> (анти-дрейф). Контрольная метрика — доля защитной S (1000).</p>
+
+    <h3>Питер — три сегмента (не одна лестница)</h3>
+    <table>
+      <tr><th>Сегмент</th><th>Тиры</th><th>Роль / мотивация</th></tr>
+      <tr><td class="c-tgt">Казуал</td><td class="mono">1500 + докидка 500</td><td><b>норм визита 1500</b>, доходишь докидкой по 500 (1000+500). 1000 не светим, 500 тихо. Первое не давим.</td></tr>
+      <tr><td class="c-up">Компании</td><td class="mono">2000 / 3000</td><td>выгода в <b>играх на группу</b>; сюда уводим компании, не казуала</td></tr>
+      <tr><td>VIP-папа</td><td class="mono">5000</td><td>витрина «<b>тикеты на топ-приз</b>» (этот сегмент выкупает призы); без толчка — сам себя выбирает</td></tr>
+    </table>
+    <p class="sub">Контрольная метрика Питера — <b>доля визитов, дошедших до 1500, при сохранённом попол/визит</b> (не «сжать мелкие пополнения» — это убьёт докидку).</p>
+
+    <div class="principle">
+      <div class="k">Почему так, а не плоский список</div>
+      <p class="sub" style="margin:6px 0 0;">Плоский плакат с суммами висел 2 года и не двигал чек. S/M/L (Охта) и сегменты (Питер) задают каждому тиру <b>роль и направление</b>: откуда уводим, куда ведём, чем аргументируем. Это и есть рычаг. Полные планы редистрибуции — вкладка «План».</p>
+    </div>
+  </section>
+
+  <!-- BATTLES -->
+  <section class="page" id="battles">
+    <h1>Микро-батлы</h1>
+    <p class="lead">Пополнение разовое — один шанс продать. Задача кассира: выигрывать каждый соседний батл + бить супер-оффером там, где он реально сдвигает привычку. Таблицы — для нас: сильные/слабые стороны каждой суммы, чтобы понять, чем мотивировать вверх.</p>
+
+    <div class="principle">
+      <div class="k">Два рычага — не один скрипт на оба парка</div>
+      <p class="sub" style="margin:6px 0 0;">① <b>до 500</b> — Охте не показываем (анти-дрейф); Питеру 500 = докидка (тихо). ② <b>1000/1500/2000</b> — Охта тянет первое <b>вверх</b> (движок 1000→1500); Питер первое <b>не давит</b> (убьёт докидку), ведёт визит к 1500 по 500. ③ <b>3000/5000</b> — компании (выгода в играх) + VIP-витрина. Структурный триггер: курс растёт с тиром <b>25 → 30 → 35 → 40 → 50 → 60%</b> (не озвучивают).</p>
+    </div>
+
+    <div class="switch" id="bsw">
+      <button class="on" data-b="ohta">Охта</button>
+      <button data-b="piter">Питерлэнд</button>
+    </div>
+    <p class="sub" id="bnote" style="color:var(--muted); margin-top:-8px;"></p>
+
+    <div id="b-body"></div>
+  </section>
+
+  <!-- CHARGES -->
+  <section class="page" id="charges">
+    <h1>Заряды</h1>
+    <p class="lead">Что такое заряды и почему это не рубли.</p>
+    <div style="display:flex; align-items:stretch; flex-wrap:wrap;">
+      <div style="flex:1; min-width:180px; background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center;"><div style="font-size:28px; color:var(--cyan); margin-bottom:6px;"><i class="ti ti-cash"></i></div><div class="sub">кладёшь</div><div style="font-family:Montserrat; font-weight:900; font-size:19px;">1 500 ₽</div><div class="sub">один раз, на входе</div></div>
+      <div style="display:flex; align-items:center; color:var(--lime); font-size:24px; padding:0 8px;"><i class="ti ti-arrow-right"></i></div>
+      <div style="flex:1; min-width:180px; background:var(--bg-card); border:1px solid rgba(0,212,255,.4); border-radius:14px; padding:18px; text-align:center;"><div style="font-size:28px; color:var(--cyan); margin-bottom:6px;"><i class="ti ti-bolt"></i></div><div class="sub">на карте</div><div style="font-family:Montserrat; font-weight:900; font-size:19px; color:var(--cyan);">2 025 зарядов</div><div class="sub">всегда больше, чем рублей</div></div>
+      <div style="display:flex; align-items:center; color:var(--lime); font-size:24px; padding:0 8px;"><i class="ti ti-arrow-right"></i></div>
+      <div style="flex:1; min-width:180px; background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center;"><div style="font-size:28px; color:var(--cyan); margin-bottom:6px;"><i class="ti ti-device-gamepad-2"></i></div><div class="sub">играешь</div><div style="font-family:Montserrat; font-weight:900; font-size:19px;">на зарядах</div><div class="sub">цена игры — на автомате</div></div>
+    </div>
+    <div class="principle" style="margin-top:18px;">
+      <div class="k">Деньги — только на входе. Внутри парка всё в зарядах.</div>
+      <p class="sub" style="margin:6px 0 0;">Заряд карты — как заряд батареи: купил один раз, играешь, пока есть. Заряды не возвращаются рублями — это валюта парка, а не депозит.</p>
+    </div>
+    <div style="display:flex; gap:14px;">
+      <div style="flex:1; background:var(--bg-night); border:1px solid var(--line); border-radius:12px; padding:14px 16px;"><div class="mono" style="font-size:12px; text-transform:uppercase; color:var(--cyan); margin-bottom:4px;">заряды</div><p class="sub" style="margin:0;">Тратишь на игры. Покупаешь рублями с бонусом. Чем больше зарядил — тем дешевле игра.</p></div>
+      <div style="flex:1; background:var(--bg-night); border:1px solid var(--line); border-radius:12px; padding:14px 16px;"><div class="mono" style="font-size:12px; text-transform:uppercase; color:var(--yellow); margin-bottom:4px;">тикеты</div><p class="sub" style="margin:0;">Выигрываешь на тикетных автоматах (≈¼ от зарядов), копишь и меняешь на призы. Отдельный счёт.</p></div>
+    </div>
+
+    <h4 class="dir" style="margin-top:26px;">Задачи ТТ-2 <span class="tag">из запроса 06.26</span></h4>
+    <ul class="ck">
+      <li class="prog">Объяснить «заряды»: валюта парка, 1 заряд ≠ 1 игра, игра = N зарядов <span class="tag">кассиры</span></li>
+      <li>Снять «1 заряд = 1 игра?» и «игра = 33 ₽?» <span class="tag">кассиры</span></li>
+      <li>Развести «заряды / тикеты / бонус-игры» <span class="tag">кассиры</span></li>
+      <li>Панель кассиру (как на ТТ-1) <span class="tag">аналитика · в долг</span></li>
+    </ul>
+    <p class="sub" style="margin-top:10px;">Тарифные числа — со страницы <b>«Тарифы»</b> (единственный источник правды).</p>
+  </section>
+
+  <!-- TT-3 -->
+  <section class="page" id="tt3">
+    <h1>ТТ-3 · Как у нас играть</h1>
+    <p class="lead">Третий тейбл-тент — онбординг и частые вопросы. Закрывает то, что не место на ТТ-1 (продажа) и ТТ-2 (заряды): как играть по шагам и базовые «успокаивающие» ответы. Макет пока не делаем — фиксируем задачи.</p>
+
+    <h4 class="dir">Что должен закрыть ТТ-3</h4>
+    <ul class="ck">
+      <li>Как играть по шагам: карта → пополнить → играть → тикеты → призы <span class="tag">кассиры</span></li>
+      <li>Карта бессрочная, баланс и тикеты не сгорают <span class="tag">кассиры</span></li>
+      <li>Цена игры 33–100 ₽ (на аппарате); окно 33 (вторник / будни до 12) <span class="tag">кассиры</span></li>
+      <li>Два счёта: заряды (игры) и тикеты (призы) <span class="tag">кассиры</span></li>
+      <li>ДР от 6 карт — выгодный тариф <span class="tag">кассиры</span></li>
+      <li>Сайт: +500 и доп. функции <span class="tag">кассиры</span></li>
+    </ul>
+    <p class="sub">Источник — кассирский FAQ из «Запроса». Три тейбл-тента вместе закрывают всё поле: ТТ-1 продаёт, ТТ-2 объясняет валюту, ТТ-3 онбордит.</p>
+  </section>
+
+  <!-- TARIFFS (источник правды) -->
+  <section class="page" id="tariffs">
+    <h1>Тарифы — источник правды</h1>
+    <p class="lead">Голые цифры без маркетинга. <b>Это единственный источник правды по тарифам и условиям.</b> При расхождении с любой другой страницей (ТТ-1/2/3, Стратегия, Батлы) — верны числа отсюда. Что из этого показывать гостю и как подавать — решаем во вкладке «Конструктор».</p>
+
+    <div class="principle">
+      <div class="k">1 заряд = 1 ₽</div>
+      <p class="sub" style="margin:6px 0 0;">Подтверждено: на официальной табличке подарок указан в рублях (500+125, 1000+300…), а на макете зарядов = пополнение + подарок (625, 1300…). Значит заряды — это просто рубли «на игру»: бонус даёт больше игровых рублей, чем заплатил. Цена игры 33–100 ₽ = 33–100 зарядов.</p>
+    </div>
+
+    <div class="principle" style="border-left-color:var(--yellow);">
+      <div class="k">1000 зарядов в тикетном контуре → ~250 тикетов</div>
+      <p class="sub" style="margin:6px 0 0;">Тикеты выигрываются только на тикетных автоматах — в среднем <b>~¼ от потраченных там зарядов</b>. То есть на 1000 зарядов, потраченных в тикетном контуре, игрок забирает в среднем ~250 тикетов. Это часто не понимают ни кассиры, ни администраторы. Тикеты — отдельный счёт, не путать с зарядами.</p>
+    </div>
+
+    <div class="switch" id="tsw">
+      <button class="on" data-t="fact">Факт</button>
+      <button data-t="constr">Конструктор</button>
+    </div>
+
+    <div id="tariff-fact">
+      <h3>Тарифная сетка</h3>
+      <div style="overflow-x:auto;">
+      <table>
+        <tr><th>Пополняю</th><th>+ зарядов<br>(подарок)</th><th>Всего зарядов<br>(= ₽ к зачислению)</th><th>Бонус<br>к сумме</th><th>Скидка<br>на игру</th><th>₽ за<br>1 заряд</th><th>Игр<br>(33–100 ₽, ср. 65)</th></tr>
+        <tr><td class="mono">500 ₽</td><td class="mono">+125</td><td class="mono">625</td><td class="up">+25%</td><td>−20%</td><td class="mono">0,80 ₽</td><td>6–19 (~10)</td></tr>
+        <tr><td class="mono">1 000 ₽</td><td class="mono">+300</td><td class="mono">1 300</td><td class="up">+30%</td><td>−23%</td><td class="mono">0,77 ₽</td><td>13–39 (~20)</td></tr>
+        <tr><td class="mono">1 500 ₽</td><td class="mono">+525</td><td class="mono">2 025</td><td class="up">+35%</td><td>−26%</td><td class="mono">0,74 ₽</td><td>20–61 (~31)</td></tr>
+        <tr><td class="mono">2 000 ₽</td><td class="mono">+800</td><td class="mono">2 800</td><td class="up">+40%</td><td>−29%</td><td class="mono">0,71 ₽</td><td>28–85 (~43)</td></tr>
+        <tr><td class="mono">3 000 ₽</td><td class="mono">+1 500</td><td class="mono">4 500</td><td class="up">+50%</td><td>−33%</td><td class="mono">0,67 ₽</td><td>45–136 (~69)</td></tr>
+        <tr><td class="mono">5 000 ₽</td><td class="mono">+3 000</td><td class="mono">8 000</td><td class="up">+60%</td><td>−38%</td><td class="mono">0,63 ₽</td><td>80–242 (~123)</td></tr>
+      </table>
+      </div>
+      <p class="sub"><b>Как считается:</b> «Бонус к сумме» = подарок ÷ пополнение (как на табличке «+%»). «Скидка на игру» = 1 − пополнение ÷ всего (за 1000 ₽ получаешь 1300 ₽ игры → игра дешевле на 23%). «₽ за 1 заряд» = пополнение ÷ всего зарядов. «Игр» = всего зарядов ÷ цену игры (33 дёшево / 100 дорого / ~65 средне).</p>
+
+      <h3>Условия (как есть)</h3>
+      <table>
+        <tr><th>Параметр</th><th>Значение</th></tr>
+        <tr><td>Минимальное пополнение</td><td>33 ₽. Бонус начинается с 500 ₽ (+125).</td></tr>
+        <tr><td>Бонус</td><td>Только единым платежом (нельзя нал + карта).</td></tr>
+        <tr><td>Цена игры</td><td>33–100 ₽ (= 33–100 зарядов), в среднем 60–70. Указана на каждом аппарате.</td></tr>
+        <tr><td>Окно 33 ₽</td><td>Будни до 12 и весь вторник — большинство аппаратов по 33 (кроме исключений).</td></tr>
+        <tr><td>Карта</td><td>Покупка 30 ₽ (Питер). Через сайт +500 в подарок (Охта).</td></tr>
+        <tr><td>Два счёта</td><td>Заряды (игры) и тикеты (призы) — раздельно.</td></tr>
+        <tr><td class="up">Питер · спецпредложение</td><td><b>+200 тикетов</b> при пополнении карты <b>наличными от 1000 ₽</b>.</td></tr>
+        <tr><td>Тикеты по тирам выше 1000</td><td>Точные суммы не подтверждены источником.</td></tr>
+        <tr><td>Карта</td><td>Бессрочная, баланс и тикеты не сгорают; вернуть нельзя.</td></tr>
+        <tr><td>ДР</td><td>Выгодный тариф при покупке от 6 карт.</td></tr>
+      </table>
+
+      <h3>Факт vs допущение <span class="tag">аналитика</span></h3>
+      <table>
+        <tr><th>Число</th><th>Статус</th></tr>
+        <tr><td>Пополнение / подарок / зарядов / бонус% / скидка / 1 заряд = 1 ₽</td><td class="up">факт — фото официальной таблички + tt1</td></tr>
+        <tr><td>+200 тикетов на 1000 (Питер, налом)</td><td class="up">факт — кассирский Q&amp;A</td></tr>
+        <tr><td>Число игр на тир</td><td class="down">оценка — зависит от цены игры (33–100), поэтому диапазон</td></tr>
+        <tr><td>«+тикетов» на тирах 1500+</td><td class="down">допущение — в источнике только «налом от 1000»; эскалация не подтверждена</td></tr>
+      </table>
+    </div>
+
+    <div id="tariff-constr" style="display:none;">
+      <h3>Конструктор макета ТТ-1</h3>
+      <p class="sub">Рабочая таблица. Слева — <b>реальные числа</b> (ср. <b>65 зар/игра</b> — честная середина диапазона 33–100, ср. по Питеру 60–70). Колонка <b>«Бейдж ТТ-1»</b> теперь <b>park-зависимая</b> (два тента): что выносим гостю в Охте и в Питере. «+игр бонусом» = подарок ÷ 65.</p>
+      <div style="overflow-x:auto;">
+      <table>
+        <tr><th>Пополняю</th><th>Всего зарядов</th><th>+ тикетов</th><th>+ игр бонусом</th><th>Игр всего (~65)</th><th>Бейдж ТТ-1<br>Охта / Питер</th><th>Аргументы кассиру</th></tr>
+        <tr><td class="mono">500</td><td class="mono">625</td><td>—</td><td class="mono">+2</td><td class="mono">~10</td><td class="sub">Охта: —<br>Питер: докидка (тихо)</td><td>вход; курс 25%</td></tr>
+        <tr><td class="mono">1 000</td><td class="mono">1 300</td><td class="up">+200<br>(Питер, налом)</td><td class="mono">+5</td><td class="mono">~20</td><td><span class="c-up">Охта: одному · 20+ игр</span><br><span class="sub">Питер: не светим</span></td><td><b>+5 игр бонусом</b> · курс 30% · +200 тикетов = реплика кассы (Питер), не бейдж</td></tr>
+        <tr><td class="mono">1 500</td><td class="mono">2 025</td><td class="down">?</td><td class="mono">+8</td><td class="mono">~31</td><td class="mono c-tgt">Охта: целевая 30+ ⭐<br>Питер: норм визита ⭐</td><td>курс 35% · +8 игр бонусом</td></tr>
+        <tr><td class="mono">2 000</td><td class="mono">2 800</td><td class="down">?</td><td class="mono">+12</td><td class="mono">~43 (2×21)</td><td class="mono">Охта: на двоих<br>Питер: компания</td><td>курс 40% · +12 игр бонусом</td></tr>
+        <tr><td class="mono">3 000</td><td class="mono">4 500</td><td class="down">?</td><td class="mono">+23</td><td class="mono">~69</td><td class="mono">Охта: 69 игр<br>Питер: компания 3–4</td><td>курс 50% · +23 игр · «много игры» (масса) / выгода группе</td></tr>
+        <tr><td class="mono">5 000</td><td class="mono">8 000</td><td class="down">?</td><td class="mono">+46</td><td class="mono">~123</td><td class="mono">Охта: 123 игры<br>Питер: тикеты на приз (VIP)</td><td>курс 60% · +46 игр · VIP выкупает призы</td></tr>
+      </table>
+      </div>
+      <p class="sub"><b>Логика (G закрыт):</b> бейдж park-зависим. <b>Охта</b> — лестница 1000/1500/2000, верх «много игры» (масса не выкупает тикеты), 500 прячем. <b>Питер</b> — 1500 норм + докидка 500 (тихо), 1000 не светим, компании 2000/3000, 5000 = «тикеты на приз» (VIP выкупает). «+тикетов» числом — только 1000 (Питер, налом), и как реплика кассы, не как бейдж.</p>
+    </div>
+
+    <h3>Экономика тикетов <span class="tag">аналитика</span></h3>
+    <p class="sub">Себестоимость тикета для парка низкая (оценочно ~0,1–0,15 ₽), а гость воспринимает их как ценные (плечо ~25×). Массово их не выкупают (см. «Данные»: на картах застряло ~8,96 млн тикетов в Охте). Вывод для макетов: верх продаём как «много игры + база тикетов», а не «накопишь на приз». Помесячный ряд чека и остатки — на вкладке «Данные».</p>
+  </section>
+
+  <!-- PLAN / CONTROL -->
+  <section class="page" id="plan">
+    <h1>План / Контроль · месячный цикл</h1>
+    <p class="lead">Сводка решений сессии 07.2026. Baseline — <b>июнь-2026 (факт)</b>, заморожен в DATA BLOCK «Данных». План июня признан невнедрённым (тенты ТТ-1 и скрипт кассира не выкатывались) — хвост не тянем, цели ставим заново от июньского факта. <b>Условие реальности плана: тенты/скрипт выходят в точки в июле.</b></p>
+
+    <div class="principle" style="border-left-color:var(--lime);">
+      <div class="k">Цель: чек/ВИЗИТ → 1500 (оба парка)</div>
+      <p class="sub" style="margin:6px 0 0;">Тождество: <b>чек/визит = чек/попол × пополнений/визит</b>. Два множителя. Рычаг каждого парка — его <b>слабая ось</b>. 1500/визит — горизонт; первый рубеж: Охта +5–8% (~1150), Питер — закрыть зазор до Охты (~1200).</p>
+    </div>
+    <table>
+      <tr><th>Парк</th><th>чек/попол</th><th>попол/визит</th><th>чек/визит</th><th>слабая ось → рычаг</th></tr>
+      <tr><td>Охта</td><td class="mono">~1090</td><td class="mono">~1.1</td><td class="mono">~1200</td><td>попол/визит → ввести докинг <span class="tag">тест</span></td></tr>
+      <tr><td>Питер</td><td class="mono down">~680</td><td class="mono up">~1.65</td><td class="mono">~1120</td><td>чек/попол → тиры + пол 1500</td></tr>
+      <tr><td>Mari</td><td class="mono">~960</td><td class="mono">~1.07</td><td class="mono">~1030</td><td>данных мало</td></tr>
+    </table>
+    <p class="sub"><b>Ловушка:</b> оси — обмен (фронт-загрузка ↔ докидка). Оба парка ~1120–1200/визит при противоположных профилях. Поднятие попол/визит даёт + <b>только если докидка — новые деньги</b>, а не дробление того же платежа.</p>
+
+    <h3>Второй рычаг — пополнений/визит (докинг) <span class="tag">эксперимент X1</span></h3>
+    <table>
+      <tr><th>Δ попол/визит (докидки ~500 ₽)</th><th>Охта</th><th>Питер</th></tr>
+      <tr><td>+0.1</td><td class="mono">+~220к/мес</td><td class="mono">+~268к/мес</td></tr>
+      <tr><td>+0.2</td><td class="mono">+~440к</td><td class="mono">+~535к</td></tr>
+    </table>
+    <p class="sub">Чувствительность <b>огромна</b>, но непроверена. Слабая ось Охты (попол/визит 1.1 → ввести докинг) — потенциально крупнейший рычаг, но риск <b>раскола</b> большого платежа. В план НЕ зашиваем — это X1 (кассовый A/B).</p>
+
+    <h3>План июль · Охта <span class="tag">+292к ₽ · движок: семья 1000→1500</span></h3>
+    <table>
+      <tr><th>Пакет</th><th>июнь шт</th><th>%</th><th>июль шт</th><th>%</th><th>Δ</th><th>роль</th></tr>
+      <tr><td class="mono">500</td><td>1068</td><td>36%</td><td>916</td><td>31%</td><td class="down">−152</td><td>стоп-дрейф вниз</td></tr>
+      <tr><td class="mono">1000</td><td>1020</td><td>34%</td><td>912</td><td>31%</td><td class="down">−108</td><td>источник апселла</td></tr>
+      <tr><td class="mono c-tgt">1500</td><td>367</td><td>12%</td><td>544</td><td>18%</td><td class="up">+177</td><td>движок (семья)</td></tr>
+      <tr><td class="mono">2000</td><td>360</td><td>12%</td><td>381</td><td>13%</td><td class="up">+21</td><td>пары/компании</td></tr>
+      <tr><td class="mono">3000</td><td>177</td><td>6%</td><td>233</td><td>8%</td><td class="up">+56</td><td>компании</td></tr>
+    </table>
+    <p class="sub">Baseline — <b>июнь-факт</b> (управляемая группа 500–3000, фильтр >1%). Тот же рычаг, что в мае, но объём корзины летом ниже (июнь −17% к маю) → uplift меньше (+292к vs прежние +370к). <b>Мотивируем только подвижную середину;</b> ≤300 и 5000 не трогаем (фиксированные бюджеты). Двигаем ~250 пакетов вверх, кол-во держим. Доля пакетов ≥1500: <b>25,5% → 32,2%</b>.</p>
+
+    <h3>План июль · Питер <span class="tag">+350к ₽ · докидка + компании + пол 1500</span></h3>
+    <table>
+      <tr><th>Пакет</th><th>июнь шт</th><th>%</th><th>июль шт</th><th>%</th><th>Δ</th><th>роль</th></tr>
+      <tr><td class="mono">≤400</td><td>1526</td><td>26%</td><td>1026</td><td>17%</td><td class="down">−500</td><td>докидка → 500 (тихо)</td></tr>
+      <tr><td class="mono">500</td><td>1450</td><td>24%</td><td>1950</td><td>33%</td><td class="up">+500</td><td>единица докидки</td></tr>
+      <tr><td class="mono">1000</td><td>1624</td><td>27%</td><td>1424</td><td>24%</td><td class="down">−200</td><td>не светим</td></tr>
+      <tr><td class="mono c-tgt">1500</td><td>374</td><td>6%</td><td>574</td><td>10%</td><td class="up">+200</td><td>норм / цель визита</td></tr>
+      <tr><td class="mono">2000</td><td>460</td><td>8%</td><td>310</td><td>5%</td><td class="down">−150</td><td>компании → 3000</td></tr>
+      <tr><td class="mono">3000</td><td>217</td><td>4%</td><td>367</td><td>6%</td><td class="up">+150</td><td>компании</td></tr>
+    </table>
+    <p class="sub">Baseline — <b>реальный июнь-факт tiers</b> (фильтр долей ВЫКЛ, полное распределение), не A10-счётчик прежнего плана. По рублям: компании +150к · докидка +100к · пол-1500 +100к = +350к. <b>Казуальное первое пополнение (1000) не давим</b> — докидывание целое. VIP 5000 в план <b>не входит</b> (психография, не производится репликой) — остаётся витриной для самовыбравшихся. Доля пакетов ≥1500: <b>19,4% → 22,7%</b>.</p>
+
+    <h3>Метрики контроля (мерить через месяц)</h3>
+    <table>
+      <tr><th>Метрика</th><th>Что показывает</th></tr>
+      <tr><td class="c-tgt">чек/визит по паркам</td><td>главная — растёт ли к 1500</td></tr>
+      <tr><td>попол/визит</td><td>выжило ли докидывание Питера; завелось ли в Охте</td></tr>
+      <tr><td>доля пополнений ≥1500</td><td>Охта — движок семьи (per-пополнение, не путать с чек/визит→1500)</td></tr>
+      <tr><td>доля 3000</td><td>Питер — компании</td></tr>
+      <tr><td>доля 1000 / 500</td><td>не якорим ли вниз</td></tr>
+    </table>
+
+    <h3>Эксперименты (ждут кассового A/B)</h3>
+    <table>
+      <tr><th>Гипотеза / гейт</th><th>Что различить</th></tr>
+      <tr><td>докинг «добавит / заменит»</td><td>оба парка; читаем попол/визит + чек/визит</td></tr>
+      <tr><td>пол 1500 (Питер)</td><td>риск только на визитах &gt;1500 — размер неизвестен без журнала</td></tr>
+      <tr><td>гейт C: бонус за сумму визита</td><td>умеет ли касса (сессия, не lifetime, сразу) — к Game-Keeper</td></tr>
+      <tr><td>A10</td><td>что считает счётчик ≈5 935 vs receipts 8 828</td></tr>
+      <tr><td>журнал по картам</td><td>per-visit total — без него половину гипотез не проверить</td></tr>
+    </table>
+    <p class="sub">Полные помесячные числа — в «Данных» (DATA BLOCK, синк из xlsx). Источник распределений — отчёты «Распределение сумм».</p>
+  </section>
+
+  <!-- LOYALTY (разведка: лояльность ↔ частота ↔ выручка) -->
+  <section class="page" id="loyalty">
+    <h1>Лояльность → частота → выручка</h1>
+    <p class="lead">Разведка, <b>не решение</b>. Валидация гипотезы владельца + аудит: как система лояльности (статусы/скидки) отражена в модели контроля чека сейчас. Baseline данных — июнь-2026. Смежно с «План / Контроль» (чувствительность) и «Вопросы» (эксперимент X1).</p>
+
+    <div class="principle" style="border-left-color:var(--cyan);">
+      <div class="k">Вопрос владельца</div>
+      <p class="sub" style="margin:6px 0 0;">«Лояльность напрямую влияет на частоту пополнений; при даже незначительном росте частоты выручка вырастет значительно — верно? И как лояльность учтена в контроле чека сейчас?»</p>
+    </div>
+
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">Источник — чужой продукт</div>
+      <p class="sub" style="margin:6px 0 0;">Триггер — скрин публичного <b>клиентского</b> лендинга лояльности (статусы Стандарт/Серебро/Золото/Платина, тёмно-фиолетовая тема). Это <b>отдельный продукт</b>, не boom-cmd и не aov-control; его палитра/тема не подчиняются дизайн-стандартам этих инструментов — не считать нарушением и не переносить.</p>
+    </div>
+
+    <h3>1. Гипотеза «частота → выручка ↑↑»: направление верное, но не чистое</h3>
+    <p class="sub">Две разные «частоты» — не смешивать:</p>
+    <table>
+      <tr><th>Метрика</th><th>Что это</th><th>Факт</th><th>Бьёт ли лояльность</th></tr>
+      <tr><td class="mono">пополнений / визит</td><td>докинг внутри визита</td><td>Питер ~1.65 · Охта ~1.1</td><td>слабо (поведение в моменте)</td></tr>
+      <tr><td class="mono">частота визитов / удержание</td><td>возврат между визитами</td><td>Охта ср_визитов 1.30→1.82 (пик май), июнь 1.52; вернувшихся 18.9→27.7%</td><td class="c-tgt"><b>сильно</b> — статусы держат тяжёлого гостя</td></tr>
+    </table>
+    <p class="sub">Статусы построены на <b>накопленной сумме</b> (Серебро от 5 000 · Золото от 10 500 · Платина от 45 000 ₽) → это механика <b>удержания</b>, а не разового чека.</p>
+
+    <div class="principle" style="border-left-color:var(--lime);">
+      <div class="k">Плечо действительно большое — тут владелец прав</div>
+      <p class="sub" style="margin:6px 0 0;">Тождество: <span class="mono">чек/визит = чек/попол × попол/визит</span>, выручка = <span class="mono">чек/визит × визиты</span>. Частота — множитель, бьёт нелинейно. Чувствительность (вкладка «План»): <b>+0.1 к попол/визит ≈ +220к/мес Охта, +268к Питер</b>. Удержание умножает <span class="mono">визиты</span> напрямую. Малый сдвиг частоты → крупный сдвиг выручки — да.</p>
+    </div>
+
+    <p class="sub"><b>Три контр-силы, из-за которых «однозначно вырастет» — неверно:</b></p>
+    <ol class="qn">
+      <li><b>Скидка режет курс, а не только цену.</b> −15/−30/−50% — курс заряд→игра: за 1 500 ₽ Платина берёт ≈42 игры против ≈21 у Стандарта. Заряды статусного гостя <b>живут вдвое дольше</b> → он пополняет реже/меньше. Выручка растёт только если частота/удержание перекрывают этот эффект.</li>
+      <li><b>Маржа ≠ выручка.</b> Выручка = пополнения (₽), игры — сторона <span class="mono">game_econ</span> (себестоимость, тикеты, призы). Скидка делает каждый рубль «тяжелее» по выдаче игр → <b>маржа сжимается</b>, даже когда выручка стоит.</li>
+      <li><b>Selection ≠ causation.</b> Статусы награждают уже-тяжёлых. «Лояльные пополняют чаще» частично = частые <i>и стали</i> лояльными, а не наоборот. Deadweight: скидка тем, кто потратил бы и так.</li>
+    </ol>
+
+    <div class="principle" style="border-left-color:var(--lime);">
+      <div class="k">Спрятанный плюс</div>
+      <p class="sub" style="margin:6px 0 0;">Пороги статусов — готовый <b>апселл-крючок</b> («докинь до Серебра»), толкающий к бóльшим/лишним пополнениям. Это прямая ось aov-control — <b>доля пакетов ≥1500</b>.</p>
+    </div>
+
+    <h3>2. Как лояльность учтена в контроле чека сейчас — <span class="down">никак напрямую</span></h3>
+    <ul class="ck">
+      <li><b>aov-control моделирует одну ось</b> — чек/пополнение и микс номиналов (тиры 500…5000). Весь «План июля» — про это.</li>
+      <li><b>Лояльность живёт на других осях</b> — частота/удержание (домен <span class="mono">cards</span>) и game-курс (скидка). Ни то, ни другое в модель чека не входит.</li>
+      <li>Точка стыка — второй множитель <span class="mono">попол/визит</span> — помечена как эксперимент <b>X1 (непроверено)</b>, не моделируется.</li>
+      <li><b>Скидка −15/−30/−50% в чек-метрику не попадает вообще:</b> <span class="mono">чек = выручка ÷ receipts</span> считает номинальные ₽; удар по курсу — в <span class="mono">game_econ</span>, невидимо для метрики.</li>
+      <li>Контраст: в <b>planning-ohta</b> лояльность смоделирована с жёстким firewall — входит в прогноз <b>только через частотный фактор</b> и <b>никогда в planRev</b>.</li>
+    </ul>
+
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">Вывод</div>
+      <p class="sub" style="margin:6px 0 0;">Самая высокоплечевая ось (частота = удержание × докинг) — ровно там, где действует лояльность, и aov-control её не считает. <b>Разрыв реальный.</b></p>
+    </div>
+
+    <h3>Развилка — что делать (решение владельца)</h3>
+    <table>
+      <tr><th>Вариант</th><th>Суть</th><th>Трейд-офф</th></tr>
+      <tr><td class="mono">A</td><td>Оставить раздельно: aov-control = микс пополнений; лояльность = отдельный контур удержания.</td><td>Просто. Плечо частоты не оцифровано — приборов нет.</td></tr>
+      <tr><td class="mono c-tgt">B ✓</td><td><b>Мост частоты</b>: <span class="mono">cards</span> (ср_визитов, вернувшихся) + пороги статусов → частотный множитель. <b>Обязательно вместе с маржой</b> (удар курса из <span class="mono">game_econ</span>).</td><td>Оцифровывает интуицию в число. Без маржи переоценим апсайд (рост выручки при скрытой просадке прибыли).</td></tr>
+      <tr><td class="mono">C</td><td>Полная интеграция лояльности в чек-модель.</td><td>Преждевременно: без замера эластичности (кассовый A/B, X1) — фантазия на допущениях.</td></tr>
+    </table>
+    <p class="sub"><b class="c-tgt">Рекомендация — B</b>, но отдельной фазой/заданием. В текущую модель чека молча не вшивать (смена модели = архитектурное решение владельца).</p>
+
+    <h3>Долг — вернуться <span class="tag">записано в BACKLOG-aov-control</span></h3>
+    <table>
+      <tr><th>ID</th><th>Долг</th><th>Блокер</th></tr>
+      <tr><td class="mono">L1</td><td>Мост частоты (лояльность↔модель чека) + маржинальный контр-эффект — вариант B</td><td class="down">решение владельца по фреймингу</td></tr>
+      <tr><td class="mono">L2</td><td>Замер эластичности скидки (курс заряд→игра)</td><td class="down">кассовый A/B (связано с X1)</td></tr>
+      <tr><td class="mono">L3</td><td>Пороги статусов как апселл-крючок → доля ≥1500</td><td>идея, не начато</td></tr>
+    </table>
+
+    <p class="sub" style="color:var(--muted);">Данные-опоры: <span class="mono">cards</span> (удержание Охта), <span class="mono">game_econ</span> (курс/маржа), чувствительность aov-control, тождество чек/визит. Чек-факт июнь: Охта 1070 ₽ · Питер 836 ₽ (летний профиль). Разведка; в план не входит до решения по развилке. 06.07.2026.</p>
+  </section>
+
+  <!-- STRATEGY (+ ЦА/сценарии) -->
+  <section class="page" id="strategy">
+    <h1>Стратегия чека</h1>
+    <p class="lead">Куда и почему двигаем чек. Только выводы этого проекта — от первопричин.</p>
+
+    <h3>Первопричины — почему пополняют именно так</h3>
+    <table>
+      <tr><th>Первопричина (по данным)</th><th>Что из неё следует</th></tr>
+      <tr><td>Решение = круглое число от «бюджета визита»</td><td>Двигаем между круглыми (1000→1500), не в странные суммы.</td></tr>
+      <tr><td>Карта = кошелёк на визит: casual обнуляет; регуляры грузят крупно (~5000), тратят за 1–2 захода и грузят снова</td><td>Главное решение — стартовая сумма. Докидывание вторично.</td></tr>
+      <tr><td>Тикеты — рычаг с плечом ~25× (дёшевы, воспринимаются дорого), но почти не выкупаются</td><td>Управляем тикетами; верх продаём как «много игры + база», не «накопишь на приз».</td></tr>
+      <tr><td>Парки расходятся по чеку/пополнение (Охта ~1090 · Питер ~680), но сходятся по чеку/визит (~1100–1200) — разница в докидывании (Питер ~1.65 попол/визит)</td><td>Структура тиров одна, но <b>рычаг апселла разный</b> (см. «Рычаг по паркам»). Распределения сумм совпадают; чек различается из-за receipts.</td></tr>
+      <tr><td>Туристов большинство (≤30% истинно новых; остальное — обнулённые карты), без остатка</td><td>Аргумент «грузи сразу больше + сохрани карту», а не «докинь к остатку».</td></tr>
+    </table>
+
+    <h3>Что двигает чек, а что нет</h3>
+    <table>
+      <tr><th></th><th>Рычаг</th><th>Оценка</th></tr>
+      <tr><td class="up">двигает</td><td>Активные продажи кассира</td><td>Главный незадействованный рычаг — равновесие сложилось без них. Апселл обычно +5–15%.</td></tr>
+      <tr><td class="up">двигает</td><td>Тикет-подарок (налом от 1000)</td><td>Проверенно продаётся в Питере. Сильный, но не магия — чек/пополнение Питера ниже Охты из-за докидывания, а не из-за слабого промо.</td></tr>
+      <tr><td class="down">слабо</td><td>Сам плакат / тарифы</td><td>Высокие тиры висели 2 года — масса всё равно села на 500–1000.</td></tr>
+      <tr><td class="down">вниз</td><td>Сезон / погода</td><td>Пик потока (лето) = чек НИЖЕ. Рост чека секулярный (вероятно тариф+инфляция), не сезонный.</td></tr>
+    </table>
+
+    <h3>Стержень: две оси чека <span class="tag">ядро</span></h3>
+    <div class="principle" style="border-left-color:var(--lime);">
+      <div class="k">чек/визит = чек/попол × пополнений/визит</div>
+      <p class="sub" style="margin:6px 0 0;">Цель — <b>чек/визит → 1500</b>. Два множителя. Рычаг каждого парка — его <b>слабая ось</b>: Охта (чек/попол высокий 1090, попол/визит низкий 1.1) → ввести докинг; Питер (чек/попол низкий 680, попол/визит высокий 1.65) → поднять чек/попол. <b>Ловушка:</b> оси — обмен (фронт-загрузка ↔ докидка), оба парка ~1120–1200/визит при разных профилях → поднятие попол/визит даёт + только если докидка — новые деньги, не дробление. Полный план и метрики — вкладка «План».</p>
+    </div>
+
+    <h3>Цель и реализм</h3>
+    <p class="sub"><b>Целевая метрика — чек/ВИЗИТ</b> (~1100–1200), не чек/пополнение (по нему парки несравнимы). <b>Охта:</b> чек/пополнение ~1090 можно поднимать напрямую — ≥1500 с 25% до ~40% даёт первый рубеж <b>+5–8%</b> через активную кассу. <b>Питер:</b> рычаг — общий визит, а не размер первого пополнения (см. «Рычаг по паркам»). Риск низкий: добавляем направляющую туда, где её не было — худший исход «не сдвинулось», а не откат.</p>
+
+    <h3>Роли тиров — диагностика (не реклама)</h3>
+    <table>
+      <tr><th>Тир (единый макет)</th><th>Роль</th><th>Рост доли в отчёте значит</th></tr>
+      <tr><td class="mono">1 000</td><td class="rc c-prot">защитная</td><td><span class="down">↑ провал</span> — гость откатился в безопасное</td></tr>
+      <tr><td class="mono">1 500</td><td class="rc c-tgt">целевая</td><td><span class="up">↑ работает</span> — масса в норме</td></tr>
+      <tr><td class="mono">2 000+</td><td class="rc c-up">дожимная</td><td><span class="up">↑ дожим</span> — компании / высокий интент</td></tr>
+    </table>
+    <p class="sub">Контрольная метрика — <b>доля «защитной» (1000)</b>. Падает → стратегия и касса работают. Стоит/растёт → не работает. Плюс смотрим ≥1500, чек, нал/безнал на пороге 1000.</p>
+
+    <h3>Парки — различаем не суммами, а рычагом</h3>
+    <table>
+      <tr><th>Парк</th><th>Чек/попол</th><th>Чек/визит</th><th>Попол/визит</th><th>Тур/Сред/Профи</th></tr>
+      <tr><td>Охта Молл</td><td class="mono">~1 090 ₽</td><td class="mono">~1 200 ₽</td><td class="mono">~1.1</td><td>34/56/8%</td></tr>
+      <tr><td>Питерлэнд</td><td class="mono down">~680 ₽</td><td class="mono">~1 120 ₽</td><td class="mono up">~1.65</td><td>22/66/7%</td></tr>
+      <tr><td>Mari</td><td class="mono">~960 ₽</td><td class="mono">~1 075 ₽</td><td class="mono">~1.07</td><td class="sub">—</td></tr>
+    </table>
+
+    <h3>Рычаг апселла разный по паркам <span class="tag">ядро стратегии</span></h3>
+    <div class="principle" style="border-left-color:var(--magenta);">
+      <div class="k">Один сценарий апселла на оба парка — неверен по основанию</div>
+      <p class="sub" style="margin:6px 0 0;">Парки сходятся по чеку/визит (~1100–1200), но расходятся по пополнению — и приходят к визиту по-разному. Поэтому цель — <b>чек/визит</b>, а премиса «поднять тир 1500/2000» ложится на парки неодинаково.</p>
+    </div>
+    <div class="zones">
+      <div class="zc" style="border-color:rgba(197,249,70,.45);">
+        <h4 style="color:var(--lime);">Охта</h4>
+        <div class="r">~1.1 попол/визит · чек/попол ~1090</div>
+        <ul>
+          <li>Платёж один → тир-апселл <b>прямо</b>, движок <b>семья 1000→1500</b> (+292к, план июль), каннибализировать нечего.</li>
+          <li>Остановить <b>дрейф вниз</b> (к одному и меньшему платежу). 500 на тент не выносим.</li>
+          <li>Слабая ось — <b>докинг</b> (попол/визит 1.1). Ввести через промпт «заряды кончились?» — но риск <b>раскола</b> большого платежа → это <b>эксперимент</b>, не план.</li>
+        </ul>
+      </div>
+      <div class="zc" style="border-color:rgba(0,212,255,.45);">
+        <h4 style="color:var(--cyan);">Питер</h4>
+        <div class="r">~1.65 попол/визит · чек/попол ~680</div>
+        <ul>
+          <li>Докидывание — устойчивая культура (20 мес). Первое пополнение <b>не давим</b> до тира (заменит докидку → визит не вырастет).</li>
+          <li>Казуал: <b>норм визита = 1500</b>, доходишь <b>докидкой по 500</b> (1000+500). 1000 не светим, 500 — тихо.</li>
+          <li>Деньги — у <b>компаний 2000→3000</b> (+150к) + докидка ≤300→500 (+125к) + пол 1500 (+100к) = +375к.</li>
+          <li><b>5000 = VIP-папа</b> (не производится репликой) — витрина «тикеты на приз», без толчка.</li>
+        </ul>
+      </div>
+      <div class="zc">
+        <h4>Mari</h4>
+        <div class="r">~1.07 попол/визит · чек/попол ~960</div>
+        <ul>
+          <li>Середина, данных меньше — без сильных утверждений.</li>
+          <li>Выделяется высоким <b>чек/уник</b> (~1450–1520); по <b>чек/визит</b> не выделяется (~1075). Superlative не ставим — зависит от окна.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="k">Вывод для скрипта кассира</div>
+      <p class="sub" style="margin:6px 0 0;">В <b>Охте</b> кассир тянет на тир напрямую. В <b>Питере</b> — работает с общим визитом, не «давит» первое пополнение до тира, чтобы не убить докидывание. Это различие должно быть видно в скрипте (и в «Батлах»).</p>
+    </div>
+  </section>
+
+  <div class="foot">Контроль чека | Игровые парки БУМБАСТИК</div>
+</div>
+
+<script>
+(function(){
+
+  var DIST={
+    ohta:{avg:1070,n:4035,rows:[['≤300',730,19],['500',1068,28],['1 000',1020,27],['1 500',367,10],['2 000',360,9],['3 000',177,5],['5 000',67,2],['6 000+',19,0]]},
+    piter:{avg:968,n:5937,rows:[['≤300',1526,26],['500',1450,24],['1 000',1624,27],['1 500',374,6],['2 000',460,8],['3 000',217,4],['5 000',99,2],['6 000+',187,3]]}
+  };
+  // ===== DATA BLOCK · ПОМЕСЯЧНО · синк из boom-cmd-analytics.xlsx =====
+  // [месяц, выручка, receipts, чек(=выручка÷receipts), новых(посет/карт), оценка?]
+  // Чек по модели проекта: выручка ÷ receipts. Все месяцы — из xlsx.
+  var MROWS={
+    ohta:[['2026-06',4318568,4035,1070,2399,false],['2026-05',5282622,4828,1094,2991,false],['2026-04',4851863,4383,1107,2984,false],['2026-03',5499232,5108,1077,3096,false],['2026-02',5117563,4697,1090,2278,false],['2026-01',6425606,6084,1056,3032,false],['2025-12',3233811,3142,1029,1426,false],['2025-11',4609545,4360,1057,2264,false],['2025-10',3604944,3825,942,1967,false],['2025-09',1660074,3080,539,1208,false]],
+    piter:[['2026-06',5749013,6873,836,2644,false],['2026-05',6168628,8828,699,2642,false],['2026-04',5699064,8042,709,2358,false],['2026-03',6142151,8715,705,2626,false],['2026-02',5195900,7073,735,2144,false],['2026-01',6940142,9975,696,3002,false],['2025-12',4114649,5942,692,null,false],['2025-11',6517044,9533,684,null,false],['2025-10',6384639,9389,680,null,false],['2025-09',5074354,7826,648,null,false],['2025-08',8790582,13998,628,null,false],['2025-07',7582562,12993,584,null,false],['2025-06',7731040,12262,630,null,false],['2025-05',6915987,11103,623,null,false],['2025-03',7525127,11519,653,null,false],['2025-02',5972608,9574,624,null,false],['2025-01',7591589,12154,625,null,false],['2024-12',4667881,7745,603,null,false],['2024-11',6181059,9707,637,null,false],['2024-10',5665353,9499,596,null,false],['2024-09',4924227,8759,562,null,false],['2024-08',7553031,13968,541,null,false],['2024-07',6642478,12977,512,null,false],['2024-06',5903684,11549,511,null,false],['2024-05',4715761,9137,516,null,false],['2024-04',1478104,1939,762,null,false]]
+  };
+  // ===== END DATA BLOCK =====
+  function mtable(p){
+    var head=(p==='ohta')?'Новых посет.':'Новых карт';
+    var rows=MROWS[p].map(function(r){
+      return '<tr><td class="mono">'+r[0]+'</td><td class="mono">'+(r[1]/1e6).toFixed(2)+'</td><td class="mono">'+(r[5]?'≈':'')+r[2].toLocaleString('ru-RU')+'</td><td class="mono c-tgt">'+r[3].toLocaleString('ru-RU')+'</td><td class="mono">'+(r[4]?r[4].toLocaleString('ru-RU'):'—')+'</td></tr>';
+    }).join('');
+    return '<h3>Помесячно · '+(p==='ohta'?'Охта':'Питер')+' (новые месяцы сверху)</h3>'+
+      '<table><tr><th>Мес</th><th>Выр млн</th><th>Чеки (receipts)</th><th>Чек ₽</th><th>'+head+'</th></tr>'+rows+'</table>'+
+      '<p class="sub" style="color:var(--muted);">«Чеки (receipts)» и «Чек ₽» — из xlsx: чек = выручка ÷ receipts (модель проекта). '+(p==='ohta'?'«Новых посет.» — из записок; сент-2025 — разгон.':'«Новых карт» — из записок (за 2024–2025 записок нет). 2025-04 без receipts в xlsx → пропущен.')+'</p>';
+  }
+  function drender(p){
+    var d=DIST[p];
+    var rows=d.rows.map(function(r){var hi=(r[0]==='1 500'||r[0]==='2 000');
+      return '<tr><td class="mono'+(hi?' c-tgt':'')+'">'+r[0]+' ₽</td><td class="mono">'+r[1].toLocaleString('ru-RU')+'</td><td class="mono">'+r[2]+'%</td></tr>';}).join('');
+    var note = (p==='ohta')
+      ? 'Июнь-факт · receipts '+d.n.toLocaleString('ru-RU')+' · распределение по номиналам с фильтром >1% (хвост <1% не детализирован) · чек по модели выручка÷receipts = 1 070 ₽. Зелёным целевые 1500/2000.'
+      : 'Июнь-факт · счётчик распределения ≈5 937 (меньше receipts 6 873 — A10) · по этому счётчику средняя сумма '+d.avg.toLocaleString('ru-RU')+' ₽. Канон проекта: чек = выручка÷receipts ≈ 836 ₽ (июнь, летний профиль — выше обычных ~700). '+d.avg.toLocaleString('ru-RU')+' — сверка другого счётчика. Зелёным целевые 1500/2000.';
+    document.getElementById('d-body').innerHTML=
+      '<h3>Сколько человек кладёт каждую сумму · '+(p==='ohta'?'Охта':'Питер')+'</h3>'+
+      '<table><tr><th>Сумма</th><th>Пополнений</th><th>% пополнений</th></tr>'+rows+'</table>'+
+      '<p class="sub">'+note+'</p>';
+    var mt=document.getElementById('d-months'); if(mt) mt.innerHTML=mtable(p);
+    Array.prototype.forEach.call(document.querySelectorAll('#dsw button'),function(b){b.classList.toggle('on',b.getAttribute('data-d')===p);});
+  }
+  document.getElementById('dsw').addEventListener('click',function(e){var b=e.target.closest('button'); if(b)drender(b.getAttribute('data-d'));});
+  drender('ohta');
+
+  // ---- МИКРО-БАТЛЫ ----
+  var BATTLES=[
+    {t:'500 → 1000', a:'500', b:'1000',
+      ap:'Низкий порог, «попробовать», не жалко, импульс.',
+      ac:'Кончится быстро (~11 игр), курс минимум 25%, тикет-базы почти нет.',
+      bp:'Нормальная сессия, курс 30%, круглое и привычное.',
+      bc:'Вдвое дороже порога, для casual «много сразу».',
+      lo:'Охта: за 1000 курс выгоднее и хватит надольше. 500 на тент не выносим (анти-дрейф).',
+      lp:'Питер: первое НЕ двигаем. 500 ок — добьёт докидкой. +200 тикетов @ 1000 налом — только если гость сам идёт на 1000.'},
+    {t:'1000 → 1500', a:'1000', b:'1500',
+      ap:'Понятная база, привычно, хватает одному.',
+      ac:'Курс 30% (не топ), тикет-база скромная.',
+      bp:'Курс 35%, больше тикетов, реально наиграться (fun), всё ещё для одного.',
+      bc:'+50% к цене, психологически «много для одного».',
+      lo:'Охта: ⭐ движок. 1000→1500 напрямую — курс 35%, наиграться вдоволь, +8 игр. Главный апселл.',
+      lp:'Питер: первое до 1500 НЕ давим (заменит докидку → визит не вырастет). Веди визит: «обычно за визит ~1500 — можешь докинуть по 500». 1500 = норм визита, не «клади сразу».'},
+    {t:'1500 → 2000', a:'1500', b:'2000',
+      ap:'Оптимум для одного, лучший опыт в одиночку (fun).',
+      ac:'Для двоих маловато, курс 35%.',
+      bp:'Курс 40%, «1+1» — самое дешёвое на двоих, с запасом.',
+      bc:'Для одного избыточно.',
+      lo:'Охта: вдвоём? Одной картой 2000 — выгоднее, хватит обоим. Одному не давить.',
+      lp:'Питер: 2000 — для компании/пары, НЕ для одного (одному убьёт докидку). Выгода в играх на двоих.'},
+    {t:'2000 → 3000', a:'2000', b:'3000',
+      ap:'Достаточно для пары/запаса, курс 40%.',
+      ac:'Тикет-база не дотягивает до хорошего приза.',
+      bp:'Курс скачком 50% (макс), больше игр на каждого в компании.',
+      bc:'Выходит за casual-бюджет.',
+      lo:'Охта: компания — 3000, курс 50%, много игры. (компаний меньше, чем в Питере — движок всё равно семья 1500)',
+      lp:'Питер: ⭐ денежный рычаг. Компании 2000→3000 — курс 50%, считай выгоду в ИГРАХ на человека. Сюда уводим группы, не казуала.'},
+    {t:'3000 → 5000', a:'3000', b:'5000',
+      ap:'Вход в призовую зону, курс 50%.',
+      ac:'Для кита может не хватить до топ-приза.',
+      bp:'Курс 60%, абсолютный максимум зарядов и тикетов; топ-приз ближе.',
+      bc:'Высокий порог, только high-spend.',
+      lo:'Охта: 5000 — узкий сегмент (папа+ребёнок). Не навязываем; для массы — «много игры».',
+      lp:'Питер: 5000 = VIP-папа за топ-призом — НЕ навязываем, сам себя выбирает (выкупает призы). Витрина «тикеты на приз».'}
+  ];
+  var BNOTE={ohta:'Охта: движок — семья 1000→1500, касса тянет первое вверх. 500 не показываем (анти-дрейф). Докинг — эксперимент (риск раскола большого платежа).',
+             piter:'Питер: первое НЕ давим (убьёт докидку). Ведём визит к 1500 по докидке 500. Деньги — компании 2000→3000. 5000 = VIP-витрина, без толчка.'};
+  function brender(park){
+    document.getElementById('b-body').innerHTML=BATTLES.map(function(x){
+      var lev=park==='ohta'?x.lo:x.lp;
+      return '<div class="battle"><div class="bttl">'+x.t+'</div>'+
+        '<table><tr><th>Сумма</th><th>Преимущества</th><th>Слабости</th></tr>'+
+        '<tr><td class="mono">'+x.a+'</td><td>'+x.ap+'</td><td>'+x.ac+'</td></tr>'+
+        '<tr><td class="mono c-tgt">'+x.b+'</td><td>'+x.bp+'</td><td>'+x.bc+'</td></tr></table>'+
+        '<div class="lever">Рычаг ('+(park==='ohta'?'Охта':'Питер')+'): <b>'+lev+'</b></div></div>';
+    }).join('');
+    document.getElementById('bnote').textContent=BNOTE[park];
+    Array.prototype.forEach.call(document.querySelectorAll('#bsw button'),function(b){b.classList.toggle('on',b.getAttribute('data-b')===park);});
+  }
+  document.getElementById('bsw').addEventListener('click',function(e){var b=e.target.closest('button'); if(b)brender(b.getAttribute('data-b'));});
+  brender('ohta');
+
+  // ---- ТТ-1 · два тента + переключатель ----
+  var TENT={
+    ohta:
+      '<div class="hero">Заряди карту</div>'+
+      '<div class="mk-head">Играй больше — плати меньше<span class="qmark inq" data-tip="head_solo">?</span></div>'+
+      '<div class="deal">'+
+        '<div class="opt"><span class="qmark" data-tip="t1000">?</span><div class="intent">одному</div><div class="pr">1 000 ₽</div><span class="vb">1 300 зарядов · 20+ игр</span></div>'+
+        '<div class="opt def"><span class="qmark" data-tip="t1500">?</span><span class="star">больше игр</span><span class="tk">+8 игр</span><div class="intent">одному вдоволь</div><div class="pr">1 500 ₽</div><span class="vb">2 025 зарядов · 30+ игр</span></div>'+
+        '<div class="opt"><span class="qmark" data-tip="t2000">?</span><span class="tk">2 × 21 игр</span><div class="intent">на двоих</div><div class="pr">2 000 ₽</div><span class="vb">2 800 зарядов</span></div>'+
+      '</div>'+
+      '<div class="prizes"><div class="ph">Максимум игры<span class="qmark inq" data-tip="head_company">?</span></div><div class="pgrid">'+
+        '<div class="pcard"><span class="qmark" data-tip="t3000">?</span><span class="tk">69 игр</span><div class="intent" style="font-size:15px; margin:8px 0 6px;">компания 3–4</div><div class="pr">3 000 ₽</div><span class="vb">4 500 зарядов</span></div>'+
+        '<div class="pcard"><span class="qmark" data-tip="t5000">?</span><span class="tk">123 игры</span><div class="intent" style="font-size:15px; margin:8px 0 6px;">сорвать банк</div><div class="pr">5 000 ₽</div><span class="vb">8 000 зарядов</span></div>'+
+      '</div></div>'+
+      '<div class="keep">♾ заряды не сгорают · играй больше за те же деньги — курс растёт с суммой</div>',
+    piter:
+      '<div class="hero">Заряди карту</div>'+
+      '<div class="mk-head">Норм визита — 1 500<span class="qmark inq" data-tip="head_norm">?</span></div>'+
+      '<div class="deal">'+
+        '<div class="opt def"><span class="qmark" data-tip="p1500">?</span><span class="star">норм визита</span><div class="intent">столько выходит за визит</div><div class="pr">1 500 ₽</div><span class="vb">2 025 зарядов · 30+ игр · курс 35%</span></div>'+
+      '</div>'+
+      '<div class="keep" style="border:1px solid rgba(0,212,255,.35); border-radius:10px; padding:12px; margin-top:16px;"><span class="qmark inq" data-tip="p500" style="margin-left:0; margin-right:8px;">?</span>Кончились заряды? <b>Докинь 500</b> — догоняешь визит до 1500</div>'+
+      '<div class="prizes"><div class="ph">Компании<span class="qmark inq" data-tip="head_comp">?</span></div><div class="pgrid">'+
+        '<div class="pcard"><span class="qmark" data-tip="p2000">?</span><span class="tk">2 × 21 игр</span><div class="intent" style="font-size:15px; margin:8px 0 6px;">на двоих</div><div class="pr">2 000 ₽</div><span class="vb">2 800 зарядов</span></div>'+
+        '<div class="pcard"><span class="qmark" data-tip="p3000">?</span><span class="tk">3 × 23 игр</span><div class="intent" style="font-size:15px; margin:8px 0 6px;">компания 3–4</div><div class="pr">3 000 ₽</div><span class="vb">4 500 зарядов · курс 50%</span></div>'+
+      '</div></div>'+
+      '<div class="prizes" style="border-color:rgba(255,0,128,.3);"><div class="ph" style="color:var(--magenta);">За топ-призом<span class="qmark inq" data-tip="head_vip">?</span></div><div class="pgrid">'+
+        '<div class="pcard"><span class="qmark" data-tip="p5000">?</span><span class="tk">тикеты на приз</span><div class="intent" style="font-size:15px; margin:8px 0 6px;">сорвать банк</div><div class="pr">5 000 ₽</div><span class="vb">8 000 зарядов</span></div>'+
+      '</div></div>'+
+      '<div class="keep">♾ заряды не сгорают · докидывай по 500 — догоняешь визит до 1500</div>'
+  };
+  var TT1NOTE={
+    ohta:'Охта: одна лестница 1000/1500/2000, движок 1000→1500. 500 не показываем (анти-дрейф). 3000/5000 = «много игры».',
+    piter:'Питер: норм визита 1500 (доходишь докидкой 500), 1000 не светим. Компании 2000/3000. 5000 = VIP-витрина, без толчка.'
+  };
+  var TIPS={
+    ohta:{
+      head_solo:'<h5>Играй больше — плати меньше</h5><p><b>Режим:</b> я один или вдвоём.</p><p>Помогает выбрать: 1000 (одному), 1500 (вдоволь), 2000 (на двоих).</p><p><b>Логика:</b> курс растёт с суммой <b>30 → 35 → 40%</b> (с офиц. таблички). <b>Движок Охты — увести с 1000 на 1500.</b> 500 не показываем — Охта дрейфует вниз.</p>',
+      head_company:'<h5>Максимум игры</h5><p><b>Режим:</b> компания.</p><p>3000 (компания 3–4) и 5000 (банк).</p><p><b>Логика:</b> для компаний курс <b>50 → 60%</b> и максимум игры на группу. <b>Продаём ИГРУ, не «копи на приз»</b> — масса тикеты не выкупает. Одиночкам не навязываем.</p>',
+      t1000:'<h5>1 000 — «одному»</h5><p><b>Игроку:</b> нормально поиграть одному.</p><p><b>Когда:</b> гость сомневается.</p><p><b>Ход:</b> предложить 1000 как базу, дальше тянуть на 1500.</p><ul><li>курс <b>30%</b> — подарок 300 ÷ 1000, с таблички</li><li><b>1 300 зарядов</b> — пополнение + подарок</li><li><b>20+ игр</b> = 1300 ÷ 65 (честная средняя)</li></ul><p>Микро ≤300 — не трогаем. 500 на тент не выносим.</p>',
+      t1500:'<h5>1 500 — целевая ⭐</h5><p><b>Игроку:</b> наиграться вдоволь.</p><p><b>Когда:</b> взял 1000 или спрашивает «наиграться».</p><p><b>Ход:</b> <b>главный апселл Охты — увести с 1000 на 1500.</b></p><ul><li>курс <b>35%</b> (выше 30%) — подарок 525 ÷ 1500</li><li><b>+8 игр бонусом</b> = 525 ÷ 65</li><li><b>30+ игр</b> = 2025 ÷ 65</li></ul>',
+      t2000:'<h5>2 000 — «на двоих»</h5><p><b>Когда:</b> пара.</p><p><b>Ход:</b> ок для двоих; компания больше — на 3000. Одному не давить.</p><ul><li>курс <b>40%</b> — подарок 800 ÷ 2000</li><li><b>2 × 21 игра</b> = 2800 ÷ 65 поровну</li></ul>',
+      t3000:'<h5>3 000 — компания 3–4</h5><p><b>Ход:</b> сюда сдвигаем компании с 2000.</p><ul><li>курс <b>50%</b> (макс) — подарок 1500 ÷ 3000</li><li><b>69 игр</b> = 4500 ÷ 65 — много игры на группу</li></ul><p class="sub">Масса тикеты не выкупает → продаём ИГРУ, не приз.</p>',
+      t5000:'<h5>5 000 — «сорвать банк»</h5><p><b>Когда:</b> папа+ребёнок. Узкий сегмент.</p><p><b>Ход:</b> не навязываем; для массы — «много игры».</p><ul><li>курс <b>60%</b> (макс) — подарок 3000 ÷ 5000</li><li><b>123 игры</b> = 8000 ÷ 65</li></ul>'
+    },
+    piter:{
+      head_norm:'<h5>Норм визита — 1 500</h5><p><b>Главное правило Питера:</b> первое пополнение <b>НЕ давим</b> до тира — это убьёт докидывание (визит не вырастет).</p><p>Веди ВИЗИТ к 1500: 1000 + докинь 500. 1500 — не «клади сразу», а «столько выходит за визит».</p>',
+      p1500:'<h5>1 500 — цель визита</h5><p><b>Игроку:</b> «за визит обычно выходит ~1500 — можешь сразу или докидывая по 500».</p><p><b>НЕ</b> «класть 1500 одним платежом» (это 2× привычки, испугаешь).</p><ul><li>курс <b>35%</b> — подарок 525 ÷ 1500</li><li><b>30+ игр</b> = 2025 ÷ 65</li><li>пол визита: большинство визитов ниже 1500 → ведём вверх докидкой</li></ul>',
+      p500:'<h5>Докидка 500</h5><p><b>Когда:</b> заряды кончились.</p><p><b>Реплика:</b> «докинь 500 — догонишь до 1500».</p><ul><li>бонус начисляется, <b>числом не давим</b> (не якорим на 500)</li><li>≤300-докидки тихо лифтим до 500 (поймать бонус-порог)</li><li>это <b>сохраняет</b> докидку, не заменяет первое</li></ul>',
+      head_comp:'<h5>Компании 2000 / 3000</h5><p><b>Режим:</b> группа.</p><p><b>Логика:</b> сюда уводим компании (не казуала). Выгода — в <b>играх на человека</b>, не в «+бонус».</p>',
+      p2000:'<h5>2 000 — на пару/группу</h5><p><b>Когда:</b> двое-трое. Одному не давим (убьёт докидку).</p><ul><li>курс <b>40%</b> — подарок 800 ÷ 2000</li><li><b>2 × 21 игра</b> = 2800 ÷ 65</li></ul>',
+      p3000:'<h5>3 000 — компания 3–4 ⭐</h5><p><b>Главный денежный рычаг Питера.</b> Уводим компании с 2000 на 3000.</p><ul><li>курс <b>50%</b> (макс) — подарок 1500 ÷ 3000</li><li><b>3 × 23 игры</b> = 4500 ÷ 65 — считай в играх на человека</li></ul>',
+      head_vip:'<h5>За топ-призом — 5 000</h5><p><b>Режим:</b> VIP-папа (папа+ребёнок за крупным призом).</p><p><b>НЕ навязываем</b> — этот сегмент сам себя выбирает и реально выкупает призы.</p>',
+      p5000:'<h5>5 000 — VIP-папа</h5><p><b>Когда:</b> пришёл за топ-призом. Не производится репликой — не давим.</p><ul><li>курс <b>60%</b> (макс) — подарок 3000 ÷ 5000</li><li><b>тикеты на приз</b> — для VIP рамка «приз» верна (выкупает)</li><li><b>123 игры</b> = 8000 ÷ 65</li></ul>'
+    }
+  };
+  var TT1DEF=document.getElementById('tt1panel').innerHTML;
+  var curTent='ohta';
+  function trender(park){
+    curTent=park;
+    document.getElementById('tt1board').innerHTML=TENT[park];
+    document.getElementById('tt1note').textContent=TT1NOTE[park];
+    document.getElementById('tt1panel').innerHTML=TT1DEF;
+    var sw=document.getElementById('tt1sw');
+    if(sw) Array.prototype.forEach.call(sw.querySelectorAll('button'),function(b){b.classList.toggle('on',b.getAttribute('data-tt')===park);});
+  }
+  var tt1board=document.getElementById('tt1board');
+  if(tt1board){
+    tt1board.addEventListener('click',function(e){
+      var q=e.target.closest('.qmark'); if(!q)return;
+      var id=q.getAttribute('data-tip'), act=q.classList.contains('active');
+      tt1board.querySelectorAll('.qmark').forEach(function(x){x.classList.remove('active');});
+      if(act){ document.getElementById('tt1panel').innerHTML=TT1DEF; }
+      else { q.classList.add('active'); document.getElementById('tt1panel').innerHTML=(TIPS[curTent]&&TIPS[curTent][id])||TT1DEF; }
+    });
+  }
+  var tt1sw=document.getElementById('tt1sw');
+  if(tt1sw){ tt1sw.addEventListener('click',function(e){var b=e.target.closest('button'); if(b)trender(b.getAttribute('data-tt'));}); }
+  trender('ohta');
+
+  var tsw=document.getElementById('tsw');
+  if(tsw){ tsw.addEventListener('click',function(e){var b=e.target.closest('button'); if(!b)return;
+    tsw.querySelectorAll('button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+    var t=b.getAttribute('data-t');
+    document.getElementById('tariff-fact').style.display = t==='fact'?'':'none';
+    document.getElementById('tariff-constr').style.display = t==='constr'?'':'none';
+  });}
+
+
+  var navIn=document.querySelector('.nav-in');
+  function navClose(){ navIn.querySelectorAll('.navgrp.open').forEach(function(g){g.classList.remove('open');}); }
+  function showPage(id){
+    var pg=document.getElementById(id); if(!pg)return;
+    navIn.querySelectorAll('button[data-pg]').forEach(function(x){x.classList.toggle('on', x.getAttribute('data-pg')===id);});
+    document.querySelectorAll('.page').forEach(function(p){p.classList.toggle('on', p.id===id);});
+    navIn.querySelectorAll('.navgrp').forEach(function(g){
+      var has=false; g.querySelectorAll('button[data-pg]').forEach(function(x){ if(x.getAttribute('data-pg')===id) has=true; });
+      g.classList.toggle('active',has);
+    });
+    window.scrollTo(0,0);
+  }
+  navIn.querySelectorAll('.navgrp > .grp').forEach(function(g){
+    g.addEventListener('click',function(e){ e.stopPropagation(); var grp=g.parentNode, was=grp.classList.contains('open'); navClose(); if(!was) grp.classList.add('open'); });
+  });
+  navIn.querySelectorAll('button[data-pg]').forEach(function(b){
+    b.addEventListener('click',function(e){ e.stopPropagation(); showPage(b.getAttribute('data-pg')); navClose(); });
+  });
+  document.addEventListener('click',navClose);
+  showPage('protocol');
+})();
+</script>
+</body>
+</html>
