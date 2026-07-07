@@ -1,0 +1,1507 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Песочница планирования · Охта Молл</title>
+<style>
+  :root{
+    --ink:#1A1A1A; --muted:#5B5B5B; --hint:#8A8A8A;
+    --bg:#FFFFFF; --surface:#F5F5F4; --surface2:#EFEFEE; --line:#E2E2E0;
+    --yellow:#FFC833; --yellow-2:#FFE08A; --yellow-3:#EAA400; --yellow-ink:#2A1E00; --yellow-tint:#FFF6E0; --yellow-tint-soft:#FFFBF0; --bar:#CFCDC4;
+    --blue:#2563EB; --green:#2F9E54; --red:#D92D20; --orange:#E8833A; --orange-tint:#FDEEE0;
+    --r:12px;
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --info:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E");
+  }
+  /* единый chevron через CSS-маску (наследует currentColor, ровно центрируется) */
+  .chev{display:inline-block;width:14px;height:14px;vertical-align:middle;-webkit-mask:var(--chev) center/contain no-repeat;mask:var(--chev) center/contain no-repeat;background-color:currentColor;transition:transform .2s}
+  /* инфо-подсказка (tips&tricks): светло-серая плашка + ⓘ слева сверху */
+  .tip{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 34px;font-size:12.5px;color:var(--muted);margin:6px 0;transition:box-shadow .3s,border-color .3s}
+  .tip::before{content:"";position:absolute;left:11px;top:10px;width:15px;height:15px;background-color:var(--hint);-webkit-mask:var(--info) center/contain no-repeat;mask:var(--info) center/contain no-repeat}
+  .tip.flash{border-color:var(--blue);background:var(--yellow-tint-soft)}
+  .tip .lgd{margin-top:5px;font-size:11.5px;color:var(--hint)}
+  /* сигнал-бейдж (оранжевая гамма) — режим «сигнал» */
+  .sigbadge{position:absolute;top:9px;right:12px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--orange);background:var(--orange-tint);border:1px solid var(--orange);border-radius:999px;padding:1px 8px}
+  /* клик по бейджу → скролл к подсказке (см. делегированный обработчик) */
+  .prov{cursor:pointer}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:0 16px 64px}
+  nav{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line);
+    display:flex;gap:4px;flex-wrap:wrap;align-items:center;padding:10px 0;margin-bottom:14px}
+  .brand{display:flex;flex-direction:column;line-height:1.1;margin-right:12px}
+  .brand b{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.4px}
+  .brand span{font-size:11px;font-weight:400;color:var(--muted)}
+  nav a{font-size:12.5px;text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+  nav a:hover{background:var(--surface)}
+  nav a.active{background:var(--ink);color:#fff}
+  nav .grp{width:1px;background:var(--line);margin:2px 4px}
+  .navdrop{position:relative}
+  .navdrop-btn{font-size:12.5px;color:var(--muted);padding:6px 10px;border-radius:999px;border:1px solid transparent;white-space:nowrap;cursor:pointer;display:inline-block}
+  .navdrop-btn:hover{background:var(--surface)}
+  .navdrop.active .navdrop-btn{background:var(--ink);color:#fff}
+  .navdrop-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px;z-index:20;min-width:150px}
+  .navdrop.open .navdrop-menu{display:flex;flex-direction:column;gap:2px}
+  .navdrop-btn::after{content:"";display:inline-block;width:13px;height:13px;margin-left:4px;vertical-align:middle;-webkit-mask:var(--chev) center/contain no-repeat;mask:var(--chev) center/contain no-repeat;background-color:currentColor;transition:transform .2s}
+  .navdrop.open .navdrop-btn::after{transform:rotate(180deg)}
+  h1{font-size:20px;margin:6px 0 2px}
+  h2{font-size:15px;margin:22px 0 8px}
+  h2 .tag{font-size:11px;color:var(--hint);font-weight:400}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 4px}
+  .crumb{font-size:12px;color:var(--hint);margin:4px 0 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:10px 0}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row label{font-size:14px}
+  .row .src{color:var(--hint);font-size:11px;display:block;margin-top:1px}
+  select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:175px}
+  input[type=number]{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;width:120px;text-align:right}
+  input:disabled{opacity:.5}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 4px}
+  .big{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .kpi{flex:1;min-width:165px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+  .kpi.result{background:var(--yellow);border-color:var(--yellow)}
+  .kpi.result .t,.kpi.result .v,.kpi.result .d{color:var(--yellow-ink)}
+  .kpi .t{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:21px;font-weight:700;margin-top:2px}
+  .kpi .d{font-size:12px;color:var(--muted);margin-top:2px}
+  details{margin-top:6px}
+  summary{cursor:pointer;font-size:12px;color:var(--blue);list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"";display:inline-block;width:12px;height:12px;margin-right:5px;vertical-align:middle;-webkit-mask:var(--chev) center/contain no-repeat;mask:var(--chev) center/contain no-repeat;background-color:currentColor;transform:rotate(-90deg);transition:transform .2s}
+  details[open] summary::before{transform:rotate(0deg)}
+  .why{font-size:12.5px;color:var(--muted);background:var(--surface2);border-radius:8px;padding:9px 11px;margin-top:6px}
+  .why b{color:var(--ink)}
+  .why .f{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--ink);display:block;margin:2px 0 6px}
+  .why ol{margin:4px 0 0;padding-left:18px}
+  .why li{margin:2px 0}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  th,td{text-align:right;padding:5px 6px;border-bottom:1px solid var(--line)}
+  table tr:last-child td{border-bottom:0}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted);font-weight:600}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+  .note{font-size:12px;color:var(--hint);margin-top:8px}
+  .lk-dash{color:inherit;text-decoration:underline;text-decoration-style:dashed;text-underline-offset:2px}
+  .banner{font-size:12.5px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin:6px 0 2px}
+  .gap{font-size:12.5px;color:var(--ink);background:#FFF6E0;border:1px solid var(--yellow);border-radius:8px;padding:9px 11px;margin-top:8px}
+  .zero{color:var(--hint)}
+  .lead{font-size:13px;color:var(--muted);margin:0 0 2px}
+  .eng{display:flex;gap:10px;flex-wrap:wrap}
+  .eng .m{flex:1;min-width:150px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .eng .m .t{font-size:12px;color:var(--muted)}
+  .eng .m .v{font-size:17px;font-weight:700}
+  .eng .m .s{font-size:11px;color:var(--hint);font-family:ui-monospace,Menlo,monospace}
+  .arrow{color:var(--hint);font-size:11px;margin:2px 0 0}
+  .lvl{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .lvl:last-child{border-bottom:0}
+  .lvl .k{font-weight:600;font-size:13px;min-width:150px}
+  .lvl .v{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--ink);min-width:54px;text-align:right}
+  .lvl .w{font-size:12.5px;color:var(--muted);flex:1}
+  /* параметры месяца */
+  .prow{display:grid;grid-template-columns:1.4fr 1fr 0.8fr;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+  .prow:last-child{border-bottom:0}
+  .prow .pl b{font-size:14px}
+  .prow .real{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .prow .dl{font-size:13px;text-align:right;font-family:ui-monospace,Menlo,monospace}
+  .prow.changed{background:#F4F8FF;border-radius:8px;margin:0 -8px;padding:10px 8px}
+  .chip{font-size:10.5px;color:var(--blue);border:1px solid var(--blue);border-radius:999px;padding:1px 7px;margin-left:6px}
+  .head{font-size:11px;color:var(--hint);display:grid;grid-template-columns:1.4fr 1fr 0.8fr;gap:10px;padding:0 0 4px}
+  .head div:nth-child(2),.head div:nth-child(3){text-align:right}
+  a{color:var(--blue)}
+  /* Главная · факт / прогноз / план */
+  .cmp{display:grid;grid-template-columns:128px 1fr 1fr 1fr;gap:6px;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:2px 0 8px}
+  .seg button{font:inherit;font-size:12px;padding:5px 11px;border:0;border-right:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--ink);color:#fff}
+  .thead{font-size:12.5px;color:var(--ink);margin-bottom:8px}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:108px}
+  .bcol{flex:1;display:flex;align-items:flex-end;height:100%}
+  .bar{width:100%;border-radius:3px 3px 0 0;background:var(--bar)}
+  .bar.base{background:var(--muted)}
+  .bar.fc{background:var(--yellow);border:1px dashed var(--yellow-ink)}
+  .bar.null{background:repeating-linear-gradient(45deg,var(--line),var(--line) 3px,transparent 3px,transparent 6px);opacity:.7}
+  .blabs{display:flex;gap:4px;margin-top:4px}
+  .blab{flex:1;text-align:center;font-size:9px;color:var(--hint)}
+  .blab.fc{color:var(--yellow-ink)}
+  .tlegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:10px;color:var(--hint)}
+  .tlegend .sw{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:-1px;margin-right:3px}
+  .tlegend .sw.a{background:var(--bar)}
+  .tlegend .sw.base{background:var(--muted)}
+  .tlegend .sw.fc{background:var(--yellow)}
+  .tlegend .sw.null{background:repeating-linear-gradient(45deg,var(--line),var(--line) 2px,transparent 2px,transparent 4px)}
+  .mhead{padding:2px 0 4px}
+  .mhead .h{text-align:center}
+  .mhead .h b{font-size:17px;font-weight:700;color:var(--ink)}
+  .mhead .h .s{display:block;font-size:11px;color:var(--hint);margin-top:1px}
+  .block{border-bottom:1px solid var(--line)}
+  .block:first-of-type{border-top:1px solid var(--line)}
+  .plan-plaque{background:var(--surface);border-radius:12px;padding:10px;margin-top:8px}
+  .pmhead{padding:2px 13px 4px}
+  .pmhead,.pblocks .cmp{grid-template-columns:150px 1fr 1fr 1fr}
+  .pblocks{margin-top:6px}
+  .pblocks .block{background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .pblocks .block[open]>summary{background:var(--surface)}
+  .pblocks .block.rev>summary{background:var(--yellow-tint)}
+  #plan-bridge .kpi .t{font-weight:700}
+  .pblocks .block+.block{margin-top:8px}
+  .block>summary{cursor:pointer;list-style:none;padding:11px 0;color:var(--ink)}
+  .pblocks .block>summary{padding:11px 12px}
+  .block>summary::before,.block[open]>summary::before{content:none}
+  .block>summary::-webkit-details-marker{display:none}
+  .block>summary:hover{background:var(--surface)}
+  .lab{font-size:14px;color:var(--ink)}
+  .pblocks .lab{white-space:nowrap;font-weight:700}
+  .lab::after{content:"";display:inline-block;width:13px;height:13px;margin-left:6px;vertical-align:middle;-webkit-mask:var(--chev) center/contain no-repeat;mask:var(--chev) center/contain no-repeat;background-color:var(--hint);transition:transform .2s}
+  .pkbadge{display:inline-block;min-width:16px;text-align:center;font-size:11px;font-weight:700;padding:1px 5px;border-radius:5px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);margin-right:7px}
+  .block[open]>summary .lab::after{transform:rotate(180deg)}
+  .cell{text-align:center}
+  .cell .n{font-size:16px;font-weight:700;color:var(--ink)}
+  .cell .b{font-size:11px;color:var(--muted);margin-top:1px}
+  .plan-c{background:var(--yellow-tint-soft);border-radius:8px;padding:3px 0}
+  .block.rev>summary{background:var(--yellow-tint)}
+  .block.rev>summary .lab,.block.rev>summary .cell .n,.block.rev>summary .cell .b,.block.rev .lab::after{color:var(--yellow-ink)}
+  .block.rev>summary .plan-c{background:transparent}
+  .block.rev>summary .lab::after{background-color:var(--yellow-ink)}
+  .subrow{padding:6px 0;border-top:1px solid var(--line)}
+  .subrow:first-child{border-top:0}
+  .sublab{font-size:12px;color:var(--muted);padding-left:8px}
+  .sn{font-size:12.5px;color:var(--ink)}
+  .dash{color:var(--hint)}
+  .binner{padding:2px 0 10px}
+  .pblocks .binner{padding:2px 12px 10px}
+  .layer-h{font-size:11px;font-weight:600;color:var(--ink);margin:9px 0 3px}
+  .frow{display:flex;align-items:center;gap:6px;padding:4px 0 4px 8px;border-bottom:1px solid var(--line)}
+  .fk{flex:1;font-size:12px;color:var(--muted)}
+  .fv{font-size:12.5px;color:var(--ink);font-family:ui-monospace,Menlo,monospace;text-align:right}
+  .prov{font-size:9.5px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--bg);white-space:nowrap}
+  .prov.fact{background:var(--surface2);border-color:var(--surface2)}
+  .prov.assume{border-style:dashed}
+  .prov.gap{background:var(--yellow-tint);border-color:var(--yellow);color:var(--yellow-ink)}
+  .drow{padding:7px 0 8px 8px;border-bottom:1px solid var(--line)}
+  .drow-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .dname{font-size:13px;color:var(--ink)}
+  .dpp{font-size:12.5px;font-family:ui-monospace,Menlo,monospace;text-align:right;color:var(--ink)}
+  .darr{color:var(--hint);margin:0 2px}
+  .dp.plan{background:var(--yellow-tint-soft);border-radius:6px;padding:1px 5px}
+  .dsame{color:var(--hint);font-size:11.5px}
+  .dbase{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .goalbar{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin:10px 0}
+  .gt{color:var(--muted);font-size:13px}
+  .grow1{font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .goalbar input{width:52px;padding:3px 6px}
+  .gstat{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+  .dot.ok{background:var(--green)}
+  .dot.bad{background:var(--red)}
+  .gbridge{font-size:12.5px;color:var(--ink);margin-top:6px;font-family:ui-monospace,Menlo,monospace}
+  .ghint{font-size:11.5px;color:var(--hint);margin-top:4px}
+  .ll-h{font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 6px}
+  .ll-bars{display:flex;align-items:flex-end;gap:6px;height:108px;position:relative}
+  .llcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .ll-v{font-size:9px;color:var(--muted)}
+  .ll-v.hot{color:var(--yellow-ink)}
+  .llbar{width:100%;border-radius:3px 3px 0 0;background:var(--bar)}
+  .llbar.hot{background:var(--yellow)}
+  .llbar.cur{outline:2px solid var(--ink);outline-offset:-2px}
+  .ll-thr{position:absolute;left:0;right:0;border-top:1px dashed var(--line);z-index:1}
+  .ll-note{font-size:10px;color:var(--hint);margin-top:6px}
+  .ll-m{font-size:9px;color:var(--hint);margin-top:2px;text-align:center;white-space:nowrap}
+  .ly-sep{text-align:center;color:var(--hint);font-size:13px;line-height:1;margin:8px 0}
+  .ly-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .ly-chip{font-size:11px;padding:3px 9px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .ly-det>summary{cursor:pointer;font-size:13px;color:var(--muted)}
+  .ly-sum{color:var(--muted);font-weight:400;font-size:12px}
+  .ly-big{font-size:21px;font-weight:700;color:var(--ink);margin-top:2px}
+  .lyblk-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:2px 0 6px}
+  .lyblk-h b{font-size:13px}
+  .lyblk-h .s{font-size:11px;color:var(--hint)}
+  .lycmp{display:grid;grid-template-columns:92px 1fr 1fr auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+  .lycmp:last-child{border-bottom:0}
+  .lycmp .mlab{font-size:12px;color:var(--ink)}
+  .lycmp .mlab .ctx{color:var(--hint);font-size:10px;display:block}
+  .lycmp-h{display:grid;grid-template-columns:92px 1fr 1fr auto;gap:8px;font-size:10px;color:var(--hint);padding:0 0 3px}
+  .lyval{font-size:12px;color:var(--ink);min-width:26px;text-align:right}
+  .lystat{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+  .lystat.warn{color:var(--ink);font-weight:700}
+  .lystat.good{color:var(--ink)}
+  .lynow-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .lynow-row:last-child{border-bottom:0}
+  .lynow-lab{font-size:13px;color:var(--ink);flex:1}
+  .lynow-lab .ctx{color:var(--hint);font-size:10px;margin-left:3px}
+  .lynow-r{display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .lynow-val{font-size:15px;font-weight:700;color:var(--ink)}
+  .lynow-tr{font-size:11px;color:var(--muted);min-width:58px;text-align:right}
+  .lysig{position:relative;border-radius:10px;padding:12px 14px;margin:10px 0;background:var(--orange-tint);border:1px solid var(--orange)}
+  .lysig.hold,.lysig.warn{background:var(--orange-tint);border:1px solid var(--orange)}
+  .lysig .v{font-size:14px;font-weight:700;color:var(--ink)}
+  .lysig .m{font-size:12px;color:var(--muted);margin-top:5px}
+  .bvals{display:flex;gap:4px;margin-bottom:2px}
+  .bv{flex:1;text-align:center;font-size:9px;color:var(--muted)}
+  .bv.fc{color:var(--yellow-ink)}
+  .pkrow{display:grid;grid-template-columns:84px 78px 52px 1fr 1.5fr;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+  .pkrow.pkhd{font-size:11px;color:var(--hint);border-top:0;padding-bottom:4px}
+  .pkp{font-size:16px;font-weight:700;color:var(--ink)}
+  .pkz{font-size:13px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+  .pkbonus{font-size:13px;font-weight:700;color:var(--ink)}
+  .pkbar{position:relative;background:var(--surface2);border-radius:6px;height:20px;overflow:hidden}
+  .pkfill{position:absolute;left:0;top:0;bottom:0;background:var(--yellow);opacity:.85}
+  .pkfill.ok{background:var(--green);opacity:.55}
+  .pkbar span{position:relative;font-size:11px;line-height:20px;padding-left:7px;color:var(--ink)}
+  .pkup{font-size:12px;color:var(--muted)}
+  .pkrow2{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+  .pkrow2:first-child{border-top:0}
+  .pkout{font-size:12px;color:var(--muted);text-align:right}
+  .pkfill.neutral{background:var(--muted);opacity:.5}
+  .pcmp{display:grid;grid-template-columns:78px 1fr 64px 1fr;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+  .pcmp.pchd{font-size:11px;color:var(--hint);border-top:0}
+  .pcmp.pchd>div{text-align:center}
+  .pcmp.pchd>div:first-child{text-align:left}
+  .pcell{display:flex;align-items:center;gap:6px}
+  .pbar{position:relative;background:var(--surface2);border-radius:5px;height:16px;overflow:hidden}
+  .pcell .pbar{flex:1;min-width:0}
+  .pfillm{height:100%;background:var(--yellow);opacity:.85}
+  .pfillm.ok{background:var(--green);opacity:.55}
+  .ps{font-size:11px;color:var(--ink);min-width:30px;text-align:right}
+  .pdelta{font-size:12px;text-align:center;color:var(--muted)}
+  .pdelta.up{color:var(--ink);font-weight:700}
+  .pcmp2{display:grid;grid-template-columns:78px 1fr 1fr;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+  .pcmp2.pchd{font-size:11px;color:var(--hint);border-top:0}
+  .pdl{font-size:11px;color:var(--muted)}
+  .pdl.up{color:var(--ink);font-weight:700}
+  .llbar.base{background:var(--muted)}
+  .llbar.gp{background:var(--green);opacity:.6}
+  .llbar.nd{background:repeating-linear-gradient(45deg,var(--line),var(--line) 3px,transparent 3px,transparent 6px);opacity:.7}
+  .pin{position:absolute;left:6px;top:0;line-height:16px;font-size:10px;color:var(--ink);z-index:1}
+  .prow{display:grid;grid-template-columns:64px 1fr 1fr 150px;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+  .prow.phd{font-size:11px;color:var(--hint);border-top:0}
+  .pmark{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.5;z-index:2}
+  .gmet{font-size:11px;color:var(--muted)}
+  .smet{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+  .pchg{display:flex;align-items:center;gap:8px}
+  .dbadge{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+  .dbadge.up{border-color:var(--green);color:var(--ink);font-weight:700}
+  .pmoney{font-size:11px;color:var(--muted)}
+  .pktotal{padding:10px 0 2px;border-top:1px solid var(--line);font-size:13px;color:var(--ink);margin-top:6px}
+  #pk-abc .block:last-of-type{border-bottom:0}
+  .crow3{display:grid;grid-template-columns:120px 1fr 1fr 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+  .crow3 .lab{font-size:13px;color:var(--ink)}
+  .crow3 .cell{text-align:center;font-size:14px;font-weight:700;color:var(--ink)}
+  .pkscript{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--ink)}
+  .pkscript li{margin:5px 0}
+  .tbarwrap{position:relative}
+  .tline{position:absolute;left:0;top:0;width:100%;height:108px;pointer-events:none;overflow:visible}
+  section{display:none}
+  .lk-btn{display:inline-block;font-size:12px;line-height:1.3;padding:3px 9px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none}
+  .lk-btn:hover{background:var(--surface2)}
+  details.acc>summary{list-style:none;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:2px 4px}
+  details.acc>summary::before,details.acc[open]>summary::before{content:none}
+  details.acc>summary::-webkit-details-marker{display:none}
+  details.acc .arr{position:absolute;right:6px;top:50%;margin-top:-10px;display:flex;color:var(--muted);transition:transform .2s}
+  details.acc[open] .arr{transform:rotate(180deg)}
+  /* Слой 1 «Как лояльность делает выручку» (v6): заголовок, дашборд драйверов, буст */
+  .model-h{font-size:18px;font-weight:700;color:var(--ink);text-align:center;margin:2px 0 10px}
+  .model-sub{font-size:12.5px;color:var(--muted);text-align:center;margin:0 0 12px;line-height:1.4}
+  table.bst td.c{color:var(--hint)}
+  table.bst td:last-child,table.bst th:last-child{font-variant-numeric:tabular-nums}
+  table.bst tr[data-k]{cursor:pointer}
+  table.bst tr[data-k] td:first-child{text-decoration:underline;text-decoration-style:dashed;text-underline-offset:2px;text-decoration-color:var(--line)}
+  table.bst tr[data-k]:hover td{background:var(--surface2)}
+  table.bst tr[data-k].sel td{background:var(--yellow-tint)}
+  .drv-expl{font-size:12px;color:var(--muted);background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-top:8px}
+  .drv-expl b{color:var(--ink)}
+  .boost{background:var(--green);color:var(--bg);border-radius:10px;padding:12px 14px;text-align:center;margin-top:10px}
+  .boost b{font-size:16px}
+  /* лесенка выручки на #/r4: факт → прогноз → план → цель */
+  .vrl{display:flex;align-items:stretch;gap:6px;margin:4px 0 10px}
+  .vrl .st{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 5px;text-align:center}
+  .vrl .st .l{display:block;font-size:10px;color:var(--hint)}
+  .vrl .st .v{display:block;font-size:16px;font-weight:700;color:var(--ink);margin-top:1px}
+  .vrl .st.plan{background:var(--yellow-tint-soft)}
+  .vrl .st.goal{background:var(--yellow-tint);border-color:var(--yellow)}
+  .vrl .st.goal .v{color:var(--yellow-ink)}
+  .vrl .ar{display:flex;align-items:center;color:var(--hint);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav id="nav">
+    <div class="brand"><b>БУМБАСТИК</b><span>Охта Молл</span></div>
+    <a data-p="planner" href="#/planner">План</a>
+    <a data-p="goal" href="#/goal">Цель</a>
+    <a data-p="r5" href="#/r5">Драйверы</a>
+    <div class="navdrop">
+      <span class="navdrop-btn" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')">Аналитика</span>
+      <div class="navdrop-menu">
+        <a data-p="packages" href="#/packages">Чек</a>
+        <a data-p="r4" href="#/r4">Ценность (LTV)</a>
+        <a data-p="tc" href="#/tc">Трафик</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===================== УРОВЕНЬ 2 (за цифрой) ===================== -->
+  <section id="page-l2">
+    <p class="crumb"><a href="#/planner">← План</a> · Уровень 2 · за цифрой</p>
+    <h1 id="l2-title"></h1>
+    <div id="l2-formula"></div>
+    <h2>Данные за цифрой</h2>
+    <div class="card" id="l2-data"></div>
+    <h2>Почему именно так (5 почему)</h2>
+    <div class="card" id="l2-why"></div>
+    <h2>Входы</h2>
+    <div class="card" id="l2-inputs"></div>
+  </section>
+
+  <!-- ===================== ПЛАНИРОВЩИК ===================== -->
+  <section id="page-planner">
+    <h1 id="planner-h1">План</h1>
+    <div class="tip">План = прогноз (на факторах) + драйверы роста (управляем). <span class="prov assume">допущение</span><div class="lgd">Бейджи: <span class="prov fact">фактор</span> — дано · <span class="prov gap">драйвер роста</span> — влияем · <span class="prov assume">допущение</span> — оценка/суждение. Клик по любому бейджу ведёт сюда.</div></div>
+    <div class="plan-plaque">
+      <div class="cmp mhead pmhead" id="plan-head"></div>
+      <div id="plan-blocks" class="pblocks"></div>
+    </div>
+    <div id="plan-bridge"></div>
+    <h2>Контекст</h2>
+    <div id="plan-context"></div>
+  </section>
+
+  <!-- ===================== ЦЕЛЬ 2026 ===================== -->
+  <section id="page-goal">
+    <h1>Цель на 2026</h1>
+    <div class="big" id="goal-head"></div>
+    <h2>Цель vs Факт</h2>
+    <div id="goal-graph"></div>
+    <div id="goal-detail"></div>
+    <p class="note" id="goal-note"></p>
+  </section>
+
+  <!-- ===================== ПАКЕТЫ (КАССА) ===================== -->
+  <section id="page-packages">
+    <h1>Контроль чека</h1>
+    <div class="tip">Игрок выбирает пакет на кассе. Цель — поднять долю пакетов ≥1500 ₽. Управляемый чек A — пакеты 500–3000.<div class="lgd">Бейджи: <span class="prov fact">фактор</span> — дано · <span class="prov gap">драйвер роста</span> — влияем · <span class="prov assume">допущение</span> — оценка/суждение.</div></div>
+    <div class="big" id="pk-head"></div>
+    <div id="pk-glossary"></div>
+    <div id="pk-axes"></div>
+    <h2>Тренд чек/пополнение (общий) по месяцам</h2>
+    <div class="card" id="pk-checktrend"></div>
+    <h2>Распределение пакетов · <span id="pk-per"></span></h2>
+    <div class="card" id="pk-abc"></div>
+    <h2>Тренд доли пакетов ≥1500 ₽ по месяцам · KPI касс</h2>
+    <div class="card" id="pk-trend"></div>
+    <h2>Логика плана</h2>
+    <div class="card" id="pk-script"></div>
+    <h2>Чек/визит → 1 500 ₽</h2>
+    <div class="card" id="pk-chkvisit"></div>
+    <h2>Сезонность чека</h2>
+    <div class="card"><table id="t-chkseason"></table></div>
+    <p class="note" id="chkseason-note"></p>
+  </section>
+
+  <!-- ===================== ПАРАМЕТРЫ МЕСЯЦА ===================== -->
+  <!-- «Параметры месяца» удалены: выбор уровней — из Google Sheets; интерпретации уровней — на R1–R4 -->
+
+
+  <!-- ===================== РЕАЛИСТИЧНОСТЬ ===================== -->
+  <!-- Реалистичность + Журнал вынесены в planning-parked-realism-journal.html (см. BACKLOG-planning-ohta.md). Модель realism (realismBand) оставлена как след. -->
+
+  <!-- ===================== СПРАВОЧНИКИ ===================== -->
+  <section id="page-tc">
+    <p class="crumb">Справочники · ТЦ «Охта Молл» · источник правды</p>
+    <h1>ТЦ — трафик и захват</h1>
+    <div class="tip">Поток ТЦ (сезонность) × захват (конверсия ТЦ→парк под давлением конкуренции) = объём наших пополнений.<div class="lgd">Бейджи: <span class="prov fact">фактор</span> — дано · <span class="prov gap">драйвер роста</span> — влияем · <span class="prov assume">допущение</span> — оценка/суждение.</div></div>
+
+    <h2>1. Трафик ТЦ по месяцам <span class="tag">— факт 2025 + факт 2026 (янв–июн) → экстраполяция июл–дек</span></h2>
+    <div class="card"><table id="t-tc-foot"></table></div>
+    <p class="note" id="tc-foot-note"></p>
+
+    <h2>2. Захват — конверсия ТЦ → парк</h2>
+    <div class="card"><table id="t-tc-conv"></table></div>
+    <div class="card" id="tc-conv-factors"></div>
+    <p class="note" id="tc-conv-note"></p>
+
+    <h2>3. Конкуренты</h2>
+    <h3 style="font-size:13px;margin:10px 0 4px;color:var(--ink)">Матрица конкурентов (радиус 2 км)</h3>
+    <div class="card"><table id="t-tc-comp"></table></div>
+    <h3 style="font-size:13px;margin:14px 0 4px;color:var(--ink)">Декабрьский слом · разложение потерь</h3>
+    <div class="card" id="tc-comp-dec"></div>
+    <div class="gap" id="tc-comp-gap"></div>
+
+    <h2>Статусы</h2>
+    <p class="note">Справочник: как статусы переводятся в коэффициенты. Сноска — напрямую к аналитике выше не относится.</p>
+    <div class="card"><p class="lead"><b>Загрузка ТЦ</b></p><div id="lv-vol"></div></div>
+    <div class="card"><p class="lead"><b>Захват / конкуренция</b></p><div id="lv-cap"></div></div>
+    <div class="card"><p class="lead"><b>Захват по месяцам (обоснование)</b></p><div id="tc-comp-profile"></div></div>
+  </section>
+  <!-- ===================== СИСТЕМА ЛОЯЛЬНОСТИ · ДВИГАТЕЛЬ ===================== -->
+  <section id="page-r4">
+    <h1>Система лояльности</h1>
+    <div id="ly-model"></div>
+    <div id="ly-now"></div>
+    <div id="ly-signal"></div>
+    <h2 id="ly-freq">Частота — как часто играют</h2>
+    <div id="ly-freq-body"></div>
+    <details class="card ly-det"><summary><b>Уровни «частота (кратность)» — что означают</b></summary><div style="margin-top:6px"><div id="lv-freq"></div><p class="note">Фактор «частота» прогноза — уровень выставляется Планом; эта секция — «почему» под ним.</p></div></details>
+    <h2 id="ly-depth">Глубина игры — как много играют</h2>
+    <div id="ly-depth-body"></div>
+    <h2 id="ly-topup">Пополнение — насколько пополняют</h2>
+    <div id="ly-topup-body"></div>
+    <h2 id="ly-fuel">Накопление — топливо возврата</h2>
+    <div id="ly-fuel-body"></div>
+    <h2 id="ly-method">Методология: что считать визитом</h2>
+    <div id="ly-method-body"></div>
+<!-- ═══════════════════════════════════════════════════════════════════════
+МЕТОДОЛОГИЯ · СЕМАНТИКА «ВИЗИТА» — почему оси «на визит» заблокированы
+(оркестратор, 2026-07-02; расчёт по мастерам ohta_players/cards/revenue)
+
+Две оси дают несовместимые «визиты»:
+
+ОСЬ A (мастер): визиты = уники × ср_визитов (cards.av, источник «Статистика
+посещений по количеству карт», добивка №12):
+  2026-05: 4 380 × 1,82 = 7 972 визита → попол/визит = 4 828/7 972 = 0,61;
+           чек/визит = 5 282 622/7 972 = 663 ₽
+  2026-06: 3 583 × 1,52 = 5 446 визитов → попол/визит = 0,74; чек/визит = 793 ₽
+
+ОСЬ B (планировщик): визиты = receipts ÷ ppv(1,10) ≈ 4 389 (май) ≈ УНИКАМ (4 380).
+  Факт: попол/ГОСТЯ = receipts/уники = 4 828/4 380 = 1,10 (май) — РОВНО допущение
+  ppv=1,10. Т.е. планировочный «визит» де-факто = уникальный игрок месяца, и
+  чек/визит планировщика (1 203 ₽) = выручка/игрока по мастеру (1 206 ₽, май). Сходится.
+
+Расхождение НЕ ошибка одного из рядов, а разные сущности под одним словом. Две
+гипотезы (не решать в коде): (а) cards.av считается на иной базе (например,
+накопительно по жизни карты у активных в месяце) → ось A завышает визиты 2026;
+(б) ось A — реальные месячные визиты, тогда с марта-26 игроки массово возвращаются
+ДОТРАЧИВАТЬ без пополнения (0,6–0,7 попол/визит) — это retention в действии,
+но тогда допущение ppv=1,10 в планировщике описывает игроков, а не визиты.
+
+NB: разрыв возникает в марте-26 ВНУТРИ одного источника (янв 1,30 / фев 1,33 /
+март 1,70) и совпадает с full launch коллекций — т.е. (б) правдоподобна.
+Сен–дек-25 ряд av (1,25–1,36) из другого источника («Таблица визитов Радара»).
+
+РЕШЕНИЕ ДО ВЕРИФИКАЦИИ: все производные страницы — «на игрока» (÷ uniq): игр/игрока,
+тикетов/игрока, попол/игрока, призов/игрока, выручка/игрока. Оси «/визит» не строить.
+ЗАКРЫТИЕ: запросить исходник «Статистика посещений» за май-26 — взвешенная сумма
+визитов (Σ карт×визитов) там видна напрямую; она однозначно выберет (а) или (б).
+Ответственный за решение: владелец. До закрытия ppv=1,10 в Плане/Чеке НЕ трогать.
+═══════════════════════════════════════════════════════════════════════ -->
+    <h2 id="ly-result">Результат</h2>
+    <div id="ly-result-body"></div>
+  </section>
+  <section id="page-r5">
+    <h1>Драйверы роста</h1>
+    <div class="tip">Отыгрываем разрыв «прогноз → цель» драйверами.<div class="lgd">Бейджи: <span class="prov fact">фактор</span> — дано · <span class="prov gap">драйвер роста</span> — влияем · <span class="prov assume">допущение</span> — оценка/суждение.</div></div>
+    <div class="big" id="r5-head"></div>
+    <h2>Нагрузка на драйверы – <span id="r5-mon"></span></h2>
+    <div class="card" id="r5-decomp"></div>
+  </section>
+</div>
+
+<script>
+// ===== DATA BLOCK · планировщик Охта · синк из МАСТЕРА (не редактировать числа здесь — правь мастер) =====
+// Источник правды (planning-слой, путь А 2026-07-01): ohta_traffic.md / ohta_tiers.md → boom-cmd-planning.xlsx.
+// LOY/BASE_ROWS/OHTA_SERIES — из основных доменных .md (boom-cmd-analytics.xlsx). Правит ТОЛЬКО оркестратор. Литералы:
+//   FOOT       — трафик ТЦ 2025 (референс-год модели/сезонности) ← ohta_traffic.md
+//   FOOT26     — трафик ТЦ 2026 ФАКТ (янв–июн) ← ohta_traffic.md (добивка №11). Только дисплей ТЦ-таблицы; прогноз-модель на сезонности 2025.
+//   LOY        — players.visitors_total + cards.avg_visits (Охта 2025-09..12) ← основные .md
+//   BASE_ROWS  — revenue: СКОЛЬЗЯЩЕЕ окно посл. 4 факт-мес (сейчас мар–июн 2026); tr=итого, rc=чеки ← revenue .md
+//   OHTA_SERIES— revenue: ВСЯ факт-серия сен25..посл. мес; tr=итого, rc=чеки|null ← revenue .md
+//   NB: факт-кол-ва тиров группы A (PK_A.f, ~стр.710) ← ohta_tiers.md (t500..t3000); pl — план, не данные.
+// Производные (FOOT_AVG/BASE_RC/SUM_RC/BASE_TR/BASE_CHK/BASE_FOOT) считаются сами — НЕ трогать.
+const FOOT={'2025-01':661518,'2025-02':587014,'2025-03':714276,'2025-04':662754,'2025-05':670813,'2025-06':665164,'2025-07':652700,'2025-08':761531,'2025-09':635795,'2025-10':686226,'2025-11':703135,'2025-12':756274};
+const FOOT26={'2026-01':736339,'2026-02':598171,'2026-03':717473,'2026-04':631952,'2026-05':697619,'2026-06':663761};
+const LOY=[{m:'2025-09',conv:0.238,cards:1213,krat:1.25,vis:1515},{m:'2025-10',conv:0.448,cards:2250,krat:1.36,vis:3071},
+{m:'2025-11',conv:0.546,cards:2847,krat:1.35,vis:3839},{m:'2025-12',conv:0.381,cards:2122,krat:1.36,vis:2885}];
+// BASE_ROWS — скользящие последние 4 факт-месяца; сдвигается при перекате (сейчас мар–июн 2026).
+const BASE_ROWS=[{m:'2026-03',tr:5499232,rc:5108},{m:'2026-04',tr:4851863,rc:4383},{m:'2026-05',tr:5282622,rc:4828},{m:'2026-06',tr:4318568,rc:4035}];
+// OHTA_SERIES — вся факт-серия выручки (сен25..посл. факт-мес); синк из мастера; тренд «Результата»/«Цели». Перенесён в фенс 2026-07-06.
+const OHTA_SERIES=[{m:'2025-09',tr:1660074,rc:3080},{m:'2025-10',tr:3604944,rc:3825},{m:'2025-11',tr:4609545,rc:4360},{m:'2025-12',tr:3233811,rc:3142},{m:'2026-01',tr:6425606,rc:6084},{m:'2026-02',tr:5117563,rc:4697},{m:'2026-03',tr:5499232,rc:5108},{m:'2026-04',tr:4851863,rc:4383},{m:'2026-05',tr:5282622,rc:4828},{m:'2026-06',tr:4318568,rc:4035}];
+// LY_* — система лояльности (Охта, сен25–июн26) ← мастера ohta_players/cards/game-econ/prizes/revenue.
+// Правит ТОЛЬКО оркестратор. Производные (на игрока, бонусная нагрузка, Δ остатков) — счётом в рендере.
+// LY_REV: cl — безнал ₽, ca — нал ₽, site — сайт/ЛК ₽ (cl+ca[+site]=tr, где каналы есть).
+const LY_PLAYERS=[{m:'2025-09',uniq:1213,nw:1213,nwp:100,cap:0.19},
+{m:'2025-10',uniq:2250,nw:1967,nwp:87,cap:0.33},
+{m:'2025-11',uniq:2847,nw:2264,nwp:80,cap:0.4},
+{m:'2025-12',uniq:2122,nw:1426,nwp:67,cap:0.28},
+{m:'2026-01',uniq:4063,nw:3032,nwp:75,cap:0.55},
+{m:'2026-02',uniq:3435,nw:2278,nwp:66,cap:0.57},
+{m:'2026-03',uniq:4406,nw:3096,nwp:70,cap:0.61},
+{m:'2026-04',uniq:4315,nw:2984,nwp:69,cap:0.68},
+{m:'2026-05',uniq:4380,nw:2991,nwp:68,cap:0.63},
+{m:'2026-06',uniq:3583,nw:2399,nwp:67,cap:0.54}];
+const LY_CARDS=[{m:'2025-09',cards:1209,ret:15.2,av:1.25,pts:88791,tk:422738,mx:12500},
+{m:'2025-10',cards:3163,ret:20.2,av:1.36,pts:222087,tk:1351426,mx:39500},
+{m:'2025-11',cards:5394,ret:21.5,av:1.35,pts:345175,tk:2534217,mx:55500},
+{m:'2025-12',cards:6795,ret:19.4,av:1.36,pts:436404,tk:3149441,mx:60500},
+{m:'2026-01',cards:9819,ret:18.9,av:1.3,pts:655381,tk:4566734,mx:60500},
+{m:'2026-02',cards:12002,ret:19.7,av:1.33,pts:812715,tk:5530537,mx:65500},
+{m:'2026-03',cards:14460,ret:30.2,av:1.7,pts:952035,tk:6602487,mx:78000},
+{m:'2026-04',cards:16765,ret:26.9,av:1.67,pts:1044689,tk:7690492,mx:93000},
+{m:'2026-05',cards:19106,ret:27.7,av:1.82,pts:1136218,tk:8961102,mx:98000},
+{m:'2026-06',cards:21083,ret:25.8,av:1.52,pts:1166700,tk:9739739,mx:106933}];
+const LY_GE=[{m:'2025-09',games:34125,price:45.03,grev:1536608,tk:0,bon:420824,loop:null},
+{m:'2025-10',games:76477,price:44.71,grev:3419000,tk:0,bon:1021992,loop:null},
+{m:'2025-11',games:96732,price:45.81,grev:4431692,tk:1223304,bon:1435889,loop:31},
+{m:'2025-12',games:68419,price:45.42,grev:3107591,tk:781501,bon:1007399,loop:25},
+{m:'2026-01',games:129657,price:47.45,grev:6152225,tk:1626203,bon:1998621,loop:44},
+{m:'2026-02',games:106746,price:45.88,grev:4897408,tk:2332894,bon:1549035,loop:61},
+{m:'2026-03',games:120521,price:44.06,grev:5310526,tk:2990316,bon:2053637,loop:62},
+{m:'2026-04',games:108059,price:43.72,grev:4724023,tk:3085722,bon:1870239,loop:60},
+{m:'2026-05',games:116077,price:44.38,grev:5151774,tk:3667609,bon:2015130,loop:61},
+{m:'2026-06',games:95865,price:44.38,grev:4254362,tk:2816871,bon:1606658,loop:61}];
+const LY_PRIZES=[{m:'2025-09',out:1470,cogs:41161,pay:2.68},
+{m:'2025-10',out:3448,cogs:75902,pay:2.22},
+{m:'2025-11',out:4015,cogs:121804,pay:2.75},
+{m:'2025-12',out:3058,cogs:98061,pay:3.16},
+{m:'2026-01',out:4900,cogs:139068,pay:2.26},
+{m:'2026-02',out:4033,cogs:145234,pay:2.97},
+{m:'2026-03',out:4408,cogs:152502,pay:2.87},
+{m:'2026-04',out:4163,cogs:171312,pay:3.63},
+{m:'2026-05',out:4531,cogs:154922,pay:3.01},
+{m:'2026-06',out:4200,cogs:159802,pay:3.76}];
+const LY_REV=[{m:'2025-09',tr:1660074,rc:3080,cl:1339320,ca:320754,site:null},
+{m:'2025-10',tr:3604944,rc:3825,cl:2927462,ca:677482,site:null},
+{m:'2025-11',tr:4609545,rc:4360,cl:3665902,ca:943643,site:null},
+{m:'2025-12',tr:3233811,rc:3142,cl:2542319,ca:691492,site:null},
+{m:'2026-01',tr:6425606,rc:6084,cl:5163313,ca:1262293,site:null},
+{m:'2026-02',tr:5117563,rc:4697,cl:4160321,ca:957242,site:null},
+{m:'2026-03',tr:5499232,rc:5108,cl:4425639,ca:1011728,site:61865},
+{m:'2026-04',tr:4851863,rc:4383,cl:3830519,ca:964253,site:57091},
+{m:'2026-05',tr:5282622,rc:4828,cl:4161608,ca:1094430,site:26614},
+{m:'2026-06',tr:4318568,rc:4035,cl:3383715,ca:907610,site:27243}];
+// События-аннотации трендов (даты из роадмапа, ПОДТВЕРДИТЬ у владельца → чип допущение в UI)
+const LY_EVENTS=[{m:'2026-01',t:'старт программы коллекций (28 янв)'},
+{m:'2026-02',t:'тикетный майнинг · soft launch (сер. февраля)'},
+{m:'2026-03',t:'коллекции · full launch (нач. марта)'}];
+// ===== END DATA BLOCK =====
+const FOOT_AVG=Object.values(FOOT).reduce((a,b)=>a+b,0)/12;
+const BASE_RC=Math.round(BASE_ROWS.reduce((a,r)=>a+r.rc,0)/BASE_ROWS.length);
+const SUM_RC=BASE_ROWS.reduce((a,r)=>a+r.rc,0);
+const BASE_TR=BASE_ROWS.reduce((a,r)=>a+r.tr,0);
+const BASE_CHK=BASE_TR/SUM_RC;
+const BASE_FOOT=BASE_ROWS.reduce((a,r)=>a+FOOT['2025-'+r.m.slice(5)],0)/BASE_ROWS.length; // среднее FOOT по месяцам BASE_ROWS (скользящее окно)
+
+const LV_VOL=[{k:'максимальная',v:0.15,w:'август (+12%) и декабрь (+11%) — годовые пики потока ТЦ'},
+{k:'выше средн.',v:0.06,w:'месяцы выше базового окна (март, октябрь, ноябрь)'},
+{k:'средняя',v:0,w:'около базового окна фев–май (июнь, июль ≈ 0)'},
+{k:'ниже средн.',v:-0.06,w:'сентябрь −3,5% — слабее базы'},
+{k:'минимальная',v:-0.12,w:'февраль −14% — годовой минимум потока'}];
+const LV_CAP=[{k:'высокий',v:0.15,w:'школьные каникулы (ноябрь): конверсия 0,45→0,55%'},
+{k:'выше среднего',v:0.08,w:'активный маркетинг/промо без каникул'},
+{k:'средний',v:0,w:'обычный месяц, конкуренция фоновая'},
+{k:'ниже среднего',v:-0.10,w:'акции конкурентов, частичный отток'},
+{k:'низкий',v:-0.25,w:'декабрь: конверсия −30% (КИНО-5D, Joki Joya)'}];
+const LV_FREQ=[{k:'высокая кратность',v:0.06,w:'кратность выше ~1,34 — больше повторных. Авто-правило: вернувшихся ≥22% → высокая · ≤16% → низкая · иначе норма.'},
+{k:'норма',v:0,w:'кратность ≈ 1,34 (среднее сен–дек). Авто-правило: вернувшихся ≥22% → высокая · ≤16% → низкая · иначе норма.'},
+{k:'низкая кратность',v:-0.06,w:'кратность ниже нормы (январь 1,18). Авто-правило: вернувшихся ≥22% → высокая · ≤16% → низкая · иначе норма.'}];
+const LV_TREND=[{k:'рост узнаваемости',v:0.05,w:'молодой объект, растёт узнаваемость'},
+{k:'плато (зрелость)',v:0,w:'фев–май 2026 без явного роста'},
+{k:'спад',v:-0.05,w:'снижение интереса/устаревание'}];
+const LV_CHK=[{k:'выше',v:0.06,w:'структура игроков смещена к крупному чеку'},
+{k:'скорее выше',v:0.03,w:'лёгкий сдвиг вверх'},
+{k:'средне',v:0,w:'как в базовом окне'},
+{k:'скорее ниже',v:-0.03,w:'лето: больше casual-игроков'},
+{k:'ниже (лето/casual)',v:-0.06,w:'сильный летний casual-сдвиг'}];
+
+// ====== ПЕРЕКАТ (свойство системы) + РЕШЕНИЯ ВЛАДЕЛЬЦА ==============
+// Фенс выше = чистый мастер-синк (BASE_ROWS, LY_*). Ниже — решения владельца; правит ТОЛЬКО оркестратор.
+const PARK={code:'ohta', ppv:1.10, dock:500};
+const PLAN_MONTH='2026-07';                       // месяц плана — единый источник (планнер + Пакеты); двигать при перекате
+const LAST_FACT=LY_REV[LY_REV.length-1].m;         // последний факт-месяц — из серий (LY_*), не литералом
+const PREV_M=prevMonth(LAST_FACT);                 // предыдущий факт-месяц
+// PREV — каналы факт-месяца полностью из серий (tr/rc/cl/ca, ws=site), без литерала.
+const _pf=LY_REV[LY_REV.length-1];
+const PREV={m:_pf.m,tr:_pf.tr,rc:_pf.rc,cl:_pf.cl,ca:_pf.ca,ws:_pf.site||0};
+PREV.vis=Math.round(PREV.rc/PARK.ppv);             // визиты — производное от профиля, не источник
+// Цели владельца, перекрывающие авто/прогноз. null = действует авто/«держим». Ненулевое → чип «цель владельца».
+const PLAN_TARGETS={freq:null,chk:null,cap:null,vol:null,
+  engine:{ret:null,gpv:null,ppg:null}};            // вернувшихся %, игр/игрока, попол/игрока
+// План микса пакетов A (факт → цель): факт = LAST_FACT (мастер tiers, добивка №6, фильтр >1%);
+// r_тир = round(n × r_май/n_май) — наблюдённая средняя цена тира (допущение · средняя тира из мая).
+// pl = целевые доли июньского плана 30/31/18/13/9, нормированы к Σf (кол-во держим). MIX — кодом.
+const PK_A=[
+  {lbl:'500 ₽',n:500,f:1068,pl:889,r:543653,t:'push'},
+  {lbl:'1 000 ₽',n:1000,f:1020,pl:918,r:1029876,t:'push'},
+  {lbl:'1 500 ₽',n:1500,f:367,pl:533,r:554415,t:'tgt'},
+  {lbl:'2 000 ₽',n:2000,f:360,pl:385,r:725839,t:'tgt'},
+  {lbl:'3 000 ₽',n:3000,f:177,pl:267,r:533093,t:'tgt'},
+];
+const PK_FREV=PK_A.reduce((a,x)=>a+x.r,0), PK_PREV=PK_A.reduce((a,x)=>a+x.r*x.pl/x.f,0);
+const PK_FCA=PK_A.reduce((a,x)=>a+x.f,0), PK_PCA=PK_A.reduce((a,x)=>a+x.pl,0);
+const MIX_UPLIFT=(PK_PREV-PK_FREV)/PREV.tr;
+const MANAGED_F=Math.round(PK_FREV/PK_FCA), MANAGED_P=Math.round(PK_PREV/PK_PCA);
+// ── Система лояльности → выручка. РЕШЕНИЕ ВЛАДЕЛЬЦА 2026-07-06: буст ВХОДИТ в planRev ──
+// (пересмотр прежнего канона «лояльность не в planRev»). Буст = Σ(Δцели × чувствительность
+// страницы «Лояльность»): те же коэффициенты, что в блоке «Как лояльность делает выручку».
+// Маршрут в план — через ПОПОЛНЕНИЯ (частота→визиты→пополнения), чек остаётся за скриптами.
+const _lyi=LY_PLAYERS.length-1;
+const LOY_UNIQ=LY_PLAYERS[_lyi].uniq, LOY_RPG=LY_REV[_lyi].tr/LY_PLAYERS[_lyi].uniq, LOY_CKPOP=LY_REV[_lyi].tr/LY_REV[_lyi].rc;
+const LOY_FACT={ret:LY_CARDS[_lyi].ret, ppg:LY_REV[_lyi].rc/LY_PLAYERS[_lyi].uniq, gpv:LY_GE[_lyi].games/LY_PLAYERS[_lyi].uniq};
+const LOY_GOAL={ret:29.0, ppg:1.22, gpv:29.0};           // цель июль (ориентир владельца) → буст ≈ +500к
+const LOY_SENS={ret:LOY_UNIQ*0.01*LOY_RPG, ppg:LOY_UNIQ*LOY_CKPOP}; // ₽ за +1 п.п. вернувшихся · за +1,0 попол/игрока
+const LOY_PARTS={ret:(LOY_GOAL.ret-LOY_FACT.ret)*LOY_SENS.ret, ppg:(LOY_GOAL.ppg-LOY_FACT.ppg)*LOY_SENS.ppg};
+const LOY_BOOST=LOY_PARTS.ret+LOY_PARTS.ppg;             // ₽/мес — входит в planRev (через пополнения); игр/игрока — косвенно, не в сумме
+// ====== /ПЕРЕКАТ + РЕШЕНИЯ ВЛАДЕЛЬЦА ===============================
+function prevMonth(m){let y=+m.slice(0,4),mm=+m.slice(5)-1;if(mm<1){mm=12;y--;}return y+'-'+String(mm).padStart(2,'0');}
+function monthsRange(from,to){const out=[];let[y,mm]=[+from.slice(0,4),+from.slice(5)];const[ty,tm]=[+to.slice(0,4),+to.slice(5)];while(y<ty||(y===ty&&mm<=tm)){out.push(y+'-'+String(mm).padStart(2,'0'));mm++;if(mm>12){mm=1;y++;}}return out;}
+const MONTHS=monthsRange(PLAN_MONTH,'2026-12');    // горизонт плана — кодом от PLAN_MONTH до декабря
+const RU_M={'01':'Январь','02':'Февраль','03':'Март','04':'Апрель','05':'Май','06':'Июнь','07':'Июль','08':'Август','09':'Сентябрь','10':'Октябрь','11':'Ноябрь','12':'Декабрь'};
+const mName=m=>RU_M[m.slice(5)];                   // «Июнь» и т.п. — из месяца, для динамических подписей
+const BASE_WIN=mName(BASE_ROWS[0].m).slice(0,3).toLowerCase()+'–'+mName(BASE_ROWS[BASE_ROWS.length-1].m).slice(0,3).toLowerCase(); // окно базы (BASE_ROWS), напр. «мар–июн»
+function footDev(month){return FOOT['2025-'+month.slice(5)]/BASE_FOOT-1;}
+function nearest(arr,dev){let best=arr[Math.floor(arr.length/2)],bd=1e9;for(const o of arr){const d=Math.abs(o.v-dev);if(d<bd){bd=d;best=o;}}return best.k;}
+// Помесячный профиль давления конкурентов → уровень захвата (LV_CAP). Обоснование — из отчётов Радара.
+const CAP_PROFILE={
+  '2026-06':{lvl:'средний',why:'лето, конкуренты фоновые — нет замеров (суждение)'},
+  '2026-07':{lvl:'средний',why:'город пустеет: трафик ТЦ ↓ (см. загрузку); захват фоновый — суждение'},
+  '2026-08':{lvl:'средний',why:'пик трафика ТЦ (предшкольный шопинг), захват нейтральный — суждение'},
+  '2026-09':{lvl:'средний',why:'старт сезона — суждение'},
+  '2026-10':{lvl:'средний',why:'обычный месяц — суждение'},
+  '2026-11':{lvl:'высокий',why:'школьные каникулы 1–7 ноя; конверсия пик 0,546% (факт сен–дек 2025)'},
+  '2026-12':{lvl:'ниже среднего',why:'КИНО-5D + праздничные активности ТЦ + Joki Joya; конверсия 0,546→0,381 (−30%), потеря ~1071 визита. Downside — «низкий» (−25%)'},
+};
+const capLvl=m=>(CAP_PROFILE[m]||{lvl:'средний'}).lvl;
+const CHK_DEFAULT={'2026-07':'скорее ниже','2026-08':'скорее ниже'};
+// авто-частота: по вернувшихся % последнего факт-месяца (LY_CARDS). Ряд ret не зависит
+// от спорной семантики «визита». Норма 19,1% = среднее сен–дек 25.
+function freqAuto(){const ret=LY_CARDS[LY_CARDS.length-1].ret;
+  return ret>=22?'высокая кратность':(ret<=16?'низкая кратность':'норма');}
+function realityDefaults(month){return {vol:nearest(LV_VOL,footDev(month)),cap:capLvl(month),freq:PLAN_TARGETS.freq??freqAuto(),chk:CHK_DEFAULT[month]||'средне'};}
+
+// ====== КОНКУРЕНТЫ / ТЦ-СПРАВКА (из отчётов Радара) ===============
+// рост трафика ТЦ год-к-году — теперь из ФАКТА 2026 (янв–июн) vs 2025 (среднее по-месячных отношений). Для экстраполяции июл–дек.
+const YOY_TC=Object.keys(FOOT26).reduce((a,m)=>a+FOOT26[m]/FOOT['2025-'+m.slice(5)],0)/Object.keys(FOOT26).length-1;
+const COMPETS=[
+  {r:1,name:'КИНО-5D',loc:'Заневский Каскад',dist:'900 м',ov:50,tier:'крит',risk:'20–25%'},
+  {r:2,name:'Joki Joya',loc:'Охта Молл',dist:'0 м',ov:45,tier:'крит',risk:'15–20%'},
+  {r:3,name:'MIR VR',loc:'Охта Молл',dist:'0 м',ov:45,tier:'крит',risk:'10–15%'},
+  {r:4,name:'Crazy Cart',loc:'Охта Молл',dist:'0 м',ov:30,tier:'сред',risk:'10%'},
+  {r:5,name:'Киберфокс',loc:'Охта Молл',dist:'0 м',ov:35,tier:'сред',risk:'8–12%'},
+  {r:6,name:'WARPOINT VR-Room',loc:'Заневский Каскад',dist:'900 м',ov:35,tier:'сред',risk:'8–10%'},
+  {r:7,name:'Banana Park',loc:'ТРК Июнь',dist:'1,5 км',ov:35,tier:'сред',risk:'10–12%'},
+  {r:8,name:'WARPOINT VR-Arena',loc:'Заневский Каскад',dist:'900 м',ov:20,tier:'сред',risk:'5–8%'},
+  {r:9,name:'Engage VR',loc:'Охта Молл',dist:'0 м',ov:30,tier:'низ',risk:'5–8%'},
+  {r:10,name:'Погружение',loc:'Охта Молл',dist:'0 м',ov:20,tier:'низ',risk:'3–5%'},
+  {r:11,name:'Парк Галилео',loc:'Энергетиков 8',dist:'1 км',ov:15,tier:'низ',risk:'3–5%'},
+  {r:12,name:'Формула Кино',loc:'Заневский Каскад',dist:'900 м',ov:10,tier:'низ',risk:'2–3%'},
+];
+const DEC_LOSS=[
+  {src:'КИНО-5D (ценовая)',loss:'28–37%',base:'12–15%'},
+  {src:'Праздничные активности ТЦ',loss:'19–28%',base:'8–12%'},
+  {src:'Joki Joya (замещение)',loss:'17–23%',base:'8–10%'},
+  {src:'MIR VR (подростки)',loss:'9–14%',base:'5–8%'},
+  {src:'Прочие конкуренты',loss:'7–11%',base:'3–5%'},
+];
+const CONV_FACTORS=[
+  {f:'Расположение',st:'3 этаж',eff:'нейтрально'},
+  {f:'Продвижение',st:'минимальный',eff:'ограничивает рост'},
+  {f:'Цена',st:'900–1200 ₽ (средне-высокая)',eff:'слабость против КИНО-5D (~400 ₽)'},
+  {f:'ЦА (% посетителей ТЦ)',st:'30–40% (дети 6–16)',eff:'плюс'},
+  {f:'Время пребывания',st:'30–60 мин',eff:'ограничивает повтор'},
+  {f:'Конкуренция',st:'высокая (16 объектов в радиусе 2 км)',eff:'существенно снижает'},
+];
+
+const nf=n=>Math.round(n).toLocaleString('ru-RU').replace(/\s/g,' ');
+const rub=n=>nf(n)+' ₽';
+const mln=n=>(n/1e6).toFixed(1).replace('.',',')+' млн ₽';
+const pct=v=>(v>0?'+':v<0?'−':'')+Math.abs(v*100).toFixed(0)+'%';
+function signedMoney(d){if(Math.round(d)===0)return '—';const s=d>0?'+':'−';const a=Math.abs(d);return s+(a>=1e6?mln(a):nf(a)+' ₽');}
+
+let state={month:PLAN_MONTH,vol:null,cap:null,freq:'норма',chk:null,fRc:'',fChk:'',goalPct:5,lev:{ck:9,rc:0,site:0}};
+let popsMetric='rev';
+let pkLens='cnt';
+function setMonthDefaults(){const d=realityDefaults(state.month);state.vol=d.vol;state.cap=d.cap;state.freq=d.freq;state.chk=d.chk;state.fRc='';state.fChk='';}
+const valOf=(arr,k)=>(arr.find(o=>o.k===k)||{v:0}).v;
+function computeRev(v,c,f,tr,ch){const cVol=valOf(LV_VOL,v)+valOf(LV_CAP,c)+valOf(LV_FREQ,f);const cChk=valOf(LV_CHK,ch);const rc=BASE_RC*(1+cVol),ck=BASE_CHK*(1+cChk);return {rc,ck,rev:rc*ck,cVol,cChk};}
+
+// ====== ВИДЖЕТЫ ===================================================
+function selectEl(arr,cur,onCh){const s=document.createElement('select');arr.forEach(o=>{const op=document.createElement('option');op.value=o.k;op.textContent=`${o.k} (${pct(o.v)})`;if(o.k===cur)op.selected=true;s.appendChild(op);});s.onchange=e=>onCh(e.target.value);return s;}
+function whyBlock(title,formula,whys){const d=document.createElement('details');const s=document.createElement('summary');s.textContent='расчёт + 5 почему';d.appendChild(s);const w=document.createElement('div');w.className='why';w.innerHTML=`<b>${title}</b><span class="f">${formula}</span><ol>${whys.map(x=>`<li>${x}</li>`).join('')}</ol>`;d.appendChild(w);return d;}
+function coefRO(label,src,arr,cur,defK,why){const r=document.createElement('div');r.className='row';const left=document.createElement('div');left.innerHTML=`<label>${label}</label><span class="src">${src}</span>`;const ch=cur!==defK?` · <span style="color:var(--blue)">изменено</span>`:'';const right=document.createElement('div');right.style.textAlign='right';right.innerHTML=`<b>${cur}</b> <span class="src" style="display:inline">(${pct(valOf(arr,cur))})${ch}</span>`;r.appendChild(left);r.appendChild(right);const wrap=document.createElement('div');wrap.appendChild(r);if(why)wrap.appendChild(why);return wrap;}
+function kpi(t,v,d,why,isResult){const el=document.createElement('div');el.className='kpi'+(isResult?' result':'');el.innerHTML=`<div class="t">${t}</div><div class="v">${v}</div><div class="d">${d}</div>`;if(why)el.appendChild(why);return el;}
+function engM(t,v,s,why){const el=document.createElement('div');el.className='m';el.innerHTML=`<div class="t">${t}</div><div class="v">${v}</div><div class="s">${s}</div><div class="arrow">${why}</div>`;return el;}
+function factRow(label,key,val,planVal){const r=document.createElement('div');r.className='row';const left=document.createElement('div');left.innerHTML=`<label>${label}</label><span class="src">план П1: ${nf(planVal)}</span>`;const right=document.createElement('div');const inp=document.createElement('input');inp.type='number';inp.placeholder='—';inp.value=val;inp.oninput=e=>{state[key]=e.target.value;renderAll();};right.appendChild(inp);r.appendChild(left);r.appendChild(right);return r;}
+function leverRow(label,unit,formula){const r=document.createElement('div');r.className='row';const left=document.createElement('div');left.innerHTML=`<label class="zero">${label}</label><span class="src">${formula}</span>`;const right=document.createElement('div');const inp=document.createElement('input');inp.type='number';inp.value=0;inp.disabled=true;right.appendChild(inp);right.insertAdjacentHTML('beforeend',` <span class="src">${unit}</span>`);r.appendChild(left);r.appendChild(right);return r;}
+function levelList(el,arr){el.innerHTML='';arr.forEach(o=>{const d=document.createElement('div');d.className='lvl';d.innerHTML=`<div class="k">${o.k}</div><div class="v">${pct(o.v)}</div><div class="w">${o.w}</div>`;el.appendChild(d);});}
+
+// стрелка + дельта-бейдж (относит. % изменения from→to), форма как на «Чеке»
+function arrBadge(from,to){if(from==null||to==null||from==0)return '';const d=Math.round((to/from-1)*100);if(d===0)return ' <span class="dbadge">= </span>';return ` <span class="dbadge ${d>0?'up':''}">${d>0?'+':''}${d}% ${d>0?'↑':'↓'}</span>`;}
+// ====== ПЛАНИРОВЩИК ===============================================
+function renderPlanner(){
+  const _h1=document.getElementById('planner-h1'); if(_h1)_h1.textContent=`План на ${mName(PLAN_MONTH).toLowerCase()} ${PLAN_MONTH.slice(0,4)}`;
+  renderPlanDetail(PLAN_MONTH,'plan-head','plan-blocks');
+  const month=PLAN_MONTH, def=realityDefaults(month), fc=computeRev(def.vol,def.cap,def.freq,def.trend,def.chk);
+  const planRev=fc.rc*fc.ck*(1+MIX_UPLIFT)+LOY_BOOST;   // + буст лояльности (решение владельца)
+  const goalRev=adjGoalOf(month);
+  const driverEff=planRev-fc.rev, gap=goalRev-planRev, ok=gap<=1e4;
+  const ms=v=>(v/1e6).toFixed(1).replace('.',',');
+  const sgn=v=>(v>=0?'+':'−')+ms(Math.abs(v));
+  const base=fc.rev, drv=driverEff, gapV=gap, goalV=goalRev, need=goalV-base, shr=v=>Math.round(v/goalV*100);
+  const scriptsEff=fc.rc*fc.ck*MIX_UPLIFT, loyEff=LOY_BOOST;   // разбивка драйверов: скрипты→чек, лояльность→пополнения
+  const dseg=(nm,v,bg,fg)=>`<div style="width:${(v/need*100).toFixed(1)}%;background:${bg};color:${fg};display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden;padding:0 1px"><b style="font-size:10px">${ms(v)} (${Math.round(v/need*100)}%)</b><span style="margin-top:2px">${nm}</span></div>`;
+  const moGrow=Math.round((goalV/(BASE_RC*BASE_CHK)-1)*100);
+  document.getElementById('plan-bridge').innerHTML=
+    `<div style="background:var(--surface);border-radius:12px;padding:12px 14px;margin-top:20px">`+
+    `<div style="text-align:center;font-weight:700;font-size:15px;margin-bottom:10px">Мост к цели</div>`+
+    `<div class="big">`+
+      `<div class="kpi" onclick="location.hash='#/goal'" style="cursor:pointer;display:flex;flex-direction:column"><div class="t">Прогноз ↗ <span class="prov fact">на факторах</span></div><div class="v">${ms(base)} млн</div><div class="d" style="margin-top:auto">органический рост (${shr(base)}% цели)</div></div>`+
+      `<div class="kpi" onclick="location.hash='#/r5'" style="cursor:pointer;border-color:var(--yellow);display:flex;flex-direction:column"><div class="t">Драйверы роста ↗</div>`+
+        `<div style="display:flex;height:52px;border-radius:6px;overflow:hidden;margin-top:6px;font-size:9px;line-height:1.1;text-align:center">`+
+          dseg('Контроль<br>чека',scriptsEff,'var(--yellow-3)','var(--yellow-ink)')+
+          dseg('Контроль<br>лояльности',loyEff,'var(--yellow-2)','var(--yellow-ink)')+
+          dseg('Разрыв',gapV,'var(--bar)','var(--ink)')+
+        `</div>`+
+        `<div class="d" style="margin-top:auto">итого: ${ms(need)} млн (${shr(need)}% цели)</div></div>`+
+      `<div class="kpi result" onclick="location.hash='#/goal'" style="cursor:pointer;display:flex;flex-direction:column"><div class="t">Цель ↗</div><div class="v">${ms(goalV)} млн</div><div class="d" style="margin-top:auto">рост +${moGrow}%</div></div>`+
+    `</div>`+
+    `</div>`;
+  // ── Контекст: 2 раскрывающихся блока (ТЦ · Лояльность), 3 колонки факт/прогноз/цель ──
+  const _li=LY_PLAYERS.length-1;
+  const dRet=LY_CARDS[_li].ret, dPpg=LY_REV[_li].rc/LY_PLAYERS[_li].uniq, dGpg=LY_GE[_li].games/LY_PLAYERS[_li].uniq, capF=LY_PLAYERS[_li].cap;
+  const tcF=FOOT26[LAST_FACT], tcP=FOOT['2025-'+PLAN_MONTH.slice(5)];
+  const cFactM=mName(LAST_FACT), cPlanM=mName(PLAN_MONTH), pctS=v=>lyF1(v)+'%';
+  const eq='<span style="color:var(--hint)">= прогноз</span>', asm='<span class="prov assume">допущение</span>';
+  const lkTC='<a class="lk-dash" href="#/tc">', lkLY='<a class="lk-dash" href="#/r4">';
+  const c3=(kk,f,p,g)=>`<div class="cmp subrow"><div class="sublab">${kk}</div><div class="cell"><span class="sn">${f}</span></div><div class="cell"><span class="sn">${p}</span></div><div class="cell"><span class="sn">${g}</span></div></div>`;
+  const ctxBlk=(lab,hf,hp,hg,sub,note)=>`<details class="block"><summary class="cmp"><div class="lab">${lab}</div><div class="cell"><div class="n">${hf}</div></div><div class="cell"><div class="n">${hp}</div></div><div class="cell"><div class="n">${hg}</div></div></summary><div class="binner">${sub}${note?`<p class="note" style="padding-left:8px;margin-top:6px">${note}</p>`:''}</div></details>`;
+  document.getElementById('plan-context').innerHTML=
+    `<div class="plan-plaque">`+
+    `<div class="cmp mhead pmhead"><div></div><div class="h"><b>${cFactM}</b><span class="s">факт</span></div><div class="h"><b>${cPlanM}</b><span class="s">прогноз</span></div><div class="h"><b>${cPlanM}</b><span class="s">цель ${asm}</span></div></div>`+
+    `<div class="pblocks">`+
+      ctxBlk('Трафик',nf(tcF),nf(tcP),eq,
+        c3(`${lkTC}Трафик ТЦ</a>`,nf(tcF),nf(tcP),eq)+
+        c3(`${lkTC}Захват трафика</a>`,lyF2(capF)+'%',lyF2(capF)+'%',eq),'')+
+      ctxBlk('Ценность игрока',pctS(dRet),pctS(dRet),pctS(LOY_GOAL.ret)+arrBadge(dRet,LOY_GOAL.ret),
+        c3(`${lkLY}Вернувшихся %</a>`,pctS(dRet),pctS(dRet),pctS(LOY_GOAL.ret)+arrBadge(dRet,LOY_GOAL.ret))+
+        c3(`${lkLY}Попол/игрока</a>`,lyF2(dPpg),lyF2(dPpg),lyF2(LOY_GOAL.ppg)+arrBadge(dPpg,LOY_GOAL.ppg))+
+        c3(`${lkLY}Игр/игрока</a>`,lyF1(dGpg),lyF1(dGpg),lyF1(LOY_GOAL.gpv)+arrBadge(dGpg,LOY_GOAL.gpv)),
+        `Цель — с рычагами (касса, реклама на кассах, замена карт, сайт). Буст <b>+${ms(LOY_BOOST)} млн ₽/мес</b> в план.`)+
+    `</div></div>`;
+}
+function ohtaActual(m){return OHTA_SERIES.find(r=>r.m===m);}
+const FY2026=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+let goalMonth=PLAN_MONTH;
+function setGoalMonth(m){goalMonth=m;renderGoalPage();}
+function fyRow(m){
+  const a=ohtaActual(m);
+  if(m<=LAST_FACT&&a){return {m,rev:a.tr,rc:a.rc,ck:a.tr/a.rc,fact:true};}
+  const d=realityDefaults(m),c=computeRev(d.vol,d.cap,d.freq,d.trend,d.chk);
+  return {m,rev:c.rev,rc:c.rc,ck:c.ck,fact:false,d};
+}
+// ====== ЦЕЛЬ (top-down раскладка + трекинг факта) =================
+const GOAL_YOY=0.15; // годовая амбиция владельца — из Sheets
+function modelFc(m){const d=realityDefaults(m);return computeRev(d.vol,d.cap,d.freq,d.trend,d.chk).rev;} // прогноз-траектория (коэф. ТЦ+сезонность), без роста
+function goalOf(m){return modelFc(m)*(1+GOAL_YOY);} // базовая цель месяца = прогноз × (1+амбиция)
+// Цель с нагоном хвоста: годовая цель Σ goalOf фиксирована; закрытые месяцы = факт;
+// остаток раскидывается по июн–дек ∝ сезонному весу modelFc. Возвращает эффективную цель месяца.
+function adjGoalOf(m){
+  if(m<=LAST_FACT) return goalOf(m);
+  const annual=FY2026.reduce((a,x)=>a+goalOf(x),0);
+  const closedFact=FY2026.filter(x=>x<=LAST_FACT).reduce((a,x)=>{const r=ohtaActual(x);return a+(r&&r.tr?r.tr:0);},0);
+  const rem=FY2026.filter(x=>x>LAST_FACT), sumFc=rem.reduce((a,x)=>a+modelFc(x),0);
+  return (annual-closedFact)*modelFc(m)/sumFc; // Σ по остатку = annual − closedFact ⇒ год добирается до цели
+}
+function renderGoalPage(){
+  const rows=FY2026.map(function(m){const a=ohtaActual(m), fact=(m<=LAST_FACT&&a)?a.tr:null;
+    return {m,target:adjGoalOf(m),base:goalOf(m),fact,proj:fact!=null?fact:modelFc(m),isFact:fact!=null};});
+  const pctY=Math.round(GOAL_YOY*100);
+  const annualTarget=FY2026.reduce((a,m)=>a+goalOf(m),0), annualTraj=FY2026.reduce((a,m)=>a+modelFc(m),0), growthMoney=annualTarget-annualTraj;
+  let cum=0; rows.forEach(function(r){if(r.isFact)cum+=r.fact-r.base;});
+  const factMo=rows.filter(function(r){return r.isFact;});
+  const factOrg=factMo.reduce(function(a,r){return a+modelFc(r.m);},0), factAct=factMo.reduce(function(a,r){return a+r.fact;},0);
+  const factGM=factAct-factOrg, factGP=Math.round(factGM/factOrg*100);
+  const head=document.getElementById('goal-head');head.innerHTML='';
+  head.appendChild(kpi('Годовая цель 2026',mln(annualTarget),mln(annualTarget/12)+'/мес',null,true));
+  head.appendChild(kpi('Рост','+'+pctY+'% / '+signedMoney(growthMoney),'факт: '+(factGP>=0?'+':'')+factGP+'% / '+signedMoney(factGM)));
+  head.appendChild(kpi('Накопленный хвост · янв–май',signedMoney(cum),cum<0?'отстаём — нагнать':'идём с опережением'));
+  const vmax=Math.max(...rows.map(r=>Math.max(r.target,r.proj)));
+  const chart=`<div style="display:flex;align-items:flex-end;gap:5px;height:142px">`+
+    rows.map(function(r){const ht=Math.max(3,Math.round(r.target/vmax*108)), hv=Math.max(3,Math.round(r.proj/vmax*108));
+      const htBase=Math.max(0,Math.round(r.base/vmax*108)), htCatch=Math.max(0,ht-htBase);
+      const fill=r.isFact?(r.fact>=r.target?'var(--green)':'var(--muted)'):'var(--bar)';
+      const dp=r.isFact?Math.round((r.fact-r.target)/r.target*100):0, dc=(dp>=0)?'var(--green)':'var(--red)';
+      const factCol=r.isFact?(r.fact>=r.target?'var(--green)':'var(--ink)'):'var(--hint)';
+      return `<div onclick="setGoalMonth('${r.m}')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;border-radius:6px;${r.m===goalMonth?'background:var(--surface)':''}">`+
+        `<div style="font-size:8px;font-weight:700;color:${r.isFact?dc:'transparent'};height:11px;white-space:nowrap">${r.isFact?((dp>=0?'+':'−')+Math.abs(dp)+'%'):''}</div>`+
+        `<div style="display:flex;align-items:flex-end;justify-content:center;gap:2px;width:100%;height:122px">`+
+          `<div style="width:45%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">`+
+            `<div style="font-size:8px;color:var(--muted);line-height:10px" title="цель">${(r.target/1e6).toFixed(1).replace('.',',')}</div>`+
+            (htCatch>0?`<div style="width:100%;height:${htCatch}px;background:var(--yellow);border-radius:2px 2px 0 0" title="нагон хвоста +${((r.target-r.base)/1e6).toFixed(1)} млн"></div>`:'')+
+            `<div style="width:100%;height:${htBase}px;background:var(--yellow);opacity:.45;border-radius:${htCatch>0?'0':'2px 2px 0 0'}" title="базовая цель ${(r.base/1e6).toFixed(1)} млн"></div>`+
+          `</div>`+
+          `<div style="width:45%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">`+
+            `<div style="font-size:8px;font-weight:600;color:${factCol};line-height:10px" title="${r.isFact?'факт':'прогноз'}">${(r.proj/1e6).toFixed(1).replace('.',',')}</div>`+
+            `<div style="width:100%;height:${hv}px;background:${fill};border-radius:2px 2px 0 0" title="${r.isFact?'факт':'прогноз'} ${(r.proj/1e6).toFixed(1)} млн"></div>`+
+          `</div>`+
+        `</div></div>`;}).join('')+`</div>`;
+  const labs=`<div class="blabs" style="gap:5px">`+rows.map(r=>`<div class="blab">${RU_M[r.m.slice(5)].slice(0,3).toLowerCase()}</div>`).join('')+`</div>`;
+  document.getElementById('goal-graph').innerHTML=
+    chart+labs+
+    `<div class="tlegend"><span><i class="sw" style="background:var(--yellow);opacity:.45"></i>базовая цель ×1,15</span><span><i class="sw" style="background:var(--yellow)"></i>+ нагон хвоста</span><span><i class="sw" style="background:var(--muted)"></i>факт ниже цели</span><span><i class="sw" style="background:var(--green)"></i>факт ≥ цели</span><span><i class="sw" style="background:var(--bar)"></i>прогноз</span></div>`+
+    `<p class="note">Цель на <b>июн–дек</b> — с нагоном хвоста: годовая цель фиксирована (${mln(annualTarget)}), накопленный хвост янв–май (${signedMoney(cum)}) перераскинут по оставшимся месяцам <b>пропорционально сезонности</b> (сильные месяцы — авг, дек — берут больше). Поэтому жёлтые столбики июн–дек выше базовой цели ×1,15.</p>`;
+  renderMonthDetail(goalMonth,'goal-detail');
+  const f25=['2025-09','2025-10','2025-11','2025-12'].map(m=>ohtaActual(m)).filter(Boolean);
+  const f26=FY2026.filter(m=>m>='2026-01'&&m<=LAST_FACT).map(m=>ohtaActual(m)).filter(Boolean);
+  const sumRev=arr=>arr.reduce((a,x)=>a+x.tr,0), mm=v=>(v/1e6).toFixed(1).replace('.',',');
+  const NTRL=BASE_RC*BASE_CHK, HD='font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 2px';
+  document.getElementById('goal-note').innerHTML=
+    `<div class="card" style="background:var(--surface2);border:0"><details class="acc">`+
+      `<summary><span>База — ${mln(NTRL)}/мес</span><span class="arr"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></summary>`+
+      `<div style="margin-top:8px">`+
+      `<p style="${HD};margin-top:4px">Уровень базы</p>`+
+      `<p class="note" style="margin:0">База — стабильный месячный run-rate выручки, от которого рассчитывается цель. Определён по окну ${BASE_WIN} 2026: среднемесячная выручка ${mln(NTRL)}.</p>`+
+      `<p style="${HD}">Почему исключён январь</p>`+
+      `<p class="note" style="margin:0">Январь 2026 (6,4 млн ₽) — каникулярный пик (школьные каникулы 1–13 января), аномальное значение, не отражающее штатный режим работы. Его включение завысило бы базу. Март (5,5 млн ₽) и прочие месяцы окна сохранены — это обычные месяцы.</p>`+
+      `<p style="${HD}">Динамика: разгон → плато</p>`+
+      `<p class="note" style="margin:0">Выручка прошла фазу разгона после запуска (сентябрь 1,7 → декабрь 3,2 млн ₽) и с февраля 2026 вышла на плато ~5,2 млн ₽ (фев 5,1 · мар 5,5 · апр 4,9 · май 5,3). Линия тренда (МНК) в блоке «Результат» страницы «Лояльность» отражает это: рост в период запуска, далее горизонталь. → <a href="#/r4" onclick="PENDING_ANCHOR='ly-result'">Лояльность · линия тренда</a></p>`+
+      `<p style="${HD}">Почему база не поднята по наклону тренда</p>`+
+      `<p class="note" style="margin:0">Наклон последних месяцев близок к нулю (плато февраль–май). Восходящий наклон формирует только разгон запуска (сентябрь–декабрь), который завершён. Экстраполяция этого наклона даёт ~6,3 млн ₽ на июнь, однако это продолжение раскрутки, которого не происходит — парк вышел на стабильный уровень. Поэтому база принята равной уровню плато (${mln(NTRL)}), а не наклону разгона.</p>`+
+      `<p style="${HD}">Откуда якорь (расчёт)</p>`+
+      `<table style="background:var(--bg);border-radius:8px">`+
+      `<tr><th>Шаг</th><th>Выручка/мес</th><th>За год</th></tr>`+
+      `<tr><td>Факт 2025 · сен–дек (разгон)</td><td>${f25.map(x=>mm(x.tr)).join(' · ')}</td><td>${mln(sumRev(f25))}</td></tr>`+
+      `<tr><td>Факт 2026 · янв–${mName(LAST_FACT).slice(0,3).toLowerCase()}</td><td>${f26.map(x=>mm(x.tr)).join(' · ')}</td><td>${mln(sumRev(f26))}</td></tr>`+
+      `<tr><td>База (${BASE_WIN}'26)</td><td><b>${mm(NTRL)}</b></td><td>—</td></tr>`+
+      `<tr><td>Органический рост (коэф. ТЦ + сезонность)</td><td>${mm(annualTraj/12)} ср.</td><td>${mln(annualTraj)}</td></tr>`+
+      `<tr><td>+ ${pctY}% амбиция → <b>цель</b></td><td>${mm(annualTarget/12)} ср.</td><td><b>${mln(annualTarget)}</b> · рост ${signedMoney(growthMoney)}</td></tr>`+
+      `</table>`+
+      `<p style="${HD}">Почему не сравниваем с прошлым годом</p>`+
+      `<p class="note" style="margin:0">Парк открылся 09.2025 — целого года-аналога нет. Факт 2025 используется для контекста и сверки сезонности. «Линии тренда» посетителей и чека — следующий шаг для точности.</p>`+
+      `</div></details></div>`;
+}
+function renderMonthDetail(month,elId){
+  const r=fyRow(month), tgt=adjGoalOf(month), dPct=Math.round((r.rev-tgt)/tgt*100), lab=r.fact?'Факт':'Прогноз';
+  const dv='border-top:1px solid var(--line);margin-top:6px;padding-top:5px;font-size:10px;color:var(--muted);line-height:1.3';
+  const revF=`<div style="${dv}">цель ${mln(tgt)} (${dPct>=0?'+':'−'}${Math.abs(dPct)}% к цели)</div>`;
+  let popF='', chkF='', info='';
+  if(!r.fact){const d=r.d;
+    popF=`<div style="${dv}">${nf(BASE_RC)} × (1 + загрузка ${pct(valOf(LV_VOL,d.vol))} + захват ${pct(valOf(LV_CAP,d.cap))} + частота ${pct(valOf(LV_FREQ,d.freq))})</div>`;
+    chkF=`<div style="${dv}">${nf(BASE_CHK)} × (1 + сезонность ${pct(valOf(LV_CHK,d.chk))}) · <a href="#/packages">сезонность чека →</a></div>`;
+    info=`<div class="card" style="background:var(--surface2);border:0;margin-bottom:8px"><p class="lead" style="margin:0"><b>Рост без драйверов</b></p><p class="note" style="margin:2px 0 0">Прогноз — это органический рост: только факторы (загрузка ТЦ, захват, частота, сезонность чека). Драйверы роста (микс пакетов, скрипты и пр.) здесь на нуле — их эффект добавляется на «Плане» и в прогноз не входит.</p></div>`;}
+  document.getElementById(elId).innerHTML=
+    `<h2>${RU_M[month.slice(5)]} 2026 – ${lab}</h2>`+
+    info+
+    `<div class="big">`+
+      `<div class="kpi"><div class="t">Пополнения</div><div class="v">${nf(r.rc)}</div>${popF}</div>`+
+      `<div style="align-self:center;font-size:20px;font-weight:700">×</div>`+
+      `<div class="kpi"><div class="t">Чек/пополнение</div><div class="v">${nf(r.ck)} ₽</div>${chkF}</div>`+
+      `<div style="align-self:center;font-size:20px;font-weight:700">=</div>`+
+      `<div class="kpi${r.fact?' result':''}"><div class="t">Выручка</div><div class="v">${mln(r.rev)}</div>${revF}</div>`+
+    `</div>`;
+}
+function renderPlanDetail(month, headId, blocksId){
+  const def=realityDefaults(month);
+  const fc=computeRev(def.vol,def.cap,def.freq,def.trend,def.chk);
+  const planCk=fc.ck*(1+MIX_UPLIFT), planRc=fc.rc+LOY_BOOST/planCk, planRev=planRc*planCk; // скрипты→чек, лояльность→пополнения
+  const fm=RU_M[month.slice(5)], pm=RU_M[PREV.m.slice(5)], pchk=PREV.tr/PREV.rc;
+  const pct1=v=>(v>0?'+':v<0?'−':'')+Math.abs(v*100).toFixed(1).replace('.',',')+'%';
+  const ms=v=>(v/1e6).toFixed(1).replace('.',',');
+  document.getElementById(headId).innerHTML=
+    `<div></div>`+
+    `<div class="h"><b>${pm}</b><span class="s">факт</span></div>`+
+    `<div class="h"><b>${fm}</b><span class="s">прогноз</span></div>`+
+    `<div class="h"><b>${fm}</b><span class="s">план</span></div>`;
+  const dRc=(fc.rc-PREV.rc)/PREV.rc, dCk=(fc.ck-pchk)/pchk, dRev=(fc.rev-PREV.tr)/PREV.tr;
+  const pRc=(planRc-fc.rc)/fc.rc, pCk=(planCk-fc.ck)/fc.ck, pRev=(planRev-fc.rev)/fc.rev;
+  const planB=d=>Math.abs(d)<1e-9?'= прогноз':pct1(d)+' к прогн.';
+  const block=(lab,fV,fB,nV,nB,pV,pB,subrows,isRev)=>`<details class="block${isRev?' rev':''}"><summary class="cmp"><div class="lab">${lab}</div><div class="cell"><div class="n">${fV}</div>${fB?'<div class="b">'+fB+'</div>':''}</div><div class="cell"><div class="n">${nV}</div><div class="b">${nB}</div></div><div class="cell plan-c"><div class="n">${pV}</div><div class="b">${pB}</div></div></summary><div class="binner">${subrows}</div></details>`;
+  const sub3=(kk,f,n,p)=>`<div class="cmp subrow"><div class="sublab">${kk}</div><div class="cell"><span class="sn">${f}</span></div><div class="cell"><span class="sn">${n}</span></div><div class="cell plan-c"><span class="sn">${p}</span></div></div>`;
+  const dh='<span class="sn" style="color:var(--hint)">—</span>';
+  const tagF=' <span class="prov fact">фактор</span>', tagD=' <span class="prov gap">драйвер роста</span>';
+  const lh=t=>`<div class="layer-h">${t}</div>`;
+  const srow=(k,v)=>`<div class="frow"><span class="fk">${k}</span><span class="fv">${v}</span></div>`;
+  const m2=v=>(v/1e6).toFixed(1).replace('.',',')+' млн';
+  const ck3=((5117563/4697)+(5499232/5108)+(4851863/4383))/3, mayCk=PREV.tr/PREV.rc, ckDev=(mayCk-ck3)/ck3;
+  const ppv=PARK.ppv, ppvS=ppv.toFixed(1).replace('.',','), visFact=Math.round(PREV.rc/ppv);
+  const ckPopF=Math.round(pchk), ckPopN=Math.round(fc.ck), ckPopP=Math.round(planCk);
+  const cvF=Math.round(ckPopF*ppv), cvN=Math.round(ckPopN*ppv), cvP=Math.round(ckPopP*ppv);
+  const restP=planRev*0.95, chRow=(v,t)=>`${m2(v)} (${(v/t*100).toFixed(1).replace('.',',')}%)`;
+  const revSub=
+    sub3('Безнал',chRow(PREV.cl,PREV.tr),chRow(fc.rev*PREV.cl/PREV.tr,fc.rev),chRow(restP*PREV.cl/(PREV.cl+PREV.ca),planRev))+
+    sub3('Наличные',chRow(PREV.ca,PREV.tr),chRow(fc.rev*PREV.ca/PREV.tr,fc.rev),chRow(restP*PREV.ca/(PREV.cl+PREV.ca),planRev))+
+    sub3('Сайт',chRow(PREV.ws,PREV.tr),chRow(fc.rev*PREV.ws/PREV.tr,fc.rev),chRow(planRev*0.05,planRev))+
+    `<p class="note" style="padding-left:8px">Доли каналов: прогноз — как в факте; план — сайт <b>5%</b> (целевой рост канала), остальное в фактической пропорции безнал/наличные. <span class="prov assume">план по каналам — допущение</span></p>`;
+  const freqChip=PLAN_TARGETS.freq!=null?'<span class="pill">цель</span>':'<span class="pill">авто</span> <span class="prov assume">допущение</span>';
+  const lk=(t,h)=>`<a class="lk-dash" href="${h}">${t}</a>`, retF=LY_CARDS[LY_CARDS.length-1].ret;
+  const popSub=
+    sub3(lk('Частота (вернувшихся %)','#/r4')+' '+freqChip,lyF1(retF)+'%',lyF1(retF)+'%',lyF1(LOY_GOAL.ret)+'%')+
+    sub3(lk('Кол-во пополнений','#/l2/receipts'),nf(PREV.rc),nf(fc.rc),nf(planRc))+
+    sub3(lk('Визиты','#/l2/receipts')+' <span class="prov assume">допущение</span>',nf(visFact),dh,dh)+
+    sub3(lk('Пополнений/визит','#/l2/receipts')+' <span class="prov assume">допущение</span>',ppvS,dh,`${ppvS} <span style="color:var(--muted);font-size:11px">держим</span>`);
+  const chkSub=
+    sub3(lk('Управляемый чек A','#/packages')+tagD,nf(MANAGED_F)+' ₽',nf(MANAGED_F)+' ₽',nf(MANAGED_P)+' ₽')+
+    sub3(lk('Чек/визит','#/packages')+' <span class="prov assume">допущение</span>',nf(cvF)+' ₽',nf(cvN)+' ₽',nf(cvP)+' ₽');
+  document.getElementById(blocksId).innerHTML=
+    block('Выручка',mln(PREV.tr),'',mln(fc.rev),pct1(dRev)+' к факту',mln(planRev),arrBadge(fc.rev,planRev),revSub,true)+
+    block('Пополнения',nf(PREV.rc),'',nf(fc.rc),pct1(dRc)+' к факту',nf(planRc),arrBadge(fc.rc,planRc),popSub,false)+
+    block('Чек/пополнение',nf(pchk)+' ₽',pct1(ckDev)+' к базе',nf(fc.ck)+' ₽',pct1(dCk)+' к факту',nf(planCk)+' ₽',arrBadge(fc.ck,planCk),chkSub,false);
+}
+
+// ====== ПАРАМЕТРЫ МЕСЯЦА ==========================================
+// «Параметры месяца» удалены: выбор уровней приходит из Google Sheets; интерпретации — на R1–R4.
+
+// ====== ГЛАВНАЯ (Уровень 1) =======================================
+// Профиль парка — единый источник попол/визит и базы докидки (допущения: счётчика визитов нет).
+// PARK/PLAN_MONTH/PREV/PK_A/MIX_UPLIFT/MANAGED — перенесены в ранний блок «ПЕРЕКАТ + РЕШЕНИЯ ВЛАДЕЛЬЦА» (см. выше), чтобы MONTHS строился от PLAN_MONTH.
+function setPopsMetric(k){popsMetric=k;renderLyTrend();}
+function setPkLens(k){pkLens=k;renderPackages();}
+function setGoal(v){state.goalPct=parseFloat(v)||0;renderAll();}
+function setLever(k,v){state.lev[k]=parseFloat(v)||0;renderAll();}
+const MET_T={rev:'Выручка',rc:'Пополнения',chk:'Чек/пополнение'};
+function buildTrend(metricKey){
+  const def=realityDefaults(state.month);
+  const fc=computeRev(def.vol,def.cap,def.freq,def.trend,def.chk);
+  const SHORT=m=>RU_M[m.slice(5)].slice(0,3).toLowerCase();
+  const MET={
+    rev:{v:r=>r.tr,f:fc.rev},
+    rc:{v:r=>r.rc,f:fc.rc},
+    chk:{v:r=>r.rc?r.tr/r.rc:null,f:fc.ck},
+  };
+  const mk=MET[metricKey];
+  const baseMs=Object.fromEntries(BASE_ROWS.map(r=>[r.m,1])); // окно базы — из BASE_ROWS (скользящее)
+  const series=OHTA_SERIES.map(r=>({m:r.m,v:mk.v(r),base:baseMs[r.m]})).concat([{m:state.month,v:mk.f,forecast:1}]);
+  const vmax=Math.max(...series.filter(s=>s.v!=null).map(s=>s.v));
+  const bars=series.map(s=>{
+    if(s.v==null) return `<div class="bcol"><div class="bar null" style="height:100%"></div></div>`;
+    const h=Math.max(4,Math.round(s.v/vmax*100));
+    const cls=s.forecast?'bar fc':(s.base?'bar base':'bar');
+    return `<div class="bcol"><div class="${cls}" style="height:${h}px"></div></div>`;
+  }).join('');
+  const labels=series.map(s=>`<div class="blab${s.forecast?' fc':''}">${SHORT(s.m)}</div>`).join('');
+  const hasNull=series.some(s=>s.v==null);
+  const blab2=v=>v==null?'':metricKey==='rev'?(v/1e6).toFixed(1).replace('.',','):metricKey==='rc'?(v/1000).toFixed(1).replace('.',',')+'к':Math.round(v);
+  const bvals=series.map(s=>`<div class="bv${s.forecast?' fc':''}">${blab2(s.v)}</div>`).join('');
+  const n=series.length;
+  const ai=[]; series.forEach((s,i)=>{if(s.v!=null&&!s.forecast)ai.push([i,s.v]);});
+  const np=ai.length, xb=ai.reduce((a,p)=>a+p[0],0)/np, yb=ai.reduce((a,p)=>a+p[1],0)/np;
+  let snum=0,sden=0; ai.forEach(p=>{snum+=(p[0]-xb)*(p[1]-yb);sden+=(p[0]-xb)*(p[0]-xb);});
+  const slope=sden?snum/sden:0, intc=yb-slope*xb;
+  const TX=i=>(i+0.5)/n*100, TY=v=>108-v/vmax*100;
+  const tline=`<line x1="${TX(0).toFixed(1)}" y1="${TY(intc).toFixed(1)}" x2="${TX(n-1).toFixed(1)}" y2="${TY(intc+slope*(n-1)).toFixed(1)}" stroke="var(--ink)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+  const slopeFmt=metricKey==='rev'?(Math.abs(slope)/1e6).toFixed(1).replace('.',',')+' млн':metricKey==='rc'?Math.round(Math.abs(slope))+' пополнений':Math.round(Math.abs(slope))+' ₽';
+  const dataTxt=series.filter(s=>!s.forecast).map(s=>`${SHORT(s.m)} ${s.v==null?'—':blab2(s.v)}`).join(' · ');
+  return `<div class="bvals">${bvals}</div>`+
+    `<div class="tbarwrap"><svg class="tline" viewBox="0 0 100 108" preserveAspectRatio="none">${tline}</svg><div class="bars">${bars}</div></div>`+
+    `<div class="blabs">${labels}</div>`+
+    `<div class="tlegend"><span><i class="sw a"></i>факт</span><span><i class="sw base"></i>база ${BASE_WIN}</span><span><i class="sw fc"></i>прогноз</span>${hasNull?'<span><i class="sw null"></i>нет данных</span>':''}</div>`+
+    `<div class="ll-note">Линия тренда — линейная регрессия (МНК) по факту, наклон ${slope>=0?'+':'−'}${slopeFmt}/мес. Данные: ${dataTxt}.</div>`;
+}
+// ====== СИСТЕМА ЛОЯЛЬНОСТИ · двигатель (Задание-09) ================
+// Все производные — счётом из LY_* по оси «на игрока» (÷ uniq месяца). Оси «/визит»
+// заблокированы до верификации семантики визитов — см. HTML-комментарий у блока «Методология».
+// Двигатель: прогноз берёт уровень частоты (авто); буст целей (LOY_BOOST) входит в planRev как драйвер (решение владельца 2026-07-06).
+const LY_M=LY_PLAYERS.map(r=>r.m);
+const lyF1=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1}).replace(/\s/g,' ');
+const lyF2=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/\s/g,' ');
+const lyK=v=>lyF1(v/1000)+'к ₽';
+const lyMon=m=>RU_M[m.slice(5)].slice(0,3).toLowerCase();
+const LY_SUP=['¹','²','³'];
+const lyEvSup=m=>{const j=LY_EVENTS.findIndex(e=>e.m===m);return j>=0?LY_SUP[j]:'';};
+function lyGo(id){const el=document.getElementById(id);if(el&&el.scrollIntoView)el.scrollIntoView();}
+// расшифровки драйверов буста (Слой 1): строятся в renderLoyalty, показываются по клику
+let LY_DRV_EXPL={};
+function showDrv(k){
+  const el=document.getElementById('ly-drv-expl'); if(el)el.innerHTML=LY_DRV_EXPL[k]||'';
+  document.querySelectorAll('#ly-model table.bst tr[data-k]').forEach(tr=>tr.classList.toggle('sel',tr.dataset.k===k));
+}
+function lyStat(t,v,s){return `<div class="m"><div class="t">${t}</div><div class="v" style="font-size:16px">${v}</div>${s?`<div class="s" style="font-family:inherit">${s}</div>`:''}</div>`;}
+function lyBars(rows,fmt){
+  const vmax=Math.max(...rows.map(r=>r.v));
+  return `<div class="ll-bars">`+rows.map((r,i)=>{
+    const h=Math.max(3,Math.round(r.v/vmax*100));
+    return `<div class="llcol"><div class="ll-v">${fmt(r.v)}</div><div class="llbar${i===rows.length-1?' cur':''}" style="height:${h}px"></div><div class="ll-m">${lyMon(r.m)}${r.ev?'<b>'+r.ev+'</b>':''}</div></div>`;
+  }).join('')+`</div>`;
+}
+function renderLyTrend(){
+  const el=document.getElementById('ly-trend');if(!el)return;
+  const seg=k=>`<button class="${popsMetric===k?'on':''}" onclick="setPopsMetric('${k}')">${MET_T[k]}</button>`;
+  el.innerHTML=`<div class="seg">${seg('rev')}${seg('rc')}</div>`+buildTrend(popsMetric);
+}
+// 10a · переключатели графиков секций (паттерн setPopsMetric; состояние не персистится)
+let lyCh={freq:'ret',depth:'gpg',fuel:'pts'};
+let LY_CH_SPEC=null; // заполняется в renderLoyalty (ряды считаются там же, из LY_*)
+function setLyCh(sec,k){lyCh[sec]=k;renderLyChart(sec);}
+function renderLyChart(sec){
+  if(!LY_CH_SPEC)return;
+  const el=document.getElementById('ly-ch-'+sec);if(!el)return;
+  const S=LY_CH_SPEC[sec], opt=S.find(o=>o.k===lyCh[sec])||S[0];
+  const seg=S.length>1?`<div class="seg">${S.map(o=>`<button class="${lyCh[sec]===o.k?'on':''}" onclick="setLyCh('${sec}','${o.k}')">${o.lab}</button>`).join('')}</div>`:'';
+  el.innerHTML=seg+`<div class="ll-h">${opt.title}</div>`+lyBars(opt.rows,opt.fmt)+(opt.after||'');
+}
+function renderLoyalty(){
+  const P=LY_PLAYERS,C=LY_CARDS,G=LY_GE,Z=LY_PRIZES,R=LY_REV;
+  const n=LY_M.length,iC=n-1,iP=n-2; // текущий (июнь) и предыдущий (май) месяцы ряда
+  // производные «на игрока»
+  const gpg=i=>G[i].games/P[i].uniq;          // игр/игрока
+  const tpg=i=>G[i].tk/P[i].uniq;             // тикетов/игрока (выдано за месяц)
+  const ppg=i=>R[i].rc/P[i].uniq;             // попол/игрока
+  const rpg=i=>R[i].tr/P[i].uniq;             // выручка/игрока, ₽
+  const bl=i=>G[i].bon/G[i].grev*100;         // бонусная нагрузка, %
+  const przg=i=>Z[i].out/P[i].uniq;           // призов/игрока
+  const retPeak=C.reduce((a,r)=>r.ret>a.ret?r:a,C[0]);
+  const dPts=C[iC].pts-C[iP].pts, dPtsPrev=C[iP].pts-C[iP-1].pts, dTk=C[iC].tk-C[iP].tk;
+  const footYoY=(FOOT26['2026-06']/FOOT['2025-06']-1)*100, uniqYoM=(P[iC].uniq/P[iP].uniq-1)*100;
+  // ── общие хелперы статусов ──
+  const LY_THRESH=0.03; // |Δотн|<=3% — «стабильно»; далее по направлению блага
+  const lyStatusOf=(lv,rv,lowerBetter)=>{const d=(rv-lv)/Math.abs(lv);
+    if(Math.abs(d)<=LY_THRESH)return {c:'',t:'стабильно'};
+    const better=lowerBetter?d<0:d>0;return better?{c:'good',t:'лучше'}:{c:'warn',t:'⚠ хуже'};};
+  const lyDpct=(lv,rv)=>{const d=(rv/lv-1)*100;return (d>=0?'+':'−')+lyF1(Math.abs(d))+'%';};
+  const f1p=v=>lyF1(v)+'%', f2p=v=>lyF2(v)+'%', fMoney=v=>nf(Math.round(v));
+  const jf=realityDefaults(PLAN_MONTH), jfc=computeRev(jf.vol,jf.cap,jf.freq,jf.trend,jf.chk); // прогноз план-месяца
+  const engTgt=k=>PLAN_TARGETS.engine[k]!=null;
+
+  // ── Слой 1 · Модель «Как лояльность делает выручку» (v6: 3 драйвера + буст, деньги в млн) ──
+  const m1=v=>(v>=0?'+':'−')+(Math.abs(v)/1e6).toFixed(1).replace('.',',')+' млн'; // как на #/r5
+  const uniqF=P[iC].uniq, rpgF=Math.round(rpg(iC)), ckPopF=Math.round(R[iC].tr/R[iC].rc);
+  const dRetG=Math.round((LOY_GOAL.ret-LOY_FACT.ret)*uniqF*0.01), dPpgR=Math.round((LOY_GOAL.ppg-LOY_FACT.ppg)*uniqF);
+  LY_DRV_EXPL={
+    ret:`<b>Частота — сколько визитов на игрока.</b> Возвраты сейчас ${f1p(C[iC].ret)}, цель ${f1p(LOY_GOAL.ret)}. Больше повторных визитов → выше ценность игрока: примерно <b>+${nf(dRetG)} визитов</b> в месяц, каждый ~${nf(rpgF)} ₽. В план это добавляет <b>${m1(LOY_PARTS.ret)} ₽/мес</b>.`,
+    ppg:`<b>Пополнение — платёж за визит.</b> Сейчас ${lyF2(ppg(iC))} пополнения на игрока, цель ${lyF2(LOY_GOAL.ppg)}. Те же игроки платят чуть чаще: примерно <b>+${nf(dPpgR)} пополнений</b> в месяц, каждое ~${nf(ckPopF)} ₽. В план это добавляет <b>${m1(LOY_PARTS.ppg)} ₽/мес</b>.`,
+    gpv:`<b>Глубина — вовлечённость.</b> Игр на игрока ${lyF1(gpg(iC))}, цель ${lyF1(LOY_GOAL.gpv)}. Отдельной суммы в буст нет: глубже играют → охотнее возвращаются, а эти визиты уже в «Частоте». Считать и там, и тут — посчитать дважды.`
+  };
+  document.getElementById('ly-model').innerHTML=
+    `<div class="card">`+
+      `<h3 class="model-h">Как растёт ценность игрока (LTV)</h3>`+
+      `<p class="model-sub"><b>Ценность игрока</b> = платёж за визит × число визитов. Три рычага её растят; <b>чек за раз</b> — отдельный рычаг, на <a href="#/packages">странице «Чек»</a>.</p>`+
+      `<table class="bst"><tr><th>Рычаг</th><th>Факт → цель</th><th>Вклад в буст</th></tr>`+
+        `<tr data-k="ret" onclick="showDrv('ret')"><td>Частота — сколько визитов</td><td>${f1p(C[iC].ret)} → ${f1p(LOY_GOAL.ret)}</td><td>${m1(LOY_PARTS.ret)}</td></tr>`+
+        `<tr data-k="ppg" onclick="showDrv('ppg')"><td>Пополнение — платёж за визит</td><td>${lyF2(ppg(iC))} → ${lyF2(LOY_GOAL.ppg)}</td><td>${m1(LOY_PARTS.ppg)}</td></tr>`+
+        `<tr data-k="gpv" onclick="showDrv('gpv')"><td>Глубина — вовлечённость</td><td>${lyF1(gpg(iC))} → ${lyF1(LOY_GOAL.gpv)}</td><td class="c">косвенно</td></tr>`+
+      `</table>`+
+      `<div class="drv-expl" id="ly-drv-expl"></div>`+
+      `<div class="boost"><b>Буст в план → ${m1(LOY_BOOST)} ₽/мес</b></div>`+
+    `</div>`;
+  showDrv('ret');
+
+  // ── Слой 2 · Что происходит (факт LAST_FACT → прогноз/цель PLAN_MONTH, по колонкам) ──
+  const planRevJ=jfc.rc*jfc.ck*(1+MIX_UPLIFT)+LOY_BOOST, goalRevJ=adjGoalOf(PLAN_MONTH);
+  const dG='<span style="color:var(--hint)">—</span>', eqG='<span style="color:var(--hint)">= прогноз</span>';
+  const nRow=(lab,f,p,g,tgt)=>`<tr><td style="text-align:left">${lab}</td><td>${f}</td><td>${p}</td><td${tgt?' style="font-weight:600"':''}>${g}</td></tr>`;
+  const th3=(m,r)=>`<th>${m}<br><span style="font-weight:400;color:var(--hint);font-size:11px">${r}</span></th>`;
+  document.getElementById('ly-now').innerHTML=
+    `<div class="card"><div class="lyblk-h"><b>Что происходит</b></div>`+
+    `<div class="ll-h" style="margin:2px 0 4px">Выручка, млн ₽</div>`+
+    `<div class="vrl">`+
+      `<div class="st"><span class="l">факт ${mName(LAST_FACT).toLowerCase()}</span><span class="v">${lyF1(R[iC].tr/1e6)}</span></div>`+
+      `<div class="ar">→</div>`+
+      `<div class="st"><span class="l">прогноз</span><span class="v">${lyF1(jfc.rev/1e6)}</span></div>`+
+      `<div class="ar">→</div>`+
+      `<div class="st plan"><span class="l">план</span><span class="v">${lyF1(planRevJ/1e6)}</span></div>`+
+      `<div class="ar">→</div>`+
+      `<div class="st goal"><span class="l">цель</span><span class="v">${lyF1(goalRevJ/1e6)}</span></div>`+
+    `</div>`+
+    `<table><tr><th style="text-align:left">Показатель</th>${th3(mName(LAST_FACT),'факт')}${th3(mName(PLAN_MONTH),'прогноз')}${th3(mName(PLAN_MONTH),'цель')}</tr>`+
+      nRow('Вернувшихся %',f1p(C[iC].ret),f1p(C[iC].ret),f1p(LOY_GOAL.ret)+arrBadge(C[iC].ret,LOY_GOAL.ret),1)+
+      nRow('Попол/игрока',lyF2(ppg(iC)),lyF2(ppg(iC)),lyF2(LOY_GOAL.ppg)+arrBadge(ppg(iC),LOY_GOAL.ppg),1)+
+      nRow('Игр/игрока',lyF1(gpg(iC)),lyF1(gpg(iC)),lyF1(LOY_GOAL.gpv)+arrBadge(gpg(iC),LOY_GOAL.gpv),1)+
+      nRow('Захват %',f2p(P[iC].cap),f2p(P[iC].cap),eqG)+
+      nRow('Выручка/игрока ₽',fMoney(rpg(iC)),fMoney(rpg(iC)),dG)+
+      nRow('Бонусная нагрузка %',f1p(bl(iC)),f1p(bl(iC)),dG)+
+    `</table>`+
+    `<p class="note"><b>План ${lyF1(planRevJ/1e6)} млн</b> = прогноз + скрипты (чек) + буст лояльности (${m1(LOY_BOOST)}, <span class="prov assume">допущение</span>). <b>Цель ${lyF1(goalRevJ/1e6)} млн</b> — амбиция +15%; разрыв план→цель закрывают драйверы на <a href="#/planner">«Плане»</a>. Ниже — цели по рычагам; захват (ТЦ) не планируем.</p>`;
+
+  // ── Слой 3 · План на PLAN_MONTH — сигнал (интерпретация данных) ──
+  const checks=[['возврат',C[iP].ret,C[iC].ret],['захват',P[iP].cap,P[iC].cap],['попол/игрока',ppg(iP),ppg(iC)],['игр/игрока',gpg(iP),gpg(iC)]];
+  const attn=checks.filter(a=>(a[2]-a[1])/Math.abs(a[1])<-LY_THRESH).map(a=>`${a[0]} ${lyDpct(a[1],a[2])}`);
+  const boostTxt=`Чтобы расти, план ставит цели по лояльности и добирает <b>${m1(LOY_BOOST)} ₽/мес</b> (вернувшихся/попол/игр — в таблице выше).`;
+  const sig=attn.length
+    ? `<div class="lysig warn"><span class="sigbadge">сигнал</span><div class="v">⚠ Внимание: ${attn.join(', ')}</div><div class="m">В ${mName(LAST_FACT)} просела частота — возврат и захват. Прогноз лишь держит этот уровень («хуже не будет»). ${boostTxt} Фокус — возврат игроков, не цены.</div></div>`
+    : `<div class="lysig hold"><span class="sigbadge">сигнал</span><div class="v">Стабильно — уровни держатся</div><div class="m">Риск-сигналов нет: прогноз = удержание. ${boostTxt}</div></div>`;
+  document.getElementById('ly-signal').innerHTML=
+    `<div class="lyblk-h"><b>План на ${mName(PLAN_MONTH)}</b></div>`+
+    sig+
+    `<p class="note">Прогноз выручки ≈ <b>${lyF1(jfc.rev/1e6)} млн</b> (двигает частота, авто: <b>${freqAuto()}</b>); буст целей — сверху, в план. → <a href="#/planner">детали на «Плане»</a></p>`;
+  // C3 · Частота (10a: видимое — KPI-строка + инсайт; таблица/график/сноски — в details)
+  const lyArr=(cur,prev)=>cur>prev?'↑':cur<prev?'↓':'→';
+  const evLegend=LY_EVENTS.map((e,j)=>LY_SUP[j]+' '+e.t).join(' · ');
+  const tRows=LY_M.map((m,i)=>`<tr><td>${lyMon(m)} ${m.slice(2,4)}</td><td>${nf(P[i].uniq)}</td><td>${nf(P[i].nw)}</td><td>${P[i].nwp}%</td><td>${lyF1(C[i].ret)}%</td><td>${lyF2(C[i].av)}</td><td>${nf(C[i].cards)}</td><td>${lyF2(P[i].cap)}%</td></tr>`).join('');
+  LY_CH_SPEC={
+    freq:[
+      {k:'ret',lab:'Вернувшихся %',title:`Вернувшихся % · ${lyMon(LY_M[0])} 25 – ${lyMon(LY_M[iC])} 26`,rows:LY_M.map((m,i)=>({m,v:C[i].ret,ev:lyEvSup(m)})),fmt:lyF1,
+        after:`<p class="ll-note">${evLegend} <span class="prov assume">допущение · даты подтвердить</span></p>`+
+              `<p class="note">Скачок ${lyF1(C[5].ret)} → ${lyF1(C[6].ret)}% совпадает с full launch коллекций — рычаг работает.</p>`},
+      {k:'av',lab:'Ср. визитов',title:'Ср. визитов <span class="prov assume">допущение</span>',rows:LY_M.map((m,i)=>({m,v:C[i].av})),fmt:lyF2},
+      {k:'uniq',lab:'Уники',title:'Уники (игроков за месяц)',rows:LY_M.map((m,i)=>({m,v:P[i].uniq})),fmt:nf}
+    ],
+    depth:[
+      {k:'gpg',lab:'Игр/игрока',title:'Игр/игрока (игр на уникального игрока за месяц)',rows:LY_M.map((m,i)=>({m,v:gpg(i)})),fmt:lyF1,
+        after:`<p class="ll-note">Пик ${lyF1(Math.max(...LY_M.map((m,i)=>gpg(i))))} → ${lyF1(gpg(iC))} сейчас: с ростом базы игрок за месяц играет меньше. В деньги не кладём (глубина — косвенно); цель ${lyF1(LOY_GOAL.gpv)} — ориентир.</p>`},
+      {k:'tpg',lab:'Тикетов/игрока',title:'Тикетов/игрока (выдано за месяц)',rows:LY_M.map((m,i)=>({m,v:tpg(i),ev:m===LY_EVENTS[1].m?LY_SUP[1]:''})),fmt:v=>nf(v),
+        after:`<p class="ll-note">${LY_SUP[1]} ${LY_EVENTS[1].t} <span class="prov assume">допущение · дата подтвердить</span> — удвоение с февраля: накопление тикетов на игрока ускорилось.</p>`},
+      {k:'bl',lab:'Бонусная нагрузка',title:'Бонусная нагрузка % (бонусные очки ÷ игровая выручка)',rows:LY_M.map((m,i)=>({m,v:bl(i)})),fmt:lyF1}
+    ],
+    fuel:[
+      {k:'pts',lab:'Очки-деньги',title:'Непогашенные очки-деньги, тыс ₽',rows:LY_M.map((m,i)=>({m,v:C[i].pts/1000})),fmt:lyF1},
+      {k:'tk',lab:'Невыкупленные тикеты',title:'Невыкупленные тикеты, млн шт',rows:LY_M.map((m,i)=>({m,v:C[i].tk/1e6})),fmt:lyF2}
+    ]
+  };
+  document.getElementById('ly-freq-body').innerHTML=
+    `<div class="card"><div class="eng">`+
+      lyStat('Вернувшихся',lyF1(C[iC].ret)+'%')+
+      lyStat('Ср. визитов <span class="prov assume">допущение</span>',lyF2(C[iC].av),`<span class="lk-dash" style="cursor:pointer" onclick="lyGo('ly-method')">⚠ семантика под верификацией</span>`)+
+      lyStat('База карт',nf(C[iC].cards))+
+      lyStat('Захват',lyF2(P[iC].cap)+'%')+
+    `</div></div>`+
+    `<p class="note"><b>Июнь:</b> трафик ТЦ июня обычный (${lyF1(FOOT26['2026-06']/1000)}к; ${footYoY>=0?'+':'−'}${lyF1(Math.abs(footYoY))}% г/г), а уники ${uniqYoM>=0?'+':'−'}${lyF1(Math.abs(uniqYoM))}% и захват ${lyF2(P[iP].cap)} → ${lyF2(P[iC].cap)} — спад внутренний (конверсия/возврат), не сезон ТЦ.</p>`+
+    `<details class="card ly-det"><summary><b>Тренд и детали</b> <span class="ly-sum">· вернувшихся ${lyF1(C[iC].ret)}% ${lyArr(C[iC].ret,C[iP].ret)} к маю</span></summary>`+
+      `<div id="ly-ch-freq" style="margin-top:8px"></div>`+
+      `<div style="margin-top:10px"><table><tr><th>Месяц</th><th>Уники</th><th>Новые</th><th>Доля новых</th><th>Вернувшихся</th><th>Ср. визитов ⚠</th><th>Карт в системе</th><th>Захват</th></tr>${tRows}</table></div>`+
+      `<p class="note"><span class="lk-dash">захват</span> = уники ÷ трафик ТЦ (мастер); ≠ conv планировщика (визиты ÷ трафик).</p>`+
+    `</details>`;
+  // C4 · Глубина игры (10a: видимое — KPI-строка + инсайт; график с переключателем и сноска — в details)
+  const prMin=Math.round(Math.min(...G.map(g=>g.price))), prMax=Math.round(Math.max(...G.map(g=>g.price)));
+  document.getElementById('ly-depth-body').innerHTML=
+    `<div class="card"><div class="eng">`+
+      lyStat('Игр/игрока',lyF1(gpg(iC)))+
+      lyStat('Тикетов/игрока',nf(tpg(iC)))+
+      lyStat('Тикетный контур',G[iC].loop+'%')+
+      lyStat('<b>Бонусная нагрузка</b>',lyF1(bl(iC))+'%')+
+    `</div></div>`+
+    `<p class="note">Нагрузка выросла на ~7 п.п. с марта — каждый ₽ пополнения тянет больше бонусных очков. Целевой <span class="prov assume">коридор</span> не задан; рычаг «бонусы» без трек-цели.</p>`+
+    `<details class="card ly-det"><summary><b>Тренд и детали</b> <span class="ly-sum">· нагрузка ${lyF1(bl(iC))}% ${lyArr(bl(iC),bl(iP))} к маю</span></summary>`+
+      `<div id="ly-ch-depth" style="margin-top:8px"></div>`+
+      `<p class="note">Ср. цена игры стабильна ${prMin}–${prMax} ₽; <span class="lk-dash">игровая выручка (очки-деньги) ≠ пополнениям</span> — не смешивать.</p>`+
+    `</details>`;
+  // C5 · Пополнение (10a: видимое — KPI-строка + инсайт + блок ЛК; график и VIP-потолок — в details)
+  const lkIdx=LY_M.map((m,i)=>i).filter(i=>R[i].site!=null);
+  const lkVals=lkIdx.map((i,j)=>lyF1(R[i].site/1000)+'к'+(j===lkIdx.length-1?' ₽':'')+' ('+lyMon(LY_M[i])+')').join(' → ');
+  const lkShares=lkIdx.map(i=>lyF1(R[i].site/R[i].tr*100)).join(' → ')+'% выручки';
+  document.getElementById('ly-topup-body').innerHTML=
+    `<div class="card"><div class="eng">`+
+      lyStat('Попол/игрока',lyF2(ppg(iC)))+
+      lyStat('Выручка/игрока',nf(rpg(iC))+' ₽')+
+      lyStat('Макс. платёж',lyK(C[iC].mx))+
+      lyStat('Топап-ЛК',lyK(R[iC].site),lyF1(R[iC].site/R[iC].tr*100)+'% выручки')+
+    `</div></div>`+
+    `<p class="note">Дрейф к одному пополнению на игрока — стратегическая рамка Охты («кладут один раз») подтверждается фактом; рычаги размера пакета — на странице <a href="#/packages">«Чек»</a>.</p>`+
+    `<details class="card ly-det"><summary><b>Тренд и детали</b> <span class="ly-sum">· попол/игрока ${lyF2(ppg(iC))} ${lyArr(ppg(iC),ppg(iP))} к маю</span></summary>`+
+      `<div style="margin-top:8px"><div class="ll-h">Попол/игрока по месяцам</div>`+
+      lyBars(LY_M.map((m,i)=>({m,v:ppg(i)})),lyF2)+`</div>`+
+      `<p class="note"><b>VIP-потолок:</b> макс. платёж ${lyK(C[0].mx)} → ${lyK(C[iC].mx)} — верх лестницы пополнений растёт.</p>`+
+    `</details>`+
+    `<div class="gap"><b>Личный кабинет (дыра-задача):</b> ЛК запущен (Охта — live; Июнь и Питерленд — июль). Канал «сайт» в выручке — единственный текущий след: ${lkVals} = ${lkShares}. Метрики ЛК (регистрации, заходы, пополнения через ЛК) — источник подключается; до появления мастера — план-слоты, не прогноз. <span class="prov assume">допущение</span></div>`;
+  // C6 · Накопление (10a: видимое — KPI-строка + инсайт; вводная, график с переключателем и справки — в details)
+  document.getElementById('ly-fuel-body').innerHTML=
+    `<div class="card"><div class="eng">`+
+      lyStat('Непогашенные очки-деньги',lyK(C[iC].pts),'Δ +'+lyF1(dPts/1000)+'к за июнь')+
+      lyStat('Невыкупленные тикеты',lyF2(C[iC].tk/1e6)+' млн шт','Δ +'+lyF1(dTk/1000)+'к')+
+      lyStat('Призов/игрока',lyF2(przg(iC)))+
+      lyStat('Payout',lyF2(Z[iC].pay)+'%')+
+    `</div></div>`+
+    `<p class="note">Рост замедлился (Δ июня +${lyF1(dPts/1000)}к против +${lyF1(dPtsPrev/1000)}к в мае) — база остатка стабилизируется.</p>`+
+    `<details class="card ly-det"><summary><b>Тренд и детали</b> <span class="ly-sum">· очки-деньги ${lyK(C[iC].pts)} ${lyArr(C[iC].pts,C[iP].pts)} за июнь</span></summary>`+
+      `<p class="sub" style="margin-top:6px">Игрок возвращается, когда копит: остаток ₽ (дотратить) · тикеты (на крупный приз) · прогресс. Остатки — одновременно обязательство на балансе И retention-актив.</p>`+
+      `<div id="ly-ch-fuel" style="margin-top:8px"></div>`+
+      `<p class="note"><b>Призотека:</b> призов выдано ${nf(Z[iC].out)} (июнь), себестоимость ${lyK(Z[iC].cogs)}, payout ${lyF2(Z[iC].pay)}% (канон ΣE ÷ игровая выручка). <span class="lk-dash">payout по канону контура B</span>; коридоры «20–30%» из рыночных отчётов считаются по другому знаменателю (тикетный контур) — напрямую НЕ сравнивать.</p>`+
+      `<p class="note"><b>Призов/игрока:</b> 2025 ~1,2–1,5 → 2026 ~1,0–1,2 — игроки чаще копят, чем обменивают сразу (согласуется с ростом невыкупленных тикетов).</p>`+
+    `</details>`;
+  // C7 · Методология «визит» (10a: видимая ⚠-строка + «Подробно» с полным текстом дословно)
+  document.getElementById('ly-method-body').innerHTML=
+    `<div class="gap">⚠ Семантика «визита» под верификацией — производные страницы считаются на игрока.`+
+      `<details class="ly-det"><summary><b>Подробно</b></summary>`+
+      `<div style="margin-top:6px">⚠ Две оси «визита» расходятся: уники × ср. визитов (мастер) даёт <b>${nf(P[iP].uniq*C[iP].av)}</b> визита в мае, планировочная ось (receipts ÷ ${PARK.ppv.toString().replace('.',',')} ≈ уники) — <b>${nf(R[iP].rc/PARK.ppv)}</b>. До верификации исходника «Статистика посещений» все производные этой страницы считаются <b>на игрока</b> (÷ уники) — эта ось бесспорна. Нужно подтвердить базу ср. визитов исходником «Статистика посещений».</div>`+
+      `</details></div>`;
+  renderLyChart('freq');renderLyChart('depth');renderLyChart('fuel');
+  // C8 · Результат (тренд — перенос со страницы «Пополнения»)
+  document.getElementById('ly-result-body').innerHTML=
+    `<div id="ly-trend"></div>`+
+    `<p class="note">Результат. Выручка = Пополнения × Чек/пополнение — план ставится на <a href="#/planner">«Плане»</a>; лояльность выше в формулу плана не входит. Разложение чека — на <a href="#/packages">«Чеке»</a>.</p>`+
+    `<p class="note">Столбец текущего план-месяца на тренде — прогноз-траектория модели, не факт. Факт месяца — в шапке страницы (источник: мастера). Тренд догоняет факт при перекате планировщика на новый месяц.</p>`;
+  renderLyTrend();
+  // C9 · Цели на лояльность — удалён (дублировал «Что происходит» с колонкой «цель»)
+}
+
+// ====== РЕАЛИСТИЧНОСТЬ ============================================
+const REAL_BASE={own:95,ownNoisy:80,proxy:70,judgment:65,none:0}, REAL_K=1.5;
+const REAL_DRIVERS=[
+ {name:'Загрузка ТЦ',type:'proxy',cv:6.9,weight:2,data:'прокси (нет своего июля)',act:'уточнять прогнозом загрузки ТЦ',ref:'#/tc'},
+ {name:'Захват / конкуренция',type:'ownNoisy',cv:27.8,weight:3,data:'своё, шумное',act:'замер + драйвер, не уверенный план',ref:'#/tc'},
+ {name:'Частота (кратность)',type:'ownNoisy',cv:3.5,weight:1,data:'своё, занижено',act:'надёжно в тренде',ref:'#/r4'},
+ {name:'Чек/пополнение',type:'own',cv:1.0,weight:2,data:'своя история',act:'точно; двигать драйвером',ref:null},
+];
+const REAL_GAPS=[{name:'Глубина игры',need:'домен game_econ — игр/визит, цена игры, тикеты'},{name:'Канал сайт',need:'история сайта + UTM-теги (подключим позже)'}];
+function realismOf(d){return Math.round(Math.max(0,Math.min(99,REAL_BASE[d.type]-REAL_K*d.cv)));}
+function realCat(r){return r>=85?'высокая':r>=72?'хорошая':r>=55?'средняя':r>=35?'низкая':'нет основы';}
+function realismBand(){let W=0,WR=0,WC=0;REAL_DRIVERS.forEach(d=>{const r=realismOf(d);W+=d.weight;WR+=d.weight*r;WC+=d.weight*d.cv;});const overall=Math.round(WR/W);return {overall,cat:realCat(overall),band:WC/W/100};}
+// renderRealism() вынесена в planning-parked-realism-journal.html (см. BACKLOG-planning-ohta.md).
+// Модель realism (REAL_*, realismOf/realCat/realismBand) ниже оставлена как след — питала полосу риска прогноза на Плане (сейчас скрыта по Заданию-5).
+
+// ====== СПРАВОЧНИКИ ===============================================
+function renderRefs(){
+  // 1 · Трафик ТЦ: факт 2025 + факт 2026 (янв–июн) → экстраполяция июл–дек
+  const tf=document.getElementById('t-tc-foot');
+  tf.innerHTML='<tr><th>Месяц</th><th>Трафик 2025</th><th>Откл. от среднего</th><th>Трафик 2026</th><th>YoY</th><th>Уровень загрузки</th><th>Уровень захвата</th></tr>';
+  Object.keys(FOOT).forEach(m=>{const mm=m.slice(5),dev=FOOT[m]/FOOT_AVG-1,plan=MONTHS.includes('2026-'+mm),
+    f26=FOOT26['2026-'+mm],isFact=(f26!=null),v2026=isFact?f26:Math.round(FOOT[m]*(1+YOY_TC)),yoy=v2026/FOOT[m]-1;
+    tf.innerHTML+=`<tr${plan?' style="font-weight:600"':''}><td>${RU_M[mm]}</td><td>${nf(FOOT[m])}</td><td>${pct(dev)}</td><td>${nf(v2026)} ${isFact?'<span class="tag">факт</span>':'≈'}</td><td>${pct(yoy)}</td><td>${nearest(LV_VOL,footDev('2026-'+mm))}</td><td>${plan?capLvl('2026-'+mm):'—'}</td></tr>`;});
+  document.getElementById('tc-foot-note').innerHTML='<b>Трафик 2026 за янв–июн — ФАКТ</b> (отчёт «Посещаемость 2026», добивка №11); июл–дек — экстраполяция = трафик того же месяца 2025 × (1 + YoY). <b>YoY ≈ +2,1%</b> — теперь из факта 2026 (среднее год-к-году янв–июн), раньше держали 0. «Откл. от среднего» — сезонное чтение; «уровень загрузки» — относительно <b>базового окна '+BASE_WIN+'</b>, поэтому июнь/июль ≈ «средне». Пики: <b>авг +12%</b>, <b>дек +11%</b>; минимум <b>фев −14%</b>. Прогноз-модель по-прежнему на сезонности 2025 (перевод базы на 2026 — в перекате на июль, отдельное ТЗ). Жирным — месяцы планирования ('+mName(MONTHS[0]).slice(0,3).toLowerCase()+'–'+mName(MONTHS[MONTHS.length-1]).slice(0,3).toLowerCase()+').';
+  // 2 · Захват: конверсия ТЦ→парк (факт сен–дек 2025)
+  const tcv=document.getElementById('t-tc-conv');
+  tcv.innerHTML='<tr><th>Месяц 2025</th><th>Трафик ТЦ</th><th>Визиты парка</th><th>Конверсия</th><th>Кратность</th></tr>';
+  LOY.forEach(x=>{tcv.innerHTML+=`<tr><td>${RU_M[x.m.slice(5)]}</td><td>${nf(FOOT[x.m])}</td><td>${nf(x.vis)}</td><td>${x.conv.toFixed(3).replace('.',',')}%</td><td>${x.krat.toFixed(2).replace('.',',')}</td></tr>`;});
+  document.getElementById('tc-conv-factors').innerHTML='<table><tr><th>Фактор</th><th>Статус</th><th>Влияние на конверсию</th></tr>'+CONV_FACTORS.map(x=>`<tr><td>${x.f}</td><td>${x.st}</td><td>${x.eff}</td></tr>`).join('')+'</table>';
+  document.getElementById('tc-conv-note').innerHTML='Траектория: рост узнаваемости (сен→ноя 0,238→0,546%), слом под конкуренцией (дек 0,381%, −30%). Потолок <b>0,45–0,55%</b> достижим за 12–18 мес при маркетинге и позиционировании. <b>Визиты парка ≠ пополнения:</b> конверсия = визиты ÷ трафик ТЦ, а прогноз считает пополнения — прямой связки нет.';
+  // 3 · Конкуренты: помесячный профиль давления → уровень захвата
+  const cp=document.getElementById('tc-comp-profile');cp.innerHTML='';
+  MONTHS.forEach(m=>{const p=CAP_PROFILE[m]||{lvl:'средний',why:'—'};const v=valOf(LV_CAP,p.lvl);
+    const d=document.createElement('div');d.className='lvl';
+    d.innerHTML=`<div class="k">${RU_M[m.slice(5)]}</div><div class="v">${p.lvl} (${pct(v)})</div><div class="w">${p.why}</div>`;cp.appendChild(d);});
+  const tm=document.getElementById('t-tc-comp');
+  tm.innerHTML='<tr><th>#</th><th>Конкурент</th><th>Локация</th><th>Дист.</th><th>Пересеч. ЦА</th><th>Угроза</th><th>Риск</th></tr>'+
+    COMPETS.map(c=>{const dot=c.tier==='крит'?'<span class="dot bad"></span> ':'';const tn=c.tier==='крит'?'критич.':c.tier==='сред'?'средняя':'низкая';
+      return `<tr><td>${c.r}</td><td>${c.name}</td><td>${c.loc}</td><td>${c.dist}</td><td>${c.ov}%</td><td>${dot}${tn}</td><td>${c.risk}</td></tr>`;}).join('');
+  document.getElementById('tc-comp-dec').innerHTML=
+    `<p class="lead">Ноябрь 3 839 → декабрь 2 885 визитов = <b>−1 071 (−27%)</b> под конкуренцией, при росте трафика ТЦ +7,6%.</p>`+
+    `<table><tr><th>Источник потерь</th><th>% от потерь</th><th>% от базы трафика</th></tr>`+
+    DEC_LOSS.map(x=>`<tr><td>${x.src}</td><td>${x.loss}</td><td>${x.base}</td></tr>`).join('')+`</table>`;
+  document.getElementById('tc-comp-gap').innerHTML='<b>Дыра (нет данных):</b> помесячное перераспределение трафика между конкурентами количественно есть только за декабрь; июн–окт — фон (суждение, не замер). Связку «конкуренция → пополнения» напрямую не строим, пока нет коэффициента «визит↔пополнение».';
+  // Уровни-справочники
+  levelList(document.getElementById('lv-vol'),LV_VOL);
+  levelList(document.getElementById('lv-cap'),LV_CAP);
+  const tcs=document.getElementById('t-chkseason');
+  if(tcs){const byLvl={}; MONTHS.forEach(function(m){const l=CHK_DEFAULT[m]||'средне';(byLvl[l]=byLvl[l]||[]).push(RU_M[m.slice(5)].slice(0,3).toLowerCase());});
+    tcs.innerHTML='<tr><th>Уровень</th><th>Δ%</th><th>Чек/пополнение</th><th>Месяцы</th><th>Смысл</th></tr>'+
+      LV_CHK.map(function(o){const mo=byLvl[o.k]?byLvl[o.k].join(', '):'—';
+        return `<tr><td>${o.k}</td><td>${pct(o.v)}</td><td>${nf(BASE_CHK*(1+o.v))} ₽</td><td>${mo}</td><td>${o.w}</td></tr>`;}).join('');
+    document.getElementById('chkseason-note').innerHTML=`Базовый чек на год — <b>${nf(BASE_CHK)} ₽</b> (стабильное окно ${BASE_WIN}, как и базовая выручка). Сверху — сезонная поправка по столбцу «Месяцы»: летом (июл, авг) больше casual-игроков → чек ниже.`;}
+  // R4 · Система лояльности: помесячная таблица теперь в renderLoyalty() (LY_*); здесь — только справочник уровней
+  levelList(document.getElementById('lv-freq'),LV_FREQ);
+}
+
+// ====== ЖУРНАЛ ПЛАН/ФАКТ ==========================================
+// backtest()/renderJournal() вынесены в planning-parked-realism-journal.html (см. BACKLOG-planning-ohta.md). OHTA_SERIES перенесён в DATA BLOCK (мастер-синк) — нужен «Цели»/тренду «Результата».
+
+// ====== УРОВЕНЬ 2 (за цифрой) =====================================
+function l2Metrics(){
+  const c=computeRev(state.vol,state.cap,state.freq,state.trend,state.chk);
+  const rb=realismBand();
+  const fm=RU_M[state.month.slice(5)], pm=RU_M[PREV.m.slice(5)];
+  const pchk=PREV.tr/PREV.rc;
+  return {
+   revenue:{title:'Выручка · П1 · '+fm,
+    formula:`${nf(c.rc)} × ${nf(c.ck)} ₽ = ${nf(c.rev)} ₽`,
+    data:`<table><tr><th>Показатель</th><th>План ${fm}</th><th>Было (${pm})</th></tr><tr><td>Пополнения</td><td>${nf(c.rc)}</td><td>${nf(PREV.rc)}</td></tr><tr><td>Чек/пополнение</td><td>${nf(c.ck)} ₽</td><td>${nf(pchk)} ₽</td></tr><tr><td>Выручка</td><td>${nf(c.rev)} ₽</td><td>${nf(PREV.tr)} ₽</td></tr></table>`,
+    why:['Почему произведение? — Выручка = пополнения × чек.','Почему «П1»? — База, если драйверы роста не трогать.','Почему не управляем прямо? — Следствие двух ручек.','Почему диапазон? — Реалистичность '+rb.overall+'% → полоса ±'+Math.round(rb.band*100)+'%.','Почему месяц меняет? — Сезонность зашита в коэффициенты.'],
+    inputs:[{l:'Пополнения',h:'#/l2/receipts'},{l:'Чек/пополнение',h:'#/l2/check'}]},
+   receipts:{title:'Пополнения · П1 · '+fm,
+    formula:`${nf(BASE_RC)} × (1 + загрузка ${pct(valOf(LV_VOL,state.vol))} + захват ${pct(valOf(LV_CAP,state.cap))} + частота ${pct(valOf(LV_FREQ,state.freq))}) = ${nf(c.rc)}`,
+    data:`<table><tr><th>Коэффициент</th><th>Уровень</th><th>Вклад</th></tr><tr><td>Загрузка ТЦ</td><td>${state.vol}</td><td>${pct(valOf(LV_VOL,state.vol))}</td></tr><tr><td>Захват</td><td>${state.cap}</td><td>${pct(valOf(LV_CAP,state.cap))}</td></tr><tr><td>Частота</td><td>${state.freq}</td><td>${pct(valOf(LV_FREQ,state.freq))}</td></tr><tr><td><b>База (${BASE_WIN})</b></td><td colspan="2"><b>${nf(BASE_RC)} пополнений</b></td></tr></table>`,
+    why:['Почему 4 754 база? — Среднее пополнений '+BASE_WIN+' 2026.','Почему '+BASE_WIN+'? — Январь — праздничный всплеск.','Почему складываем? — Сумма влияний = направление.','Почему 3 фактора? — Поток (объём+захват) + частота.','Почему уровни из справочников? — Привязка к данным, не на глаз.'],
+    inputs:[{l:'ТЦ загрузка',h:'#/tc'},{l:'ТЦ захват',h:'#/tc'},{l:'R4 частота',h:'#/r4'}]},
+   check:{title:'Чек/пополнение · П1 · '+fm,
+    formula:`${nf(BASE_CHK)} × (1 + ${pct(c.cChk)}) = ${nf(c.ck)} ₽`,
+    data:`<table><tr><th>Элемент</th><th>Значение</th></tr><tr><td>База чека (${BASE_WIN})</td><td>${nf(BASE_CHK)} ₽</td></tr><tr><td>Сезонность чека</td><td>${state.chk} (${pct(c.cChk)})</td></tr><tr><td>Чек/пополнение П1</td><td>${nf(c.ck)} ₽</td></tr></table>`,
+    why:['Почему 1 091 ₽? — Выручка ÷ пополнения '+BASE_WIN+' 2026.','Почему не 1500? — Цель скриптов (драйвер роста), не база.','Почему сезонный сдвиг? — Структура игроков по месяцам разная.','Почему «суджение»? — Нет своей июльской истории чека Охты.','Почему отдельно от объёма? — Видеть, чем крыть спад.'],
+    inputs:[{l:'Сезонность чека (Пакеты)',h:'#/packages'}]},
+   base:{title:'База · '+BASE_WIN+' 2026',
+    formula:`пополнения = среднее пополнений = ${nf(BASE_RC)}; чек = Σвыручка ÷ Σпополнений = ${nf(BASE_CHK)} ₽`,
+    data:`<table><tr><th>Месяц</th><th>Выручка</th><th>Пополнения</th><th>Чек/пополнение</th></tr>`+BASE_ROWS.map(r=>`<tr><td>${RU_M[r.m.slice(5)]}</td><td>${nf(r.tr)}</td><td>${nf(r.rc)}</td><td>${nf(r.tr/r.rc)} ₽</td></tr>`).join('')+`</table>`,
+    why:['Почему '+BASE_WIN+'? — 4 свежих месяца стабильного режима.','Почему без января? — Праздничный всплеск (6,43 млн) завышает.','Почему среднее? — Сглаживает месячный шум.','Почему чек = Σ÷Σ? — Взвешено по объёму, не среднее средних.','Почему это «реальность»? — Только факт, без сезонных коэффициентов.'],
+    inputs:[{l:'Тренд · Пополнения',h:'#/r4',a:'ly-result'}]},
+   realism:{title:'Реалистичность · итог',
+    formula:`взвеш. по вкладу: итог ${rb.overall}% (${rb.cat}); полоса ±${Math.round(rb.band*100)}%`,
+    data:`<table><tr><th>Фактор</th><th>Реалистичн.</th><th>Вес</th></tr>`+REAL_DRIVERS.map(d=>`<tr><td>${d.name}</td><td>${realismOf(d)}%</td><td>${d.weight}</td></tr>`).join('')+`</table>`,
+    why:['Почему не «точность»? — Точность меряем по факту (журнал).','Почему base−1,5×волат.? — Чем шумнее, тем меньше веры.','Почему горлышко? — Слабый высоковесный фактор тащит итог.','Почему захват тащит? — 38% при весе 3.','Почему диапазон, не точка? — Не имитируем точность.'],
+    inputs:[{l:'Реалистичность (полная)',h:'#/realism'}]},
+  };
+}
+function renderL2(id){
+  const M=l2Metrics()[id], el=k=>document.getElementById(k);
+  if(!M){el('l2-title').textContent='Показатель не найден';['l2-formula','l2-data','l2-why','l2-inputs'].forEach(k=>el(k).innerHTML='');return;}
+  el('l2-title').textContent=M.title;
+  el('l2-formula').innerHTML=`<div class="why" style="margin:10px 0"><b>Формула</b><span class="f">${M.formula}</span></div>`;
+  el('l2-data').innerHTML=M.data;
+  el('l2-why').innerHTML='<ol style="margin:0;padding-left:18px">'+M.why.map(x=>`<li style="margin:3px 0">${x}</li>`).join('')+'</ol>';
+  el('l2-inputs').innerHTML=M.inputs.map(i=>`<a href="${i.h}"${i.a?` onclick="PENDING_ANCHOR='${i.a}'"`:''} style="margin-right:14px">${i.l} ↗</a>`).join('');
+}
+
+// ====== ОБЩИЙ РЕНДЕР + РОУТЕР =====================================
+function renderPackages(){
+  const fCA=PK_A.reduce((a,x)=>a+x.f,0), pCA=PK_A.reduce((a,x)=>a+x.pl,0);
+  const geFc=PK_A.filter(x=>x.n>=1500).reduce((a,x)=>a+x.f,0), gePc=PK_A.filter(x=>x.n>=1500).reduce((a,x)=>a+x.pl,0);
+  const geF=Math.round(geFc/fCA*100), geP=Math.round(gePc/pCA*100);
+  const TMAY=PREV.tr, TCHK=PREV.rc, TPLAN=PREV.tr+(PK_PREV-PK_FREV);
+  const perF=mName(LAST_FACT), perP=mName(PLAN_MONTH);
+  const pkPer=document.getElementById('pk-per'); if(pkPer)pkPer.textContent=`${perF} (факт) → ${perP} (план)`;
+  const deltas=PK_A.map(x=>Math.round(x.r*(x.pl-x.f)/x.f/1000));
+  const revEff=deltas.reduce((a,b)=>a+b,0);
+  const formula=deltas.map(m=>(m>=0?'+':'−')+Math.abs(m)).join(' ')+' тыс';
+  const head=document.getElementById('pk-head');head.innerHTML='';
+  head.appendChild(kpi('Управляемый чек (A)',nf(MANAGED_F)+' → '+nf(MANAGED_P)+' ₽ <span style="font-size:13px;color:var(--muted)">+'+Math.round((MANAGED_P/MANAGED_F-1)*100)+'%</span>','факт '+perF+' → план '+perP,null,true));
+  head.appendChild(kpi('Доля пакетов ≥1500 ₽ (A)',geF+'% → '+geP+'%','факт → план'));
+  head.appendChild(kpi('Выручка A · эффект','+'+revEff+'к ₽',formula));
+  // ── Чек/визит и оси чека: пересчёт из PREV/PARK/computeRev (единый источник, без дублей констант) ──
+  const _def=realityDefaults(PLAN_MONTH), _fc=computeRev(_def.vol,_def.cap,_def.freq,_def.trend,_def.chk);
+  const ckPopF=Math.round(PREV.tr/PREV.rc), ckPopN=Math.round(_fc.ck), ckPopP=Math.round(_fc.ck*(1+MIX_UPLIFT));
+  const ppvK=PARK.ppv, ppvKS=ppvK.toFixed(1).replace('.',','), visK=Math.round(PREV.rc/ppvK);
+  const cvF=Math.round(ckPopF*ppvK), cvN=Math.round(ckPopN*ppvK), cvP=Math.round(ckPopP*ppvK);
+  const dock01=Math.round(visK*0.1*PARK.dock/1e4)*10, dock02=dock01*2;
+  const GLOSS=[
+    ['Чек/пополнение','выручка ÷ все пополнения (общий)',`~${nf(ckPopF)} → ${nf(ckPopP)} ₽`,false],
+    ['Управляемый чек A','средний чек группы A (пакеты 500–3000)',`~${nf(MANAGED_F)} → ${nf(MANAGED_P)} ₽`,false],
+    ['Чек/визит','на игрока за визит = чек/пополнение × попол/визит',`~${nf(cvF)} → ${nf(cvP)} ₽`,true],
+    ['Чек/уник','на уникального игрока (ось удержания, справка)','~1 620 ₽',true],
+    ['Доля пакетов ≥1500','доля пополнений ≥1500 ₽ — размер пакета, НЕ чек',`${geF}% → ${geP}%`,false],
+  ];
+  document.getElementById('pk-glossary').innerHTML=
+    `<details class="card"><summary style="cursor:pointer;font-size:13px;color:var(--muted)"><b>Какой чек где</b> — пять разных метрик, не смешивать</summary>`+
+    `<table style="margin-top:8px"><tr><th>Метрика</th><th>Что это</th><th>Число</th></tr>`+
+    GLOSS.map(g=>`<tr><td><b>${g[0]}</b>${g[3]?' <span class="prov assume">допущение</span>':''}</td><td>${g[1]}</td><td>${g[2]}</td></tr>`).join('')+`</table></details>`;
+  document.getElementById('pk-chkvisit').innerHTML=
+    `<div class="big">`+
+      `<div class="kpi"><div class="t">факт ${perF}</div><div class="v">${nf(cvF)} ₽</div></div>`+
+      `<div class="kpi"><div class="t">прогноз ${perP}</div><div class="v">${nf(cvN)} ₽</div></div>`+
+      `<div class="kpi result"><div class="t">план ${perP}</div><div class="v">${nf(cvP)} ₽</div></div>`+
+    `</div>`+
+    `<p class="note">чек/визит = чек/пополнение × попол/визит (план ${nf(ckPopP)} × ${ppvKS} = ${nf(cvP)} ₽). Итог на игрока за визит — стратегическая цель <b>→ 1 500 ₽</b>. <span class="prov assume">визиты — допущение</span></p>`+
+    `<p class="note"><b>Это per-визит.</b> Доля пакетов ≥1500 ₽ (KPI выше) — per-пополнение, размер пакета. На игрока за визит ≠ на один платёж — не путать.</p>`;
+  const P3=[
+    {k:'Чек ÷ пополнение (модель)',o:'~1 090',p:'~680',m:'~960',a:false},
+    {k:'Пополнений ÷ визит',o:'~1,1',p:'~1,65',m:'~1,07',a:true},
+    {k:'Чек ÷ визит',o:'~1 200',p:'~1 120',m:'~1 075',a:false},
+    {k:'Чек ÷ уник. посетителя',o:'~1 620',p:'~1 300',m:'~1 450',a:true},
+  ];
+  const p3rows=P3.map(r=>`<tr><td>${r.k}${r.a?' <span class="prov assume">допущение</span>':''}</td><td>${r.o}</td><td>${r.p}</td><td>${r.m}</td></tr>`).join('');
+  document.getElementById('pk-axes').innerHTML=
+    `<div class="card"><p class="lead"><b>Две оси чека</b></p><p class="note">Выручку считаем на <b>пополнениях</b> (реальная единица), цель ставим на <b>визит</b>. На Охте попол/визит ≈ <b>${ppvKS}</b> (кладут один раз) — слабая ось и потенциально крупнейший рычаг (докидка), но с риском раскола платежа → <b>эксперимент</b>, не план. Визиты — допущение (нет счётчика).</p>`+
+    `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">Горизонт: докидка и сравнение парков</summary>`+
+      `<p class="note" style="margin-top:8px"><b>Сценарий докидки</b> (горизонт, не в плане): попол/визит Факт <b>${ppvKS}</b> · План ${perP} <b>${ppvKS}</b> <span style="color:var(--muted)">(держим)</span> · Горизонт <b>1,2</b> (+0,1) <span class="prov assume">допущение</span> → ≈ <b>+${dock01}к ₽/мес</b>. Чувствительность: +0,1 ≈ +${dock01}к, +0,2 ≈ +${dock02}к. <b>База докидки ~${nf(PARK.dock)} ₽</b>/топап (малый догруз, не второй полный пакет). Гипотеза, риск раскола платежа, <b>не в planRev</b>.</p>`+
+      `<table><tr><th>метрика</th><th>Охта</th><th>Питер</th><th>Mari</th></tr>${p3rows}</table>`+
+      `<p class="note">На <i>пополнение</i> Питер ниже (~680 vs ~1 090), на <i>визит</i> парки похожи (~1 100–1 200). Питер докидывает (~1,65), Охта кладёт один раз (~${ppvKS}). Не «у Питера маленький чек», а «дробит визит на два пополнения». <b>Поэтому считаем на визит.</b> Чек/уник — справочная ось удержания, не моделируется.</p>`+
+      `<p class="note">На Питере чек/пополнение (~680) и чек/визит (~1 120) расходятся: <b>доля пакетов ≥1500 (per-пополнение) ≠ чек/визит ≥1500 (per-визит)</b> — не смешивать.</p>`+
+    `</details></div>`;
+  document.getElementById('pk-checktrend').innerHTML=
+    buildTrend('chk')+
+    `<p class="note">«Чек/пополнение» здесь — общий (выручка ÷ все пополнения). Управляемый чек A (на него влияет микс ниже) выше чек/пополнения — мелочь ≤300 ₽ тянет вниз.</p>`;
+  // B/C — вне-A группы факт-месяца (добивка №6, фильтр >1%): 5000, ≤400, прочее. r по правилу «средняя тира из мая»
+  // (маппинг ≤300→≤400, нестанд+6000→прочее — допущение, до по-тирной выручки июня). План=факт: перераспределение только в A.
+  const GR=[
+    {k:'A',n:'500–3000',it:PK_A},
+    {k:'B',n:'5000',it:[{lbl:'5 000 ₽',n:5000,f:67,pl:67,r:335544,t:'tgt'}]},
+    {k:'C',n:'≤400 и прочее',it:[{lbl:'≤400 ₽',n:0,f:730,pl:730,r:107814,t:'push'},{lbl:'прочее',n:0,f:19,pl:19,r:39441,t:'mid'}]},
+  ];
+  const useRev=pkLens==='rev';
+  const VF=x=>useRev?x.r:x.f, VP=x=>useRev?Math.round(x.r*x.pl/x.f):x.pl;
+  const labAbs=v=>useRev?Math.round(v/1000)+'к':''+v;
+  const mD=x=>Math.round(x.r*(x.pl-x.f)/x.f);
+  const money=m=>Math.round(m/1000)===0?'—':(m>0?'+':'−')+Math.abs(Math.round(m/1000))+'к ₽';
+  const lensDelta=x=>{if(useRev)return money(mD(x));const dn=x.pl-x.f;return dn===0?'—':(dn>0?'+':'−')+Math.abs(dn)+' шт';};
+  const ar=(f,p,s)=>(f===p?f:f+'→'+p)+(s||'');
+  const seg=`<div class="seg"><button class="${!useRev?'on':''}" onclick="setPkLens('cnt')">Кол-во</button><button class="${useRev?'on':''}" onclick="setPkLens('rev')">Выручка</button></div>`;
+  const abc=document.getElementById('pk-abc');
+  const wasOpen=[...abc.querySelectorAll('details.block')].map(d=>d.open);
+  const aChF=Math.round(PK_FREV/fCA), aChP=Math.round(PK_PREV/pCA);
+  const aVbF=Math.round(PK_FREV/TMAY*100), aVbP=Math.round(PK_PREV/TPLAN*100);
+  const totMain=useRev
+    ? `чек ${nf(aChF)}→${nf(aChP)} ₽ · выр ${aVbF}→${aVbP}%`
+    : `пополнений ≥1500 <b>+${nf(gePc-geFc)}</b> (${nf(geFc)}→${nf(gePc)}) · выручка <b>+${revEff}к ₽</b>`;
+  abc.innerHTML=seg+GR.map(g=>{
+    const cF=g.it.reduce((a,x)=>a+x.f,0), cP=g.it.reduce((a,x)=>a+x.pl,0);
+    const rF=g.it.reduce((a,x)=>a+x.r,0), rP=g.it.reduce((a,x)=>a+x.r*x.pl/x.f,0);
+    const vbF=Math.round(rF/TMAY*100), vbP=Math.round(rP/TPLAN*100);
+    const chF=Math.round(rF/cF), chP=Math.round(rP/cP);
+    const fT=g.it.reduce((a,x)=>a+VF(x),0), pT=g.it.reduce((a,x)=>a+VP(x),0);
+    const mx=Math.max(...g.it.map(x=>Math.max(VF(x)/fT,VP(x)/pT)))*100;
+    return `<details class="block"><summary class="cmp" style="grid-template-columns:1fr auto"><div class="lab"><span class="pkbadge">${g.k}</span>${g.n}</div><div class="smet">чек ${ar(nf(chF),nf(chP),' ₽')} · выр ${ar(vbF,vbP,'%')}</div></summary>`+
+      `<div class="binner">`+
+      `<div class="prow phd"><div></div><div class="gmet">${vbF}% выр · ${Math.round(cF/TCHK*100)}% чек · ${nf(chF)} ₽</div><div class="gmet">${vbP}% выр · ${Math.round(cP/TCHK*100)}% чек · ${nf(chP)} ₽</div><div></div></div>`+
+      `<div class="prow phd"><div>Пакет</div><div>${perF} · факт</div><div>${perP} · план</div><div>Δ</div></div>`+
+      g.it.map(x=>{const sf=VF(x)/fT*100, sp=VP(x)/pT*100, d=Math.round(sp)-Math.round(sf), cls=x.t==='tgt'?'ok':x.t==='mid'?'neutral':'';
+        return `<div class="prow"><div class="pkp">${x.lbl}</div>`+
+        `<div class="pcell"><div class="pbar"><div class="pfillm ${cls}" style="width:${Math.round(sf/mx*100)}%"></div><span class="pin">${labAbs(VF(x))}</span></div><span class="ps">${Math.round(sf)}%</span></div>`+
+        `<div class="pcell"><div class="pbar"><div class="pfillm ${cls}" style="width:${Math.round(sp/mx*100)}%"></div><div class="pmark" style="left:${Math.round(sf/mx*100)}%"></div><span class="pin">${labAbs(VP(x))}</span></div><span class="ps">${Math.round(sp)}%</span></div>`+
+        `<div class="pchg"><span class="dbadge ${d>0?'up':''}">${d>0?'+'+d:d}% ${d>0?'↑':d<0?'↓':''}</span><span class="pmoney">${lensDelta(x)}</span></div></div>`;}).join('')+
+      `<p class="note" style="padding-left:8px">Бар — доля внутри группы, одна шкала ${perF}/${perP}, % в конце. В ${perP} риска = уровень ${perF}: заливка правее риски — рост, левее — падение. Бейдж — Δ доли, рядом — ${useRev?'вес в деньгах':'изменение в пополнениях'}.</p></div></details>`;}).join('')+
+    `<div class="pktotal"><b>Итого A:</b> ${totMain}<div style="font-size:12px;color:var(--muted);margin-top:4px">кол-во пополнений A держим (${nf(fCA)})</div></div>`;
+  [...abc.querySelectorAll('details.block')].forEach((d,i)=>{if(wasOpen[i])d.open=true;});
+  const _trTail=monthsRange(PLAN_MONTH,'2026-12').slice(0,4), _sm=m=>mName(m).slice(0,3).toLowerCase();
+  const TR=[{m:_sm(LAST_FACT),v:geF,c:'base'},{m:_sm(_trTail[0]),v:geP,c:'gp'},{m:_sm(_trTail[1]),v:null},{m:_sm(_trTail[2]),v:null},{m:_sm(_trTail[3]),v:null}];
+  document.getElementById('pk-trend').innerHTML=
+    `<div class="ll-bars">`+TR.map(t=>t.v==null?`<div class="llcol"><div class="ll-v">—</div><div class="llbar nd" style="height:100px"></div></div>`:`<div class="llcol"><div class="ll-v">${t.v}%</div><div class="llbar ${t.c}" style="height:${Math.round(t.v/50*100)}px"></div></div>`).join('')+`</div>`+
+    `<div class="blabs" style="gap:6px">`+TR.map(t=>`<div class="blab">${t.m}</div>`).join('')+`</div>`+
+    `<div class="ll-note">Факт ${perF} ${geF}% → план ${perP} ${geP}%. Дальше — нет данных: оживёт с помесячными выгрузками распределения из Sheets. Рост доли пакетов ≥1500 ₽ = KPI работы касс.</div>`;
+  const psK=PK_A.find(x=>x.n===1500), psT=PK_A.find(x=>x.n===1000);
+  const psShF=x=>Math.round(x.f/fCA*100), psShP=x=>Math.round(x.pl/pCA*100);
+  const psEf=x=>Math.round(x.r*(x.pl-x.f)/x.f/1000), psE=x=>(psEf(x)>=0?'+':'−')+Math.abs(psEf(x))+'к ₽';
+  document.getElementById('pk-script').innerHTML=
+    `<ul class="pkscript">`+
+    `<li><b>План ${perP}:</b> сдвиг в пользу 1500 ₽ — доля 1500 ${psShF(psK)}%→${psShP(psK)}% (${psE(psK)}), доля 1000 ${psShF(psT)}%→${psShP(psT)}% (${psE(psT)}); вместе с достройкой 2000/3000 итог <b>+${revEff}к ₽</b>.</li>`+
+    `<li><b>Кол-во пополнений не меняем</b> — план микса, не объёма; перераспределение нулевой суммы (Σ Δ=0).</li>`+
+    `<li><b>Эффект:</b> управляемый чек A ${nf(MANAGED_F)}→${nf(MANAGED_P)} ₽ (+${Math.round((MANAGED_P/MANAGED_F-1)*100)}%); доля пакетов ≥1500 ${geF}%→${geP}%; чек/пополнение и выручка — на «Плане».</li></ul>`;
+}
+function renderR5(){
+  const M=state.month, RM=RU_M[M.slice(5)];
+  const cor=computeRev(state.vol,state.cap,state.freq,state.trend,state.chk);
+  const fcRev=cor.rev, mixEff=cor.rc*cor.ck*MIX_UPLIFT, planRev=cor.rev+mixEff+LOY_BOOST; // скрипты + буст лояльности
+  const goalRev=adjGoalOf(M), baseGoal=goalOf(M), NEUTRAL=BASE_RC*BASE_CHK;
+  const d=realityDefaults(M), fNoCap=computeRev(d.vol,'средний',d.freq,d.trend,d.chk).rev;
+  const growth=baseGoal-NEUTRAL, season=-(fNoCap-NEUTRAL), comp=-(fcRev-fNoCap), catchup=goalRev-baseGoal;
+  const load=goalRev-fcRev, mix=planRev-fcRev, remain=goalRev-planRev; // load = growth+season+comp+catchup = mix+remain
+  const m1=v=>(v>=0?'+':'−')+(Math.abs(v)/1e6).toFixed(1).replace('.',',')+' млн';
+  const P=v=>load>0?Math.round(v/load*100):0;
+  const head=document.getElementById('r5-head');head.innerHTML='';
+  head.appendChild(kpi('Надо компенсировать · '+RM,mln(load),'разрыв прогноз → цель',null,true));
+  head.appendChild(kpi('Компенсируется',m1(mix),'контроль чека + контроль лояльности'));
+  head.appendChild(kpi('Остаётся драйверам',m1(remain),'разрыв план → цель'));
+  document.getElementById('r5-mon').textContent=RM+' 2026';
+  const gp=Math.round(GOAL_YOY*100);
+  const comps=[
+    {k:'Рост',full:'Рост (амбиция +'+gp+'%)',v:growth,c:'var(--muted)'},
+    {k:'Сезонность',full:'<a class="lk-dash" href="#/tc">Сезонность</a>',v:season,c:'var(--bar)'},
+    {k:'Конкуренция',full:'<a class="lk-dash" href="#/tc">Конкуренция за трафик</a>',v:comp,c:'var(--line)'},
+    {k:'Нагон',full:'Нагон хвоста (янв–май)',v:catchup,c:'var(--hint)'},
+  ];
+  const cbar=(v,c)=>`<div style="width:${(Math.max(0,v)/load*100).toFixed(1)}%;background:${c}"></div>`;
+  const crow=(nm,sub,v,c)=>`<div class="frow"><span class="fk"><i class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${c};margin-right:6px"></i>${nm} <span style="color:var(--hint);font-size:11px">${sub}</span></span><span class="fv"><b>${m1(v)}</b> (${P(v)}%)</span></div>`;
+  document.getElementById('r5-decomp').innerHTML=
+    `<div class="ll-h">Чем компенсируем разрыв</div>`+
+    `<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:4px">`+
+      cbar(mixEff,'var(--yellow)')+cbar(LOY_BOOST,'var(--yellow-2)')+cbar(remain,'var(--bar)')+
+    `</div>`+
+    `<div style="margin-top:8px">`+
+      crow('<a class="lk-dash" href="#/packages">Контроль чека</a>','чек/пополнение (Пакеты)',mixEff,'var(--yellow)')+
+      crow('<a class="lk-dash" href="#/r4">Контроль лояльности</a>','частота → пополнения (буст)',LOY_BOOST,'var(--yellow-2)')+
+      crow('Остаётся драйверам','ещё не закрыто · разрыв план → цель',remain,'var(--bar)')+
+    `</div>`+
+    `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px;color:var(--ink)"><b>Итого нагрузка ${m1(load)}</b></summary>`+
+    `<div class="note" style="margin-top:6px">`+
+    `Нагрузка = <b>цель − прогноз = ${mln(load)}</b>. Из чего состоит (причины разрыва): `+
+    comps.map(x=>`${x.k} ${m1(x.v)}${x.v<0?' (помогает)':''}`).join(' · ')+`.<br>`+
+    `Рост — амбиция +${gp}% над базой ${mln(NEUTRAL)}. Сезонность/конкуренция — коэффициенты ТЦ (минус = фактор помогает). Нагон хвоста — отставание янв–май, перераскинутое на ${RM}.<br>`+
+    `Компенсируем: скрипты ${m1(mixEff)} + лояльность ${m1(LOY_BOOST)} = ${m1(mix)}; остаётся <b>${m1(remain)}</b> (цель − план).`+
+    `</div></details>`;
+}
+function renderAll(){
+  renderPlanner(); renderGoalPage(); renderLoyalty(); renderPackages(); renderR5();
+}
+const PAGES=['planner','goal','packages','tc','r4','r5'];
+const ALLSECS=PAGES.concat(['l2']);
+let PENDING_ANCHOR=null; // якорь для скролла после смены страницы (ссылки «тренд → Результат»)
+function route(){
+  let raw=(location.hash||'').replace('#/','');
+  if(raw==='pops'){location.hash='#/r4';return;} // страница «Пополнения» поглощена «Лояльностью» (Задание-09)
+  let isL2=raw.indexOf('l2/')===0;
+  let h=isL2?'l2':raw;
+  if(!isL2 && !PAGES.includes(h)) h='planner';
+  ALLSECS.forEach(p=>{const el=document.getElementById('page-'+p);if(el)el.style.display=(p===h?'block':'none');});
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.p===h));
+  const an=document.querySelector('.navdrop');if(an){an.classList.toggle('active',['packages','r4','tc'].includes(h));an.classList.remove('open');}
+  if(isL2) renderL2(raw.slice(3));
+  if(PENDING_ANCHOR){const a=PENDING_ANCHOR;PENDING_ANCHOR=null;const el=document.getElementById(a);if(el&&el.scrollIntoView){el.scrollIntoView();return;}}
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',route);
+// меню «Аналитика»: закрытие по клику вне (открытие/тоггл — по клику на кнопку, stopPropagation выше)
+document.addEventListener('click',e=>{const nd=document.querySelector('.navdrop');if(nd&&nd.classList.contains('open')&&!nd.contains(e.target))nd.classList.remove('open');});
+// клик по бейджу-провенансу → скролл к инфо-подсказке (легенда бейджей) + подсветка
+document.addEventListener('click',e=>{const b=e.target.closest('.prov');if(!b)return;const sec=b.closest('section');let tip=sec&&sec.querySelector('.tip');if(!tip){const vis=[...document.querySelectorAll('section')].find(s=>s.style.display!=='none');tip=vis&&vis.querySelector('.tip');}if(tip){if(tip.scrollIntoView)tip.scrollIntoView({block:'center'});tip.classList.add('flash');setTimeout(()=>tip.classList.remove('flash'),1200);}});
+
+// ====== ИНИЦ ======================================================
+setMonthDefaults();renderAll();renderRefs();route();
+</script>
+</body>
+</html>
