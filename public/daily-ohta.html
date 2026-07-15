@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Контроль ежедневной выручки · Охта Молл</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --surface:#ffffff; --surface2:#f0f2f5; --surface3:#fafbfc;
+    --ink:#161a1f; --muted:#5b6470; --hint:#8a94a2; --line:#e4e8ee; --line2:#eef1f5;
+    --yellow:#e6a917; --yellow-bg:#fdf7e6;
+    --green:#2f9e64; --green-bg:#e8f5ee; --amber:#d9982a; --amber-bg:#fbf1dd;
+    --red:#d1495b; --red-bg:#fae7ea; --bar:#c7cfda; --track:#e9edf2;
+    --shadow:0 1px 2px rgba(20,25,35,.05),0 3px 10px rgba(20,25,35,.045);
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:0 0 64px}
+  .wrap{max-width:1060px;margin:0 auto;padding:22px 20px 0}
+  h1{font-size:23px;margin:0;letter-spacing:-.3px;font-weight:700}
+  .head-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .parkbadge{background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:3px 12px;border-radius:20px;letter-spacing:.2px}
+  .month{color:var(--muted);font-size:14px;text-transform:capitalize}
+  .upd{color:var(--hint);font-size:12px;margin-left:auto}
+  .prov{display:inline-block;font-size:11px;color:var(--hint);border:1px dashed var(--line);border-radius:5px;padding:0 6px;vertical-align:middle}
+  .prov.assume{color:var(--amber);border-color:#e7cf9a;background:var(--yellow-bg)}
+  .good{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)} .muted{color:var(--hint)}
+
+  /* календарь месяца — своя серая плашка с заголовком */
+  .calpanel{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:11px 15px;margin:16px 0 6px}
+  .calpanel .ttl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin:0 0 7px}
+  .calpills{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .pill{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:2px 11px;font-size:12px;color:var(--muted)}
+  .pill.hol{background:var(--red-bg);color:#a83545;border-color:#e9c6cd}
+  .pill.none{color:var(--hint)}
+
+  /* hero */
+  .hero{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin:14px 0 14px}
+  .hero-top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 30px}
+  .hero-col .lab{font-size:12px;color:var(--muted);margin-bottom:3px;letter-spacing:.2px}
+  .hero-target{font-size:38px;font-weight:750;letter-spacing:-1px;line-height:1}
+  .hero-fc{font-size:27px;font-weight:700;letter-spacing:-.5px;line-height:1.05}
+  .hero-dev{font-size:15px;font-weight:600;margin-left:6px}
+  .to-target{margin-left:auto;text-align:right;font-size:12px;color:var(--muted)}
+  .to-target .st{display:block;margin-bottom:3px}
+  .to-target b{font-size:20px;color:var(--ink);font-weight:700;display:block}
+  .hbar{position:relative;height:16px;background:var(--track);border-radius:8px;margin-top:16px;overflow:hidden}
+  .hbar>i{position:absolute;top:0;bottom:0;display:block}
+  .hbar .fact{left:0;background:var(--green);border-radius:8px 0 0 8px}
+  .hbar .proj{background:var(--bar)}
+  .hbar .tgt{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+  .hbar-leg{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .hbar-leg span{display:inline-flex;align-items:center;gap:5px}
+  .sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .sw.f{background:var(--green)} .sw.p{background:var(--bar)} .sw.g{background:var(--track);border:1px solid var(--line)}
+
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:0 0 16px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:13px 15px;box-shadow:var(--shadow)}
+  .kpi .lab{font-size:12px;color:var(--muted);margin-bottom:5px}
+  .kpi .val{font-size:23px;font-weight:700;letter-spacing:-.3px}
+  .kpi .note{font-size:11.5px;color:var(--hint);margin-top:4px;line-height:1.45}
+
+  /* главный рычаг (инсайт) */
+  .insight{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:10px;box-shadow:var(--shadow);padding:15px 18px;margin:14px 0 4px}
+  .insight .ins-h{font-size:16px;font-weight:750;color:var(--ink);margin:0 0 9px;letter-spacing:-.2px}
+  .insight p{margin:0 0 7px;font-size:13.5px;line-height:1.55;color:var(--muted)}
+  .insight p:last-child{margin-bottom:0}
+  .insight p b{color:var(--ink)}
+  .insight p b.bad{color:var(--red)} .insight p b.good{color:var(--green)}
+  .insight .ins-do{margin-top:9px;padding-top:9px;border-top:1px solid var(--line2)}
+
+  /* уточнить */
+  .todo{background:var(--yellow-bg);border:1px solid #ecd9a3;border-radius:10px;padding:12px 16px;margin:0 0 20px}
+  .todo h3{margin:0 0 7px;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;color:#9a7714}
+  .todo ul{margin:0;padding:0;list-style:none}
+  .todo li{font-size:13px;color:#6d5410;padding:3px 0 3px 22px;position:relative;line-height:1.5}
+  .todo li:before{content:"◻";position:absolute;left:2px;color:#b8912f}
+
+  h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:24px 0 11px;font-weight:700}
+
+  details.week{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin:0 0 10px;box-shadow:var(--shadow);overflow:hidden}
+  details.week[open]{border-color:#d7dde6}
+  summary.wk{list-style:none;cursor:pointer;padding:12px 16px;display:block}
+  summary.wk::-webkit-details-marker{display:none}
+  .wk-l1{display:flex;align-items:center;gap:10px}
+  .wk-name{font-weight:700;font-size:15px}
+  .wk-dates{color:var(--hint);font-size:12.5px;font-weight:500}
+  .wk-chev{margin-left:auto;color:var(--hint);transition:transform .15s}
+  details.week[open] .wk-chev{transform:rotate(180deg)}
+  .wk-l2{display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;font-size:12.5px}
+  .wk-l2 .s .k{color:var(--hint);font-size:11px;display:block;margin-bottom:1px;text-transform:uppercase;letter-spacing:.3px}
+  .wk-l2 .s b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  .wk-body{border-top:1px solid var(--line2)}
+  td,th{padding:7px 16px;text-align:right;font-size:13.5px;border-top:1px solid var(--line2)}
+  th{color:var(--hint);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-top:0;padding-top:9px;padding-bottom:5px}
+  td.day,th.day{text-align:left}
+  tr.wknd td{background:var(--surface3)}
+  tr.today td{background:var(--yellow-bg)}
+  .dow{color:var(--hint);font-size:12px;margin-left:5px}
+  .chk{color:var(--hint);font-size:11.5px;margin-left:6px}
+  .need{color:var(--muted);font-weight:600}
+  .tag{color:#a83545;font-size:11px;margin-left:4px}
+  .actbadge{display:inline-block;background:var(--ink);color:#fff;font-size:10.5px;font-weight:700;border-radius:5px;padding:0 5px;margin-left:5px;vertical-align:middle}
+  .prog{position:relative;height:8px;background:var(--track);border-radius:4px;min-width:70px;overflow:hidden}
+  .prog>i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;display:block}
+  .prog>.fa.good{background:var(--green)} .prog>.fa.warn{background:var(--amber)} .prog>.fa.bad{background:var(--red)}
+  .wk-foot{padding:9px 16px;font-size:12.5px;color:var(--muted);background:var(--surface3);border-top:1px solid var(--line2)}
+  .wk-foot b{color:var(--ink)}
+
+  .sumcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+  .sumrow{display:grid;grid-template-columns:130px 1fr 96px 82px;align-items:center;gap:14px;padding:10px 16px;border-top:1px solid var(--line2);font-size:13px}
+  .sumrow:first-child{border-top:0}
+  .sumrow .nm{font-weight:600}
+  .sumrow .nm small{display:block;color:var(--hint);font-weight:500;font-size:11px}
+  .sumbar{position:relative;height:12px;background:var(--track);border-radius:6px;overflow:hidden}
+  .sumbar>i{position:absolute;top:0;bottom:0;left:0;border-radius:6px}
+  .sumbar>.fa.good{background:var(--green)} .sumbar>.fa.warn{background:var(--amber)} .sumbar>.fa.bad{background:var(--red)} .sumbar>.fa.idle{background:var(--bar)}
+  .sumrow .amt{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .sumrow .amt b{color:var(--ink)}
+  .sumrow .dl{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .sumrow.total{background:var(--surface2);font-weight:700}
+  .dayblock{padding:13px 16px;border-top:1px solid var(--line2)}
+  .dbhead{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:9px}
+  .dbhead span{color:var(--hint);font-weight:500;text-transform:none;letter-spacing:0;margin-left:8px}
+  .dbbar{display:flex;height:16px;border-radius:8px;overflow:hidden;gap:2px;background:var(--track)}
+  .dbbar>i{display:block;height:100%;min-width:3px}
+  .dbbar>i.good{background:var(--green)} .dbbar>i.warn{background:var(--amber)} .dbbar>i.bad{background:var(--red)}
+  .dblegend{display:flex;gap:8px 22px;flex-wrap:wrap;margin-top:11px;font-size:13px}
+  .dblegend span{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
+  .dblegend span b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .dblegend span:before{content:"";width:11px;height:11px;border-radius:3px;display:inline-block}
+  .dblegend .good:before{background:var(--green)} .dblegend .warn:before{background:var(--amber)} .dblegend .bad:before{background:var(--red)}
+  details.sect{margin:0}
+  summary.sect-h{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;margin:24px 0 11px}
+  summary.sect-h::-webkit-details-marker{display:none}
+  summary.sect-h .chev{transition:transform .15s;color:var(--hint)}
+  details.sect[open] summary.sect-h .chev{transform:rotate(180deg)}
+  .nowrap{white-space:nowrap}
+
+  /* журнал прогноза */
+  .jcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+  .jrow{display:grid;grid-template-columns:92px 112px 118px 1fr 46px 116px;align-items:center;gap:12px;padding:8px 16px;border-top:1px solid var(--line2);font-size:13px}
+  .jrow:first-child{border-top:0}
+  .jrow .jd{font-weight:600}
+  .jrow .jz{color:var(--hint);font-size:12px}
+  .jrow .jf{font-weight:700;font-variant-numeric:tabular-nums}
+  .jrow .jp{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .jrow .ja{font-size:12px;text-align:right}
+
+  /* активности */
+  .actcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:6px 0}
+  .actrow{display:flex;align-items:center;gap:12px;padding:9px 16px;border-top:1px solid var(--line2);font-size:13px}
+  .actrow:first-child{border-top:0}
+  .actrow .code{background:var(--ink);color:#fff;font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;flex:none}
+  .actrow .an{flex:1}
+  .actrow .an small{color:var(--hint);display:block;font-size:11.5px}
+  .actrow .res{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;flex:none;min-width:90px}
+
+  .rules{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:12px 16px;font-size:12.5px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+  .rules b{color:var(--ink)}
+  .rules .r{display:inline-flex;align-items:center;gap:6px}
+  .rules .d{width:22px;height:8px;border-radius:4px;display:inline-block}
+  .rules .d.g{background:var(--green)} .rules .d.a{background:var(--amber)} .rules .d.r{background:var(--red)}
+
+  .coefwrap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:15px 16px;box-shadow:var(--shadow)}
+  .coefrow{display:grid;grid-template-columns:32px 1fr 52px 108px;align-items:center;gap:10px;padding:4px 0;font-size:13px}
+  .coefbar{height:9px;background:var(--track);border-radius:5px;position:relative}
+  .coefbar>i{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
+  .coefbar>i.data,.coefbar>i.oper{background:var(--bar)}
+  .coefbar>.mid{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--hint);opacity:.55}
+  .src.oper{color:var(--amber)} .src.data{color:var(--hint)} .src{font-size:11px}
+  .arith{background:var(--surface3);border:1px solid var(--line2);border-radius:8px;padding:10px 13px;margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .arith b{color:var(--ink)}
+  .legend{font-size:11.5px;color:var(--hint);margin:10px 0 0;line-height:1.5}
+  .foot{font-size:12px;color:var(--hint);margin:18px 2px 0;line-height:1.75}
+  .foot b{color:var(--muted)}
+  code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body data-palette="#2f9e64,#e6a917,#d1495b">
+<div class="wrap"><div id="app"><p class="muted">Загрузка…</p></div></div>
+
+<script>
+// ===== DATA BLOCK (генерируется tools/sync_daily.py из boom-cmd-daily.json — руками НЕ править) =====
+const DATA = {"park": "ohta", "park_name": "Охта Молл", "month": "2026-07", "month_target": 5200000, "days": [{"date": "2026-07-01", "dow": 3, "rev": 88190, "receipts": 110, "chk": 801.73, "topups": 89, "sessions": 81, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 62695, "cash": 25495, "status": "full", "outlier": false}, {"date": "2026-07-02", "dow": 4, "rev": 133634, "receipts": 171, "chk": 781.49, "topups": 124, "sessions": 122, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 103544, "cash": 30090, "status": "full", "outlier": false}, {"date": "2026-07-03", "dow": 5, "rev": 163444, "receipts": 171, "chk": 955.81, "topups": 137, "sessions": 126, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 130054, "cash": 33390, "status": "full", "outlier": false}, {"date": "2026-07-04", "dow": 6, "rev": 204848, "receipts": 249, "chk": 822.68, "topups": 183, "sessions": 173, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 179518, "cash": 25330, "status": "full", "outlier": false}, {"date": "2026-07-05", "dow": 7, "rev": 222362, "receipts": 278, "chk": 799.86, "topups": 215, "sessions": 204, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 182617, "cash": 39745, "status": "full", "outlier": false}, {"date": "2026-07-06", "dow": 1, "rev": 128400, "receipts": 150, "chk": 856.0, "topups": 116, "sessions": 108, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 93495, "cash": 34905, "status": "full", "outlier": false}, {"date": "2026-07-07", "dow": 2, "rev": 303806, "receipts": 320, "chk": 949.39, "topups": 247, "sessions": 237, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 254401, "cash": 49405, "status": "full", "outlier": true}, {"date": "2026-07-08", "dow": 3, "rev": 133020, "receipts": 175, "chk": 760.11, "topups": 132, "sessions": 128, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 112260, "cash": 20760, "status": "full", "outlier": false}, {"date": "2026-07-09", "dow": 4, "rev": 128080, "receipts": 150, "chk": 853.87, "topups": 110, "sessions": 108, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 99781, "cash": 28299, "status": "full", "outlier": false}, {"date": "2026-07-10", "dow": 5, "rev": 97027, "receipts": 109, "chk": 890.16, "topups": 86, "sessions": 77, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 76377, "cash": 20650, "status": "full", "outlier": false}, {"date": "2026-07-11", "dow": 6, "rev": 175921, "receipts": 169, "chk": 1040.95, "topups": 134, "sessions": 122, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 118195, "cash": 57726, "status": "full", "outlier": false}, {"date": "2026-07-12", "dow": 7, "rev": 178368, "receipts": 210, "chk": 849.37, "topups": 162, "sessions": 149, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 150620, "cash": 27748, "status": "full", "outlier": false}, {"date": "2026-07-13", "dow": 1, "rev": 7061, "receipts": 10, "chk": 706.1, "topups": 7, "sessions": 8, "new": null, "promo": null, "rev_y": null, "rev_vk": null, "cashless": 5031, "cash": 2030, "status": "partial", "outlier": false}], "dow_coef": [0.753, 1.214, 0.73, 0.864, 0.86, 1.257, 1.323], "dow_n": [1, 0, 2, 2, 2, 2, 2], "dow_src": ["операторы", "операторы", "данные", "данные", "данные", "данные", "данные"], "calib": {"clean_n": 11, "weeks_equiv": 1.6, "weekday_base": 123899, "tue_bonus": 60000, "mon_dip": 0.92, "wknd_mult": 1.7, "min_obs": 2, "outliers": ["2026-07-07"], "oper_days": ["Пн", "Вт"], "note": "откалибровано на 11 чистых днях. Пн, Вт — логика админов (мало данных), остальное из факта. Выброс из калибровки: 2026-07-07."}, "holidays": [], "activities": [{"code": "Г1", "name": "Активные продажи на кассе", "days": ["2026-07-13", "2026-07-14"]}], "journal": [{"date": "2026-07-01", "n": 1, "realized": 88190, "landing": 3679577, "landing_pct": 0.7076, "on_plan": 0.7076, "achievable": false}, {"date": "2026-07-02", "n": 2, "realized": 221824, "landing": 4238592, "landing_pct": 0.8151, "on_plan": 0.8151, "achievable": false}, {"date": "2026-07-03", "n": 3, "realized": 385268, "landing": 4781782, "landing_pct": 0.9196, "on_plan": 0.9196, "achievable": true}, {"date": "2026-07-04", "n": 4, "realized": 590116, "landing": 4843372, "landing_pct": 0.9314, "on_plan": 0.9314, "achievable": true}, {"date": "2026-07-05", "n": 5, "realized": 812478, "landing": 4915863, "landing_pct": 0.9454, "on_plan": 0.9454, "achievable": true}, {"date": "2026-07-06", "n": 6, "realized": 940878, "landing": 4952007, "landing_pct": 0.9523, "on_plan": 0.9523, "achievable": true}, {"date": "2026-07-07", "n": 7, "realized": 1244684, "landing": 5058435, "landing_pct": 0.9728, "on_plan": 1.0414, "achievable": true}, {"date": "2026-07-08", "n": 8, "realized": 1377704, "landing": 5122752, "landing_pct": 0.9851, "on_plan": 1.0438, "achievable": true}, {"date": "2026-07-09", "n": 9, "realized": 1505784, "landing": 5066121, "landing_pct": 0.9743, "on_plan": 1.0262, "achievable": true}, {"date": "2026-07-10", "n": 10, "realized": 1602811, "landing": 4913453, "landing_pct": 0.9449, "on_plan": 0.9929, "achievable": true}, {"date": "2026-07-11", "n": 11, "realized": 1778732, "landing": 4845050, "landing_pct": 0.9317, "on_plan": 0.9726, "achievable": true}, {"date": "2026-07-12", "n": 12, "realized": 1957100, "landing": 4771871, "landing_pct": 0.9177, "on_plan": 0.9525, "achievable": true}], "cross_check": "месяц открыт (строки в revenue.md нет) — сверка отложена", "day_factors": {}, "generated": "15.07.2026 16:51"};
+// ===== END DATA BLOCK =====
+
+const RU_M={"01":"январь","02":"февраль","03":"март","04":"апрель","05":"май","06":"июнь","07":"июль","08":"август","09":"сентябрь","10":"октябрь","11":"ноябрь","12":"декабрь"};
+const RU_MG={"07":"июля","01":"января","02":"февраля","03":"марта","04":"апреля","05":"мая","06":"июня","08":"августа","09":"сентября","10":"октября","11":"ноября","12":"декабря"};
+const DOW_RU=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+const nf=new Intl.NumberFormat("ru-RU");
+const mln=n=>(n/1e6).toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2})+" млн";
+const ths=n=>nf.format(Math.round(n/1000))+" тыс";
+const sths=n=>(n>=0?"+":"−")+nf.format(Math.round(Math.abs(n)/1000))+" тыс";
+const pct=x=>(x>=0?"+":"−")+Math.abs(x*100).toFixed(1)+"%";
+const pctA=x=>Math.round(x*100)+"%";
+const GOOD=1.0, OK=0.85;                       // правила цвета прогресса
+function sigClass(r){return r==null?"idle":r>=GOOD?"good":r>=OK?"warn":"bad";}
+
+function model(){
+  const [Y,M]=DATA.month.split("-").map(Number);
+  const DIM=new Date(Y,M,0).getDate();
+  const factors=DATA.day_factors||{}, hol=new Set(DATA.holidays||[]);
+  const actBy={}; (DATA.activities||[]).forEach(a=>a.days.forEach(dt=>{(actBy[dt]=actBy[dt]||[]).push(a.code);}));
+  const byDate={}; (DATA.days||[]).forEach(x=>byDate[x.date]=x);
+  const days=[];
+  for(let dd=1;dd<=DIM;dd++){
+    const dt=new Date(Y,M-1,dd), dow=(dt.getDay()+6)%7+1;
+    const iso=`${Y}-${String(M).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
+    const coef=DATA.dow_coef[dow-1]??1, fac=factors[iso]?.mult??1, f=byDate[iso]||null, full=!!(f&&f.status==="full");
+    days.push({dd,iso,dow,dowRu:DOW_RU[dow-1],weekend:dow>=6,holiday:hol.has(iso),acts:actBy[iso]||[],
+      coef,weight:coef*fac,fact:f?f.rev:null,chk:f?f.chk:null,status:f?f.status:null,outlier:!!(f&&f.outlier),full});
+  }
+  const T=DATA.month_target||0, sumW=days.reduce((a,x)=>a+x.weight,0);
+  days.forEach(x=>x.plan=T*x.weight/sumW);
+  const realized=days.filter(x=>x.full), realizedRev=realized.reduce((a,x)=>a+x.fact,0);
+  const pace=days.filter(x=>x.full&&!x.outlier);
+  const wPace=pace.reduce((a,x)=>a+x.weight,0), impliedBase=wPace>0?pace.reduce((a,x)=>a+x.fact,0)/wPace:0;
+  const remaining=days.filter(x=>!x.full), wRemain=remaining.reduce((a,x)=>a+x.weight,0);
+  const remainTarget=Math.max(T-realizedRev,0), adjBase=wRemain>0?remainTarget/wRemain:0;
+  days.forEach(x=>x.need=x.full?null:adjBase*x.weight);
+  const landing=realizedRev+remaining.reduce((a,x)=>a+impliedBase*x.weight,0);
+  const maxObsBase=pace.length?Math.max(...pace.map(x=>x.fact/x.weight)):0, achievable=adjBase<=maxObsBase*1.001;
+  const planRealized=realized.reduce((a,x)=>a+x.plan,0), onPlan=planRealized>0?realizedRev/planRealized:null;
+  const tailCum=planRealized-realizedRev;
+  const lastFactISO=realized.length?realized[realized.length-1].iso:null;
+  const futureDays=days.filter(x=>!x.full && (!lastFactISO || x.iso>lastFactISO));  // будущие незакрытые (прошлые пропуски НЕ считаем)
+  const currentPace=realized.length?realizedRev/realized.length:0;
+  const needPerDay=futureDays.length?remainTarget/futureDays.length:0;
+  const paceGap=currentPace?needPerDay/currentPace-1:0;
+  const weeks=[]; let cur=null;
+  days.forEach(x=>{ if(!cur||x.dow===1){cur={days:[]};weeks.push(cur);} cur.days.push(x); });
+  weeks.forEach((w,i)=>{ w.idx=i+1;
+    w.plan=w.days.reduce((a,x)=>a+x.plan,0);
+    w.factDays=w.days.filter(x=>x.full); w.fact=w.factDays.reduce((a,x)=>a+x.fact,0); w.hasFact=w.factDays.length>0;
+    w.partOfPlan=w.factDays.reduce((a,x)=>a+x.plan,0); w.delta=w.fact-w.partOfPlan;
+    w.leftDays=w.days.filter(x=>!x.full).length; w.need=w.days.filter(x=>!x.full).reduce((a,x)=>a+(x.need||0),0);
+  });
+  return {Y,M,DIM,days,weeks,T,realizedRev,remainTarget,remaining,landing,achievable,onPlan,tailCum,realized,
+    futureDays,currentPace,needPerDay,paceGap};
+}
+
+function render(){
+  const m=model(), d=DATA, cal=d.calib||{};
+  const lastFact=m.realized.length?m.realized[m.realized.length-1].iso:null;
+  const H=[];
+
+  H.push(`<h1>Контроль ежедневной выручки</h1>`);
+  H.push(`<div class="head-row"><span class="parkbadge">${d.park_name}</span>`+
+    `<span class="month">${RU_M[d.month.slice(5)]} ${d.month.slice(0,4)}</span>`+
+    `<span class="upd">обновлено ${d.generated}</span></div>`);
+
+  // ── ГЛАВНЫЙ РЫЧАГ (опережающий индикатор) — в самом верху ──
+  if(d.lead && m.currentPace>0){
+    const L=d.lead;
+    const arrow=L.prev_avg==null?"":(L.cur_avg<L.prev_avg?"↓ падает":L.cur_avg>L.prev_avg?"↑ растёт":"→ ровно");
+    const trend=L.prev_avg!=null?`${L.prev_label} ${L.prev_avg}/день → ${L.cur_label} ${L.cur_avg}/день`:`${L.cur_label} ${L.cur_avg}/день`;
+    const falling=L.prev_avg!=null && L.cur_avg<L.prev_avg;
+    H.push(`<div class="insight"><div class="ins-h">⚠ Главный рычаг цели — приток «${L.name}»</div>`+
+      `<p>Чтобы выйти на <b>${mln(m.T)}</b>, остаток месяца должен давать <b>${ths(m.needPerDay)}/день</b> против текущих <b>${ths(m.currentPace)}/день</b> — это <b class="bad">${pct(m.paceGap)}</b> к темпу, и стабильно до конца месяца. Сам собой такой рост не появится.</p>`+
+      `<p><b>${L.name[0].toUpperCase()+L.name.slice(1)}</b> — опережающий индикатор выручки (связь r=${L.corr}), и он <b class="${falling?'bad':'good'}">${arrow}</b>: ${trend}. ${falling?`Пока приток снижается — выручка на ${pct(m.paceGap)} сама не пойдёт.`:``} Прогноз приземления при текущем темпе — <b>${mln(m.landing)}</b>, а не цель.</p>`+
+      `<p class="ins-do"><b>Что нужно от команды:</b> развернуть приток новых гостей (маркетинг, узнаваемость, работа с трафиком ТЦ) и поднять средний чек. Это ключевой рычаг, чтобы закрыть разрыв до ${mln(m.T)}; без него цель — амбиция, а не план.</p></div>`);
+  }
+
+  // календарь — серая плашка с заголовком
+  const wknds=m.days.filter(x=>x.weekend).map(x=>x.dd), wp=[];
+  for(let i=0;i<wknds.length;i+=2) wp.push(wknds.slice(i,i+2).join("–"));
+  H.push(`<div class="calpanel"><div class="ttl">Календарь месяца</div><div class="calpills">`+
+    `<span class="pill">выходные: ${wp.join(", ")}</span>`+
+    (d.holidays&&d.holidays.length?`<span class="pill hol">праздники: ${d.holidays.map(h=>+h.slice(8)).join(", ")}</span>`
+      :`<span class="pill none">госпраздников нет</span>`)+
+    `<span class="pill none">СПб, офиц. производственный календарь 2026</span></div></div>`);
+
+  // hero
+  const landDev=m.T?m.landing/m.T-1:0, fcCls=sigClass(m.landing/m.T);
+  const factPct=Math.min(100,m.realizedRev/m.T*100), landPct=Math.min(100,m.landing/m.T*100);
+  const gap=Math.max(0,m.T-m.landing);
+  H.push(`<div class="hero"><div class="hero-top">`+
+    `<div class="hero-col"><div class="lab">Цель на ${RU_M[d.month.slice(5)]} ${d.month.slice(0,4)}</div><div class="hero-target">${mln(m.T)}</div></div>`+
+    `<div class="hero-col"><div class="lab">Прогноз выручки <span class="hint">при текущем темпе</span></div>`+
+      `<div class="hero-fc ${fcCls}">${mln(m.landing)}<span class="hero-dev">${pct(landDev)}</span></div></div>`+
+    `<div class="to-target"><span class="st ${m.achievable?'good':'bad'}">${m.achievable?"цель достижима":"⚠ без вмешательства не выйдем"}</span>`+
+      `<b>${mln(m.remainTarget)}</b><span>осталось заработать</span></div>`+
+    `</div>`+
+    `<div class="hbar"><i class="fact" style="width:${factPct}%"></i>`+
+      `<i class="proj" style="left:${factPct}%;width:${Math.max(0,landPct-factPct)}%"></i>`+
+      `<i class="tgt" style="left:100%"></i></div>`+
+    `<div class="hbar-leg"><span><i class="sw f"></i>заработано ${mln(m.realizedRev)}</span>`+
+      `<span><i class="sw p"></i>прогноз добавит ${mln(Math.max(0,m.landing-m.realizedRev))}</span>`+
+      `<span><i class="sw g"></i>по прогнозу не хватит ${mln(gap)}</span></div></div>`);
+
+  // KPI
+  const onP=m.onPlan, remDays=m.remaining.length, spread=remDays?Math.abs(m.tailCum)/remDays:0;
+  H.push(`<div class="kpis">`);
+  H.push(kpi("Заработано",mln(m.realizedRev),`${pctA(m.realizedRev/m.T)} цели — ${m.realized.length} дн из ${m.DIM}`));
+  H.push(kpi("Идём к плану",onP==null?"—":pctA(onP),
+    onP==null?"нет факта":(onP>=1?"опережаем план по прошедшим дням":"отстаём по прошедшим дням"),
+    onP==null?"":sigClass(onP)));
+  H.push(kpi("Хвост накоплен",sths(-m.tailCum),
+    m.tailCum>0?`чтобы закрыть — по +${ths(spread)} к плану каждого из ${remDays} оставшихся дней`
+      :`идём с запасом — остаток можно вести спокойнее (≈ −${ths(spread)}/день)`,
+    m.tailCum>0?"bad":"good"));
+  if(m.futureDays.length&&m.needPerDay>0)
+    H.push(kpi("Нужный темп на остаток",`${ths(m.needPerDay)}/день`,
+      `текущий ~${ths(m.currentPace)}/день · нужен ${pct(m.paceGap)} (${m.futureDays.length} дн вперёд)`,
+      m.paceGap>0.05?"bad":m.paceGap>0.001?"warn":"good"));
+  H.push(`</div>`);
+
+  // уточнить
+  const outl=(cal.outliers||[]).map(x=>x.slice(8)+"."+x.slice(5,7)).join(", ");
+  const todos=[`<li><b>Историческая дневная выгрузка</b> — чем больше месяцев, тем точнее коэффициенты дней недели (снимет «допущение»).</li>`];
+  if(outl) todos.push(`<li><b>Событие ${outl}?</b> Аномалия ×~2 к будням исключена из калибровки — подтвердить у админов, была ли акция/событие.</li>`);
+  if(d.park==="iyun"){
+    todos.push(`<li><b>Парк открыт 17.06 (&lt;1 мес)</b> — выручка на launch-рампе (растёт), коэффициенты дней недели ПРЕДВАРИТЕЛЬНЫЕ; калибровка на июнь+июль.</li>`);
+    todos.push(`<li><b>Дневные «чеки» и «сессии»</b> — в отчётах нет → нет среднего чека и попол/сессию по дням. Запросить у администратора.</li>`);
+  } else if(d.park==="piterland") todos.push(`<li><b>Питер: дневные «Кол-во чеков»</b> — сейчас средний чек по дням недоступен (N/A).</li>`);
+  else todos.push(`<li><b>Даты акций/событий месяца</b> — отмечаются в блоке «Активности» (см. ниже), учитываются вручную.</li>`);
+  todos.push(`<li><b>Праздники/акции следующих месяцев</b> — добавить в календарь при перекате.</li>`);
+  H.push(`<div class="todo"><h3>Что загрузить / уточнить (чтобы точность росла)</h3><ul>${todos.join("")}</ul></div>`);
+
+  // недели
+  H.push(`<h2>По неделям</h2>`);
+  m.weeks.forEach(w=>{
+    const r=w.partOfPlan>0?w.fact/w.partOfPlan:null;
+    const from=w.days[0].dd, to=w.days[w.days.length-1].dd, mg=RU_MG[d.month.slice(5)];
+    const open=w.days.some(x=>x.status!=null);
+    H.push(`<details class="week"${open?" open":""}><summary class="wk">`+
+      `<div class="wk-l1"><span class="wk-name">Неделя ${w.idx}</span><span class="wk-dates">${from}–${to} ${mg}</span>`+
+        `<span class="wk-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></span></div>`+
+      `<div class="wk-l2"><span class="s"><span class="k">план</span><b>${mln(w.plan)}</b></span>`+
+        (w.hasFact?`<span class="s"><span class="k">факт</span><b>${mln(w.fact)}</b></span>`
+                  :`<span class="s"><span class="k">надо (с хвостом)</span><b>${mln(w.need)}</b></span>`)+
+        (w.hasFact?`<span class="s"><span class="k">отклонение (по пришедшим)</span><b class="${w.delta>=0?'good':'bad'}">${sths(w.delta)}</b></span>`:``)+
+      `</div></summary>`);
+    H.push(`<div class="wk-body"><table><thead><tr><th class="day">день</th><th>план</th><th>факт</th><th>надо</th><th style="width:120px">прогресс</th></tr></thead><tbody>`);
+    w.days.forEach(x=>{
+      const cls=[x.weekend?"wknd":"",x.iso===lastFact?"today":""].filter(Boolean).join(" ");
+      const rD=x.full?x.fact/x.plan:null, sc=sigClass(rD);
+      const chk=x.chk?`<span class="chk">чек ${nf.format(Math.round(x.chk))}</span>`:"";
+      const badges=x.acts.map(c=>`<span class="actbadge">${c}</span>`).join("");
+      let factCell,needCell,progCell;
+      if(x.full){factCell=`${ths(x.fact)}${chk}`+(x.outlier?` <span class="prov">событие</span>`:"");needCell=`<span class="muted">—</span>`;
+        const fw=Math.min(100,x.fact/x.plan*100);
+        progCell=`<div class="prog"><i class="fa ${sc}" style="width:${fw}%"></i></div>`;}
+      else if(x.status==="partial"){factCell=`${ths(x.fact)} <span class="prov">неполный</span>`;needCell=`<span class="need">${ths(x.need)}</span>`;progCell=`<span class="muted">—</span>`;}
+      else{factCell=`<span class="muted">—</span>`;needCell=`<span class="need">${ths(x.need)}</span>`;progCell=`<span class="muted">—</span>`;}
+      H.push(`<tr class="${cls}"><td class="day">${x.dd} <span class="dow">${x.dowRu}</span>`+
+        (x.holiday?`<span class="tag">празд.</span>`:"")+badges+`</td>`+
+        `<td>${ths(x.plan)}</td><td>${factCell}</td><td>${needCell}</td><td>${progCell}</td></tr>`);
+    });
+    H.push(`</tbody></table>`);
+    if(w.leftDays>0 && w.hasFact)
+      H.push(`<div class="wk-foot">Осталось в неделе ${w.leftDays} дн — «надо» с учётом хвоста: <b>${mln(w.need)}</b> (недобор прошедших дней добавлен к плану будущих).</div>`);
+    H.push(`</details>`);
+  });
+
+  // сводка
+  H.push(`<h2>Сводка по неделям</h2><div class="sumcard">`);
+  m.weeks.forEach(w=>{
+    const r=w.partOfPlan>0?w.fact/w.partOfPlan:null, sc=sigClass(r);
+    const faW=w.hasFact?Math.min(100,w.fact/w.plan*100):0;
+    const from=w.days[0].dd,to=w.days[w.days.length-1].dd,mg=RU_MG[d.month.slice(5)];
+    H.push(`<div class="sumrow"><div class="nm">Неделя ${w.idx}<small>${from}–${to} ${mg}</small></div>`+
+      `<div class="sumbar"><i class="fa ${sc}" style="width:${faW}%"></i></div>`+
+      `<div class="amt">${w.hasFact?`<b>${mln(w.fact)}</b>`:`<span class="muted">ждём</span>`}<br><span style="font-size:11px">план ${mln(w.plan)}</span></div>`+
+      `<div class="dl ${w.hasFact?(w.delta>=0?'good':'bad'):'muted'}">${w.hasFact?sths(w.delta):"—"}</div></div>`);
+  });
+  const ld=m.landing/m.T-1, ldc=sigClass(m.landing/m.T);
+  H.push(`<div class="sumrow total"><div class="nm">Месяц</div>`+
+    `<div class="sumbar"><i class="fa ${ldc}" style="width:${Math.min(100,m.landing/m.T*100)}%"></i></div>`+
+    `<div class="amt"><b>прогноз ${mln(m.landing)}</b><br><span style="font-size:11px">цель ${mln(m.T)}</span></div>`+
+    `<div class="dl ${ldc}">${pct(ld)}</div></div>`);
+  // распределение фактических дней — ВНУТРИ Сводки
+  const fd=m.days.filter(x=>x.full);
+  if(fd.length){
+    const g=fd.filter(x=>x.fact/x.plan>=GOOD).length;
+    const yl=fd.filter(x=>{const r=x.fact/x.plan;return r>=OK&&r<GOOD;}).length;
+    const rd=fd.filter(x=>x.fact/x.plan<OK).length;
+    const P=k=>Math.round(k/fd.length*100);
+    H.push(`<div class="dayblock"><div class="dbhead">Дни по плану<span>факт — ${fd.length} дн</span></div>`+
+      `<div class="dbbar">${g?`<i class="good" style="width:${P(g)}%"></i>`:''}${yl?`<i class="warn" style="width:${P(yl)}%"></i>`:''}${rd?`<i class="bad" style="width:${P(rd)}%"></i>`:''}</div>`+
+      `<div class="dblegend"><span class="good"><b>${g}</b> выше плана · ${P(g)}%</span>`+
+      `<span class="warn"><b>${yl}</b> близко 85–99% · ${P(yl)}%</span>`+
+      `<span class="bad"><b>${rd}</b> ниже 85% · ${P(rd)}%</span></div></div>`);
+  }
+  H.push(`</div>`);   // /sumcard
+
+  // журнал прогноза (раскрывающийся, по умолчанию открыт)
+  if((d.journal||[]).length){
+    H.push(`<details class="sect" open><summary class="sect-h">Журнал прогноза <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary><div class="jcard">`);
+    let prev=null;
+    d.journal.forEach(s=>{
+      const cls=sigClass(s.landing_pct);
+      const arrow=prev==null?"":(s.landing>prev+5000?`<span class="good">▲</span>`:(s.landing<prev-5000?`<span class="bad">▼</span>`:`<span class="muted">→</span>`));
+      H.push(`<div class="jrow"><div class="jd">${+s.date.slice(8)} ${RU_MG[d.month.slice(5)]}</div>`+
+        `<div class="jz">зараб. ${mln(s.realized)}</div>`+
+        `<div class="jf">${mln(s.landing)} ${arrow}</div>`+
+        `<div class="sumbar"><i class="fa ${cls}" style="width:${Math.min(100,s.landing_pct*100)}%"></i></div>`+
+        `<div class="jp ${cls}">${Math.round(s.landing_pct*100)}%</div>`+
+        `<div class="ja">${s.achievable?`<span class="good">✓ достижима</span>`:`<span class="bad">⚠ риск</span>`}</div></div>`);
+      prev=s.landing;
+    });
+    H.push(`</div><p class="legend">Прогноз выручки на конец каждого дня (коэффициенты фиксированы — видно, как факт двигал прогноз и оценку достижимости). ▲/▼ — сдвиг ко вчерашнему.</p></details>`);
+  }
+
+  // метрики по дням (раскрывающийся, свёрнут) — колонки адаптивные под парк
+  const md=m.days.filter(x=>x.status), dmap={}; (DATA.days||[]).forEach(z=>dmap[z.date]=z);
+  const MET=[
+    {k:'chk', h:'ср. чек',       f:z=>z.chk?nf.format(Math.round(z.chk)):null},
+    {k:'sessions', h:'сессии',   f:z=>z.sessions!=null?nf.format(z.sessions):null},
+    {k:'topups', h:'пополнения', f:z=>z.topups!=null?nf.format(z.topups):null},
+    {k:'pps', h:'попол/сессию',  f:z=>(z.topups!=null&&z.sessions)?(z.topups/z.sessions).toFixed(2):null},
+    {k:'new', h:'новые гости',   f:z=>z.new!=null?nf.format(z.new):null},
+    {k:'promo', h:'акция 300₽',  f:z=>z.promo!=null?nf.format(z.promo):null},
+    {k:'reviews', h:'отзывы',    f:z=>(z.rev_y!=null||z.rev_vk!=null)?`${(z.rev_y||0)+(z.rev_vk||0)}`:null},
+  ].filter(c=>md.some(x=>c.f(dmap[x.iso]||{})!=null));
+  const head=`<th class="day">день</th><th>выручка</th>`+MET.map(c=>`<th class="nowrap">${c.h}</th>`).join("")+`<th class="nowrap">нал / безнал</th>`;
+  H.push(`<details class="sect"><summary class="sect-h">Метрики по дням <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary><div class="sumcard"><table><thead><tr>${head}</tr></thead><tbody>`);
+  md.forEach(x=>{
+    const z=dmap[x.iso]||{};
+    const tot=(z.cash||0)+(z.cashless||0);
+    const cc=tot?`${Math.round(z.cash/tot*100)} / ${Math.round(z.cashless/tot*100)}%`:`<span class="muted">—</span>`;
+    const cells=MET.map(c=>{const v=c.f(z);return `<td>${v!=null?v:'<span class="muted">—</span>'}</td>`;}).join("");
+    H.push(`<tr class="${x.weekend?'wknd':''}"><td class="day nowrap">${x.dd} <span class="dow">${x.dowRu}</span>${x.status==='partial'?' <span class="prov">неполн.</span>':''}</td><td>${ths(x.fact)}</td>${cells}<td class="nowrap">${cc}</td></tr>`);
+  });
+  const leg = MET.some(c=>c.k==='pps') ? `<b>Попол/сессию</b> — пополнений на кассовую сессию с пополнением (≈ попол/визит, канон ~1,1). Ср.чек = выручка ÷ все чеки.`
+    : MET.some(c=>c.k==='new') ? `<b>Новые гости</b> — новые посетители за день (лидирующая метрика для растущего парка). <b>Акция 300₽</b> — участники «подписка+репост». Чеки/сессии/ср.чек — нет в отчётах (в долге).`
+    : `Ср.чек, сессии, пополнения — N/A (нет дневной выгрузки, в долге; запросим у админа).`;
+  H.push(`</tbody></table></div><p class="legend">${leg}</p></details>`);
+
+  // правила цвета прогресса
+  H.push(`<h2>Прогресс дня</h2><div class="rules">`+
+    `<span class="r"><i class="d g"></i>план выполнен — ≥100%</span>`+
+    `<span class="r"><i class="d a"></i>близко — 85–99%</span>`+
+    `<span class="r"><i class="d r"></i>недобор — ниже 85%</span></div>`);
+
+  // активности / гипотезы
+  if((d.activities||[]).length){
+    H.push(`<h2>Активности и гипотезы</h2><div class="actcard">`);
+    d.activities.forEach(a=>{
+      const dd=a.days.map(iso=>m.days.find(x=>x.iso===iso)).filter(Boolean);
+      const full=dd.filter(x=>x.full);
+      let res,rc="muted";
+      if(!full.length) res= dd.some(x=>x.status==="partial")?"идёт (ждём полный факт)":"впереди";
+      else{const rr=full.reduce((a,x)=>a+x.fact,0)/full.reduce((a,x)=>a+x.plan,0);
+        res=`${pct(rr-1)} к плану`; rc=rr>=GOOD?"good":rr>=OK?"warn":"bad";}
+      const dl=a.days.map(iso=>+iso.slice(8)).join(", ");
+      H.push(`<div class="actrow"><span class="code">${a.code}</span>`+
+        `<div class="an">${a.name}<small>дни: ${dl} ${RU_MG[d.month.slice(5)]}</small></div>`+
+        `<div class="res ${rc}">${res}</div></div>`);
+    });
+    H.push(`</div><p class="legend">Бейдж активности стоит у дней, когда она работала; здесь — её результат к плану по этим дням.</p>`);
+  }
+
+  // коэффициенты
+  H.push(`<h2>Коэффициенты дней недели <span class="prov assume">${cal.clean_n} дн · уточнятся с историей</span></h2><div class="coefwrap">`);
+  const maxc=Math.max(...d.dow_coef.map(c=>c||0),1.3), midpos=1/maxc*100;
+  DOW_RU.forEach((dn,i)=>{const c=d.dow_coef[i],src=d.dow_src[i],n=d.dow_n[i],w=c?c/maxc*100:0;
+    H.push(`<div class="coefrow"><span>${dn}</span>`+
+      `<div class="coefbar"><i class="${src==='данные'?'data':'oper'}" style="width:${w}%"></i><span class="mid" style="left:${midpos}%"></span></div>`+
+      `<span style="text-align:right;font-variant-numeric:tabular-nums">${c?c.toFixed(2):"—"}</span>`+
+      `<span class="src ${src==='данные'?'data':'oper'}">${src==='данные'?`факт (n=${n})`:`админы (n=${n})`}</span></div>`);});
+  const wb=cal.weekday_base||0, od=cal.oper_days||[];
+  let arith=`<b>Как получены:</b> будни Ср/Чт/Пт — среднее по факту, база ≈ <b>${ths(wb)}</b>/день. Выходные Сб/Вс — по факту (коэф ${d.dow_coef[5]} и ${d.dow_coef[6]}). `;
+  if(od.includes("Вт")) arith+=`<b>Вторник</b> = будни + надбавка ${ths(cal.tue_bonus)} (админы, мало данных) → ${d.dow_coef[1]}. `;
+  if(od.includes("Пн")) arith+=`<b>Понедельник</b> = будни ×${cal.mon_dip} (админы) → ${d.dow_coef[0]}. `;
+  if(!od.length) arith+=`Остальные дни — тоже из факта (данных достаточно). `;
+  if((cal.outliers||[]).length) arith+=`Событие ${(cal.outliers||[]).map(x=>x.slice(8)+"."+x.slice(5,7)).join(", ")} исключено из калибровки (в факте осталось). `;
+  arith+=`При &lt;${cal.min_obs} наблюдений по дню — временно логика админов, дальше факт.`;
+  H.push(`<div class="arith">${arith}</div>`);
+  H.push(`<p class="legend">Полоса — величина коэффициента (риска — уровень «1.00», средний день). Источник справа: <b>факт</b> или <b>логика админов</b> (пока мало данных).</p></div>`);
+
+  H.push(`<p class="foot">`+
+    `<b>План дня</b> = цель × коэффициент дня недели, сумма всех дней = ${mln(m.T)} (не «цель ÷ ${m.DIM}»).<br>`+
+    `<b>«Надо»</b> — сколько нужно в будущий день, чтобы выйти на цель: недобор прошедших дней перераспределён по остатку (форма недели сохранена). «Надо − план» = добавленный хвост.<br>`+
+    `<b>Прогноз выручки</b> — куда придём при текущем темпе (событие из темпа исключено). Достижимость — если для цели нужны дни выше лучшего обычного.</p>`);
+
+  document.getElementById("app").innerHTML=H.join("");
+}
+function kpi(l,v,n,cls){return `<div class="kpi"><div class="lab">${l}</div><div class="val ${cls||""}">${v}</div>${n?`<div class="note">${n}</div>`:""}</div>`;}
+try{render();}catch(e){document.getElementById("app").innerHTML=`<p class="muted">Ошибка: ${e.message}</p>`;console.error(e);}
+</script>
+</body>
+</html>
