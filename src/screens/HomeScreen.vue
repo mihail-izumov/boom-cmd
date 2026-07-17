@@ -19,10 +19,11 @@ function goMaterials() { setActive('materials') }
 </script>
 
 <template>
-  <section class="flex flex-col gap-2 px-3 pb-6 pt-1">
-    <!-- бейдж под заголовком «Мастерплан»: имя приложения + компания -->
-    <div class="mb-1 flex justify-center">
-      <span class="rounded-full bg-[var(--surface-2)] px-3 py-1 text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+  <section class="flex flex-col gap-2 px-3 pb-6 pt-0">
+    <!-- подзаголовок под «Мастерплан»: имя приложения + компания-владелец данных.
+         Прижат к заголовку (отрицательный верхний отступ), отделён от «Контроль дня» снизу. -->
+    <div class="-mt-2 mb-3 flex justify-center">
+      <span class="rounded-full bg-[var(--surface-2)] px-3.5 py-1 text-[0.9375rem] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         БУМБАСТИК
       </span>
     </div>
