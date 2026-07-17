@@ -223,18 +223,24 @@ export function computeNetwork(setsByKey, parkIds) {
       park: pid, parkName: s.park_name, month: s.month,
       target: m.T, earned: m.realizedRev, landing: m.landing,
       landDev: m.landDev, fcSig: m.fcSig, achievable: m.achievable,
-      onPlan: m.onPlan, assume,
+      onPlan: m.onPlan, tailCum: m.tailCum, assume,
     })
   }
   const totTarget = sum(cards, (c) => c.target)
   const totEarned = sum(cards, (c) => c.earned)
   const totLanding = sum(cards, (c) => c.landing)
+  const opv = cards.map((c) => c.onPlan).filter((v) => v != null && Number.isFinite(v))
+  const onPlanAvg = opv.length ? opv.reduce((a, b) => a + b, 0) / opv.length : null
+  const tailCumSum = sum(cards, (c) => c.tailCum || 0)
+  const months = cards.map((c) => c.month).filter(Boolean).sort()
   return {
     cards,
     totals: {
       target: totTarget, earned: totEarned, landing: totLanding,
       landDev: totTarget ? totLanding / totTarget - 1 : 0,
       fcSig: sigClass(totTarget ? totLanding / totTarget : null),
+      onPlanAvg, tailCumSum,
+      month: months.length ? months[months.length - 1] : null,
       anyAssume: cards.some((c) => c.assume),
     },
   }

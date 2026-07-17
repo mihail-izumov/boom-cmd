@@ -10,13 +10,11 @@ import { useNavCaption } from '../composables/useNavCaption.js'
 //   - sticky compact-bar сверху: back / leading-action слева, центрированный
 //     компактный заголовок по полной ширине бара (absolute-позиционирование),
 //     компактная пилюля парк-фильтра справа.
-//   - в потоке скролла: крупный центрированный заголовок;
+//   - в потоке скролла: eyebrow-бейдж (опц.) + крупный центрированный заголовок;
 //   - в потоке скролла: большая пилюля по центру под заголовком (если parkFilter).
 //
-// Компактный заголовок ВЫНЕСЕН в absolute-слой по `inset-x-0`, поэтому его
-// центр совпадает с центром бара независимо от ширины back/leading и пилюли.
-// Симметричный `px-[10rem]` защищает от наезда на левую/правую кнопки; при
-// overflow заголовок `truncate`. (`fix(header)`.)
+// `eyebrow` — короткий бейдж НАД крупным заголовком (на Главной — «БУМБАСТИК»,
+// графитовая заливка --graphite). Рендерится только когда задан.
 //
 // `leadingAction` — конфигурируемая кнопка слева вместо back-кнопки, когда
 // `showBack=false`. Сейчас единственный вариант — 'hardReload' на Главной.
@@ -28,6 +26,7 @@ defineProps({
   showBack: { type: Boolean, default: false },
   backLabel: { type: String, default: '' },
   leadingAction: { type: String, default: null }, // null | 'hardReload'
+  eyebrow: { type: String, default: null },
 })
 defineEmits(['back'])
 
@@ -43,8 +42,6 @@ function closePicker() {
 
 // Жёсткая перезагрузка: чистим кэши SW, разрегистрируем service worker и
 // перезагружаем страницу. После reload main.js снова зарегистрирует sw.js.
-// Полезно во время разработки, чтобы видеть каждую правку без ручного
-// «очистить кэш».
 async function hardReload() {
   try {
     if (typeof window !== 'undefined' && 'caches' in window) {
@@ -56,7 +53,6 @@ async function hardReload() {
       await Promise.all(regs.map((r) => r.unregister()))
     }
   } catch (e) {
-    // Не блокируем reload, даже если очистка частично не удалась.
     console.warn('hard reload cleanup failed', e)
   } finally {
     if (typeof window !== 'undefined') window.location.reload()
@@ -105,8 +101,7 @@ async function hardReload() {
         <ParkFilterPill v-if="parkFilter" :compact="true" @open="openPicker" />
       </div>
 
-      <!-- Компактный заголовок: absolute по центру всего бара,
-           симметричный px-[10rem] защищает от наезда на back/leading и пилюлю. -->
+      <!-- Компактный заголовок: absolute по центру всего бара. -->
       <div
         class="pointer-events-none absolute inset-0 flex h-11 items-center justify-center px-[10rem] transition-opacity duration-200"
         :class="collapsed ? 'opacity-100' : 'opacity-0'"
@@ -117,14 +112,16 @@ async function hardReload() {
   </header>
 
   <!-- Крупный центрированный заголовок — в потоке скролла.
-       caption ('данные от …') позиционируется absolute НАД заголовком,
-       чтобы не сдвигать h1 вниз: позиция заголовка одинакова на всех
-       разделах, с подписью и без (ревизия 12.06.2026). -->
+       eyebrow (опц., напр. «БУМБАСТИК») — графитовый бейдж НАД заголовком.
+       caption ('данные от …') — absolute НАД заголовком, не сдвигает h1. -->
   <div class="relative px-4 pb-3 pt-2 text-center">
     <p
       v-if="caption"
       class="pointer-events-none absolute inset-x-0 -top-2 text-[0.75rem] leading-none text-[var(--text-muted)]"
     >{{ caption }}</p>
+    <div v-if="eyebrow" class="mb-1.5 flex justify-center">
+      <span class="rounded-full bg-[var(--graphite)] py-1 pl-4 pr-3 text-[0.75rem] font-medium uppercase tracking-[0.32em] text-[var(--ink-on-color)]">{{ eyebrow }}</span>
+    </div>
     <h1 class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
       {{ title }}
     </h1>

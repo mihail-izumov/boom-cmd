@@ -65,11 +65,10 @@ watch(
         :back-label="current.backLabel || ''"
         :park-filter="!!current.parkFilter"
         :leading-action="current.leadingAction || null"
+        :eyebrow="current.eyebrow || null"
         @back="emit('back')"
       />
-      <!-- keep-alive: экраны не размонтируются при переключении вкладок —
-           содержимое и загруженные данные сохраняются, без повторной загрузки.
-           При ре-логине AppShell пересоздаётся → кэш сбрасывается → свежая загрузка. -->
+      <!-- keep-alive: экраны не размонтируются при переключении вкладок. -->
       <keep-alive>
         <component :is="current.screen" />
       </keep-alive>
