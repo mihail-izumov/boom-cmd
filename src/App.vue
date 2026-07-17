@@ -20,7 +20,7 @@ import { useAccessKey } from './composables/useAccessKey.js'
 const tabs = [
   // title Home — «БУМБАСТИК» (ревизия 12.06.2026): бренд в шапке,
   // label вкладки в таб-баре остаётся «Главная».
-  { id: 'home',      label: 'Главная',   title: 'БУМБАСТИК', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
+  { id: 'home',      label: 'Главная',   title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload' },
   { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
   { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },

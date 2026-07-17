@@ -22,11 +22,8 @@ function goMaterials() { setActive('materials') }
 
 <template>
   <section class="flex flex-col gap-2 px-3 pb-6 pt-2">
-    <!-- оперативная точка входа: под-страница «Контроль дня» -->
-    <SectionBanner title="Контроль дня" :icon="Gauge" @select="goDaily" />
-
-    <!-- разделитель: под-страница отделена от баннеров-зеркал вкладок -->
-    <div class="my-1 h-px bg-[var(--line)]" aria-hidden="true" />
+    <!-- оперативная точка входа: под-страница «Контроль дня» (жёлтая акцент-карта) -->
+    <SectionBanner title="Контроль дня" :icon="Gauge" accent @select="goDaily" />
 
     <SectionBanner title="Аналитика" :icon="ChartColumnBig" @select="goAnalytics" />
     <SectionBanner title="Проекты"   :icon="Layers"         @select="goProjects" />

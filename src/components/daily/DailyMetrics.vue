@@ -29,8 +29,8 @@ const legend = computed(() => {
       {{ L.metrics }}
       <ChevronDown class="h-4 w-4 transition-transform group-open:rotate-180" :stroke-width="2.5" />
     </summary>
-    <div class="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
-      <table class="w-full border-collapse text-[0.8125rem] [font-variant-numeric:tabular-nums]">
+    <div class="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]" style="-webkit-overflow-scrolling: touch">
+      <table class="w-full min-w-max border-collapse text-[0.8125rem] [font-variant-numeric:tabular-nums]">
         <thead>
           <tr class="text-[0.6875rem] uppercase tracking-wide text-[var(--text-muted)]">
             <th class="whitespace-nowrap px-3 py-2 text-left font-semibold">день</th>

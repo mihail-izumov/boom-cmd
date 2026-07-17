@@ -1,17 +1,22 @@
 <script setup>
+import { ChevronRight } from 'lucide-vue-next'
 import { mln, pctSigned, L, SIG_VAR } from '../../i18n/daily.js'
 import { PARKS_BY_ID } from '../../data/parks.js'
+import { useParkContext } from '../../composables/useParkContext.js'
 
-// «Вся сеть»: мини-карта по каждому парку (цель/факт/прогноз/достижимость) + сетевые суммы.
-// Цели/факты суммируются; прогноз = Σ по-парковых (каждый со своим coef). Незрелые coef — чип «допущение».
+// «Вся сеть»: сетевые суммы + мини-карта по каждому парку. v1.1 — карты парков
+// кликабельны: тап → setPark(c.park) переключает глобальный парк-контекст, страница
+// перерисовывается в полный дашборд парка. Возврат — через пилюлю парка сверху.
+// Карта сетевых сумм НЕ кликабельна.
 const props = defineProps({ net: { type: Object, required: true } })
+const { setPark } = useParkContext()
 const nameOf = (c) => PARKS_BY_ID[c.park]?.name || c.parkName || c.park
 const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
 </script>
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- сетевые суммы -->
+    <!-- сетевые суммы (не кликабельны) -->
     <div class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
       <div class="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div>
@@ -34,8 +39,14 @@ const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
       <p v-if="net.totals.anyAssume" class="mt-3 text-[0.6875rem] text-[var(--text-muted)]">Часть парков — на предварительных коэффициентах ({{ L.assume }}); прогноз ориентировочный.</p>
     </div>
 
-    <!-- по паркам -->
-    <div v-for="c in net.cards" :key="c.park" class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
+    <!-- по паркам — кликабельные карты (тап → детали парка) -->
+    <button
+      v-for="c in net.cards"
+      :key="c.park"
+      type="button"
+      class="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left transition-colors active:bg-[var(--surface-2)]"
+      @click="setPark(c.park)"
+    >
       <div class="mb-2 flex items-center gap-2">
         <span class="font-semibold text-[var(--text)]">{{ nameOf(c) }}</span>
         <span v-if="c.assume" class="rounded border border-dashed border-[var(--warning)] px-1.5 py-0.5 text-[0.625rem] text-[var(--text-muted)]">{{ L.assume }}</span>
@@ -43,6 +54,7 @@ const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
           <i class="inline-block h-2 w-2 rounded-full" :style="{ background: c.achievable ? 'var(--positive)' : 'var(--negative)' }" />
           {{ c.achievable ? L.achievable : L.not_achievable }}
         </span>
+        <ChevronRight class="h-5 w-5 shrink-0 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
       </div>
       <div class="relative mb-2 h-3 overflow-hidden rounded-full bg-[var(--surface-2)]">
         <i class="absolute bottom-0 left-0 top-0 rounded-full" :style="{ width: pctW(c) + '%', background: SIG_VAR[c.fcSig] }" />
@@ -52,6 +64,6 @@ const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
         <span>заработано <b class="font-semibold text-[var(--text)]">{{ mln(c.earned) }}</b></span>
         <span>прогноз <b class="font-semibold text-[var(--text)]">{{ mln(c.landing) }}</b> <span class="text-[var(--text-secondary)]">{{ pctSigned(c.landDev) }}</span></span>
       </div>
-    </div>
+    </button>
   </div>
 </template>

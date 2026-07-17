@@ -17,7 +17,9 @@ const note = computed(() => props.m.calib?.note || '')
       <span v-if="cleanN" class="rounded border border-dashed border-[var(--warning)] px-1.5 py-0.5 text-[0.625rem] font-normal normal-case tracking-normal text-[var(--text-muted)]">{{ cleanN }} дн · уточнятся с историей</span>
     </h2>
     <div class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
-      <div v-for="(r, i) in m.coefRows" :key="i" class="grid items-center gap-3 py-1 text-[0.8125rem]" style="grid-template-columns: 28px 1fr 44px 96px">
+      <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch">
+        <div class="min-w-[340px]">
+      <div v-for="(r, i) in m.coefRows" :key="i" class="grid items-center gap-3 py-1 text-[0.8125rem]" style="grid-template-columns: 28px 1fr 44px 150px">
         <span class="text-[var(--text)]">{{ r.dowRu }}</span>
         <div class="relative h-2.5 rounded-full bg-[var(--surface-2)]">
           <i class="absolute bottom-0 left-0 top-0 rounded-full" :style="{ width: (r.coef ? (r.coef / m.maxCoef) * 100 : 0) + '%', background: 'var(--text-muted)', opacity: 0.4 }" />
@@ -28,6 +30,8 @@ const note = computed(() => props.m.calib?.note || '')
           {{ r.src === 'данные' ? `факт (n=${r.n})` : `админы (n=${r.n})` }}
           <span v-if="r.assume" class="rounded border border-dashed border-[var(--warning)] px-1 text-[0.625rem] text-[var(--text-muted)]">{{ L.assume }}</span>
         </span>
+      </div>
+        </div>
       </div>
       <p v-if="note" class="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-[0.75rem] leading-relaxed text-[var(--text-muted)]">{{ note }}</p>
     </div>

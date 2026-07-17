@@ -32,7 +32,8 @@ const monthGen = (dd) => dayGen(dd, props.m.month)
       </summary>
 
       <div class="border-t border-[var(--line)]">
-        <table class="w-full border-collapse text-[0.8125rem] [font-variant-numeric:tabular-nums]">
+        <div class="overflow-x-auto" style="-webkit-overflow-scrolling: touch">
+        <table class="w-full min-w-[460px] border-collapse text-[0.8125rem] [font-variant-numeric:tabular-nums]">
           <thead>
             <tr class="text-[0.6875rem] uppercase tracking-wide text-[var(--text-muted)]">
               <th class="px-3 py-2 text-left font-semibold">день</th>
@@ -67,6 +68,7 @@ const monthGen = (dd) => dayGen(dd, props.m.month)
             </tr>
           </tbody>
         </table>
+        </div>
         <div v-if="w.leftDays > 0 && w.hasFact" class="border-t border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-[0.75rem] text-[var(--text-muted)]">
           Осталось в неделе {{ w.leftDays }} дн — «надо» с хвостом: <b class="font-semibold text-[var(--text)]">{{ mln(w.need) }}</b>.
         </div>
