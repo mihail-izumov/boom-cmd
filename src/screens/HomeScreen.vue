@@ -6,13 +6,11 @@ import { setActive, setSubView } from '../composables/useAppNav.js'
 
 // Home — командная дека (TZ-3.1 §1, ревизия 12.06.2026):
 // 3 крупных баннера-кнопки (порядок как в таб-баре, без Главной): Аналитика,
-// Проекты, Материалы. Иконки — те же, что в таб-баре, крупные и монохромные.
-// Ниже — баннер-ссылка на сайт b00m.fun (жёлтая заливка --accent + --accent-ink,
-// бренд-акцент по DESIGN-STANDARD; новое окно).
+// Проекты, Материалы. Ниже — баннер-ссылка на сайт b00m.fun (жёлтая заливка).
 //
-// СВЕРХУ — оперативная точка входа «Контроль дня» (под-страница, не вкладка):
-// визуально отделена тонким разделителем от трёх баннеров-зеркал вкладок.
-// Тап → setSubView('daily') (открывает под-страницу над Главной, back → Главная).
+// СВЕРХУ — оперативная точка входа «Контроль дня» (под-страница, не вкладка),
+// тёмная акцент-карта (variant primary) → setSubView('daily'), back → Главная.
+// Под заголовком «Мастерплан» — бейдж «БУМБАСТИК» (имя приложения + компания-владелец данных).
 
 function goDaily()     { setSubView('daily') }
 function goAnalytics() { setActive('analytics') }
@@ -21,9 +19,16 @@ function goMaterials() { setActive('materials') }
 </script>
 
 <template>
-  <section class="flex flex-col gap-2 px-3 pb-6 pt-2">
-    <!-- оперативная точка входа: под-страница «Контроль дня» (жёлтая акцент-карта) -->
-    <SectionBanner title="Контроль дня" :icon="Gauge" accent @select="goDaily" />
+  <section class="flex flex-col gap-2 px-3 pb-6 pt-1">
+    <!-- бейдж под заголовком «Мастерплан»: имя приложения + компания -->
+    <div class="mb-1 flex justify-center">
+      <span class="rounded-full bg-[var(--surface-2)] px-3 py-1 text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+        БУМБАСТИК
+      </span>
+    </div>
+
+    <!-- оперативная точка входа: под-страница «Контроль дня» (тёмная акцент-карта) -->
+    <SectionBanner title="Контроль дня" :icon="Gauge" variant="primary" @select="goDaily" />
 
     <SectionBanner title="Аналитика" :icon="ChartColumnBig" @select="goAnalytics" />
     <SectionBanner title="Проекты"   :icon="Layers"         @select="goProjects" />

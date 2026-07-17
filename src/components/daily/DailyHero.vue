@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { mln, pctSigned, L, SIG_VAR } from '../../i18n/daily.js'
 
 // Hero: цель · прогноз выручки (+отклонение) · достижимость · осталось заработать.
+// v1.1: устойчивая сетка (цель во всю ширину, ниже 2 колонки: прогноз | достижимость),
+// без flex-wrap+ml-auto — блоки не разъезжаются на узком экране.
 // Текст монохромный; сигнал — цветная точка + заливка полосы (DESIGN-STANDARD).
 const props = defineProps({ m: { type: Object, required: true } })
 const fcColor = computed(() => SIG_VAR[props.m.fcSig] || 'var(--line)')
@@ -10,26 +12,29 @@ const fcColor = computed(() => SIG_VAR[props.m.fcSig] || 'var(--line)')
 
 <template>
   <div class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
-    <div class="flex flex-wrap items-end gap-x-8 gap-y-3">
-      <div>
-        <div class="text-[0.75rem] text-[var(--text-muted)]">{{ L.target }}</div>
-        <div class="text-[2rem] font-bold leading-none tracking-tight text-[var(--text)]">{{ mln(m.T) }}</div>
-      </div>
-      <div>
-        <div class="text-[0.75rem] text-[var(--text-muted)]">{{ L.forecast }} · {{ L.forecast_hint }}</div>
-        <div class="flex items-center gap-2">
+    <!-- цель месяца — во всю ширину -->
+    <div>
+      <div class="text-[0.75rem] text-[var(--text-muted)]">{{ L.target }}</div>
+      <div class="text-[2rem] font-bold leading-none tracking-tight text-[var(--text)]">{{ mln(m.T) }}</div>
+    </div>
+
+    <!-- прогноз (слева) · достижимость + остаток (справа) -->
+    <div class="mt-3 grid grid-cols-2 items-start gap-4">
+      <div class="min-w-0">
+        <div class="text-[0.75rem] leading-snug text-[var(--text-muted)]">{{ L.forecast }} · {{ L.forecast_hint }}</div>
+        <div class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: fcColor }" />
-          <span class="text-[1.5rem] font-bold leading-none tracking-tight text-[var(--text)]">{{ mln(m.landing) }}</span>
-          <span class="text-[0.9375rem] font-semibold text-[var(--text-secondary)]">{{ pctSigned(m.landDev) }}</span>
+          <span class="text-[1.375rem] font-bold leading-none tracking-tight text-[var(--text)]">{{ mln(m.landing) }}</span>
+          <span class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ pctSigned(m.landDev) }}</span>
         </div>
       </div>
-      <div class="ml-auto text-right">
-        <div class="mb-1 flex items-center justify-end gap-1.5 text-[0.75rem] text-[var(--text-muted)]">
-          <span class="inline-block h-2 w-2 rounded-full" :style="{ background: m.achievable ? 'var(--positive)' : 'var(--negative)' }" />
+      <div class="min-w-0 text-right">
+        <div class="flex items-center justify-end gap-1.5 text-[0.75rem] leading-snug text-[var(--text-muted)]">
+          <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: m.achievable ? 'var(--positive)' : 'var(--negative)' }" />
           {{ m.achievable ? L.achievable : L.not_achievable }}
         </div>
-        <div class="text-[1.25rem] font-bold text-[var(--text)]">{{ mln(m.remainTarget) }}</div>
-        <div class="text-[0.75rem] text-[var(--text-muted)]">{{ L.to_earn }}</div>
+        <div class="mt-1 text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ mln(m.remainTarget) }}</div>
+        <div class="mt-0.5 text-[0.75rem] text-[var(--text-muted)]">{{ L.to_earn }}</div>
       </div>
     </div>
 
