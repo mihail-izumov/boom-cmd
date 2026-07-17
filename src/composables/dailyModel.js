@@ -213,6 +213,7 @@ export function computeNetwork(setsByKey, parkIds) {
     if (!byPark[p] || String(s.month) > String(byPark[p].month)) byPark[p] = s
   })
   const cards = []
+  let dLanding = 0, nLanding = 0, dOnPlan = 0, nOnPlan = 0
   for (const pid of parkIds) {
     const s = byPark[pid]
     if (!s) continue
@@ -225,6 +226,13 @@ export function computeNetwork(setsByKey, parkIds) {
       landDev: m.landDev, fcSig: m.fcSig, achievable: m.achievable,
       onPlan: m.onPlan, tailCum: m.tailCum, assume,
     })
+    // моментум «как в журнале»: последний шаг journal по каждому парку (сетевой ряд A)
+    const j = m.journal || []
+    if (j.length >= 2) {
+      const a = j[j.length - 1], b = j[j.length - 2]
+      if (a.landing != null && b.landing != null) { dLanding += a.landing - b.landing; nLanding++ }
+      if (a.onPlan != null && b.onPlan != null) { dOnPlan += a.onPlan - b.onPlan; nOnPlan++ }
+    }
   }
   const totTarget = sum(cards, (c) => c.target)
   const totEarned = sum(cards, (c) => c.earned)
@@ -233,6 +241,11 @@ export function computeNetwork(setsByKey, parkIds) {
   const onPlanAvg = opv.length ? opv.reduce((a, b) => a + b, 0) / opv.length : null
   const tailCumSum = sum(cards, (c) => c.tailCum || 0)
   const months = cards.map((c) => c.month).filter(Boolean).sort()
+  // моментум прогноза (landing) и исполнения (onPlan) — стрелки как в журнале
+  const LTHR = 5000 * (nLanding || 1)
+  const trendForecast = nLanding === 0 ? null : (dLanding > LTHR ? 'up' : dLanding < -LTHR ? 'down' : 'flat')
+  const meanDOnPlan = nOnPlan ? dOnPlan / nOnPlan : null
+  const trendPlanFact = meanDOnPlan == null ? null : (meanDOnPlan > 0.003 ? 'up' : meanDOnPlan < -0.003 ? 'down' : 'flat')
   return {
     cards,
     totals: {
@@ -240,6 +253,7 @@ export function computeNetwork(setsByKey, parkIds) {
       landDev: totTarget ? totLanding / totTarget - 1 : 0,
       fcSig: sigClass(totTarget ? totLanding / totTarget : null),
       onPlanAvg, tailCumSum,
+      trendForecast, trendPlanFact,
       month: months.length ? months[months.length - 1] : null,
       anyAssume: cards.some((c) => c.assume),
     },

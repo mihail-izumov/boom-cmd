@@ -11,6 +11,11 @@ export function mlnNum(n) {
   if (n == null || !Number.isFinite(Number(n))) return DASH
   return (Number(n) / 1e6).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
+// ₽-млн со знаком рубля слитно (для мелкой подписи): «₽5,4 млн».
+export function mlnRub(n) {
+  if (n == null || !Number.isFinite(Number(n))) return DASH
+  return `₽${(Number(n) / 1e6).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${NBSP}млн`
+}
 // Накопленный хвост со знаком: −₽ 0,2 млн (минус = опережение), +₽ 0,3 млн (недобор).
 export function mlnSigned(n) {
   if (n == null || !Number.isFinite(Number(n))) return DASH

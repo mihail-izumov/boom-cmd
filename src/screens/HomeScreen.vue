@@ -7,7 +7,7 @@ import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnNum, mlnSigned, pctDelta, pctWhole, monthCap, L } from '../i18n/home.js'
+import { mlnRub, mlnSigned, pctDelta, pctWhole, monthCap, L } from '../i18n/home.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
 // серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
@@ -34,16 +34,11 @@ const parkNames = computed(() =>
 const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : ''))
 
 const planFact = computed(() => (ready.value ? pctWhole(t.value.onPlanAvg) : '—'))
-const planFactTrend = computed(() => {
-  const v = t.value.onPlanAvg
-  if (!ready.value || v == null) return null
-  if (v >= 1.005) return 'up'
-  if (v <= 0.995) return 'down'
-  return 'flat'
-})
+const planFactTrend = computed(() => (ready.value ? t.value.trendPlanFact || null : null))
 const tail = computed(() => (ready.value ? mlnSigned(-t.value.tailCumSum) : '—'))
-const forecastMain = computed(() => (ready.value ? `₽ ${mlnNum(t.value.landing)}` : '—'))
 const pace = computed(() => (ready.value ? pctDelta(t.value.landDev) : '—'))
+const forecastTrend = computed(() => (ready.value ? t.value.trendForecast || null : null))
+const forecastSub = computed(() => (ready.value ? mlnRub(t.value.landing) : '—'))
 
 function goDaily() { setSubView('daily') }
 function goGoals() { setSubView('goals') }
@@ -89,11 +84,11 @@ function goMaterials() { setActive('materials') }
         class="flex-1"
         :icon="Target"
         :name="NM_GOALS"
-        :metric-label="L.forecast"
-        :value-main="forecastMain"
-        :value-unit="ready ? 'млн' : ''"
-        :sub-label="L.pace"
-        :sub-value="pace"
+        :metric-label="L.pace"
+        :value-main="pace"
+        :trend="forecastTrend"
+        :sub-label="L.forecast"
+        :sub-value="forecastSub"
         :loading="loading"
         @select="goGoals"
       />
