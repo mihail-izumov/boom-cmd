@@ -1,10 +1,8 @@
 <script setup>
-import { ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { MoveUpRight, MoveDownRight, MoveRight } from 'lucide-vue-next'
 
-// Виджет-кнопка на Главной (два столбца). Белая карта: шапка (жёлтая плашка-иконка +
-// имя в 2 строки), лейбл метрики, крупное значение (+ опц. серая стрелка тренда), внизу
-// тихий подлейбл + жирное значение. Пока данные грузятся (loading) — вместо значений
-// переливающиеся скелетоны (bc-skeleton), как везде в приложении. Тап → переход.
+// Виджет-кнопка на Главной. Стрелка тренда — 3 состояния (up/down/flat), серая
+// монохромная в круге. Пока грузятся данные — переливы (bc-skeleton). Тап → переход.
 
 defineProps({
   icon: { type: [Object, Function], required: true },
@@ -12,7 +10,7 @@ defineProps({
   metricLabel: { type: String, required: true },
   valueMain: { type: String, default: '' },
   valueUnit: { type: String, default: '' },
-  trend: { type: String, default: null }, // 'up' | 'down' | null
+  trend: { type: String, default: null }, // 'up' | 'down' | 'flat' | null
   subLabel: { type: String, required: true },
   subValue: { type: String, default: '' },
   loading: { type: Boolean, default: false },
@@ -41,13 +39,17 @@ defineEmits(['select'])
       </template>
       <template v-else>
         <span class="text-[1.875rem] font-extrabold leading-none tracking-tight text-[var(--text)]">{{ valueMain }}</span>
-        <span v-if="valueUnit" class="self-end pb-0.5 text-[1.0625rem] font-bold text-[var(--text)]">{{ valueUnit }}</span>
+        <span v-if="valueUnit" class="self-end text-[1.0625rem] font-bold leading-none text-[var(--text)]">{{ valueUnit }}</span>
         <span
           v-if="trend"
           class="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-secondary)]"
           aria-hidden="true"
         >
-          <component :is="trend === 'down' ? ChevronDown : ChevronUp" class="h-4 w-4" :stroke-width="2.6" />
+          <component
+            :is="trend === 'up' ? MoveUpRight : trend === 'down' ? MoveDownRight : MoveRight"
+            class="h-4 w-4"
+            :stroke-width="2"
+          />
         </span>
       </template>
     </div>

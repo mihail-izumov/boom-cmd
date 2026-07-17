@@ -35,10 +35,13 @@ const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : '')
 
 const planFact = computed(() => (ready.value ? pctWhole(t.value.onPlanAvg) : '—'))
 const planFactTrend = computed(() => {
-  if (!ready.value || t.value.onPlanAvg == null) return null
-  return t.value.onPlanAvg >= 1 ? 'up' : 'down'
+  const v = t.value.onPlanAvg
+  if (!ready.value || v == null) return null
+  if (v >= 1.005) return 'up'
+  if (v <= 0.995) return 'down'
+  return 'flat'
 })
-const tail = computed(() => (ready.value ? mlnSigned(t.value.tailCumSum) : '—'))
+const tail = computed(() => (ready.value ? mlnSigned(-t.value.tailCumSum) : '—'))
 const forecastMain = computed(() => (ready.value ? `₽ ${mlnNum(t.value.landing)}` : '—'))
 const pace = computed(() => (ready.value ? pctDelta(t.value.landDev) : '—'))
 

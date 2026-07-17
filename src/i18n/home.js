@@ -17,7 +17,8 @@ export function mlnSigned(n) {
   const v = Number(n)
   const sign = v < 0 ? MINUS : v > 0 ? '+' : ''
   const abs = (Math.abs(v) / 1e6).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-  return `${sign}₽${NBSP}${abs}${NBSP}млн`
+  // знак — пробел — ₽ слитно с цифрой — пробел — млн
+  return `${sign}${NBSP}₽${abs}${NBSP}млн`
 }
 // Доля-фракция → «103,7%» (до десятых). x=1.037 → 103,7%.
 export function pct1(x) {
@@ -51,7 +52,7 @@ export const L = {
   daily: 'Контроль Дня',
   goals: 'Цели и планы',
   planfact: 'План/Факт',
-  tail: 'Накопленный хвост',
+  tail: 'Разрыв',
   forecast: 'Прогноз выручки',
-  pace: 'Отклонение от цели',
+  pace: 'Прогноз/План',
 }
