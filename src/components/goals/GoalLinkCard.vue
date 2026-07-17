@@ -2,9 +2,31 @@
 import { ExternalLink } from 'lucide-vue-next'
 import { L } from '../../i18n/goals.js'
 
-// Карта-ссылка «Цели и прогнозы»: чип типа (монохром, как DirectionChip) + заголовок +
-// иконка внешней ссылки. Открывает страницу в новом окне (target=_blank, noopener).
-defineProps({ item: { type: Object, required: true } })
+// Карта-ссылка «Цели и планы»: чип типа (монохром) + заголовок + иконка внешней ссылки.
+// В обычном браузере — обычная <a target="_blank"> (новая вкладка). В установленном
+// PWA (standalone) same-origin ссылка с target=_blank открывается ВНУТРИ приложения
+// без кнопки закрытия и «застревает». Поэтому в standalone перехватываем клик и
+// открываем через window.open — внешний браузер/SafariVC, закрывается как b00m.fun.
+const props = defineProps({ item: { type: Object, required: true } })
+
+function isStandalone() {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        window.navigator.standalone === true)
+    )
+  } catch {
+    return false
+  }
+}
+
+function onOpen(e) {
+  if (isStandalone()) {
+    e.preventDefault()
+    window.open(props.item.url, '_blank', 'noopener,noreferrer')
+  }
+}
 </script>
 
 <template>
@@ -15,6 +37,7 @@ defineProps({ item: { type: Object, required: true } })
     class="flex w-full items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition-colors active:bg-[var(--surface-2)]"
     style="min-height: 44px"
     :aria-label="`${item.title} — ${L.open_new_tab}`"
+    @click="onOpen"
   >
     <div class="flex min-w-0 flex-1 flex-col gap-1.5">
       <span
