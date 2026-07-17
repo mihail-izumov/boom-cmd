@@ -42,6 +42,22 @@ const forecastSub = computed(() => (ready.value ? mlnRub(t.value.landing) : '—
 
 const infoOpen = ref(false)
 
+// Живые интерпретации для «Как читать виджеты» (реальные числа, разные формулировки).
+const planFactInfo = computed(() => {
+  if (!ready.value || t.value.onPlanAvg == null) return ''
+  const v = t.value.onPlanAvg
+  if (v > 1.001) return `Сейчас ${planFact.value} — опережаем план на сегодня.`
+  if (v < 0.999) return `Сейчас ${planFact.value} — отстаём от плана на сегодня.`
+  return `Сейчас ${planFact.value} — идём ровно по плану.`
+})
+const paceInfo = computed(() => {
+  if (!ready.value || t.value.landDev == null) return ''
+  const d = t.value.landDev
+  if (d < -0.001) return `Сейчас ${pace.value} — по прогнозу придём на ${pct1(Math.abs(d))} ниже цели.`
+  if (d > 0.001) return `Сейчас ${pace.value} — по прогнозу придём на ${pct1(d)} выше цели.`
+  return `Сейчас ${pace.value} — по прогнозу выйдем ровно к цели.`
+})
+
 function goDaily() { setSubView('daily') }
 function goGoals() { setSubView('goals') }
 function goAnalytics() { setActive('analytics') }
@@ -106,14 +122,23 @@ function goMaterials() { setActive('materials') }
       <Info class="h-4 w-4" :stroke-width="2" aria-hidden="true" />
       <span>Как читать виджеты</span>
     </button>
-    <div
-      v-if="infoOpen"
-      class="bc-fade-in mt-1 rounded-2xl bg-[var(--surface)] p-4 text-[0.8125rem] leading-relaxed text-[var(--text-secondary)] shadow-sm"
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 -translate-y-1"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-1"
     >
-      <p><b class="text-[var(--text)]">План/Факт</b> — сколько заработали к сегодняшнему дню от плана на прошедшие дни. 100% — идём ровно по плану, ниже — отстаём. Стрелка — тренд за последний день.</p>
-      <p class="mt-2"><b class="text-[var(--text)]">Прогноз/План</b> — если темп сохранится, насколько выручка месяца отклонится от цели. «−7,7%» — придём на 7,7% ниже цели.</p>
-      <p class="mt-2"><b class="text-[var(--text)]">Вместе:</b> слева — где мы сейчас, справа — куда придём к концу месяца. Мелким внизу — рубли: «Разрыв» (недобор или опережение на сегодня) и «Прогноз выручки» (₽ на конец месяца).</p>
-    </div>
+      <div
+        v-if="infoOpen"
+        class="mt-1 rounded-2xl bg-[var(--surface)] p-4 text-[0.8125rem] leading-relaxed text-[var(--text-secondary)] shadow-sm"
+      >
+        <p><b class="text-[var(--text)]">План/Факт</b> — сколько заработали к сегодняшнему дню от плана на прошедшие дни. 100% — идём ровно по плану, ниже — отстаём. Стрелка — тренд за последний день. {{ planFactInfo }}</p>
+        <p class="mt-2"><b class="text-[var(--text)]">Прогноз/План</b> — если темп сохранится, насколько выручка месяца отклонится от цели. {{ paceInfo }}</p>
+        <p class="mt-2"><b class="text-[var(--text)]">Вместе:</b> слева — где мы сейчас, справа — куда придём к концу месяца.</p>
+      </div>
+    </Transition>
 
     <!-- карта-сетка: три серые плитки-приложения -->
     <div class="mt-3.5 rounded-[22px] bg-[var(--surface)] px-2.5 pb-3.5 pt-[18px] shadow-sm">
