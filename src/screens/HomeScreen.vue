@@ -5,41 +5,42 @@ import HomeWidget from '../components/home/HomeWidget.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
-import { PARKS } from '../data/parks.js'
+import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
 import { mlnNum, mlnSigned, pct1, pctWhole, monthCap, L } from '../i18n/home.js'
 
-// Home — командная дека. Сверху два ВИДЖЕТА (два столбца, белые карты, без стрелок
-// входа): «Контроль Дня» (План/Факт % + серая стрелка тренда + Накопленный хвост млн
-// со знаком) и «Цели и планы» (Прогноз выручки млн + Текущий темп %). Над ними — строка
-// «Июль 2026: <парки>» (какие парки в данных, не вся сеть). Ниже — карта-сетка из трёх
-// серых плиток-приложений (Аналитика/Проекты/Материалы). Внизу — графитовая ссылка
-// b00m.fun. Бейдж «БУМБАСТИК» рендерит NavigationBar (eyebrow над «Мастерплан»).
-//
-// Данные виджетов — сетевой агрегат computeNetwork из daily-пейлоада (те же числа, что
-// в «Контроль дня»): onPlanAvg (План/Факт), tailCumSum (хвост), landing (прогноз),
-// landDev (темп = landing/цель). Нет данных → «—», строка тегов скрыта. Read-only.
+// Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
+// серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
+// выручки млн, Текущий темп %). Над ними — «<Месяц Год>: <парки>» (какие парки в
+// данных). Ниже — карта-сетка из трёх серых плиток. Внизу — графитовая ссылка b00m.fun.
+// Данные — сетевой агрегат computeNetwork из daily-пейлоада. Пока грузится — переливы
+// (bc-skeleton) вместо значений; имена парков — с фолбэком на справочник parks.js.
 
-const { data } = useDaily()
+const NM_DAILY = 'Контроль\nДня'
+const NM_GOALS = 'Цели и\nпланы'
+
+const { data, loading } = useDaily()
 const sets = computed(() => data.value?.sets || {})
 const parkIdsWithDaily = computed(() =>
   PARKS.map((p) => p.id).filter((id) => Object.values(sets.value).some((s) => s.park === id)),
 )
 const net = computed(() => computeNetwork(sets.value, parkIdsWithDaily.value))
 const t = computed(() => net.value.totals)
-const hasData = computed(() => net.value.cards.length > 0 && t.value.target > 0)
+const ready = computed(() => net.value.cards.length > 0)
 
-const parkNames = computed(() => net.value.cards.map((c) => c.parkName).filter(Boolean))
+const parkNames = computed(() =>
+  net.value.cards.map((c) => c.parkName || PARKS_BY_ID[c.park]?.name).filter(Boolean),
+)
 const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : ''))
 
-const planFact = computed(() => (hasData.value ? pctWhole(t.value.onPlanAvg) : '—'))
+const planFact = computed(() => (ready.value ? pctWhole(t.value.onPlanAvg) : '—'))
 const planFactTrend = computed(() => {
-  if (!hasData.value || t.value.onPlanAvg == null) return null
+  if (!ready.value || t.value.onPlanAvg == null) return null
   return t.value.onPlanAvg >= 1 ? 'up' : 'down'
 })
-const tail = computed(() => (hasData.value ? mlnSigned(t.value.tailCumSum) : '—'))
-const forecastMain = computed(() => (hasData.value ? `₽ ${mlnNum(t.value.landing)}` : '—'))
-const pace = computed(() => (hasData.value ? pct1(1 + t.value.landDev) : '—'))
+const tail = computed(() => (ready.value ? mlnSigned(t.value.tailCumSum) : '—'))
+const forecastMain = computed(() => (ready.value ? `₽ ${mlnNum(t.value.landing)}` : '—'))
+const pace = computed(() => (ready.value ? pct1(1 + t.value.landDev) : '—'))
 
 function goDaily() { setSubView('daily') }
 function goGoals() { setSubView('goals') }
@@ -50,14 +51,21 @@ function goMaterials() { setActive('materials') }
 
 <template>
   <section class="flex flex-col px-4 pb-6 pt-0">
-    <!-- Июль 2026: + парки в данных (не вся сеть); не кликабельно, одна строка -->
-    <div v-if="hasData && parkNames.length" class="mb-3 flex flex-nowrap items-center gap-[7px]">
-      <span class="shrink-0 text-[0.75rem] font-bold text-[var(--text-secondary)]">{{ monthLabel }}:</span>
-      <span
-        v-for="p in parkNames"
-        :key="p"
-        class="shrink-0 whitespace-nowrap rounded-full border border-[var(--line)] px-[9px] py-[3px] text-[0.6875rem] font-semibold text-[var(--text-muted)]"
-      >{{ p }}</span>
+    <!-- <Месяц Год>: парки в данных. Пока грузится — переливы. -->
+    <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center gap-[7px]">
+      <template v-if="loading">
+        <span class="bc-skeleton h-[15px] w-[78px] shrink-0 rounded"></span>
+        <span class="bc-skeleton h-[22px] w-[74px] shrink-0 rounded-full"></span>
+        <span class="bc-skeleton h-[22px] w-[74px] shrink-0 rounded-full"></span>
+      </template>
+      <template v-else>
+        <span class="shrink-0 text-[0.75rem] font-bold text-[var(--text-secondary)]">{{ monthLabel }}:</span>
+        <span
+          v-for="p in parkNames"
+          :key="p"
+          class="shrink-0 whitespace-nowrap rounded-full border border-[var(--line)] px-[9px] py-[3px] text-[0.6875rem] font-semibold text-[var(--text-muted)]"
+        >{{ p }}</span>
+      </template>
     </div>
 
     <!-- два виджета -->
@@ -65,23 +73,25 @@ function goMaterials() { setActive('materials') }
       <HomeWidget
         class="flex-1"
         :icon="Gauge"
-        :name="L.daily"
+        :name="NM_DAILY"
         :metric-label="L.planfact"
         :value-main="planFact"
         :trend="planFactTrend"
         :sub-label="L.tail"
         :sub-value="tail"
+        :loading="loading"
         @select="goDaily"
       />
       <HomeWidget
         class="flex-1"
         :icon="Target"
-        :name="L.goals"
+        :name="NM_GOALS"
         :metric-label="L.forecast"
         :value-main="forecastMain"
-        :value-unit="hasData ? 'млн' : ''"
+        :value-unit="ready ? 'млн' : ''"
         :sub-label="L.pace"
         :sub-value="pace"
+        :loading="loading"
         @select="goGoals"
       />
     </div>
@@ -104,7 +114,7 @@ function goMaterials() { setActive('materials') }
       </div>
     </div>
 
-    <!-- графитовая ссылка: ширина карты, адрес по центру, иконка сразу за адресом -->
+    <!-- графитовая ссылка -->
     <a
       href="https://b00m.fun"
       target="_blank"

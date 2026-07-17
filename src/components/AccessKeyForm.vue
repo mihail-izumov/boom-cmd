@@ -107,7 +107,7 @@ const logoMask = {
         <button
           type="submit"
           :disabled="loading"
-          class="w-full rounded-full bg-[var(--accent)] px-4 text-[1.125rem] font-bold text-[var(--accent-ink)] active:opacity-90 disabled:opacity-60"
+          class="w-full rounded-2xl bg-[var(--accent)] px-4 text-[1.125rem] font-bold text-[var(--accent-ink)] active:opacity-90 disabled:opacity-60"
           style="min-height: 52px"
         >
           {{ loading ? ACCESS_RU.checking : ACCESS_RU.submit }}
@@ -118,7 +118,7 @@ const logoMask = {
     <!-- футер: маскированный графитом логотип + обводочная плашка «Мастерплан», приглушены -->
     <div class="flex flex-1 flex-col items-center justify-end gap-2 pb-10 opacity-[0.62]">
       <div class="h-7 w-[99px] bg-[var(--graphite)]" :style="logoMask" role="img" aria-label="Модуль роста"></div>
-      <div class="w-[99px] rounded-full border-2 border-[var(--graphite)] py-1 text-center text-[0.625rem] font-bold uppercase tracking-[0.12em] text-[var(--graphite)]">{{ ACCESS_RU.section }}</div>
+      <div class="min-w-[99px] rounded-full border-2 border-[var(--graphite)] px-3 py-1 text-center text-[0.625rem] font-bold uppercase tracking-[0.12em] text-[var(--graphite)]">{{ ACCESS_RU.section }}</div>
     </div>
   </div>
 </template>

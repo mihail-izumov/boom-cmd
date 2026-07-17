@@ -35,7 +35,7 @@ const subViews = {
     parkFilter: false,
   },
   daily: {
-    title: 'Контроль дня',
+    title: 'Контроль Дня',
     screen: DailyScreen,
     showBack: true,
     backLabel: 'Главная',
