@@ -29,6 +29,13 @@ export function pctWhole(x) {
   if (x == null || !Number.isFinite(Number(x))) return DASH
   return `${Math.round(Number(x) * 100)}%`
 }
+// Знаковое отклонение (как в отчётах): x=-0.077 → «−7,7%», x=0.023 → «+2,3%».
+export function pctDelta(x) {
+  if (x == null || !Number.isFinite(Number(x))) return DASH
+  const v = Number(x) * 100
+  const sign = v < 0 ? MINUS : '+'
+  return `${sign}${Math.abs(v).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+}
 
 const MONTH = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 // 'YYYY-MM' → «Июль 2026» (с заглавной).
@@ -46,5 +53,5 @@ export const L = {
   planfact: 'План/Факт',
   tail: 'Накопленный хвост',
   forecast: 'Прогноз выручки',
-  pace: 'Текущий темп',
+  pace: 'Отклонение от цели',
 }

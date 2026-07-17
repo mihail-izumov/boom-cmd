@@ -7,7 +7,7 @@ import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnNum, mlnSigned, pct1, pctWhole, monthCap, L } from '../i18n/home.js'
+import { mlnNum, mlnSigned, pctDelta, pctWhole, monthCap, L } from '../i18n/home.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
 // серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
@@ -40,7 +40,7 @@ const planFactTrend = computed(() => {
 })
 const tail = computed(() => (ready.value ? mlnSigned(t.value.tailCumSum) : '—'))
 const forecastMain = computed(() => (ready.value ? `₽ ${mlnNum(t.value.landing)}` : '—'))
-const pace = computed(() => (ready.value ? pct1(1 + t.value.landDev) : '—'))
+const pace = computed(() => (ready.value ? pctDelta(t.value.landDev) : '—'))
 
 function goDaily() { setSubView('daily') }
 function goGoals() { setSubView('goals') }
@@ -52,7 +52,7 @@ function goMaterials() { setActive('materials') }
 <template>
   <section class="flex flex-col px-4 pb-6 pt-0">
     <!-- <Месяц Год>: парки в данных. Пока грузится — переливы. -->
-    <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center gap-[7px]">
+    <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center justify-center gap-[7px]">
       <template v-if="loading">
         <span class="bc-skeleton h-[15px] w-[78px] shrink-0 rounded"></span>
         <span class="bc-skeleton h-[22px] w-[74px] shrink-0 rounded-full"></span>
