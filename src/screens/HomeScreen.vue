@@ -1,17 +1,20 @@
 <script setup>
-import { ChartColumnBig, ExternalLink, Folder, Layers } from 'lucide-vue-next'
+import { ChartColumnBig, ExternalLink, Folder, Gauge, Layers } from 'lucide-vue-next'
 import SectionBanner from '../components/home/SectionBanner.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
-import { setActive } from '../composables/useAppNav.js'
+import { setActive, setSubView } from '../composables/useAppNav.js'
 
 // Home — командная дека (TZ-3.1 §1, ревизия 12.06.2026):
 // 3 крупных баннера-кнопки (порядок как в таб-баре, без Главной): Аналитика,
 // Проекты, Материалы. Иконки — те же, что в таб-баре, крупные и монохромные.
 // Ниже — баннер-ссылка на сайт b00m.fun (жёлтая заливка --accent + --accent-ink,
-// бренд-акцент по DESIGN-STANDARD; новое окно). Кнопка «Парки» убрана
-// (решение владельца); ParksScreen и subView 'parks' остаются в коде —
-// вернутся, когда появится статистика парков (Ф6).
+// бренд-акцент по DESIGN-STANDARD; новое окно).
+//
+// СВЕРХУ — оперативная точка входа «Контроль дня» (под-страница, не вкладка):
+// визуально отделена тонким разделителем от трёх баннеров-зеркал вкладок.
+// Тап → setSubView('daily') (открывает под-страницу над Главной, back → Главная).
 
+function goDaily()     { setSubView('daily') }
 function goAnalytics() { setActive('analytics') }
 function goProjects()  { setActive('projects') }
 function goMaterials() { setActive('materials') }
@@ -19,6 +22,12 @@ function goMaterials() { setActive('materials') }
 
 <template>
   <section class="flex flex-col gap-2 px-3 pb-6 pt-2">
+    <!-- оперативная точка входа: под-страница «Контроль дня» -->
+    <SectionBanner title="Контроль дня" :icon="Gauge" @select="goDaily" />
+
+    <!-- разделитель: под-страница отделена от баннеров-зеркал вкладок -->
+    <div class="my-1 h-px bg-[var(--line)]" aria-hidden="true" />
+
     <SectionBanner title="Аналитика" :icon="ChartColumnBig" @select="goAnalytics" />
     <SectionBanner title="Проекты"   :icon="Layers"         @select="goProjects" />
     <SectionBanner title="Материалы" :icon="Folder"         @select="goMaterials" />

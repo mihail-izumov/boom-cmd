@@ -6,6 +6,7 @@ import AnalyticsScreen from './screens/AnalyticsScreen.vue'
 import ProjectsScreen from './screens/ProjectsScreen.vue'
 import MaterialsScreen from './screens/MaterialsScreen.vue'
 import ParksScreen from './screens/ParksScreen.vue'
+import DailyScreen from './screens/DailyScreen.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import AccessKeyForm from './components/AccessKeyForm.vue'
 import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
@@ -25,7 +26,8 @@ const tabs = [
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },
 ]
 
-// Под-страницы (мини-стек глубиной 1). На под-странице бедж-фильтра нет.
+// Под-страницы (мини-стек глубиной 1). На под-странице бедж-фильтра нет — кроме
+// «Контроль дня», где парк-контекст ведёт весь дашборд (parkFilter: true).
 const subViews = {
   parks: {
     title: 'Парки',
@@ -33,6 +35,13 @@ const subViews = {
     showBack: true,
     backLabel: 'Главная',
     parkFilter: false,
+  },
+  daily: {
+    title: 'Контроль дня',
+    screen: DailyScreen,
+    showBack: true,
+    backLabel: 'Главная',
+    parkFilter: true,
   },
 }
 
