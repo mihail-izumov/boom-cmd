@@ -7,6 +7,7 @@ import ProjectsScreen from './screens/ProjectsScreen.vue'
 import MaterialsScreen from './screens/MaterialsScreen.vue'
 import ParksScreen from './screens/ParksScreen.vue'
 import DailyScreen from './screens/DailyScreen.vue'
+import GoalsScreen from './screens/GoalsScreen.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import AccessKeyForm from './components/AccessKeyForm.vue'
 import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
@@ -39,6 +40,13 @@ const subViews = {
   daily: {
     title: 'Контроль дня',
     screen: DailyScreen,
+    showBack: true,
+    backLabel: 'Главная',
+    parkFilter: true,
+  },
+  goals: {
+    title: 'Цели и прогнозы',
+    screen: GoalsScreen,
     showBack: true,
     backLabel: 'Главная',
     parkFilter: true,

@@ -1,0 +1,11 @@
+{
+ "updated": "2025-05-20",
+ "items": [
+  { "park": "ohta", "month": "2025-05", "type": "План", "title": "План на май 2025", "url": "https://example.com/goals/ohta-plan.html" },
+  { "park": "ohta", "month": "2025-05", "type": "Стратегия", "title": "Стратегия развития (мок)", "url": "https://example.com/goals/ohta-strategy.html" },
+  { "park": "ohta", "month": "2025-04", "type": "План", "title": "План на апрель 2025", "url": "https://example.com/goals/ohta-plan-04.html" },
+  { "park": "piterland", "month": "2025-05", "type": "План", "title": "План на май 2025", "url": "https://example.com/goals/piter-plan.html" },
+  { "park": "network", "month": "2025-05", "type": "Контроль чека", "title": "Контроль чека (май–июнь 2025)", "url": "https://example.com/goals/aov-control.html" },
+  { "park": "network", "month": "2025-04", "type": "Стратегия", "title": "Сетевая стратегия сезона (мок)", "url": "https://example.com/goals/net-strategy.html" }
+ ]
+}

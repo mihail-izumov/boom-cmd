@@ -1,5 +1,5 @@
 <script setup>
-import { ChartColumnBig, ExternalLink, Folder, Gauge, Layers } from 'lucide-vue-next'
+import { ChartColumnBig, ExternalLink, Folder, Gauge, Layers, Target } from 'lucide-vue-next'
 import SectionBanner from '../components/home/SectionBanner.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { setActive, setSubView } from '../composables/useAppNav.js'
@@ -13,6 +13,7 @@ import { setActive, setSubView } from '../composables/useAppNav.js'
 // Под заголовком «Мастерплан» — бейдж «БУМБАСТИК» (имя приложения + компания-владелец данных).
 
 function goDaily()     { setSubView('daily') }
+function goGoals()     { setSubView('goals') }
 function goAnalytics() { setActive('analytics') }
 function goProjects()  { setActive('projects') }
 function goMaterials() { setActive('materials') }
@@ -30,6 +31,7 @@ function goMaterials() { setActive('materials') }
 
     <!-- оперативная точка входа: под-страница «Контроль дня» (тёмная акцент-карта) -->
     <SectionBanner title="Контроль дня" :icon="Gauge" variant="primary" @select="goDaily" />
+    <SectionBanner title="Цели и прогнозы" :icon="Target" @select="goGoals" />
 
     <SectionBanner title="Аналитика" :icon="ChartColumnBig" @select="goAnalytics" />
     <SectionBanner title="Проекты"   :icon="Layers"         @select="goProjects" />
