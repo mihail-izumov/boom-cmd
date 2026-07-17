@@ -1,13 +1,13 @@
 <script setup>
-import { computed } from 'vue'
-import { ChartColumnBig, ExternalLink, Folder, Gauge, Layers, Target } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Layers, Target } from 'lucide-vue-next'
 import HomeWidget from '../components/home/HomeWidget.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnRub, mlnSigned, pctDelta, pctWhole, monthCap, L } from '../i18n/home.js'
+import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, L } from '../i18n/home.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
 // серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
@@ -33,12 +33,14 @@ const parkNames = computed(() =>
 )
 const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : ''))
 
-const planFact = computed(() => (ready.value ? pctWhole(t.value.onPlanAvg) : '—'))
+const planFact = computed(() => (ready.value ? pct1(t.value.onPlanAvg) : '—'))
 const planFactTrend = computed(() => (ready.value ? t.value.trendPlanFact || null : null))
 const tail = computed(() => (ready.value ? mlnSigned(-t.value.tailCumSum) : '—'))
 const pace = computed(() => (ready.value ? pctDelta(t.value.landDev) : '—'))
 const forecastTrend = computed(() => (ready.value ? t.value.trendForecast || null : null))
 const forecastSub = computed(() => (ready.value ? mlnRub(t.value.landing) : '—'))
+
+const infoOpen = ref(false)
 
 function goDaily() { setSubView('daily') }
 function goGoals() { setSubView('goals') }
@@ -92,6 +94,25 @@ function goMaterials() { setActive('materials') }
         :loading="loading"
         @select="goGoals"
       />
+    </div>
+
+    <!-- как читать виджеты: инфо-блок + раскрывающееся пояснение -->
+    <button
+      type="button"
+      class="mx-auto mt-2.5 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium text-[var(--text-muted)] transition-colors active:bg-[var(--surface-2)]"
+      :aria-expanded="infoOpen ? 'true' : 'false'"
+      @click="infoOpen = !infoOpen"
+    >
+      <Info class="h-4 w-4" :stroke-width="2" aria-hidden="true" />
+      <span>Как читать виджеты</span>
+    </button>
+    <div
+      v-if="infoOpen"
+      class="bc-fade-in mt-1 rounded-2xl bg-[var(--surface)] p-4 text-[0.8125rem] leading-relaxed text-[var(--text-secondary)] shadow-sm"
+    >
+      <p><b class="text-[var(--text)]">План/Факт</b> — сколько заработали к сегодняшнему дню от плана на прошедшие дни. 100% — идём ровно по плану, ниже — отстаём. Стрелка — тренд за последний день.</p>
+      <p class="mt-2"><b class="text-[var(--text)]">Прогноз/План</b> — если темп сохранится, насколько выручка месяца отклонится от цели. «−7,7%» — придём на 7,7% ниже цели.</p>
+      <p class="mt-2"><b class="text-[var(--text)]">Вместе:</b> слева — где мы сейчас, справа — куда придём к концу месяца. Мелким внизу — рубли: «Разрыв» (недобор или опережение на сегодня) и «Прогноз выручки» (₽ на конец месяца).</p>
     </div>
 
     <!-- карта-сетка: три серые плитки-приложения -->
