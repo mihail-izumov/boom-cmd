@@ -4,19 +4,23 @@ import { Check, ChevronDown } from 'lucide-vue-next'
 import ReportField from '../components/report/ReportField.vue'
 import { useReport } from '../composables/useReport.js'
 import {
-  REPORT_PARK_IDS, emptyForm, numericFieldsFor, todayISO, validate, buildPayload,
+  REPORT_PARK_IDS, emptyForm, fieldGroupsFor, numericFieldsFor, derived,
+  todayISO, validate, buildPayload,
 } from '../composables/reportModel.js'
 import { PARKS_BY_ID } from '../data/parks.js'
 import {
-  L, TIPS, FIELD_LABELS, WEATHER_OPTIONS, UPLOAD_REMINDER, sumMismatch, dateHuman,
+  L, FIELD_LABELS, SECTION_TITLES, SUMMARY_LABELS, WEATHER_OPTIONS, WEEKLY_NOTE,
+  tipFor, summaryValue, sumMismatch, dateHuman,
 } from '../i18n/report.js'
 
-// «Отчёт дня» (D-12) — ЕДИНСТВЕННАЯ пишущая страница фронта: форма → POST →
-// Apps Script doPost → строка в лист `inbox` дневной таблицы. Канон (daily_days
-// и пр.) не читается и не пишется. Дата по умолчанию — ВЧЕРА; будущие запрещены;
-// не-вчера — жёлтая плашка (не блокирует). Валидация §4 ТЗ блокирует отправку;
-// «Отправить» активна только при зелёной валидации. Ошибка сети — красная
-// плашка, данные формы НЕ теряются. Тултипы §5 — дословно (i18n/report.js).
+// «Отчёт дня» v2 (D-12) — ЕДИНСТВЕННАЯ пишущая страница фронта: форма → POST →
+// Apps Script doPost → строка в лист `inbox` дневной таблицы. Канон не читается
+// и не пишется. Дата по умолчанию — ВЧЕРА; будущие запрещены; не-вчера —
+// жёлтая плашка (не блокирует). Форма — смысловые карты (ТЗ v2 §1): Деньги /
+// Игроки / Чеки / День + живая сводка «Проверь себя» (§5, в payload не уходит).
+// Валидация §2–3 блокирует отправку; тап «Отправить» с ошибками — плавный
+// скролл к первому проблемному полю (визарда нет — один экран для рутины).
+// Ошибка сети — красная плашка, данные формы НЕ теряются.
 
 const { sending, sent, sendError, submit, resetSent } = useReport()
 
@@ -27,13 +31,26 @@ const parks = REPORT_PARK_IDS.map((id) => ({ id, name: PARKS_BY_ID[id]?.name || 
 const todayMax = todayISO()
 
 const v = computed(() => validate(form))
+const groups = computed(() => fieldGroupsFor(form.park))
 const fields = computed(() => numericFieldsFor(form.park))
-const showUploadReminder = computed(() => form.park === 'ohta' || form.park === 'piterland')
+// тихая строка про недельную выгрузку — только Охта/Питерленд (ТЗ v2 §3)
+const showWeeklyNote = computed(() => form.park === 'ohta' || form.park === 'piterland')
+
+// живая сводка производных (ТЗ v2 §5): порядок плиток — как в ТЗ; пустые/÷0 —
+// не показываются; у Июня «Чек / пополнение» дублирует средний чек (D-10) — прячем
+const SUMMARY_ORDER = ['avg_check', 'per_topup', 'topups_per_session', 'cash_share', 'site_share', 'new_share']
+const summaryTiles = computed(() => {
+  const d = derived(form)
+  return SUMMARY_ORDER
+    .filter((k) => !(form.park === 'iyun' && k === 'per_topup'))
+    .filter((k) => d[k] != null)
+    .map((k) => ({ key: k, label: SUMMARY_LABELS[k], value: summaryValue(k, d[k]) }))
+})
 
 // подсветка инпутов, участвующих в ошибках пар/сумм
 function isInvalid(key) {
   const e = v.value.errors
-  if (e.sum && (key === 'revenue' || key === 'cashless' || key === 'cash')) return true
+  if (e.sum && (key === 'revenue' || key === 'cashless' || key === 'cash' || key === 'site')) return true
   if (e.visitors && (key === 'visitors_total' || key === 'visitors_new')) return true
   if (e.sessions && (key === 'topups' || key === 'sessions')) return true
   return false
@@ -50,8 +67,27 @@ const errorMessages = computed(() => {
   return out
 })
 
+// первое проблемное поле в порядке рендера (для скролла по тапу «Отправить»)
+function firstProblemId() {
+  const val = v.value
+  if (val.errors.date_future) return 'rep-date'
+  for (const f of fields.value) {
+    if (val.missing.includes(f.key) || isInvalid(f.key)) return `rep-${f.key}`
+  }
+  if (val.missing.includes('weather')) return 'rep-weather'
+  return null
+}
+function scrollToProblem() {
+  const id = firstProblemId()
+  const el = id && document.getElementById(id)
+  if (!el) return
+  el.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  el.focus?.({ preventScroll: true })
+}
+
 async function onSubmit() {
-  if (!v.value.ok || sending.value) return
+  if (sending.value) return
+  if (!v.value.ok) { scrollToProblem(); return } // ТЗ v2 §1
   const date = form.date
   await submit(buildPayload(form))
   if (sent.value) sentDate.value = date
@@ -123,57 +159,81 @@ function more() {
         </div>
       </div>
 
-      <!-- числовые поля парка (после выбора парка) -->
-      <div
-        v-if="form.park"
-        class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 py-1 shadow-sm divide-y divide-[var(--line)]"
-      >
-        <ReportField
-          v-for="f in fields"
-          :id="`rep-${f.key}`"
-          :key="f.key"
-          v-model="form[f.key]"
-          :label="FIELD_LABELS[f.key]"
-          :tip="TIPS[f.key] || ''"
-          :optional="!f.required"
-          :invalid="isInvalid(f.key)"
-        />
-      </div>
+      <!-- смысловые карты (ТЗ v2 §1): Деньги / Игроки / Чеки; поля — только отступы -->
+      <template v-if="form.park">
+        <template v-for="g in groups" :key="g.section">
+          <section class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 pb-1.5 pt-3 shadow-sm">
+            <h2 class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ SECTION_TITLES[g.section] }}</h2>
+            <ReportField
+              v-for="f in g.fields"
+              :id="`rep-${f.key}`"
+              :key="f.key"
+              v-model="form[f.key]"
+              :label="FIELD_LABELS[f.key]"
+              :tip="tipFor(form.park, f.key)"
+              :optional="!f.required"
+              :invalid="isInvalid(f.key)"
+            />
+          </section>
 
-      <!-- погода + комментарий -->
-      <div
-        v-if="form.park"
-        class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 py-1 shadow-sm divide-y divide-[var(--line)]"
-      >
-        <ReportField id="rep-weather" :label="FIELD_LABELS.weather" :tip="TIPS.weather">
-          <template #control>
-            <div class="relative mt-1.5">
-              <select
-                id="rep-weather"
-                v-model="form.weather"
-                class="w-full min-h-[44px] appearance-none rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 pr-10 text-[1.0625rem] outline-none focus:border-[var(--text-muted)]"
-                :class="form.weather ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'"
-              >
-                <option value="" disabled>{{ L.weather_placeholder }}</option>
-                <option v-for="w in WEATHER_OPTIONS" :key="w.value" :value="w.value">{{ w.label }}</option>
-              </select>
-              <ChevronDown class="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
+          <!-- тихая строка под картой «Чеки» — недельная контрольная сверка (§3) -->
+          <p
+            v-if="g.section === 'checks' && showWeeklyNote"
+            class="bc-fade-in px-4 text-[0.75rem] leading-relaxed text-[var(--text-muted)]"
+          >{{ WEEKLY_NOTE }}</p>
+        </template>
+
+        <!-- карта «День»: погода + комментарий -->
+        <section class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 pb-1.5 pt-3 shadow-sm">
+          <h2 class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ SECTION_TITLES.day }}</h2>
+          <ReportField id="rep-weather" :label="FIELD_LABELS.weather" :tip="tipFor(form.park, 'weather')">
+            <template #control>
+              <div class="relative mt-1.5">
+                <select
+                  id="rep-weather"
+                  v-model="form.weather"
+                  class="w-full min-h-[44px] appearance-none rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 pr-10 text-[1.0625rem] outline-none focus:border-[var(--text-muted)]"
+                  :class="form.weather ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'"
+                >
+                  <option value="" disabled>{{ L.weather_placeholder }}</option>
+                  <option v-for="w in WEATHER_OPTIONS" :key="w.value" :value="w.value">{{ w.label }}</option>
+                </select>
+                <ChevronDown class="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
+              </div>
+            </template>
+          </ReportField>
+
+          <ReportField id="rep-comment" :label="FIELD_LABELS.comment" :tip="tipFor(form.park, 'comment')" optional>
+            <template #control>
+              <textarea
+                id="rep-comment"
+                v-model="form.comment"
+                rows="3"
+                :placeholder="L.comment_placeholder"
+                class="mt-1.5 w-full min-h-[44px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-[1.0625rem] text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)]"
+              ></textarea>
+            </template>
+          </ReportField>
+        </section>
+
+        <!-- живая сводка «Проверь себя» (§5): серые плитки, в payload не уходит -->
+        <section
+          v-if="summaryTiles.length"
+          class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 pb-4 pt-3 shadow-sm"
+        >
+          <h2 class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ SECTION_TITLES.summary }}</h2>
+          <div class="mt-2.5 grid grid-cols-2 gap-2">
+            <div
+              v-for="t in summaryTiles"
+              :key="t.key"
+              class="rounded-xl bg-[var(--surface-2)] px-3 py-2.5"
+            >
+              <p class="text-[0.75rem] font-medium text-[var(--text-secondary)]">{{ t.label }}</p>
+              <p class="mt-0.5 text-[1.125rem] font-semibold tabular-nums text-[var(--text)]">{{ t.value }}</p>
             </div>
-          </template>
-        </ReportField>
-
-        <ReportField id="rep-comment" :label="FIELD_LABELS.comment" :tip="TIPS.comment" optional>
-          <template #control>
-            <textarea
-              id="rep-comment"
-              v-model="form.comment"
-              rows="3"
-              :placeholder="L.comment_placeholder"
-              class="mt-1.5 w-full min-h-[44px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-[1.0625rem] text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)]"
-            ></textarea>
-          </template>
-        </ReportField>
-      </div>
+          </div>
+        </section>
+      </template>
 
       <!-- живая валидация: блокирующие сообщения -->
       <div
@@ -192,7 +252,7 @@ function more() {
         role="alert"
       >{{ L.send_error }}</div>
 
-      <!-- отправить -->
+      <!-- отправить: при ошибках тап скроллит к первому проблемному полю (§1) -->
       <button
         v-if="form.park"
         type="submit"
@@ -200,14 +260,9 @@ function more() {
         :class="v.ok && !sending
           ? 'bg-[var(--accent)] text-[var(--accent-ink)] active:opacity-90'
           : 'bg-[var(--surface-2)] text-[var(--text-muted)]'"
-        :disabled="!v.ok || sending"
+        :disabled="sending"
+        :aria-disabled="!v.ok || sending ? 'true' : 'false'"
       >{{ sending ? L.sending : L.submit }}</button>
-
-      <!-- §5.8: напоминание про выгрузку (Охта / Питерленд) — серый инфо-блок под формой -->
-      <p
-        v-if="showUploadReminder"
-        class="bc-fade-in rounded-2xl bg-[var(--surface-2)] px-4 py-3 text-[0.8125rem] leading-relaxed text-[var(--text-secondary)]"
-      >{{ UPLOAD_REMINDER }}</p>
     </form>
   </section>
 </template>

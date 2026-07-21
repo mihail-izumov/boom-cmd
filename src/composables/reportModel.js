@@ -1,36 +1,57 @@
 // Модель формы «Отчёт дня» — ЧИСТЫЕ функции без DOM/Vue (тестируются в node).
 //
-// Контракт (ТЗ §4, §7):
+// Контракт v2 (ТЗ v2 §2–3, §6):
 //   • отчитываются 3 парка: ohta / piterland / iyun (MARI не сдаёт дневной отчёт);
-//   • обязательные для всех: revenue, cashless, cash, visitors_total, visitors_new,
-//     weather; comment — необязателен;
-//   • только Июнь дополнительно: topups, sessions (обязательные), promo, rev_y,
-//     rev_vk (необязательные). Охта/Питерленд чеки/пополнения/сессии НЕ вводят —
-//     эти счётчики берутся только из системной выгрузки (блок-напоминание в UI);
-//   • валидация БЕЗ допусков: cashless + cash === revenue ровно, до рубля;
-//     visitors_new ≤ visitors_total; дата не в будущем; Июнь: sessions ≤ topups.
+//   • обязательные для ВСЕХ: revenue, cashless, cash, site («Личный кабинет»,
+//     ТРЕТЬЕ слагаемое — не часть безнала; нет канала → вводят 0),
+//     visitors_total, visitors_new, topups, sessions, weather;
+//   • receipts — только Охта/Питерленд (обязателен); у Июня receipts НЕ
+//     показывается (там 1 пополнение = 1 чек, D-10);
+//   • только Июнь дополнительно: promo, rev_y, rev_vk (необязательные);
+//   • валидация БЕЗ допусков: cashless + cash + site === revenue ровно, до
+//     рубля; visitors_new ≤ visitors_total; дата не в будущем; sessions ≤
+//     topups (у всех, у кого оба поля). topups ≤ receipts НЕ проверять —
+//     пакеты дают «Кол-во» без чеков;
+//   • comment — необязателен.
 
 export const REPORT_PARK_IDS = ['ohta', 'piterland', 'iyun']
 
-// Поля, которые вводит парк (без park/date/weather/comment — они отдельные блоки).
-export function numericFieldsFor(park) {
-  const base = [
+// Смысловые карты формы (ТЗ v2 §1): «Деньги» / «Игроки» / «Чеки».
+// Карта «День» (погода + комментарий) — отдельные контролы экрана.
+export function fieldGroupsFor(park) {
+  const money = [
     { key: 'revenue', required: true },
     { key: 'cashless', required: true },
     { key: 'cash', required: true },
+    { key: 'site', required: true },
+  ]
+  const players = [
     { key: 'visitors_total', required: true },
     { key: 'visitors_new', required: true },
   ]
+  const checks = []
+  if (park === 'ohta' || park === 'piterland') checks.push({ key: 'receipts', required: true })
+  checks.push(
+    { key: 'topups', required: true },
+    { key: 'sessions', required: true },
+  )
   if (park === 'iyun') {
-    base.push(
-      { key: 'topups', required: true },
-      { key: 'sessions', required: true },
+    checks.push(
       { key: 'promo', required: false },
       { key: 'rev_y', required: false },
       { key: 'rev_vk', required: false },
     )
   }
-  return base
+  return [
+    { section: 'money', fields: money },
+    { section: 'players', fields: players },
+    { section: 'checks', fields: checks },
+  ]
+}
+
+// Плоский список числовых полей парка (порядок = порядок рендера).
+export function numericFieldsFor(park) {
+  return fieldGroupsFor(park).flatMap((g) => g.fields)
 }
 
 // 'YYYY-MM-DD' по ЛОКАЛЬНОМУ времени устройства (управляющий вносит «свой вчера»).
@@ -53,9 +74,9 @@ export function emptyForm(park = '', now = new Date()) {
   return {
     park,
     date: yesterdayISO(now),
-    revenue: '', cashless: '', cash: '',
+    revenue: '', cashless: '', cash: '', site: '',
     visitors_total: '', visitors_new: '',
-    topups: '', sessions: '', promo: '', rev_y: '', rev_vk: '',
+    receipts: '', topups: '', sessions: '', promo: '', rev_y: '', rev_vk: '',
     weather: '',
     comment: '',
   }
@@ -95,10 +116,11 @@ export function validate(form, now = new Date()) {
   const notYesterday = !missing.includes('date') && !errors.date_future &&
     form.date !== yesterdayISO(now)
 
-  // безнал + нал = выручка, РОВНО до рубля (никаких допусков — ТЗ §4)
+  // безнал + нал + личный кабинет = выручка, РОВНО до рубля (ТЗ v2 §2)
   let sum = null
-  if (nums.revenue != null && nums.cashless != null && nums.cash != null) {
-    const s = nums.cashless + nums.cash
+  if (nums.revenue != null && nums.cashless != null && nums.cash != null &&
+      nums.site != null) {
+    const s = nums.cashless + nums.cash + nums.site
     if (s !== nums.revenue) {
       errors.sum = true
       sum = { sum: s, revenue: nums.revenue }
@@ -108,15 +130,37 @@ export function validate(form, now = new Date()) {
   if (nums.visitors_total != null && nums.visitors_new != null &&
       nums.visitors_new > nums.visitors_total) errors.visitors = true
 
-  if (form.park === 'iyun' && nums.topups != null && nums.sessions != null &&
+  // sessions ≤ topups — у всех, у кого оба поля (ТЗ v2 §3).
+  // topups ≤ receipts НЕ проверяем: пакеты дают «Кол-во» без чеков.
+  if (nums.topups != null && nums.sessions != null &&
       nums.sessions > nums.topups) errors.sessions = true
 
   const ok = missing.length === 0 && Object.keys(errors).length === 0
   return { ok, missing, errors, sum, notYesterday }
 }
 
+// Живая сводка производных (ТЗ v2 §5) — расчёт на лету, В PAYLOAD НЕ УХОДИТ
+// (канон считает контур B). Деление на 0/пусто → null (плитка не показывается).
+// Доли — в диапазоне 0..1 (форматирование в % — слой i18n).
+export function derived(form) {
+  const n = (k) => toInt(form[k])
+  const div = (a, b) => (a != null && b != null && b > 0 ? a / b : null)
+  const revenue = n('revenue')
+  const topups = n('topups')
+  return {
+    // Средний чек: revenue ÷ receipts; Июнь — revenue ÷ topups (D-10)
+    avg_check: form.park === 'iyun' ? div(revenue, topups) : div(revenue, n('receipts')),
+    per_topup: div(revenue, topups),
+    topups_per_session: div(topups, n('sessions')),
+    cash_share: div(n('cash'), revenue),
+    site_share: div(n('site'), revenue),
+    new_share: div(n('visitors_new'), n('visitors_total')),
+  }
+}
+
 // Тело POST (без гейт-ключа `key` — его добавляет useReport из useAccessKey).
-// Необязательные пустые поля не отправляются; чужие парку поля — не отправляются.
+// Контракт §6: site — все парки; receipts — только Охта/Питер; topups/sessions —
+// у всех; promo/rev_y/rev_vk — Июнь, необязательные (пустые не отправляются).
 export function buildPayload(form) {
   const p = {
     park: form.park,
@@ -124,13 +168,17 @@ export function buildPayload(form) {
     revenue: toInt(form.revenue),
     cashless: toInt(form.cashless),
     cash: toInt(form.cash),
+    site: toInt(form.site),
     visitors_total: toInt(form.visitors_total),
     visitors_new: toInt(form.visitors_new),
+    topups: toInt(form.topups),
+    sessions: toInt(form.sessions),
     weather: form.weather,
   }
+  if (form.park === 'ohta' || form.park === 'piterland') {
+    p.receipts = toInt(form.receipts)
+  }
   if (form.park === 'iyun') {
-    p.topups = toInt(form.topups)
-    p.sessions = toInt(form.sessions)
     for (const k of ['promo', 'rev_y', 'rev_vk']) {
       const n = toInt(form[k])
       if (n != null) p[k] = n

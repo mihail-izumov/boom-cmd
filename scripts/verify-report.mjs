@@ -1,21 +1,26 @@
-// Локальная приёмка страницы «Отчёт дня» (D-12). Запуск: `node scripts/verify-report.mjs`.
+// Локальная приёмка страницы «Отчёт дня» v2 (D-12). Запуск: `node scripts/verify-report.mjs`.
 //
 // Двухслойная проверка:
-//   1) ЧИСТАЯ МОДЕЛЬ (reportModel.js, без DOM): все блокировки §4 ТЗ —
-//      cashless+cash===revenue ровно (без допусков), visitors_new ≤ visitors_total,
-//      дата не в будущем, Июнь sessions ≤ topups, обязательность полей, payload.
+//   1) ЧИСТАЯ МОДЕЛЬ (reportModel.js, без DOM): все блокировки ТЗ v2 §2–3 —
+//      cashless+cash+site===revenue ровно (без допусков), visitors_new ≤
+//      visitors_total, дата не в будущем, sessions ≤ topups (все парки),
+//      receipts обязателен только у Охты/Питера, обязательность полей,
+//      payload §6, живая сводка derived() (§5).
 //   2) ЖИВОЙ РЕНДЕР В JSDOM: временная lib-сборка Vite (экран + оболочка
-//      репортёра), монтирование в jsdom, прогон формы событиями: кнопка
-//      блокируется/разблокируется, тексты ошибок/плашек, POST мокается
-//      (реального URL нет — VITE_REPORT_API подменён фиктивным), тело POST
-//      сверяется с контрактом §7, экран успеха, красная плашка без потери данных.
+//      репортёра), монтирование в jsdom, прогон формы событиями: смысловые
+//      карты, «игроки» в текстах, отсутствие §5.8-блока v1, тихая строка
+//      недельной сверки, сводка «Проверь себя», тап «Отправить» с ошибками
+//      НЕ шлёт POST, тело POST по §6, экран успеха, красная плашка без
+//      потери данных.
 
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import {
-  emptyForm, validate, buildPayload, toInt, yesterdayISO, todayISO,
+  emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
+  yesterdayISO, todayISO,
 } from '../src/composables/reportModel.js'
+import { rub } from '../src/i18n/report.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -36,25 +41,63 @@ check('toInt("-5") → null', toInt('-5') === null)
 check('toInt("0") → 0', toInt('0') === 0)
 check('toInt("207249") → 207249', toInt('207249') === 207249)
 
+// revenue = cashless + cash + site (три слагаемых, §2)
 function filled(park = 'piterland', over = {}) {
-  return {
+  const base = {
     ...emptyForm(park, NOW),
-    revenue: '207249', cashless: '147834', cash: '59415',
+    revenue: '207249', cashless: '147834', cash: '44415', site: '15000',
     visitors_total: '300', visitors_new: '40',
+    topups: '180', sessions: '160',
     weather: 'rain_all',
-    ...over,
   }
+  if (park === 'ohta' || park === 'piterland') base.receipts = '265'
+  return { ...base, ...over }
 }
 
-console.log('\n=== reportModel: блокировки §4 ===')
+console.log('\n=== reportModel: состав полей v2 ===')
+{
+  const keys = (park) => numericFieldsFor(park).map((f) => f.key)
+  check('Питер: money-поля включают site',
+    keys('piterland').includes('site'))
+  check('Питер: receipts/topups/sessions есть',
+    ['receipts', 'topups', 'sessions'].every((k) => keys('piterland').includes(k)))
+  check('Охта: receipts есть', keys('ohta').includes('receipts'))
+  check('Июнь: receipts НЕТ (1 пополнение = 1 чек, D-10)',
+    !keys('iyun').includes('receipts'))
+  check('Июнь: topups/sessions/promo/rev_y/rev_vk есть',
+    ['topups', 'sessions', 'promo', 'rev_y', 'rev_vk'].every((k) => keys('iyun').includes(k)))
+  const req = (park, k) => numericFieldsFor(park).find((f) => f.key === k)?.required
+  check('site обязателен (все парки)',
+    req('ohta', 'site') && req('piterland', 'site') && req('iyun', 'site'))
+  check('topups/sessions обязательны у всех',
+    ['ohta', 'piterland', 'iyun'].every((p) => req(p, 'topups') && req(p, 'sessions')))
+  check('receipts обязателен у Охты/Питера',
+    req('ohta', 'receipts') === true && req('piterland', 'receipts') === true)
+  check('promo/rev_y/rev_vk необязательны',
+    req('iyun', 'promo') === false && req('iyun', 'rev_y') === false && req('iyun', 'rev_vk') === false)
+}
+
+console.log('\n=== reportModel: блокировки §2–3 ===')
 check('пустая форма НЕ ок', validate(emptyForm('', NOW), NOW).ok === false)
 check('заполненный Питер ок', validate(filled(), NOW).ok === true)
 {
-  const v = validate(filled('piterland', { cash: '59414' }), NOW)
-  check('сумма ±1 ₽ блокирует (без допусков)', v.ok === false && v.errors.sum === true)
-  check('данные для текста: sum=207248, revenue=207249',
-    v.sum && v.sum.sum === 207248 && v.sum.revenue === 207249)
+  const v = validate(filled('piterland', { site: '15001' }), NOW)
+  check('сумма трёх слагаемых ±1 ₽ блокирует (без допусков)', v.ok === false && v.errors.sum === true)
+  check('данные для текста: sum=207250, revenue=207249',
+    v.sum && v.sum.sum === 207250 && v.sum.revenue === 207249)
 }
+check('site пустой → блокирует (обязателен)',
+  validate(filled('piterland', { site: '' }), NOW).missing.includes('site'))
+check('site=0 валиден (канала нет — вводят 0)',
+  validate(filled('piterland', { site: '0', cash: '59415' }), NOW).ok === true)
+check('receipts пустой у Питера → блокирует',
+  validate(filled('piterland', { receipts: '' }), NOW).missing.includes('receipts'))
+check('topups пустой у Питера → блокирует (теперь у всех)',
+  validate(filled('piterland', { topups: '' }), NOW).missing.includes('topups'))
+check('sessions > topups блокирует у Питера (не только Июнь)',
+  validate(filled('piterland', { sessions: '181' }), NOW).errors.sessions === true)
+check('topups > receipts НЕ блокирует (пакеты дают Кол-во без чеков)',
+  validate(filled('piterland', { topups: '300', sessions: '160' }), NOW).ok === true)
 check('visitors_new > total блокирует',
   validate(filled('piterland', { visitors_new: '301' }), NOW).errors.visitors === true)
 check('visitors_new == total ок',
@@ -69,36 +112,76 @@ check('погода обязательна',
 check('комментарий необязателен', validate(filled(), NOW).ok === true)
 
 console.log('\n=== reportModel: Июнь ===')
-const iyunOver = { revenue: '100000', cashless: '60000', cash: '40000', topups: '120', sessions: '110' }
+const iyunOver = {
+  revenue: '100000', cashless: '60000', cash: '30000', site: '10000',
+  topups: '120', sessions: '110', receipts: '',
+}
 check('Июнь без topups/sessions НЕ ок',
-  validate(filled('iyun'), NOW).missing.includes('topups'))
+  validate(filled('iyun', { ...iyunOver, topups: '', sessions: '' }), NOW).missing.includes('topups'))
 check('Июнь с topups/sessions ок', validate(filled('iyun', iyunOver), NOW).ok === true)
 check('Июнь sessions > topups блокирует',
   validate(filled('iyun', { ...iyunOver, sessions: '121' }), NOW).errors.sessions === true)
+check('Июнь: receipts не требуется',
+  !validate(filled('iyun', iyunOver), NOW).missing.includes('receipts'))
 check('Июнь promo/rev_y/rev_vk необязательны',
   validate(filled('iyun', iyunOver), NOW).ok === true)
-check('Охта/Питер: sessions-поля не требуются и не валидируются',
-  validate(filled('ohta'), NOW).ok === true)
 
-console.log('\n=== reportModel: payload §7 ===')
+console.log('\n=== reportModel: payload §6 ===')
 {
   const p = buildPayload(filled('piterland', { comment: '  гроза  ' }))
   check('park/date/числа — типы верные',
     p.park === 'piterland' && p.date === '2026-07-20' && p.revenue === 207249 &&
-    p.cashless === 147834 && p.cash === 59415 && p.visitors_total === 300 && p.visitors_new === 40)
+    p.cashless === 147834 && p.cash === 44415 && p.visitors_total === 300 && p.visitors_new === 40)
+  check('site в payload числом', p.site === 15000)
+  check('receipts/topups/sessions в payload у Питера',
+    p.receipts === 265 && p.topups === 180 && p.sessions === 160)
   check('comment триммится', p.comment === 'гроза')
-  check('у Питера НЕТ topups/sessions/promo/rev_*',
-    !('topups' in p) && !('sessions' in p) && !('promo' in p) && !('rev_y' in p) && !('rev_vk' in p))
+  check('у Питера НЕТ promo/rev_*',
+    !('promo' in p) && !('rev_y' in p) && !('rev_vk' in p))
   check('weather — слаг', p.weather === 'rain_all')
   check('ключа `key` в payload НЕТ (добавляет useReport)', !('key' in p))
 }
 {
   const p = buildPayload(filled('iyun', { ...iyunOver, promo: '7', rev_y: '', rev_vk: '2' }))
-  check('Июнь: topups/sessions в payload', p.topups === 120 && p.sessions === 110)
+  check('Июнь: site/topups/sessions в payload',
+    p.site === 10000 && p.topups === 120 && p.sessions === 110)
+  check('Июнь: receipts в payload НЕТ', !('receipts' in p))
   check('Июнь: promo=7, rev_vk=2, rev_y отсутствует',
     p.promo === 7 && p.rev_vk === 2 && !('rev_y' in p))
   const p2 = buildPayload(filled('iyun', iyunOver))
   check('Июнь: пустой comment не отправляется', !('comment' in p2))
+}
+{
+  const keys = Object.keys(buildPayload(filled()))
+  const DERIVED = ['avg_check', 'per_topup', 'topups_per_session', 'cash_share', 'site_share', 'new_share']
+  check('производные §5 в payload НЕ уходят', DERIVED.every((k) => !keys.includes(k)))
+}
+
+console.log('\n=== reportModel: живая сводка derived() §5 ===')
+{
+  const d = derived(filled())
+  check('средний чек = revenue ÷ receipts ≈ 782,07',
+    Math.abs(d.avg_check - 207249 / 265) < 1e-9)
+  check('чек/пополнение = revenue ÷ topups',
+    Math.abs(d.per_topup - 207249 / 180) < 1e-9)
+  check('попол/сессию = 180 ÷ 160 = 1.125', d.topups_per_session === 1.125)
+  check('доля нала = cash ÷ revenue', Math.abs(d.cash_share - 44415 / 207249) < 1e-9)
+  check('доля ЛК = site ÷ revenue', Math.abs(d.site_share - 15000 / 207249) < 1e-9)
+  check('доля новых = 40 ÷ 300', Math.abs(d.new_share - 40 / 300) < 1e-9)
+}
+{
+  const d = derived(filled('piterland', { receipts: '0', sessions: '', revenue: '' }))
+  check('÷0 → null (средний чек)', d.avg_check === null)
+  check('пустой revenue → null (чек/попол, доли)',
+    d.per_topup === null && d.cash_share === null && d.site_share === null)
+  check('пустые sessions → null', d.topups_per_session === null)
+  const d2 = derived(emptyForm('piterland', NOW))
+  check('пустая форма → все производные null', Object.values(d2).every((x) => x === null))
+}
+{
+  const d = derived(filled('iyun', iyunOver))
+  check('Июнь: средний чек = revenue ÷ topups (D-10)',
+    Math.abs(d.avg_check - 100000 / 120) < 1e-9)
 }
 
 // ═══════════════ 2. Живой рендер в jsdom ═══════════════
@@ -200,6 +283,8 @@ async function setInput(root, id, value) {
   await fire(el, el.tagName === 'SELECT' ? 'change' : 'input')
 }
 const submitBtn = (root) => root.querySelector('button[type="submit"]')
+// v2: «Отправить» тапабельна всегда (скролл к проблеме), блокировка — aria-disabled
+const btnBlocked = (root) => submitBtn(root).getAttribute('aria-disabled') === 'true'
 
 console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) ===')
 {
@@ -212,53 +297,123 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
 
   await setInput(el, 'rep-park', 'piterland')
   check('после выбора парка поля появились', !!el.querySelector('#rep-revenue') && !!el.querySelector('#rep-weather'))
-  check('у Питера НЕТ полей Июня', !el.querySelector('#rep-topups') && !el.querySelector('#rep-sessions'))
-  check('напоминание про выгрузку (§5.8) на месте', el.textContent.includes('Не забудьте прислать выгрузку'))
+  check('смысловые карты: Деньги/Игроки/Чеки/День на месте',
+    ['Деньги', 'Игроки', 'Чеки', 'День'].every((t) =>
+      [...el.querySelectorAll('h2')].some((h) => h.textContent.trim() === t)))
+  check('divide-y между полями убран (§1)', !el.querySelector('form .divide-y'))
+  check('поле site (Личный кабинет) есть у Питера', !!el.querySelector('#rep-site'))
+  check('подпись site дословно', el.textContent.includes('Личный кабинет (сайт), ₽'))
+  check('receipts/topups/sessions есть у Питера (§3)',
+    !!el.querySelector('#rep-receipts') && !!el.querySelector('#rep-topups') && !!el.querySelector('#rep-sessions'))
+  check('полей Июня (promo/отзывы) у Питера НЕТ', !el.querySelector('#rep-promo') && !el.querySelector('#rep-rev_y'))
+  check('«игроки», не «посетители» (§4)',
+    el.textContent.includes('Игроков всего') && !el.textContent.includes('Посетителей'))
+  check('блока-напоминания §5.8 v1 БОЛЬШЕ НЕТ', !el.textContent.includes('Не забудьте прислать выгрузку'))
+  check('тихая строка недельной сверки (§3) на месте',
+    el.textContent.includes('Раз в неделю присылайте владельцу саму выгрузку за неделю'))
   check('числовые инпуты: inputmode=numeric, type=text (без спиннеров)',
-    el.querySelector('#rep-revenue').getAttribute('inputmode') === 'numeric' &&
-    el.querySelector('#rep-revenue').getAttribute('type') === 'text')
-  check('кнопка есть и заблокирована', submitBtn(el) && submitBtn(el).disabled === true)
+    el.querySelector('#rep-site').getAttribute('inputmode') === 'numeric' &&
+    el.querySelector('#rep-site').getAttribute('type') === 'text')
+  check('кнопка есть и «заблокирована» (aria-disabled)', submitBtn(el) && btnBlocked(el))
+  check('сводки «Проверь себя» на пустой форме нет', !el.textContent.includes('Проверь себя'))
 
-  // тултип дословно
-  const tipBtn = el.querySelector('button[aria-label="Пояснение: Общая выручка, ₽"]')
-  check('ⓘ у выручки есть', !!tipBtn)
-  await fire(tipBtn, 'click')
-  check('текст тултипа §5.1 дословно', el.textContent.includes('строка „Итого выручка“. Включает онлайн-кассу (C2P)'))
+  // тултипы дословно (v2 §2)
+  const tip = async (label) => {
+    const b = el.querySelector(`button[aria-label="Пояснение: ${label}"]`)
+    if (b) await fire(b, 'click')
+    return !!b
+  }
+  check('ⓘ у выручки есть', await tip('Общая выручка, ₽'))
+  check('тултип выручки дополнен проверкой трёх слагаемых',
+    el.textContent.includes('Проверка: безнал + нал + личный кабинет = выручка.'))
+  check('ⓘ у безнала есть', await tip('Безналичные, ₽'))
+  check('тултип безнала: «НА КАССАХ … своё поле» дословно',
+    el.textContent.includes('Оплаты банковской картой НА КАССАХ, за день, из системы. Пополнения через личный кабинет сюда не входят — у них своё поле.'))
+  check('ⓘ у ЛК есть', await tip('Личный кабинет (сайт), ₽'))
+  check('тултип site: «Онлайн-касса C2P … ставьте 0» дословно',
+    el.textContent.includes('Пополнения через личный кабинет на сайте (в выгрузке — строки „Онлайн-касса C2P“). Если канала в парке нет или сегодня ноль — ставьте 0.'))
+  check('ⓘ у чеков есть', await tip('Чеков за день'))
+  check('тултип receipts §3 дословно',
+    el.textContent.includes('итоговое „Кол-во чеков“ дня.'))
+  check('ⓘ у игроков есть', await tip('Игроков всего'))
+  check('тултип игроков: «сколько игроков пришло»',
+    el.textContent.includes('Счётчик визитов за день: сколько игроков пришло. Это НЕ количество чеков.'))
+
+  // тап «Отправить» на невалидной форме → POST НЕ уходит (скролл к проблеме)
+  postedBodies.length = 0
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, 20))
+  check('тап по «Отправить» с ошибками POST не шлёт (§1)', postedBodies.length === 0)
 
   await setInput(el, 'rep-revenue', '207249')
   await setInput(el, 'rep-cashless', '147834')
-  await setInput(el, 'rep-cash', '59415')
+  await setInput(el, 'rep-cash', '44415')
+  await setInput(el, 'rep-site', '15000')
   await setInput(el, 'rep-visitors_total', '300')
   await setInput(el, 'rep-visitors_new', '40')
-  check('без погоды — ещё заблокирована', submitBtn(el).disabled === true)
+  await setInput(el, 'rep-receipts', '265')
+  await setInput(el, 'rep-topups', '180')
+  await setInput(el, 'rep-sessions', '160')
+  check('без погоды — ещё заблокирована', btnBlocked(el))
   await setInput(el, 'rep-weather', 'rain_all')
-  check('валидация зелёная → кнопка активна', submitBtn(el).disabled === false)
+  check('валидация зелёная → кнопка активна', !btnBlocked(el))
 
-  // расхождение суммы
-  await setInput(el, 'rep-cash', '59414')
-  check('сумма разошлась → кнопка заблокирована', submitBtn(el).disabled === true)
-  check('текст §4: «Безнал + нал = … Разница …»',
-    el.textContent.includes('Безнал + нал =') && el.textContent.includes('Разница') && el.textContent.includes('проверьте цифры'))
-  await setInput(el, 'rep-cash', '59415')
+  // живая сводка «Проверь себя» (§5)
+  check('сводка появилась', el.textContent.includes('Проверь себя'))
+  check('средний чек ≈ 782 ₽', el.textContent.includes('≈ 782 ₽'))
+  check('чек/пополнение ≈ 1 151 ₽ (пробел-разделитель тысяч из i18n)',
+    el.textContent.includes(rub(1151)), JSON.stringify(rub(1151)))
+  check('попол/сессию 1,13 (2 знака, запятая)', el.textContent.includes('1,13'))
+  check('доли: нал 21 % · ЛК 7 % · новых 13 %',
+    el.textContent.includes('21 %') && el.textContent.includes('7 %') && el.textContent.includes('13 %'))
+
+  // расхождение суммы из ТРЁХ слагаемых
+  await setInput(el, 'rep-site', '15001')
+  check('сумма разошлась → кнопка заблокирована', btnBlocked(el))
+  check('текст §2: «Безнал + нал + личный кабинет = … Разница …»',
+    el.textContent.includes('Безнал + нал + личный кабинет =') &&
+    el.textContent.includes('Разница') && el.textContent.includes('проверьте цифры'))
+  postedBodies.length = 0
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, 20))
+  check('с расхождением суммы POST не уходит', postedBodies.length === 0)
+  await setInput(el, 'rep-site', '15000')
+
+  // sessions > topups у Питера
+  await setInput(el, 'rep-sessions', '181')
+  check('Питер: sessions > topups блокирует + текст', btnBlocked(el) &&
+    el.textContent.includes('Чеков с пополнением не может быть больше'))
+  await setInput(el, 'rep-sessions', '160')
+
+  // topups > receipts НЕ блокирует
+  await setInput(el, 'rep-topups', '300')
+  await setInput(el, 'rep-sessions', '290')
+  check('topups > receipts НЕ блокирует', !btnBlocked(el))
+  await setInput(el, 'rep-topups', '180')
+  await setInput(el, 'rep-sessions', '160')
 
   // не-вчера: жёлтая плашка, не блокирует
   await setInput(el, 'rep-date', todayISO(new Date()))
   check('не-вчера: жёлтая плашка дословно', el.textContent.includes('Вы вносите отчёт не за вчера — проверьте дату'))
-  check('не-вчера НЕ блокирует', submitBtn(el).disabled === false)
+  check('не-вчера НЕ блокирует', !btnBlocked(el))
   await setInput(el, 'rep-date', yesterdayISO(new Date()))
 
   // отправка: успех
   postMode = 'ok'
+  postedBodies.length = 0
   await fire(el.querySelector('form'), 'submit')
   await new Promise((r) => setTimeout(r, 20))
   await nextTick()
   check('POST ушёл ровно один', postedBodies.length === 1)
   const body = JSON.parse(postedBodies[0] || '{}')
   check('в теле — гейт-ключ key', body.key === 'test-phrase')
-  check('тело по контракту §7 (числа числами)',
+  check('тело по контракту §6 (числа числами)',
     body.park === 'piterland' && body.revenue === 207249 && body.cashless === 147834 &&
-    body.cash === 59415 && body.visitors_total === 300 && body.visitors_new === 40 &&
-    body.weather === 'rain_all' && !('topups' in body))
+    body.cash === 44415 && body.site === 15000 && body.visitors_total === 300 &&
+    body.visitors_new === 40 && body.receipts === 265 && body.topups === 180 &&
+    body.sessions === 160 && body.weather === 'rain_all')
+  check('производных §5 в теле НЕТ',
+    !('avg_check' in body) && !('cash_share' in body) && !('new_share' in body))
   check('экран успеха: «Отчёт за … принят»', el.textContent.includes('принят'))
   check('кнопка «Внести ещё»', el.textContent.includes('Внести ещё'))
   app.unmount()
@@ -271,42 +426,69 @@ console.log('\n=== jsdom: ошибка бэка — данные не теряю
   const { el, app } = mount(bundle.DailyReportScreen)
   await nextTick()
   await setInput(el, 'rep-park', 'ohta')
+  check('у Охты receipts есть', !!el.querySelector('#rep-receipts'))
   await setInput(el, 'rep-revenue', '100000')
   await setInput(el, 'rep-cashless', '60000')
-  await setInput(el, 'rep-cash', '40000')
+  await setInput(el, 'rep-cash', '30000')
+  await setInput(el, 'rep-site', '10000')
   await setInput(el, 'rep-visitors_total', '150')
   await setInput(el, 'rep-visitors_new', '10')
+  await setInput(el, 'rep-receipts', '140')
+  await setInput(el, 'rep-topups', '120')
+  await setInput(el, 'rep-sessions', '110')
   await setInput(el, 'rep-weather', 'sunny')
   await fire(el.querySelector('form'), 'submit')
   await new Promise((r) => setTimeout(r, 20))
   await nextTick()
   check('красная плашка дословно', el.textContent.includes('Не отправилось — попробуйте ещё раз или пришлите отчёт как обычно'))
-  check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' && el.querySelector('#rep-park').value === 'ohta')
+  check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' &&
+    el.querySelector('#rep-site').value === '10000' && el.querySelector('#rep-park').value === 'ohta')
   check('успеха нет', !el.textContent.includes('принят'))
   app.unmount()
 }
 
-console.log('\n=== jsdom: Июнь — доп-поля и sessions ≤ topups ===')
+console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
 {
   postMode = 'ok'
   const { el, app } = mount(bundle.DailyReportScreen)
   await nextTick()
   await setInput(el, 'rep-park', 'iyun')
   check('поля Июня появились', !!el.querySelector('#rep-topups') && !!el.querySelector('#rep-sessions') && !!el.querySelector('#rep-promo'))
-  check('напоминания §5.8 у Июня НЕТ', !el.textContent.includes('Не забудьте прислать выгрузку'))
+  check('receipts у Июня НЕТ', !el.querySelector('#rep-receipts'))
+  check('site у Июня есть (все парки)', !!el.querySelector('#rep-site'))
+  check('тихой строки недельной сверки у Июня НЕТ',
+    !el.textContent.includes('Раз в неделю присылайте владельцу'))
+  // тултипы topups/sessions у Июня — v1 («как раньше», §1)
+  const tipBtn = el.querySelector('button[aria-label="Пояснение: Пополнений за день"]')
+  await fire(tipBtn, 'click')
+  check('тултип topups Июня — v1 (1 пополнение = 1 чек)',
+    el.textContent.includes('Общее количество пополнений баланса. У нас 1 пополнение = 1 чек.'))
   await setInput(el, 'rep-revenue', '100000')
   await setInput(el, 'rep-cashless', '60000')
-  await setInput(el, 'rep-cash', '40000')
+  await setInput(el, 'rep-cash', '30000')
+  await setInput(el, 'rep-site', '10000')
   await setInput(el, 'rep-visitors_total', '150')
   await setInput(el, 'rep-visitors_new', '10')
   await setInput(el, 'rep-weather', 'mixed')
-  check('без topups/sessions — заблокирована', submitBtn(el).disabled === true)
+  check('без topups/sessions — заблокирована', btnBlocked(el))
   await setInput(el, 'rep-topups', '120')
   await setInput(el, 'rep-sessions', '121')
-  check('sessions > topups — заблокирована + текст', submitBtn(el).disabled === true &&
+  check('sessions > topups — заблокирована + текст', btnBlocked(el) &&
     el.textContent.includes('Чеков с пополнением не может быть больше'))
   await setInput(el, 'rep-sessions', '110')
-  check('sessions ≤ topups — активна', submitBtn(el).disabled === false)
+  check('sessions ≤ topups — активна', !btnBlocked(el))
+  // Июнь: средний чек = revenue ÷ topups (D-10); плитки «чек/пополнение» нет (дубль)
+  check('Июнь: средний чек ≈ 833 ₽ (revenue ÷ topups)', el.textContent.includes('≈ 833 ₽'))
+  check('Июнь: плитки «Чек / пополнение» нет (дубль D-10)', !el.textContent.includes('Чек / пополнение'))
+  // payload Июня
+  postedBodies.length = 0
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, 20))
+  await nextTick()
+  const body = JSON.parse(postedBodies[0] || '{}')
+  check('Июнь: тело §6 — site есть, receipts нет',
+    body.park === 'iyun' && body.site === 10000 && !('receipts' in body) &&
+    body.topups === 120 && body.sessions === 110)
   app.unmount()
 }
 
