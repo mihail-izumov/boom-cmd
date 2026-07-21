@@ -93,6 +93,14 @@ export function computeDaily(set) {
   const landing = realizedRev + sum(remaining, (x) => impliedBase * x.weight)
   const maxObsBase = pace.length ? Math.max(...pace.map((x) => x.fact / x.weight)) : 0
   const achievable = adjBase <= maxObsBase * 1.001
+  // Три состояния достижимости (v2.1 §5, D-16; тот же расчёт — в пультах контура B
+  // и build_daily.py). `achievable` сохраняем — обратная совместимость.
+  //   out    — нужный темп выше ЛУЧШЕГО наблюдённого дня → цель вне досягаемости;
+  //   record — темп в пределах лучшего дня, но > +25% к среднему → нужен рекордный темп;
+  //   ok     — темп в пределах +25% к среднему → цель достижима.
+  const goalState = adjBase > maxObsBase * 1.001 ? 'out'
+    : adjBase > impliedBase * 1.25 ? 'record'
+    : 'ok'
   const planRealized = sum(realized, (x) => x.plan)
   const onPlan = planRealized > 0 ? realizedRev / planRealized : null
   const tailCum = planRealized - realizedRev
@@ -162,7 +170,14 @@ export function computeDaily(set) {
   const journal = (set.journal || []).map((s) => {
     const arrow = prev == null ? 'flat' : s.landing > prev + 5000 ? 'up' : s.landing < prev - 5000 ? 'down' : 'flat'
     prev = s.landing
-    return { date: s.date, realized: s.realized, landing: s.landing, landingPct: s.landing_pct, onPlan: s.on_plan, achievable: s.achievable, sig: sigClass(s.landing_pct), arrow }
+    return {
+      date: s.date, realized: s.realized, landing: s.landing, landingPct: s.landing_pct,
+      onPlan: s.on_plan, achievable: s.achievable,
+      // goal_state пишет build_daily.py (v2.1 §5); фолбэк для старых payload — из achievable
+      // (без 'record': бинарной истории трёх состояний не восстановить).
+      goalState: s.goal_state || (s.achievable ? 'ok' : 'out'),
+      sig: sigClass(s.landing_pct), arrow,
+    }
   })
 
   // активности: результат к плану по дням активности
@@ -193,7 +208,7 @@ export function computeDaily(set) {
     park: set.park, parkName: set.park_name, month: set.month, Y, M, DIM,
     T, realizedRev, realizedCount: realized.length,
     landing, landDev, fcSig: sigClass(T ? landing / T : null),
-    achievable, remainTarget, factPct, landPct, gap,
+    achievable, goalState, remainTarget, factPct, landPct, gap,
     onPlan, tailCum, spread: remaining.length ? Math.abs(tailCum) / remaining.length : 0,
     currentPace, needPerDay, paceGap, futureCount: futureDays.length,
     days, weeks, dayStats, metColumns, metRows, journal, activities,
@@ -223,7 +238,7 @@ export function computeNetwork(setsByKey, parkIds) {
     cards.push({
       park: pid, parkName: s.park_name, month: s.month,
       target: m.T, earned: m.realizedRev, landing: m.landing,
-      landDev: m.landDev, fcSig: m.fcSig, achievable: m.achievable,
+      landDev: m.landDev, fcSig: m.fcSig, achievable: m.achievable, goalState: m.goalState,
       onPlan: m.onPlan, tailCum: m.tailCum, assume,
     })
     // моментум «как в журнале»: последний шаг journal по каждому парку (сетевой ряд A)

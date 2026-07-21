@@ -1,4 +1,6 @@
-// Локальная приёмка страницы «Отчёт дня» v2 (D-12). Запуск: `node scripts/verify-report.mjs`.
+// Локальная приёмка страницы «Отчёт Дня» v2/v2.1 (D-12). Запуск: `node scripts/verify-report.mjs`.
+// v2.1: подпись/тултипы поля сессий (§1), «Переменно / затрудняюсь» (§2),
+// дата без border-t (§3), заголовок «Отчёт Дня» (§4).
 //
 // Двухслойная проверка:
 //   1) ЧИСТАЯ МОДЕЛЬ (reportModel.js, без DOM): все блокировки ТЗ v2 §2–3 —
@@ -20,7 +22,7 @@ import {
   emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
   yesterdayISO, todayISO,
 } from '../src/composables/reportModel.js'
-import { rub } from '../src/i18n/report.js'
+import { rub, L, FIELD_LABELS, WEATHER_OPTIONS, TIPS, TIPS_IYUN } from '../src/i18n/report.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -184,6 +186,22 @@ console.log('\n=== reportModel: живая сводка derived() §5 ===')
     Math.abs(d.avg_check - 100000 / 120) < 1e-9)
 }
 
+console.log('\n=== i18n: тексты v2.1 §1–2, §4 (дословно из ТЗ) ===')
+check('заголовок «Отчёт Дня» (Д заглавная, §4)', L.title === 'Отчёт Дня', L.title)
+check('подпись сессий: «Чеков с пополнением (сессии)» (§1)',
+  FIELD_LABELS.sessions === 'Чеков с пополнением (сессии)')
+check('тултип сессий Охта/Питер — дословно §1',
+  TIPS.sessions === 'Сколько чеков содержали хотя бы одно пополнение. В один чек могут пробить два пополнения (семья, докидка) — тогда это 1 чек и 2 пополнения. Где взять: в выгрузке „[Финансовые] Выручка“ — сумма колонки „Кол-во чеков“ по строкам „Покупка очков“. Всегда ≤ „Пополнений за день“.')
+check('тултип сессий Июня — дословно §1',
+  TIPS_IYUN.sessions === 'Сколько чеков содержали хотя бы одно пополнение. Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.')
+check('погода: по-прежнему 5 опций, новых не добавлено (§2)', WEATHER_OPTIONS.length === 5)
+check('погода: слаги не тронуты (§2)',
+  WEATHER_OPTIONS.map((w) => w.value).join(',') === 'sunny,mixed,overcast,rain_part,rain_all')
+check('опция mixed: «Переменно / затрудняюсь» (§2)',
+  WEATHER_OPTIONS.find((w) => w.value === 'mixed')?.label === 'Переменно / затрудняюсь')
+check('тултип погоды дополнен — дословно §2',
+  TIPS.weather.endsWith('Если день не подходит точно ни под один вариант — выбирайте „Переменно / затрудняюсь“ и напишите пару слов о погоде в комментарии.'))
+
 // ═══════════════ 2. Живой рендер в jsdom ═══════════════
 console.log('\n=== jsdom: сборка тестового бандла ===')
 const tmp = resolve(root, '.tmp-verify-report')
@@ -301,6 +319,8 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
     ['Деньги', 'Игроки', 'Чеки', 'День'].every((t) =>
       [...el.querySelectorAll('h2')].some((h) => h.textContent.trim() === t)))
   check('divide-y между полями убран (§1)', !el.querySelector('form .divide-y'))
+  check('разделителя border-t в форме нет — дата отделена отступом (v2.1 §3)',
+    !el.querySelector('form .border-t'))
   check('поле site (Личный кабинет) есть у Питера', !!el.querySelector('#rep-site'))
   check('подпись site дословно', el.textContent.includes('Личный кабинет (сайт), ₽'))
   check('receipts/topups/sessions есть у Питера (§3)',
@@ -338,6 +358,21 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
   check('ⓘ у игроков есть', await tip('Игроков всего'))
   check('тултип игроков: «сколько игроков пришло»',
     el.textContent.includes('Счётчик визитов за день: сколько игроков пришло. Это НЕ количество чеков.'))
+
+  // v2.1 §1–2: сессии и погода
+  check('подпись сессий в форме: «Чеков с пополнением (сессии)» (v2.1 §1)',
+    el.textContent.includes('Чеков с пополнением (сессии)'))
+  check('ⓘ у сессий есть (по новой подписи)', await tip('Чеков с пополнением (сессии)'))
+  check('тултип сессий Питера: «семья, докидка» + источник из выгрузки (v2.1 §1)',
+    el.textContent.includes('В один чек могут пробить два пополнения (семья, докидка) — тогда это 1 чек и 2 пополнения.') &&
+    el.textContent.includes('Где взять: в выгрузке „[Финансовые] Выручка“ — сумма колонки „Кол-во чеков“ по строкам „Покупка очков“. Всегда ≤ „Пополнений за день“.'))
+  check('опция погоды в селекте: «Переменно / затрудняюсь» (v2.1 §2)',
+    [...el.querySelectorAll('#rep-weather option')].some((o) => o.value === 'mixed' && o.textContent.trim() === 'Переменно / затрудняюсь'))
+  check('в селекте погоды 5 опций + placeholder (новых нет, v2.1 §2)',
+    el.querySelectorAll('#rep-weather option').length === 6)
+  check('ⓘ у погоды есть', await tip('Погода'))
+  check('тултип погоды дополнен про «Переменно / затрудняюсь» (v2.1 §2)',
+    el.textContent.includes('Если день не подходит точно ни под один вариант — выбирайте „Переменно / затрудняюсь“ и напишите пару слов о погоде в комментарии.'))
 
   // тап «Отправить» на невалидной форме → POST НЕ уходит (скролл к проблеме)
   postedBodies.length = 0
@@ -463,6 +498,12 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
   await fire(tipBtn, 'click')
   check('тултип topups Июня — v1 (1 пополнение = 1 чек)',
     el.textContent.includes('Общее количество пополнений баланса. У нас 1 пополнение = 1 чек.'))
+  // v2.1 §1: сессии Июня — свой тултип (без выгрузки), подпись общая
+  const sesTipBtn = el.querySelector('button[aria-label="Пояснение: Чеков с пополнением (сессии)"]')
+  await fire(sesTipBtn, 'click')
+  check('тултип сессий Июня — v2.1 (без «Где взять», с «Всегда ≤»)',
+    el.textContent.includes('Сколько чеков содержали хотя бы одно пополнение. Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.') &&
+    !el.textContent.includes('Где взять'))
   await setInput(el, 'rep-revenue', '100000')
   await setInput(el, 'rep-cashless', '60000')
   await setInput(el, 'rep-cash', '30000')
@@ -496,7 +537,8 @@ console.log('\n=== jsdom: ReporterShell (вход по фразе репортё
 {
   const { el, app } = mount(bundle.ReporterShell)
   await nextTick()
-  check('заголовок «Отчёт дня»', el.textContent.includes('Отчёт дня'))
+  check('заголовок «Отчёт Дня» (Д заглавная, v2.1 §4)',
+    el.textContent.includes('Отчёт Дня') && !el.textContent.includes('Отчёт дня'))
   check('таб-бара нет (nav отсутствует)', !el.querySelector('nav'))
   check('форма внутри', !!el.querySelector('#rep-park'))
   check('без NaN/undefined/Infinity', !BAD.test(el.textContent))

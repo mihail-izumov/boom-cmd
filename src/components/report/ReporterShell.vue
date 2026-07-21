@@ -26,7 +26,7 @@ function onScroll(e) {
       class="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[env(safe-area-inset-bottom)]"
       @scroll="onScroll"
     >
-      <NavigationBar title="Отчёт дня" eyebrow="БУМБАСТИК" :collapsed="collapsed" />
+      <NavigationBar title="Отчёт Дня" eyebrow="БУМБАСТИК" :collapsed="collapsed" />
       <DailyReportScreen />
     </div>
   </div>

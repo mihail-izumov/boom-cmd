@@ -1,13 +1,15 @@
 <script setup>
 import { computed } from 'vue'
-import { mln, pctSigned, L, SIG_VAR } from '../../i18n/daily.js'
+import { mln, pctSigned, L, SIG_VAR, GOAL_STATE } from '../../i18n/daily.js'
 
 // Hero: цель · прогноз выручки (+отклонение) · достижимость · осталось заработать.
 // v1.1: устойчивая сетка (цель во всю ширину, ниже 2 колонки: прогноз | достижимость),
 // без flex-wrap+ml-auto — блоки не разъезжаются на узком экране.
+// v2.1 §5: достижимость — три состояния goalState (ok/record/out), не бинарный флаг.
 // Текст монохромный; сигнал — цветная точка + заливка полосы (DESIGN-STANDARD).
 const props = defineProps({ m: { type: Object, required: true } })
 const fcColor = computed(() => SIG_VAR[props.m.fcSig] || 'var(--line)')
+const gs = computed(() => GOAL_STATE[props.m.goalState] || GOAL_STATE.ok)
 </script>
 
 <template>
@@ -30,8 +32,8 @@ const fcColor = computed(() => SIG_VAR[props.m.fcSig] || 'var(--line)')
       </div>
       <div class="min-w-0 text-right">
         <div class="flex items-center justify-end gap-1.5 text-[0.75rem] leading-snug text-[var(--text-muted)]">
-          <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: m.achievable ? 'var(--positive)' : 'var(--negative)' }" />
-          {{ m.achievable ? L.achievable : L.not_achievable }}
+          <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: gs.dot }" />
+          {{ gs.label }}
         </div>
         <div class="mt-1 text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ mln(m.remainTarget) }}</div>
         <div class="mt-0.5 text-[0.75rem] text-[var(--text-muted)]">{{ L.to_earn }}</div>

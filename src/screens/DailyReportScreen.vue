@@ -140,7 +140,8 @@ function more() {
           </div>
         </div>
 
-        <div class="border-t border-[var(--line)] py-2.5">
+        <!-- v2.1 §3: без border-t — поля разделяются отступом, как во всех картах -->
+        <div class="py-2.5">
           <label for="rep-date" class="text-[0.875rem] font-medium text-[var(--text-secondary)]">{{ L.date_label }}</label>
           <input
             id="rep-date"

@@ -1,6 +1,6 @@
 <script setup>
 import { ChevronRight } from 'lucide-vue-next'
-import { mln, pctSigned, L, SIG_VAR } from '../../i18n/daily.js'
+import { mln, pctSigned, L, SIG_VAR, GOAL_STATE } from '../../i18n/daily.js'
 import { PARKS_BY_ID } from '../../data/parks.js'
 import { useParkContext } from '../../composables/useParkContext.js'
 
@@ -11,6 +11,8 @@ const props = defineProps({ net: { type: Object, required: true } })
 const { setPark } = useParkContext()
 const nameOf = (c) => PARKS_BY_ID[c.park]?.name || c.parkName || c.park
 const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
+// v2.1 §5: три состояния достижимости — по каждой карточке парка из её модели
+const gsOf = (c) => GOAL_STATE[c.goalState] || GOAL_STATE.ok
 </script>
 
 <template>
@@ -52,8 +54,8 @@ const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
         <ChevronRight class="ml-auto h-5 w-5 shrink-0 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
       </div>
       <div class="mb-2 flex items-center gap-1.5 text-[0.75rem] text-[var(--text-muted)]">
-        <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: c.achievable ? 'var(--positive)' : 'var(--negative)' }" />
-        {{ c.achievable ? L.achievable : L.not_achievable }}
+        <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: gsOf(c).dot }" />
+        {{ gsOf(c).label }}
       </div>
       <div class="relative mb-2 h-3 overflow-hidden rounded-full bg-[var(--surface-2)]">
         <i class="absolute bottom-0 left-0 top-0 rounded-full" :style="{ width: pctW(c) + '%', background: SIG_VAR[c.fcSig] }" />

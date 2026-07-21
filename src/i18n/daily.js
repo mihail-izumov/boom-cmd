@@ -59,6 +59,14 @@ export function dayGenIso(iso) {
 // Токен-класс заливки по sigClass → CSS-переменная сигнала.
 export const SIG_VAR = { good: 'var(--positive)', warn: 'var(--warning)', bad: 'var(--negative)', idle: 'var(--line)' }
 
+// Три состояния достижимости цели (v2.1 §5, D-16). Цветная — ТОЛЬКО точка-индикатор,
+// текст всегда монохромный (DESIGN-STANDARD); рядом с точкой смысл дублируется словами.
+export const GOAL_STATE = {
+  ok:     { dot: 'var(--positive)', label: 'цель достижима',             journal: '✓ достижима' },
+  record: { dot: 'var(--warning)',  label: 'нужен рекордный темп',       journal: '↑ рекордный темп' },
+  out:    { dot: 'var(--negative)', label: 'фокус — минимум отставания', journal: 'вне досягаемости' },
+}
+
 export const L = {
   home_banner: 'Контроль Дня',
   back: 'Главная',
@@ -68,8 +76,6 @@ export const L = {
   target: 'Цель месяца',
   forecast: 'Прогноз выручки',
   forecast_hint: 'при текущем темпе',
-  achievable: 'цель достижима',
-  not_achievable: 'без вмешательства не выйдем',
   to_earn: 'осталось заработать',
   earned: 'заработано',
   will_add: 'прогноз добавит',
@@ -99,6 +105,4 @@ export const L = {
   net_earned: 'заработано',
   net_forecast: 'прогноз',
   assume: 'допущение',
-  reached: 'достижима',
-  risk: 'риск',
 }
