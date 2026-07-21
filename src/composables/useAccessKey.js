@@ -22,6 +22,7 @@ const API =
 const SESSION_TTL_MS = 60 * 60 * 1000
 
 const authed = ref(false) // пускать в оболочку
+const role = ref(null) // 'owner' | 'reporter' | null (D-12 §9, вариант A)
 const ready = ref(false) // стартовая инициализация завершена
 const checking = ref(false) // идёт проверка фразы
 const keyError = ref(false) // неверная фраза при сабмите
@@ -43,13 +44,16 @@ function getKey() {
   return memKey
 }
 
-// Проверка фразы против эндпоинта. Возвращает 'ok' | 'unauthorized' | 'neterror'.
+// Проверка фразы против эндпоинта. Возвращает { status, role }:
+// status 'ok' | 'unauthorized' | 'neterror'; role — 'reporter', если гейт
+// ответил { role: 'reporter' } (вторая фраза «репортёра», D-12 §9-A), иначе
+// 'owner'. Старый гейт без поддержки ролей отвечает как раньше → 'owner'.
 async function check(phrase) {
   const res = await fetch(`${API}?key=${encodeURIComponent(phrase)}`)
-  if (!res.ok) return 'neterror'
+  if (!res.ok) return { status: 'neterror', role: null }
   const data = await res.json()
-  if (data && data.error === 'unauthorized') return 'unauthorized'
-  return 'ok'
+  if (data && data.error === 'unauthorized') return { status: 'unauthorized', role: null }
+  return { status: 'ok', role: data && data.role === 'reporter' ? 'reporter' : 'owner' }
 }
 
 // Стартовая инициализация (из App.vue). Без источника — гейт неактивен.
@@ -57,6 +61,7 @@ async function check(phrase) {
 function init() {
   if (!API) {
     authed.value = true
+    role.value = 'owner' // без гейта репортёрского режима нет
   } else {
     authed.value = false
   }
@@ -71,16 +76,18 @@ async function submitKey(phrase) {
   notice.value = null
   if (!API) {
     authed.value = true
+    role.value = 'owner'
     return
   }
   checking.value = true
   try {
     const r = await check(v)
-    if (r === 'ok') {
+    if (r.status === 'ok') {
       memKey = v
       memTs = Date.now()
+      role.value = r.role
       authed.value = true
-    } else if (r === 'unauthorized') {
+    } else if (r.status === 'unauthorized') {
       keyError.value = true
     } else {
       netError.value = 'Нет связи с источником данных'
@@ -97,6 +104,7 @@ function logout(reason) {
   memKey = ''
   memTs = 0
   authed.value = false
+  role.value = null
   if (reason === 'expired') notice.value = 'Время сессии истекло. Войдите снова.'
   else if (reason === 'unauthorized') notice.value = 'Доступ изменился. Войдите снова.'
 }
@@ -113,6 +121,7 @@ if (typeof window !== 'undefined') {
 export function useAccessKey() {
   return {
     authed,
+    role,
     ready,
     checking,
     keyError,

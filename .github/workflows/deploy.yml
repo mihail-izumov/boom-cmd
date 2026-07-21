@@ -29,6 +29,7 @@ jobs:
           VITE_MATERIALS_API: ${{ vars.VITE_MATERIALS_API }}
           VITE_DAILY_API: ${{ vars.VITE_DAILY_API }}
           VITE_GOALS_API: ${{ vars.VITE_GOALS_API }}
+          VITE_REPORT_API: ${{ vars.VITE_REPORT_API }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

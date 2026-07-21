@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
+import { Plus } from 'lucide-vue-next'
 import { useDaily } from '../composables/useDaily.js'
+import { setSubView } from '../composables/useAppNav.js'
 import { useParkContext } from '../composables/useParkContext.js'
 import { useNavCaption } from '../composables/useNavCaption.js'
 import { computeDaily, computeNetwork, monthsForPark, setForParkMonth } from '../composables/dailyModel.js'
@@ -107,5 +109,19 @@ watch(updatedLabel, () => syncCaption())
       <p class="bc-fade-in px-1 text-[0.8125rem] capitalize text-[var(--text-muted)]">{{ monthLabel }}</p>
       <DailyDashboard :m="model" class="bc-fade-in" />
     </template>
+
+    <!-- «Отчёт дня» (D-12): вход в единственную пишущую страницу.
+         Показываем всегда (кроме загрузки) — форма не зависит от дневного слоя. -->
+    <button
+      v-if="!loading"
+      type="button"
+      class="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--surface)] shadow-sm transition-opacity active:opacity-90"
+      @click="setSubView('daily-report')"
+    >
+      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)]">
+        <Plus class="h-[18px] w-[18px] text-[var(--accent-ink)]" :stroke-width="2.5" aria-hidden="true" />
+      </span>
+      <span class="text-[1rem] font-semibold text-[var(--text)]">Добавить отчёт</span>
+    </button>
   </section>
 </template>

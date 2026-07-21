@@ -8,9 +8,11 @@ import MaterialsScreen from './screens/MaterialsScreen.vue'
 import ParksScreen from './screens/ParksScreen.vue'
 import DailyScreen from './screens/DailyScreen.vue'
 import GoalsScreen from './screens/GoalsScreen.vue'
+import DailyReportScreen from './screens/DailyReportScreen.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import AccessKeyForm from './components/AccessKeyForm.vue'
-import { useAppNav, setActive, clearSubView } from './composables/useAppNav.js'
+import ReporterShell from './components/report/ReporterShell.vue'
+import { useAppNav, setActive, setSubView, clearSubView } from './composables/useAppNav.js'
 import { useAccessKey } from './composables/useAccessKey.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
@@ -48,12 +50,32 @@ const subViews = {
     backLabel: 'Главная',
     parkFilter: true,
   },
+  // «Отчёт дня» (D-12) — единственная пишущая страница; открывается кнопкой
+  // «Добавить отчёт» из «Контроля Дня». `backTo` — статический возврат на
+  // родительскую под-страницу (стек по-прежнему глубиной 1, без роутера).
+  'daily-report': {
+    title: 'Отчёт дня',
+    screen: DailyReportScreen,
+    showBack: true,
+    backLabel: 'Контроль Дня',
+    backTo: 'daily',
+    parkFilter: false,
+  },
 }
 
 const { active, subView } = useAppNav()
 
+// Назад с под-страницы: у «Отчёта дня» возврат на «Контроль Дня» (backTo),
+// у остальных — на Главную (как раньше).
+function onBack() {
+  const sv = subView.value && subViews[subView.value]
+  if (sv && sv.backTo) setSubView(sv.backTo)
+  else clearSubView()
+}
+
 // Гейт на весь вход: пока фраза не подтверждена — экран входа вместо оболочки.
-const { authed, ready, checking, keyError, netError, notice, init, submitKey } =
+// role === 'reporter' (вторая фраза, D-12 §9-A) → только «Отчёт дня» без оболочки.
+const { authed, role, ready, checking, keyError, netError, notice, init, submitKey } =
   useAccessKey()
 init()
 </script>
@@ -78,6 +100,9 @@ init()
     @submit="submitKey"
   />
 
+  <!-- режим репортёра: только форма «Отчёт дня», цифры сети не загружаются -->
+  <ReporterShell v-else-if="role === 'reporter'" />
+
   <AppShell
     v-else
     :tabs="tabs"
@@ -85,6 +110,6 @@ init()
     :sub-view="subView"
     :sub-views="subViews"
     @update:active="(id) => setActive(id)"
-    @back="clearSubView"
+    @back="onBack"
   />
 </template>
