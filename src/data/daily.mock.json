@@ -1,5 +1,6 @@
 {
  "updated": "2025-05-20",
+ "stats": { "checkups": 137, "signals": 42 },
  "sets": {
   "ohta:2025-05": {
    "park": "ohta",

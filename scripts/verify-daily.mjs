@@ -18,6 +18,7 @@ import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
   buildSignalReadBody, postSignalRead,
 } from '../src/composables/dailySignals.js'
+import { readCounters } from '../src/i18n/home.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -325,27 +326,30 @@ async function fire(node, type) {
   await nextTick()
 }
 
-const ohtaSignals = sets['ohta:2025-05'].signals
+const NOW_MID = new Date(2025, 4, 16, 12, 0, 0) // 16.05.2025, пятница (mOhta/mIyun объявлены выше)
 
-console.log('\n=== jsdom: полоса B — карточка «Сигнал дня» ===')
+console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B слиты, v3.1) ===')
 {
   localStorage.clear()
-  const { el, app } = mount(bundle.DailySignalCard, { signals: ohtaSignals, park: 'ohta' })
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
-  check('заголовок «Сигнал дня»', el.textContent.includes('Сигнал дня'))
+  check('заголовок «Сигнал Дня» (Дня с большой)', el.textContent.includes('Сигнал Дня'))
   check('подпись «разбор аналитика от 16.05» (актуальный = max date)', el.textContent.includes('разбор аналитика от 16.05'))
   check('headline актуального виден', el.textContent.includes('Темп восстановлен к выходным'))
   check('бейдж «новое» на первом заходе', el.textContent.includes('новое'))
   const btn = el.querySelector('[data-test="signal-read"]')
-  check('кнопка «Прочитал» активна (не Прочитано)',
-    !!btn && btn.disabled === false && el.textContent.includes('Прочитал') && !el.textContent.includes('Прочитано'))
+  check('кнопка «Прочитала» активна (не «Прочитано»)',
+    !!btn && btn.disabled === false && el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
+  check('«Как идёт день» влит в блок', el.textContent.includes('Как идёт день'))
+  check('день-строки влиты (4 на моке)', el.querySelectorAll('[data-test="day-line"]').length === 4,
+    el.querySelectorAll('[data-test="day-line"]').length)
   check('лента свёрнута: старые сигналы не в DOM', !el.textContent.includes('Среда провалилась по будням'))
   check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
   app.unmount()
 }
 {
   // второй заход: актуальный уже viewed → бейдж «новое» снят
-  const { el, app } = mount(bundle.DailySignalCard, { signals: ohtaSignals, park: 'ohta' })
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('бейдж «новое» снят в следующий заход', !el.textContent.includes('новое'))
   await fire(el.querySelector('[data-test="signal-feed-toggle"]'), 'click')
@@ -358,7 +362,7 @@ console.log('\n=== jsdom: полоса B — карточка «Сигнал д�
   // успех POST → «Прочитано ✓», кнопка неактивна; тело по контракту §2
   localStorage.clear()
   postMode = 'ok'; postedBodies.length = 0
-  const { el, app } = mount(bundle.DailySignalCard, { signals: ohtaSignals, park: 'ohta' })
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
   await new Promise((r) => setTimeout(r, 20)); await nextTick()
@@ -369,7 +373,7 @@ console.log('\n=== jsdom: полоса B — карточка «Сигнал д�
   check('после успеха: «Прочитано ✓», кнопка неактивна',
     el.textContent.includes('Прочитано') && el.querySelector('[data-test="signal-read"]').disabled === true)
   app.unmount()
-  const re = mount(bundle.DailySignalCard, { signals: ohtaSignals, park: 'ohta' })
+  const re = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('прочитано и при следующих заходах', re.el.textContent.includes('Прочитано'))
   re.app.unmount()
@@ -378,29 +382,32 @@ console.log('\n=== jsdom: полоса B — карточка «Сигнал д�
   // ошибка бэка → красная плашка, кнопка остаётся активной
   localStorage.clear()
   postMode = 'reject'; postedBodies.length = 0
-  const { el, app } = mount(bundle.DailySignalCard, { signals: ohtaSignals, park: 'ohta' })
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
   await new Promise((r) => setTimeout(r, 20)); await nextTick()
   check('красная плашка дословно', el.textContent.includes('Не удалось отметить. Проверьте связь и попробуйте ещё раз.'))
   check('кнопка осталась активной (повтор разрешён)',
     el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитал') && !el.textContent.includes('Прочитано'))
+    el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
   app.unmount()
   postMode = 'ok'
 }
 {
-  // нет сигналов → карточка скрыта
-  const { el, app } = mount(bundle.DailySignalCard, { signals: [], park: 'ohta' })
+  // нет сигнала (Июнь) → блок есть (Как идёт день живёт), но разбора нет
+  const { el, app } = mount(bundle.DailySignalCard, { m: mIyun, now: NOW_MID })
   await nextTick()
-  check('нет сигналов → карточка не рендерится', el.textContent.trim() === '')
+  check('без сигнала: заголовок «Сигнал Дня» есть', el.textContent.includes('Сигнал Дня'))
+  check('без сигнала: разбора/кнопки нет',
+    !el.querySelector('[data-test="signal-read"]') && !el.textContent.includes('разбор аналитика от'))
+  check('без сигнала: заметка-пустышка дословно', el.textContent.includes('Разбор аналитика появится позже.'))
+  check('без сигнала: «Как идёт день» всё равно есть', el.textContent.includes('Как идёт день'))
   app.unmount()
 }
 
-console.log('\n=== jsdom: полоса A — «Как идёт день» ===')
+console.log('\n=== jsdom: полоса A — «Как идёт день» (bare-блок) ===')
 {
-  const m = computeDaily(sets['ohta:2025-05'])
-  const { el, app } = mount(bundle.DailyDayProgress, { m, now: new Date(2025, 4, 16, 12, 0, 0) })
+  const { el, app } = mount(bundle.DailyDayProgress, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('заголовок «Как идёт день»', el.textContent.includes('Как идёт день'))
   check('4 строки на моке (16.05, пятница)', el.querySelectorAll('[data-test="day-line"]').length === 4,
@@ -416,25 +423,23 @@ console.log('\n=== jsdom: полоса A — «Как идёт день» ===')
 }
 {
   // фолбэк «вчера не внесён» (17.05: вчера 16.05 = partial)
-  const m = computeDaily(sets['ohta:2025-05'])
-  const { el, app } = mount(bundle.DailyDayProgress, { m, now: new Date(2025, 4, 17, 12, 0, 0) })
+  const { el, app } = mount(bundle.DailyDayProgress, { m: mOhta, now: new Date(2025, 4, 17, 12, 0, 0) })
   await nextTick()
   check('фолбэк «Вчера: отчёт ещё не внесён.»', el.textContent.includes('Вчера: отчёт ещё не внесён.'))
   app.unmount()
 }
 {
   // фолбэк «неделя началась» (05.05 понедельник: закрытых дней недели нет)
-  const m = computeDaily(sets['ohta:2025-05'])
-  const { el, app } = mount(bundle.DailyDayProgress, { m, now: new Date(2025, 4, 5, 12, 0, 0) })
+  const { el, app } = mount(bundle.DailyDayProgress, { m: mOhta, now: new Date(2025, 4, 5, 12, 0, 0) })
   await nextTick()
   check('фолбэк «Неделя началась: план — … ₽.»', /Неделя началась: план — .+₽\./.test(el.textContent))
   app.unmount()
 }
 {
   // out: строка месяца без вычисленного +N% (литеральное «100%» — часть фразы)
-  const m = computeDaily(synthSet(310))
-  check('синтетика: goalState out', m.goalState === 'out')
-  const { el, app } = mount(bundle.DailyDayProgress, { m, now: new Date(2025, 5, 3, 12, 0, 0) })
+  const mOut = computeDaily(synthSet(310))
+  check('синтетика: goalState out', mOut.goalState === 'out')
+  const { el, app } = mount(bundle.DailyDayProgress, { m: mOut, now: new Date(2025, 5, 3, 12, 0, 0) })
   await nextTick()
   const monthLine = [...el.querySelectorAll('[data-test="day-line"]')].find((n) => n.textContent.includes('Месяц:'))
   check('out: строка месяца дословная, без вычисленного +N%',
@@ -444,32 +449,41 @@ console.log('\n=== jsdom: полоса A — «Как идёт день» ===')
   app.unmount()
 }
 
-console.log('\n=== jsdom: «Вся сеть» — миниатюры сигналов ===')
+console.log('\n=== jsdom: «Вся сеть» — сигнал внутри карточки парка (v3.1) ===')
 {
   const netForUi = computeNetwork(sets, ['ohta', 'piterland', 'iyun'])
   const { el, app } = mount(bundle.DailyNetwork, { net: netForUi })
   await nextTick()
-  check('блок «Сигналы дня» есть', el.textContent.includes('Сигналы дня'))
-  check('миниатюра Охты: headline + «от 16.05»',
-    el.textContent.includes('Темп восстановлен к выходным') && el.textContent.includes('от 16.05'))
-  const minis = el.querySelectorAll('[data-test="net-signal"]')
-  check('миниатюр = паркам с сигналом (2; Июнь пропущен)', minis.length === 2, minis.length)
+  check('отдельного блока «Сигналы дня» больше нет', !el.textContent.includes('Сигналы дня'))
+  check('сигнал внутри карточки: headline Охты виден', el.textContent.includes('Темп восстановлен к выходным'))
+  check('дата — бейджем «16.05» без «от»', el.textContent.includes('16.05') && !el.textContent.includes('от 16.05'))
+  const plates = el.querySelectorAll('[data-test="net-signal"]')
+  check('плашек = паркам с сигналом (2; Июнь без сигнала)', plates.length === 2, plates.length)
   const pc = bundle.useParkContext()
-  await fire(minis[0], 'click')
-  check('tap миниатюры → переключение парк-контекста (ohta)', pc.current.value === 'ohta')
+  await fire(plates[0], 'click')
+  check('tap по плашке/карточке → переключение парк-контекста (ohta)', pc.current.value === 'ohta')
   pc.setPark('network')
   app.unmount()
 }
 {
-  // сеть без сигналов → блок скрыт
+  // сеть без сигналов → плашек нет
   const bare = JSON.parse(JSON.stringify(sets))
   for (const k of Object.keys(bare)) delete bare[k].signals
   const netBare = computeNetwork(bare, ['ohta', 'piterland', 'iyun'])
   const { el, app } = mount(bundle.DailyNetwork, { net: netBare })
   await nextTick()
-  check('сеть без сигналов: блока «Сигналы дня» нет', !el.textContent.includes('Сигналы дня'))
+  check('сеть без сигналов: плашек нет', el.querySelectorAll('[data-test="net-signal"]').length === 0)
   app.unmount()
 }
+
+console.log('\n=== Главная: счётчики чекапов/сигналов (readCounters, v3.1) ===')
+check('readCounters из stats → числа строками',
+  (() => { const c = readCounters({ stats: { checkups: 137, signals: 42 } }); return c.checkups === '137' && c.signals === '42' })())
+check('readCounters без stats → null (покажем «—»)',
+  (() => { const c = readCounters({}); return c.checkups === null && c.signals === null })())
+check('readCounters битые значения → null',
+  (() => { const c = readCounters({ stats: { checkups: 'x', signals: null } }); return c.checkups === null && c.signals === null })())
+check('мок содержит stats (чекапов ≥ сигналов)', !!data.stats && Number(data.stats.checkups) >= Number(data.stats.signals))
 
 console.log('\n=== Vue warnings ===')
 check('нет [Vue warn]', vueWarns.length === 0, vueWarns[0] || 'чисто')

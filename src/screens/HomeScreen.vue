@@ -7,7 +7,7 @@ import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, L } from '../i18n/home.js'
+import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, L } from '../i18n/home.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
 // серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
@@ -32,6 +32,7 @@ const parkNames = computed(() =>
   net.value.cards.map((c) => c.parkName || PARKS_BY_ID[c.park]?.name).filter(Boolean),
 )
 const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : ''))
+const counters = computed(() => readCounters(data.value)) // v3.1: чекапы/сигналы (система)
 
 const planFact = computed(() => (ready.value ? pct1(t.value.onPlanAvg) : '—'))
 const planFactTrend = computed(() => (ready.value ? t.value.trendPlanFact || null : null))
@@ -67,6 +68,21 @@ function goMaterials() { setActive('materials') }
 
 <template>
   <section class="flex flex-col px-4 pb-6 pt-0">
+    <!-- v3.1: полоса-счётчик (система): всего чекапов · всего сигналов -->
+    <div class="mb-3 flex items-stretch overflow-hidden rounded-2xl bg-[var(--surface)] shadow-sm">
+      <div class="flex flex-1 flex-col items-center py-2.5">
+        <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
+        <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.checkups ?? '—' }}</span>
+        <span class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ L.checkups }}</span>
+      </div>
+      <div class="my-2 w-px bg-[var(--line)]"></div>
+      <div class="flex flex-1 flex-col items-center py-2.5">
+        <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
+        <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.signals ?? '—' }}</span>
+        <span class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ L.signals }}</span>
+      </div>
+    </div>
+
     <!-- <Месяц Год>: парки в данных. Пока грузится — переливы. -->
     <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center justify-center gap-[7px]">
       <template v-if="loading">

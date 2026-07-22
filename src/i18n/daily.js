@@ -130,14 +130,13 @@ export const L = {
   net_forecast: 'прогноз',
   assume: 'допущение',
   // v3 «Контроль Дня» — сигнал дня (полоса B) + «Как идёт день» (полоса A)
-  signal_title: 'Сигнал дня',
+  signal_title: 'Сигнал Дня',
   signal_by: 'разбор аналитика от',
   signal_new: 'новое',
-  signal_read: 'Прочитал',
+  signal_read: 'Прочитала',
   signal_read_done: 'Прочитано',
   signal_feed: 'Ранее в этом месяце',
   signal_error: 'Не удалось отметить. Проверьте связь и попробуйте ещё раз.',
+  signal_empty: 'Разбор аналитика появится позже.',
   day_title: 'Как идёт день',
-  net_signals: 'Сигналы дня',
-  signal_from: 'от',
 }

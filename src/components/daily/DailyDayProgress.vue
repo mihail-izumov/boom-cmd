@@ -84,14 +84,15 @@ const lines = computed(() => {
 </script>
 
 <template>
-  <section class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
-    <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ L.day_title }}</h2>
-    <ul class="mt-2 flex flex-col gap-1.5">
+  <!-- v3.1: bare-блок (без карточной обёртки) — живёт внутри карточки «Сигнал Дня». -->
+  <div>
+    <h3 class="text-[0.8125rem] font-semibold text-[var(--text-secondary)]">{{ L.day_title }}</h3>
+    <ul class="mt-1.5 flex flex-col gap-1.5">
       <li v-for="(ln, i) in lines" :key="i" data-test="day-line" class="flex items-start gap-2">
         <span v-if="ln.dot" class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: ln.dot }" />
         <span v-else class="mt-1.5 inline-block h-2 w-2 shrink-0" aria-hidden="true" />
         <span class="text-[0.875rem] leading-snug text-[var(--text)]">{{ ln.text }}</span>
       </li>
     </ul>
-  </section>
+  </div>
 </template>

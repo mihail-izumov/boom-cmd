@@ -36,6 +36,8 @@ function normalizeSet(raw) {
 function normalize(raw) {
   const safe = raw && typeof raw === 'object' ? raw : {}
   const out = { updated: typeof safe.updated === 'string' ? safe.updated : null, sets: {} }
+  // v3.1: счётчики Главной (чекапы/сигналы) — из системы, прокидываем как есть.
+  if (safe.stats && typeof safe.stats === 'object') out.stats = safe.stats
   const sets = safe.sets && typeof safe.sets === 'object' ? safe.sets : {}
   for (const [key, v] of Object.entries(sets)) {
     const n = normalizeSet(v)

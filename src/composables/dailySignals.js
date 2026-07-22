@@ -38,6 +38,11 @@ export const SIGNAL_DOT = { ok: 'var(--positive)', warn: 'var(--warning)', focus
 export function signalDot(status) {
   return SIGNAL_DOT[status] || 'var(--text-muted)'
 }
+// Лёгкая тонировка плашки под статус (сеть, v3.1): цвет-маркер 12% на surface.
+// Текст на плашке остаётся монохромным; цвет несёт статус (color-mix от токенов).
+export function signalTint(status) {
+  return `color-mix(in srgb, ${signalDot(status)} 12%, var(--surface))`
+}
 
 // ── Статусы прочитанности (на устройстве, D-17) ──
 // Хранилище — один namespaced ключ localStorage с JSON-картой «park:date»→state.

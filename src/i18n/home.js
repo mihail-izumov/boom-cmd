@@ -53,6 +53,15 @@ export function monthCap(ym) {
   return `${MONTH[mi - 1]}${NBSP}${y}`
 }
 
+// v3.1: счётчики Главной из daily-пейлоада (data.stats). Числа — из системы
+// (журнал чекапов на бэке): чекапов может быть много, сигнал — один в день,
+// потому счётчики расходятся. Фронт только рендерит; нет stats → '—'.
+export function readCounters(data) {
+  const s = data && data.stats && typeof data.stats === 'object' ? data.stats : null
+  const num = (v) => (v != null && Number.isFinite(Number(v)) ? String(Number(v)) : null)
+  return { checkups: s ? num(s.checkups) : null, signals: s ? num(s.signals) : null }
+}
+
 export const L = {
   daily: 'Контроль Дня',
   goals: 'Цели и планы',
@@ -60,4 +69,6 @@ export const L = {
   tail: 'Разрыв',
   forecast: 'Прогноз выручки',
   pace: 'Прогноз/План',
+  checkups: 'Чекапов',
+  signals: 'Сигналов',
 }

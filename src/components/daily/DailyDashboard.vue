@@ -3,7 +3,6 @@
 import DailyLead from './DailyLead.vue'
 import DailyHero from './DailyHero.vue'
 import DailySignalCard from './DailySignalCard.vue'
-import DailyDayProgress from './DailyDayProgress.vue'
 import DailyKpis from './DailyKpis.vue'
 import DailyWeeks from './DailyWeeks.vue'
 import DailySummary from './DailySummary.vue'
@@ -19,8 +18,7 @@ defineProps({ m: { type: Object, required: true } })
   <div class="flex flex-col gap-3">
     <DailyLead v-if="m.lead" :m="m" />
     <DailyHero :m="m" />
-    <DailySignalCard :signals="m.signals" :park="m.park" />
-    <DailyDayProgress :m="m" />
+    <DailySignalCard :m="m" />
     <DailyKpis :m="m" />
     <DailyWeeks :m="m" />
     <DailySummary :m="m" />
