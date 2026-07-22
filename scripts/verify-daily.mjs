@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { computeDaily, computeNetwork, sigClass } from '../src/composables/dailyModel.js'
+import { actCode } from '../src/i18n/daily.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const data = JSON.parse(readFileSync(resolve(here, '../src/data/daily.mock.json'), 'utf8'))
@@ -114,6 +115,21 @@ console.log('\n=== goalState в журнале: goal_state из payload + фол
   check("фолбэк без goal_state: achievable=false → 'out'", j[1].goalState === 'out', j[1].goalState)
   check("фолбэк без goal_state: achievable=true → 'ok'", j[2].goalState === 'ok', j[2].goalState)
   check('achievable в журнале сохранён', j[0].achievable === true && j[1].achievable === false)
+}
+
+console.log('\n=== actCode (v2.2 §3): короткий код бейджа, display-only ===')
+check("actCode('Питер-Г1') = 'Г1'", actCode('Питер-Г1') === 'Г1', actCode('Питер-Г1'))
+check("actCode('Охта-СемПак-А2') = 'А2' (последний дефис)", actCode('Охта-СемПак-А2') === 'А2')
+check("код без дефиса не меняется ('Г1')", actCode('Г1') === 'Г1')
+check("null/undefined → '' (не падает)", actCode(null) === '' && actCode(undefined) === '')
+{
+  // данные не тронуты: в модели activities/acts — ПОЛНЫЙ код из payload
+  const s = { ...sets['ohta:2025-05'], activities: [{ code: 'Охта-Г1', name: 'Тест', days: ['2025-05-03'] }] }
+  const m = computeDaily(s)
+  check('в модели activities[].code — полный код (display-only укорачивание)',
+    m.activities[0].code === 'Охта-Г1', m.activities[0].code)
+  const day = m.days.find((x) => x.iso === '2025-05-03')
+  check('в модели days[].acts — полный код', day.acts.includes('Охта-Г1'), day.acts.join(','))
 }
 
 console.log('\n=== «Вся сеть» (агрегат 3 парков) ===')

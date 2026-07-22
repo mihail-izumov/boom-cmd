@@ -12,6 +12,8 @@ defineProps({
   id: { type: String, required: true },
   label: { type: String, required: true },
   tip: { type: String, default: '' },
+  // постоянный хинт «где взять число» под контролом (v2.2 §2) — всегда видим, НЕ тултип
+  hint: { type: String, default: '' },
   modelValue: { type: String, default: '' },
   optional: { type: Boolean, default: false },
   invalid: { type: Boolean, default: false },
@@ -81,5 +83,10 @@ function onInput(e) {
         @input="onInput"
       />
     </slot>
+
+    <p
+      v-if="hint"
+      class="mt-1 text-[0.75rem] leading-snug text-[var(--text-muted)]"
+    >{{ hint }}</p>
   </div>
 </template>

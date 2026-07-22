@@ -56,6 +56,11 @@ export function dayGenIso(iso) {
   return dayGen(Number(iso.slice(8)), iso.slice(0, 7))
 }
 
+// Короткий код активности для бейджей (v2.2 §3, display-only): суффикс после
+// последнего дефиса — «Питер-Г1» → «Г1». В данных/payload код остаётся полным,
+// парко-имённым; в пультах контура B — тот же split('-').pop().
+export const actCode = (c) => String(c ?? '').split('-').pop()
+
 // Токен-класс заливки по sigClass → CSS-переменная сигнала.
 export const SIG_VAR = { good: 'var(--positive)', warn: 'var(--warning)', bad: 'var(--negative)', idle: 'var(--line)' }
 

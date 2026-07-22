@@ -10,7 +10,7 @@ import {
 import { PARKS_BY_ID } from '../data/parks.js'
 import {
   L, FIELD_LABELS, SECTION_TITLES, SUMMARY_LABELS, WEATHER_OPTIONS, WEEKLY_NOTE,
-  tipFor, summaryValue, sumMismatch, dateHuman,
+  CHECKS_INTRO, hintFor, tipFor, summaryValue, sumMismatch, dateHuman,
 } from '../i18n/report.js'
 
 // «Отчёт дня» v2 (D-12) — ЕДИНСТВЕННАЯ пишущая страница фронта: форма → POST →
@@ -33,7 +33,8 @@ const todayMax = todayISO()
 const v = computed(() => validate(form))
 const groups = computed(() => fieldGroupsFor(form.park))
 const fields = computed(() => numericFieldsFor(form.park))
-// тихая строка про недельную выгрузку — только Охта/Питерленд (ТЗ v2 §3)
+// строки про выгрузку — только Охта/Питерленд (ТЗ v2 §3 + v2.2 §2): тихая
+// недельная сверка и вводная строка карты «Чеки»; у Июня выгрузки нет.
 const showWeeklyNote = computed(() => form.park === 'ohta' || form.park === 'piterland')
 
 // живая сводка производных (ТЗ v2 §5): порядок плиток — как в ТЗ; пустые/÷0 —
@@ -165,6 +166,11 @@ function more() {
         <template v-for="g in groups" :key="g.section">
           <section class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 pb-1.5 pt-3 shadow-sm">
             <h2 class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ SECTION_TITLES[g.section] }}</h2>
+            <!-- вводная строка карты «Чеки» (v2.2 §2) — только там, где есть выгрузка -->
+            <p
+              v-if="g.section === 'checks' && showWeeklyNote"
+              class="mt-1 text-[0.8125rem] leading-snug text-[var(--text-secondary)]"
+            >{{ CHECKS_INTRO }}</p>
             <ReportField
               v-for="f in g.fields"
               :id="`rep-${f.key}`"
@@ -172,6 +178,7 @@ function more() {
               v-model="form[f.key]"
               :label="FIELD_LABELS[f.key]"
               :tip="tipFor(form.park, f.key)"
+              :hint="hintFor(form.park, f.key)"
               :optional="!f.required"
               :invalid="isInvalid(f.key)"
             />

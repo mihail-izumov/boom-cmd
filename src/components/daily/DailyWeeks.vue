@@ -1,9 +1,10 @@
 <script setup>
 import { ChevronDown } from 'lucide-vue-next'
-import { mln, ths, thsSigned, dayGen, L, SIG_VAR } from '../../i18n/daily.js'
+import { mln, ths, thsSigned, dayGen, actCode, L, SIG_VAR } from '../../i18n/daily.js'
 
 // Недели Пн–Вс: раскрывающийся блок с таблицей дней (план/факт/надо/прогресс).
 // Прогресс — цветная заливка (sig); числа монохромные.
+// v2.2 §3: бейджи активностей у дней — короткий код (display-only).
 const props = defineProps({ m: { type: Object, required: true } })
 const monthGen = (dd) => dayGen(dd, props.m.month)
 </script>
@@ -47,7 +48,7 @@ const monthGen = (dd) => dayGen(dd, props.m.month)
             <tr v-for="r in w.rows" :key="r.dd" class="border-t border-[var(--line)]" :class="r.weekend ? 'bg-[var(--surface-2)]' : ''">
               <td class="px-3 py-1.5 text-left text-[var(--text)]">
                 {{ r.dd }} <span class="text-[0.6875rem] text-[var(--text-muted)]">{{ r.dowRu }}</span>
-                <span v-for="c in r.acts" :key="c" class="ml-1 rounded bg-[var(--text)] px-1 text-[0.625rem] font-bold text-[var(--ink-on-color)]">{{ c }}</span>
+                <span v-for="c in r.acts" :key="c" class="ml-1 rounded bg-[var(--text)] px-1 text-[0.625rem] font-bold text-[var(--ink-on-color)]">{{ actCode(c) }}</span>
               </td>
               <td class="px-3 py-1.5 text-right text-[var(--text-secondary)]">{{ ths(r.plan) }}</td>
               <td class="px-3 py-1.5 text-right text-[var(--text)]">
