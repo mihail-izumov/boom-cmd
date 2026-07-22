@@ -1,6 +1,8 @@
 <script setup>
+import { computed } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
-import { mln, pctSigned, L, SIG_VAR, GOAL_STATE } from '../../i18n/daily.js'
+import { mln, pctSigned, L, SIG_VAR, GOAL_STATE, ddmm } from '../../i18n/daily.js'
+import { signalDot } from '../../composables/dailySignals.js'
 import { PARKS_BY_ID } from '../../data/parks.js'
 import { useParkContext } from '../../composables/useParkContext.js'
 
@@ -13,6 +15,8 @@ const nameOf = (c) => PARKS_BY_ID[c.park]?.name || c.parkName || c.park
 const pctW = (c) => Math.min(100, (c.landing / (c.target || 1)) * 100)
 // v2.1 §5: три состояния достижимости — по каждой карточке парка из её модели
 const gsOf = (c) => GOAL_STATE[c.goalState] || GOAL_STATE.ok
+// v3: миниатюры «Сигналы дня» — только парки, у которых есть актуальный сигнал
+const signalCards = computed(() => props.net.cards.filter((c) => c.signal))
 </script>
 
 <template>
@@ -66,5 +70,27 @@ const gsOf = (c) => GOAL_STATE[c.goalState] || GOAL_STATE.ok
         <span>прогноз <b class="font-semibold text-[var(--text)]">{{ mln(c.landing) }}</b> <span class="text-[var(--text-secondary)]">{{ pctSigned(c.landDev) }}</span></span>
       </div>
     </button>
+
+    <!-- v3: сигналы дня по паркам (миниатюры). Полосы A и кнопки «Прочитал» на сети нет. -->
+    <section v-if="signalCards.length" class="mt-1">
+      <h2 class="mb-1 px-1 text-[0.8125rem] font-semibold text-[var(--text-secondary)]">{{ L.net_signals }}</h2>
+      <div class="flex flex-col gap-2">
+        <button
+          v-for="c in signalCards"
+          :key="`sig-${c.park}`"
+          type="button"
+          data-test="net-signal"
+          class="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition-colors active:bg-[var(--surface-2)]"
+          @click="setPark(c.park)"
+        >
+          <div class="flex items-center gap-2">
+            <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: signalDot(c.signal.status) }" />
+            <span class="font-semibold text-[var(--text)]">{{ nameOf(c) }}</span>
+            <span class="ml-auto shrink-0 text-[0.75rem] text-[var(--text-muted)]">{{ L.signal_from }} {{ ddmm(c.signal.date) }}</span>
+          </div>
+          <p class="mt-1 text-[0.8125rem] leading-snug text-[var(--text)]">{{ c.signal.headline }}</p>
+        </button>
+      </div>
+    </section>
   </div>
 </template>

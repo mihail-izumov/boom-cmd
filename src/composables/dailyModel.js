@@ -14,6 +14,8 @@
 // --negative); текст компоненты держат монохромным (DESIGN-STANDARD). Форматирование —
 // в i18n/daily.js, здесь только числа/классы.
 
+import { sortSignals, latestSignal } from './dailySignals.js'
+
 export const DOW_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 export const GOOD = 1.0
 export const OK = 0.85
@@ -207,6 +209,8 @@ export function computeDaily(set) {
   return {
     park: set.park, parkName: set.park_name, month: set.month, Y, M, DIM,
     T, realizedRev, realizedCount: realized.length,
+    impliedBase, adjBase,
+    signals: Array.isArray(set.signals) ? set.signals : [],
     landing, landDev, fcSig: sigClass(T ? landing / T : null),
     achievable, goalState, remainTarget, factPct, landPct, gap,
     onPlan, tailCum, spread: remaining.length ? Math.abs(tailCum) / remaining.length : 0,
@@ -240,6 +244,7 @@ export function computeNetwork(setsByKey, parkIds) {
       target: m.T, earned: m.realizedRev, landing: m.landing,
       landDev: m.landDev, fcSig: m.fcSig, achievable: m.achievable, goalState: m.goalState,
       onPlan: m.onPlan, tailCum: m.tailCum, assume,
+      signal: latestSignal(sortSignals(s.signals)),
     })
     // моментум «как в журнале»: последний шаг journal по каждому парку (сетевой ряд A)
     const j = m.journal || []

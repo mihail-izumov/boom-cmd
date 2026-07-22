@@ -56,6 +56,25 @@ export function dayGenIso(iso) {
   return dayGen(Number(iso.slice(8)), iso.slice(0, 7))
 }
 
+// Дни недели для полосы A (v3) — ЗАХАРДКОЖЕННЫЕ RU-массивы. Intl /
+// toLocaleDateString('ru') НЕ используем: ICU-локаль в Node-сборке/CI нестабильна
+// (снапшоты тестов поплывут). Индекс — Пн=0..Вс=6 (dow−1). Строчные: строки
+// «Вчера {пн}» и «Сегодня {суббота}».
+export const DOW_FULL = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
+export const DOW_SHORT = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+
+// 'YYYY-MM-DD' → «16.05» (DD.MM, без локали).
+export function ddmm(iso) {
+  const s = String(iso || '')
+  if (s.length < 10) return s
+  return `${s.slice(8, 10)}.${s.slice(5, 7)}`
+}
+// Целые рубли с разделителем тысяч: «44 000 ₽».
+export function rubWhole(n) {
+  if (n == null || !Number.isFinite(Number(n))) return DASH
+  return `${formatInt(Math.round(Number(n)))}${NBSP}₽`
+}
+
 // Короткий код активности для бейджей (v2.2 §3, display-only): суффикс после
 // последнего дефиса — «Питер-Г1» → «Г1». В данных/payload код остаётся полным,
 // парко-имённым; в пультах контура B — тот же split('-').pop().
@@ -110,4 +129,15 @@ export const L = {
   net_earned: 'заработано',
   net_forecast: 'прогноз',
   assume: 'допущение',
+  // v3 «Контроль Дня» — сигнал дня (полоса B) + «Как идёт день» (полоса A)
+  signal_title: 'Сигнал дня',
+  signal_by: 'разбор аналитика от',
+  signal_new: 'новое',
+  signal_read: 'Прочитал',
+  signal_read_done: 'Прочитано',
+  signal_feed: 'Ранее в этом месяце',
+  signal_error: 'Не удалось отметить. Проверьте связь и попробуйте ещё раз.',
+  day_title: 'Как идёт день',
+  net_signals: 'Сигналы дня',
+  signal_from: 'от',
 }
