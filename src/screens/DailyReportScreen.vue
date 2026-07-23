@@ -5,12 +5,13 @@ import ReportField from '../components/report/ReportField.vue'
 import { useReport } from '../composables/useReport.js'
 import {
   REPORT_PARK_IDS, emptyForm, fieldGroupsFor, numericFieldsFor, derived,
-  todayISO, validate, buildPayload,
+  todayISO, validate, buildPayload, softWarnings,
 } from '../composables/reportModel.js'
 import { PARKS_BY_ID } from '../data/parks.js'
 import {
-  L, FIELD_LABELS, SECTION_TITLES, SUMMARY_LABELS, WEATHER_OPTIONS, WEEKLY_NOTE,
-  CHECKS_INTRO, hintFor, tipFor, summaryValue, sumMismatch, dateHuman,
+  L, FIELD_LABELS, SECTION_TITLES, WEATHER_OPTIONS, WEEKLY_NOTE,
+  checksIntroFor, hintFor, tipFor, summaryValue, summaryLabelFor, softWarnMessage,
+  sumMismatch, dateHuman,
 } from '../i18n/report.js'
 
 // «Отчёт дня» v2 (D-12) — ЕДИНСТВЕННАЯ пишущая страница фронта: форма → POST →
@@ -36,16 +37,19 @@ const fields = computed(() => numericFieldsFor(form.park))
 // строки про выгрузку — только Охта/Питерленд (ТЗ v2 §3 + v2.2 §2): тихая
 // недельная сверка и вводная строка карты «Чеки»; у Июня выгрузки нет.
 const showWeeklyNote = computed(() => form.park === 'ohta' || form.park === 'piterland')
+// вводная строка карты «Чеки»: Охта/Питер — «три числа»; Июнь — «оба числа» (v2.3 §2)
+const checksIntro = computed(() => checksIntroFor(form.park))
 
 // живая сводка производных (ТЗ v2 §5): порядок плиток — как в ТЗ; пустые/÷0 —
-// не показываются; у Июня «Чек / пополнение» дублирует средний чек (D-10) — прячем
+// не показываются. У Июня revenue÷topups показывается как «Ср. пополнение» (v2.3 §3),
+// а дубль «Чек / пополнение» (per_topup, тот же revenue÷topups) прячем.
 const SUMMARY_ORDER = ['avg_check', 'per_topup', 'topups_per_session', 'cash_share', 'site_share', 'new_share']
 const summaryTiles = computed(() => {
   const d = derived(form)
   return SUMMARY_ORDER
     .filter((k) => !(form.park === 'iyun' && k === 'per_topup'))
     .filter((k) => d[k] != null)
-    .map((k) => ({ key: k, label: SUMMARY_LABELS[k], value: summaryValue(k, d[k]) }))
+    .map((k) => ({ key: k, label: summaryLabelFor(form.park, k), value: summaryValue(k, d[k]) }))
 })
 
 // подсветка инпутов, участвующих в ошибках пар/сумм
@@ -67,6 +71,9 @@ const errorMessages = computed(() => {
   if (e.sessions) out.push(L.err_sessions)
   return out
 })
+
+// мягкие предупреждения (v2.3 §4) — не блокируют отправку (v.ok их не учитывает)
+const warnMessages = computed(() => softWarnings(form).map(softWarnMessage))
 
 // первое проблемное поле в порядке рендера (для скролла по тапу «Отправить»)
 function firstProblemId() {
@@ -166,11 +173,11 @@ function more() {
         <template v-for="g in groups" :key="g.section">
           <section class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 pb-1.5 pt-3 shadow-sm">
             <h2 class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ SECTION_TITLES[g.section] }}</h2>
-            <!-- вводная строка карты «Чеки» (v2.2 §2) — только там, где есть выгрузка -->
+            <!-- вводная строка карты «Чеки»: Охта/Питер (v2.2 §2) и Июнь (v2.3 §2) -->
             <p
-              v-if="g.section === 'checks' && showWeeklyNote"
+              v-if="g.section === 'checks' && checksIntro"
               class="mt-1 text-[0.8125rem] leading-snug text-[var(--text-secondary)]"
-            >{{ CHECKS_INTRO }}</p>
+            >{{ checksIntro }}</p>
             <ReportField
               v-for="f in g.fields"
               :id="`rep-${f.key}`"
@@ -251,6 +258,16 @@ function more() {
         role="alert"
       >
         <p v-for="(m, i) in errorMessages" :key="i">{{ m }}</p>
+      </div>
+
+      <!-- мягкие предупреждения (v2.3 §4): жёлтая строка, НЕ блокирует отправку -->
+      <div
+        v-if="warnMessages.length"
+        class="flex flex-col gap-1.5 rounded-2xl px-4 py-3 text-[0.875rem] font-medium leading-snug text-[var(--text)]"
+        style="background: color-mix(in srgb, var(--warning) 24%, var(--surface))"
+        role="status"
+      >
+        <p v-for="(m, i) in warnMessages" :key="i">{{ m }}</p>
       </div>
 
       <!-- ошибка сети/бэка: данные формы не потеряны -->

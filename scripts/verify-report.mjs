@@ -3,6 +3,9 @@
 // дата без border-t (§3), заголовок «Отчёт Дня» (§4).
 // v2.2: строка сверки без «владельца» (§1), вводная строка и постоянные хинты
 // карты «Чеки» + пример в тултипе сессий (§2, только Охта/Питер).
+// v2.3: тултипы Июня операционные без «1 пополнение = 1 чек» (§1); вводная строка
+// и хинты включены Июню (§2); плитка «Ср. пополнение» Июню (§3); мягкие
+// предупреждения о вводе из итоговой строки — синтетика 482/700/1,6/1,1 (§4).
 //
 // Двухслойная проверка:
 //   1) ЧИСТАЯ МОДЕЛЬ (reportModel.js, без DOM): все блокировки ТЗ v2 §2–3 —
@@ -22,11 +25,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import {
   emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
-  yesterdayISO, todayISO,
+  yesterdayISO, todayISO, softWarnings,
 } from '../src/composables/reportModel.js'
 import {
   rub, L, FIELD_LABELS, WEATHER_OPTIONS, TIPS, TIPS_IYUN,
-  WEEKLY_NOTE, CHECKS_INTRO, FIELD_HINTS, hintFor,
+  WEEKLY_NOTE, CHECKS_INTRO, CHECKS_INTRO_IYUN, FIELD_HINTS, hintFor,
+  checksIntroFor, summaryLabelFor, summaryValue, softWarnMessage,
 } from '../src/i18n/report.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -69,7 +73,7 @@ console.log('\n=== reportModel: состав полей v2 ===')
   check('Питер: receipts/topups/sessions есть',
     ['receipts', 'topups', 'sessions'].every((k) => keys('piterland').includes(k)))
   check('Охта: receipts есть', keys('ohta').includes('receipts'))
-  check('Июнь: receipts НЕТ (1 пополнение = 1 чек, D-10)',
+  check('Июнь: receipts пока НЕ собирается (v2.3; поле отложено в v2.4)',
     !keys('iyun').includes('receipts'))
   check('Июнь: topups/sessions/promo/rev_y/rev_vk есть',
     ['topups', 'sessions', 'promo', 'rev_y', 'rev_vk'].every((k) => keys('iyun').includes(k)))
@@ -187,8 +191,31 @@ console.log('\n=== reportModel: живая сводка derived() §5 ===')
 }
 {
   const d = derived(filled('iyun', iyunOver))
-  check('Июнь: средний чек = revenue ÷ topups (D-10)',
+  check('Июнь: avg_check = revenue ÷ topups (плитка «Ср. пополнение», v2.3 §3)',
     Math.abs(d.avg_check - 100000 / 120) < 1e-9)
+  check('Июнь: плитка avg_check подписана «Ср. пополнение» (не «Средний чек»)',
+    summaryLabelFor('iyun', 'avg_check') === 'Ср. пополнение')
+  check('Охта/Питер: avg_check остаётся «Средний чек»',
+    summaryLabelFor('piterland', 'avg_check') === 'Средний чек')
+}
+
+console.log('\n=== reportModel: мягкие предупреждения §4 (все парки, НЕ блокируют) ===')
+{
+  const warnKeys = (over) => softWarnings(filled('iyun', { ...iyunOver, ...over })).map((w) => w.key)
+  check('ср.пополнение 482 ₽ (<500) → предупреждение',
+    warnKeys({ revenue: '48200', cashless: '30000', cash: '10000', site: '8200', topups: '100', sessions: '90' }).includes('avg_topup'))
+  check('ср.пополнение 700 ₽ (в коридоре) → без предупреждения',
+    !warnKeys({ revenue: '70000', cashless: '40000', cash: '20000', site: '10000', topups: '100', sessions: '95' }).includes('avg_topup'))
+  check('ср.пополнение 1600 ₽ (>1500) → предупреждение',
+    warnKeys({ revenue: '160000', cashless: '100000', cash: '40000', site: '20000', topups: '100', sessions: '95' }).includes('avg_topup'))
+  check('попол/сессии 1,6 (>1,5) → предупреждение',
+    warnKeys({ revenue: '112000', cashless: '70000', cash: '30000', site: '12000', topups: '160', sessions: '100' }).includes('topups_per_session'))
+  check('попол/сессии 1,1 (≤1,5) → без предупреждения',
+    !warnKeys({ revenue: '77000', cashless: '47000', cash: '20000', site: '10000', topups: '110', sessions: '100' }).includes('topups_per_session'))
+  const warnForm = filled('iyun', { ...iyunOver, revenue: '48200', cashless: '30000', cash: '10000', site: '8200', topups: '100', sessions: '90' })
+  check('предупреждение НЕ блокирует: validate().ok === true при активном предупреждении',
+    validate(warnForm, NOW).ok === true && softWarnings(warnForm).length > 0)
+  check('пустая форма → без предупреждений', softWarnings(emptyForm('iyun', NOW)).length === 0)
 }
 
 console.log('\n=== i18n: тексты v2.1 §1–2, §4 (дословно из ТЗ) ===')
@@ -197,8 +224,8 @@ check('подпись сессий: «Чеков с пополнением (се
   FIELD_LABELS.sessions === 'Чеков с пополнением (сессии)')
 check('тултип сессий Охта/Питер — дословно §1 + пример v2.2 §2',
   TIPS.sessions === 'Сколько чеков содержали хотя бы одно пополнение. В один чек могут пробить два пополнения (семья, докидка) — тогда это 1 чек и 2 пополнения. Где взять: в выгрузке „[Финансовые] Выручка“ — сумма колонки „Кол-во чеков“ по строкам „Покупка очков“. Всегда ≤ „Пополнений за день“. Пример: за день 5 чеков, из них 3 с пополнением, в одном — два пополнения. Тогда: Чеков за день 5 · Пополнений 4 · Сессий 3.')
-check('тултип сессий Июня — дословно §1',
-  TIPS_IYUN.sessions === 'Сколько чеков содержали хотя бы одно пополнение. Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.')
+check('тултип сессий Июня — v2.3 §1: префикс «Кол-во чеков»… + сохранённый хвост',
+  TIPS_IYUN.sessions === 'Столбец „Кол-во чеков“ по тем же строкам „Покупка очков“ (сложить). Сколько чеков содержали хотя бы одно пополнение. Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.')
 check('погода: по-прежнему 5 опций, новых не добавлено (§2)', WEATHER_OPTIONS.length === 5)
 check('погода: слаги не тронуты (§2)',
   WEATHER_OPTIONS.map((w) => w.value).join(',') === 'sunny,mixed,overcast,rain_part,rain_all')
@@ -216,12 +243,34 @@ check('вводная строка карты «Чеки» — дословно 
 check('хинт receipts — дословно', FIELD_HINTS.receipts === '= итоговое „Кол-во чеков“ дня в выгрузке')
 check('хинт topups — дословно', FIELD_HINTS.topups === '= Σ „Кол-во“ по строкам „Покупка очков“')
 check('хинт sessions — дословно', FIELD_HINTS.sessions === '= Σ „Кол-во чеков“ по строкам „Покупка очков“')
-check('hintFor: Охта/Питер отдают хинты, Июнь — нет',
+check('hintFor: Охта/Питер отдают хинты receipts/topups/sessions',
   hintFor('ohta', 'receipts') === FIELD_HINTS.receipts &&
-  hintFor('piterland', 'sessions') === FIELD_HINTS.sessions &&
-  hintFor('iyun', 'topups') === '' && hintFor('iyun', 'sessions') === '')
+  hintFor('piterland', 'sessions') === FIELD_HINTS.sessions)
+check('hintFor: Июнь отдаёт хинты topups/sessions (v2.3 §2), receipts у него нет',
+  hintFor('iyun', 'topups') === FIELD_HINTS.topups &&
+  hintFor('iyun', 'sessions') === FIELD_HINTS.sessions)
 check('hintFor: полям вне карты «Чеки» хинтов нет',
   hintFor('ohta', 'revenue') === '' && hintFor('piterland', 'weather') === '')
+
+console.log('\n=== i18n: тексты v2.3 §1–2, §4 (дословно из ТЗ) ===')
+check('тултип topups Июня — операционный, БЕЗ «1 пополнение = 1 чек» (§1)',
+  !/1 пополнение = 1 чек/.test(TIPS_IYUN.topups) &&
+  TIPS_IYUN.topups === 'Количество пополнений баланса за день: столбец „Кол-во“ ТОЛЬКО по строкам операции „Покупка очков“ в отчёте „Выручка“ (обычно две строки — безнал и наличные: сложить). НЕ итоговая строка отчёта и НЕ столбец „Кол-во чеков“.')
+check('тултип сессий Июня начинается со «Столбец „Кол-во чеков“…» (§1)',
+  TIPS_IYUN.sessions.startsWith('Столбец „Кол-во чеков“ по тем же строкам „Покупка очков“ (сложить). '))
+check('хвост сессий Июня («1 чек — 2 пополнения») сохранён (§1)',
+  TIPS_IYUN.sessions.includes('Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.'))
+check('вводная карты «Чеки» Июня — дословно (§2)',
+  CHECKS_INTRO_IYUN === 'Оба числа — из отчёта „Выручка“, строки „Покупка очков“. Итоговую строку отчёта не используем.')
+check('checksIntroFor: Июнь → своя вводная; Охта/Питер → общая; пусто → «»',
+  checksIntroFor('iyun') === CHECKS_INTRO_IYUN &&
+  checksIntroFor('ohta') === CHECKS_INTRO && checksIntroFor('') === '')
+check('текст предупреждения ср.пополнения — дословно (§4)',
+  softWarnMessage({ key: 'avg_topup', value: 482 }) ===
+    `Проверьте пополнения: выручка ÷ пополнения = ${rub(482)} — похоже на число из итоговой строки отчёта. Нужны только строки „Покупка очков“.`)
+check('текст предупреждения сессий — дословно (§4)',
+  softWarnMessage({ key: 'topups_per_session' }) ===
+    'Проверьте сессии: пополнений обычно лишь немного больше, чем чеков с пополнением (~1,1).')
 
 // ═══════════════ 2. Живой рендер в jsdom ═══════════════
 console.log('\n=== jsdom: сборка тестового бандла ===')
@@ -530,20 +579,28 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
   check('тихой строки недельной сверки у Июня НЕТ',
     !el.textContent.includes('Раз в неделю присылайте'))
   // v2.2 §2: у Июня выгрузки нет — ни вводной строки, ни хинтов, ни примера
-  check('вводной строки карты «Чеки» у Июня НЕТ (v2.2 §2)',
+  check('у Июня — своя вводная «Оба числа…» (v2.3 §2), НЕ «Все три числа»',
+    el.textContent.includes('Оба числа — из отчёта „Выручка“, строки „Покупка очков“. Итоговую строку отчёта не используем.') &&
     !el.textContent.includes('Все три числа — из выгрузки'))
-  check('хинтов выгрузки у Июня НЕТ (v2.2 §2)',
-    !el.textContent.includes('= итоговое') && !el.textContent.includes('= Σ'))
+  check('у Июня — хинты topups/sessions «= Σ …» (v2.3 §2), receipts-хинта нет',
+    el.textContent.includes('= Σ „Кол-во“ по строкам „Покупка очков“') &&
+    el.textContent.includes('= Σ „Кол-во чеков“ по строкам „Покупка очков“') &&
+    !el.textContent.includes('= итоговое „Кол-во чеков“ дня в выгрузке'))
+  check('у Июня ровно 2 хинта под полями карты «Чеки» (v2.3 §2)',
+    [...el.querySelectorAll('form p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 2)
   // тултипы topups/sessions у Июня — v1 («как раньше», §1)
   const tipBtn = el.querySelector('button[aria-label="Пояснение: Пополнений за день"]')
   await fire(tipBtn, 'click')
-  check('тултип topups Июня — v1 (1 пополнение = 1 чек)',
-    el.textContent.includes('Общее количество пополнений баланса. У нас 1 пополнение = 1 чек.'))
+  check('тултип topups Июня — операционный (v2.3 §1), без «1 пополнение = 1 чек»',
+    el.textContent.includes('столбец „Кол-во“ ТОЛЬКО по строкам операции „Покупка очков“') &&
+    el.textContent.includes('НЕ итоговая строка отчёта и НЕ столбец „Кол-во чеков“.') &&
+    !el.textContent.includes('1 пополнение = 1 чек'))
   // v2.1 §1: сессии Июня — свой тултип (без выгрузки), подпись общая
   const sesTipBtn = el.querySelector('button[aria-label="Пояснение: Чеков с пополнением (сессии)"]')
   await fire(sesTipBtn, 'click')
-  check('тултип сессий Июня — v2.1 (без «Где взять», с «Всегда ≤»)',
-    el.textContent.includes('Сколько чеков содержали хотя бы одно пополнение. Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.') &&
+  check('тултип сессий Июня — v2.3 §1: префикс «Столбец „Кол-во чеков“…» + хвост, без «Где взять»',
+    el.textContent.includes('Столбец „Кол-во чеков“ по тем же строкам „Покупка очков“ (сложить). Сколько чеков содержали хотя бы одно пополнение.') &&
+    el.textContent.includes('Всегда ≤ „Пополнений за день“.') &&
     !el.textContent.includes('Где взять'))
   check('примера v2.2 в тултипе сессий Июня НЕТ (тултипы Июня не трогали)',
     !el.textContent.includes('Пример: за день 5 чеков'))
@@ -561,9 +618,23 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
     el.textContent.includes('Чеков с пополнением не может быть больше'))
   await setInput(el, 'rep-sessions', '110')
   check('sessions ≤ topups — активна', !btnBlocked(el))
-  // Июнь: средний чек = revenue ÷ topups (D-10); плитки «чек/пополнение» нет (дубль)
-  check('Июнь: средний чек ≈ 833 ₽ (revenue ÷ topups)', el.textContent.includes('≈ 833 ₽'))
-  check('Июнь: плитки «Чек / пополнение» нет (дубль D-10)', !el.textContent.includes('Чек / пополнение'))
+  // Июнь (v2.3 §3): revenue÷topups показывается как «Ср. пополнение»; дубля нет
+  check('Июнь: плитка «Ср. пополнение» (v2.3 §3), значение = revenue ÷ topups',
+    el.textContent.includes('Ср. пополнение') &&
+    el.textContent.includes(summaryValue('avg_check', 100000 / 120)))
+  check('Июнь: «Средний чек» не показывается (receipts нет)', !el.textContent.includes('Средний чек'))
+  check('Июнь: дубля «Чек / пополнение» нет', !el.textContent.includes('Чек / пополнение'))
+  // §4 мягкое предупреждение: ввод из итоговой строки (ср.пополнение <500 ₽)
+  await setInput(el, 'rep-topups', '260')
+  await setInput(el, 'rep-sessions', '200')
+  check('Июнь: ср.пополнение <500 ₽ → жёлтое предупреждение видно (§4)',
+    el.textContent.includes('Проверьте пополнения: выручка ÷ пополнения =') &&
+    el.textContent.includes('похоже на число из итоговой строки отчёта'))
+  check('§4: предупреждение НЕ блокирует кнопку (aria-disabled=false)', !btnBlocked(el))
+  await setInput(el, 'rep-topups', '120')
+  await setInput(el, 'rep-sessions', '110')
+  check('Июнь: при нормальных числах предупреждения нет (§4)',
+    !el.textContent.includes('Проверьте пополнения'))
   // payload Июня
   postedBodies.length = 0
   await fire(el.querySelector('form'), 'submit')

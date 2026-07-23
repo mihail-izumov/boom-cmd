@@ -5,8 +5,9 @@
 //   • обязательные для ВСЕХ: revenue, cashless, cash, site («Личный кабинет»,
 //     ТРЕТЬЕ слагаемое — не часть безнала; нет канала → вводят 0),
 //     visitors_total, visitors_new, topups, sessions, weather;
-//   • receipts — только Охта/Питерленд (обязателен); у Июня receipts НЕ
-//     показывается (там 1 пополнение = 1 чек, D-10);
+//   • receipts — только Охта/Питерленд (обязателен); у Июня receipts пока НЕ
+//     собирается (v2.3; D-10 пересмотрен — у Июня есть чеки дня ≠ пополнениям,
+//     поле отложено в v2.4, см. журнал контура B);
 //   • только Июнь дополнительно: promo, rev_y, rev_vk (необязательные);
 //   • валидация БЕЗ допусков: cashless + cash + site === revenue ровно, до
 //     рубля; visitors_new ≤ visitors_total; дата не в будущем; sessions ≤
@@ -148,7 +149,8 @@ export function derived(form) {
   const revenue = n('revenue')
   const topups = n('topups')
   return {
-    // Средний чек: revenue ÷ receipts; Июнь — revenue ÷ topups (D-10)
+    // Средний чек: revenue ÷ receipts. Июнь — revenue ÷ topups; это средний
+    // размер пополнения, показывается как «Ср. пополнение» (i18n, v2.3 §3).
     avg_check: form.park === 'iyun' ? div(revenue, topups) : div(revenue, n('receipts')),
     per_topup: div(revenue, topups),
     topups_per_session: div(topups, n('sessions')),
@@ -156,6 +158,33 @@ export function derived(form) {
     site_share: div(n('site'), revenue),
     new_share: div(n('visitors_new'), n('visitors_total')),
   }
+}
+
+// Мягкие предупреждения (v2.3 §4) — все парки, НЕ блокируют отправку (в validate()
+// их нет; кнопка «Отправить» на них не смотрит). Появляются при заполненных
+// участвующих полях. Ловят ввод из итоговой строки отчёта «Выручка» (боевой кейс
+// Июня 22.07: ср.пополнение падает до ~482 ₽ при привычных ~600–750). Тексты — i18n.
+export const SOFT_WARN_AVG_MIN = 500
+export const SOFT_WARN_AVG_MAX = 1500
+export const SOFT_WARN_RATIO_MAX = 1.5
+export function softWarnings(form) {
+  const out = []
+  const revenue = toInt(form.revenue)
+  const topups = toInt(form.topups)
+  const sessions = toInt(form.sessions)
+  // ср. пополнение = выручка ÷ пополнения; вне коридора 500–1500 ₽ → предупреждение
+  if (revenue != null && topups != null && topups > 0) {
+    const avg = revenue / topups
+    if (avg < SOFT_WARN_AVG_MIN || avg > SOFT_WARN_AVG_MAX) {
+      out.push({ key: 'avg_topup', value: Math.round(avg) })
+    }
+  }
+  // пополнения ÷ сессии > 1,5 → предупреждение (обычно ~1,1)
+  if (topups != null && sessions != null && sessions > 0 &&
+      topups / sessions > SOFT_WARN_RATIO_MAX) {
+    out.push({ key: 'topups_per_session' })
+  }
+  return out
 }
 
 // Тело POST (без гейт-ключа `key` — его добавляет useReport из useAccessKey).
