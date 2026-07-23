@@ -68,8 +68,15 @@ function goMaterials() { setActive('materials') }
 
 <template>
   <section class="flex flex-col px-4 pb-6 pt-0">
-    <!-- v3.1: полоса-счётчик (система): всего чекапов · всего сигналов -->
-    <div class="mb-3 flex items-stretch overflow-hidden rounded-2xl bg-[var(--surface)] shadow-sm">
+    <!-- v3.1: полоса-счётчик (система): всего чекапов · всего сигналов.
+         Тап → «Контроль Дня» (заглушка — своей страницы чекапов/сигналов пока нет,
+         бэклог: boom-cmd-data/tasks/ЗАДАНИЕ-фронт-экран-Чекапы-Сигналы.md). -->
+    <button
+      type="button"
+      aria-label="Открыть Контроль Дня"
+      class="mb-3 flex w-full items-stretch overflow-hidden rounded-2xl bg-[var(--surface)] shadow-sm transition-opacity active:opacity-90"
+      @click="goDaily"
+    >
       <div class="flex flex-1 flex-col items-center py-2.5">
         <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
         <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.checkups ?? '—' }}</span>
@@ -81,7 +88,7 @@ function goMaterials() { setActive('materials') }
         <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.signals ?? '—' }}</span>
         <span class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ L.signals }}</span>
       </div>
-    </div>
+    </button>
 
     <!-- <Месяц Год>: парки в данных. Пока грузится — переливы. -->
     <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center justify-center gap-[7px]">
