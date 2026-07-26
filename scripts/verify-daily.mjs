@@ -895,10 +895,11 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   check('сегментов три, подписи «Дни / Недели / Месяц»',
     segs.length === 3 && segs.map((s) => s.textContent.trim()).join(' / ') === 'Дни / Недели / Месяц',
     segs.map((s) => s.textContent.trim()).join(' · '))
-  check('лид — одна фраза, по центру, крупнее прежнего', (() => {
+  check('лид — одна фраза в две строки, по центру, крупнее прежнего', (() => {
     const lead = el.querySelector('[data-test="summary-lead"]')
-    return !!lead && lead.textContent.trim() === 'Где парки сегодня и какой прогресс плана месяца' &&
-      lead.className.includes('text-center') && lead.className.includes('text-[1rem]')
+    return !!lead && lead.textContent.trim() === 'Где парки сегодня и\nкакой прогресс за месяц' &&
+      lead.className.includes('text-center') && lead.className.includes('text-[1rem]') &&
+      lead.className.includes('whitespace-pre-line')
   })(), el.querySelector('[data-test="summary-lead"]')?.textContent.trim())
   check('сегменты — не таб-бар: role=tablist внутри раздела',
     el.querySelector('[data-test="summary-segments"]')?.getAttribute('role') === 'tablist')

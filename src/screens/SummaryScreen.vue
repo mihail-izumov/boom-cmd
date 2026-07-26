@@ -24,7 +24,6 @@ import SummaryMonthPicker from '../components/daily/SummaryMonthPicker.vue'
 // прошлые свёрнуты в строку с бейджем периода. Обводок в разделе нет (v2.1):
 // карточки держатся заливкой. Автоскролла нет намеренно: обратная хронология уже
 // даёт фокус на актуальном, а автоскролл на длинной ленте читается как баг.
-// Селектора месяца нет: месяц данных ровно один (ТЗ §3.4).
 
 const { data, loading, error, reload } = useDaily()
 
@@ -110,7 +109,7 @@ watchEffect(() => {
     <template v-else>
       <p
         data-test="summary-lead"
-        class="bc-fade-in px-4 pb-1 text-center text-[1rem] leading-snug text-[var(--text-muted)]"
+        class="bc-fade-in whitespace-pre-line px-4 pb-1 text-center text-[1rem] leading-snug text-[var(--text-muted)]"
       >{{ L.lead }}</p>
 
       <div
