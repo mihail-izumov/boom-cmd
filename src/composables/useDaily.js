@@ -38,6 +38,10 @@ function normalize(raw) {
   const out = { updated: typeof safe.updated === 'string' ? safe.updated : null, sets: {} }
   // v3.1: счётчики Главной (чекапы/сигналы) — из системы, прокидываем как есть.
   if (safe.stats && typeof safe.stats === 'object') out.stats = safe.stats
+  // Сводки сети (день/неделя/месяц) — отдельный верхнеуровневый массив, по образцу
+  // stats и НЕ внутри sets[k]. Прокидываем как есть: валидация и выбор актуальной
+  // записи — в netSummary.js. Нет ключа → раздел «Сводки» покажет пустой стейт.
+  if (Array.isArray(safe.net_summary)) out.net_summary = safe.net_summary
   const sets = safe.sets && typeof safe.sets === 'object' ? safe.sets : {}
   for (const [key, v] of Object.entries(sets)) {
     const n = normalizeSet(v)

@@ -19,6 +19,11 @@ import {
   buildSignalReadBody, postSignalRead,
 } from '../src/composables/dailySignals.js'
 import { readCounters } from '../src/i18n/home.js'
+import {
+  sortSummaries, latestByCadence, latestOf, splitBlock, blocksOf,
+  summaryKey, summaryStatusOf, markSummaryState, LABEL_MAX,
+} from '../src/composables/netSummary.js'
+import { cardTitle, periodLabel, addDays } from '../src/i18n/summary.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -241,8 +246,12 @@ writeFileSync(resolve(tmp, 'entry.js'), `
 export { default as DailySignalCard } from '${root}/src/components/daily/DailySignalCard.vue'
 export { default as DailyDayProgress } from '${root}/src/components/daily/DailyDayProgress.vue'
 export { default as DailyNetwork } from '${root}/src/components/daily/DailyNetwork.vue'
+export { default as NetSummaryCard } from '${root}/src/components/daily/NetSummaryCard.vue'
+export { default as SummaryScreen } from '${root}/src/screens/SummaryScreen.vue'
+export { default as HomeScreen } from '${root}/src/screens/HomeScreen.vue'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
+export { useAppNav, clearSubView } from '${root}/src/composables/useAppNav.js'
 `)
 
 // jsdom-глобали ДО импортов vite/vue (runtime-dom кэширует document при загрузке)
@@ -271,6 +280,7 @@ await build({
   define: {
     'import.meta.env.VITE_REPORT_API': JSON.stringify('https://mock.invalid/report'),
     'import.meta.env.VITE_PROJECTS_API': JSON.stringify('https://mock.invalid/gate'),
+    'import.meta.env.VITE_DAILY_API': JSON.stringify('https://mock.invalid/daily'),
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
   build: {
@@ -285,6 +295,7 @@ console.log('✓  lib-сборка готова')
 
 // мок fetch: GET → гейт «ок», POST → сценарий из postMode
 let postMode = 'ok' // 'ok' | 'reject' | 'neterror'
+let getPayload = {} // что отдаёт GET (гейт + ?action=daily); меняется в кейсах сводок
 const postedBodies = []
 global.fetch = async (url, opts = {}) => {
   const json = (obj) => ({ ok: true, status: 200, json: async () => obj })
@@ -294,7 +305,7 @@ global.fetch = async (url, opts = {}) => {
     if (postMode === 'reject') return json({ ok: false, error: 'bad key' })
     return json({ ok: true })
   }
-  return json({}) // гейт: 200 без error → фраза ок
+  return json(getPayload) // гейт: 200 без error → фраза ок
 }
 
 const vueWarns = []
@@ -324,6 +335,13 @@ function mount(comp, props) {
 async function fire(node, type) {
   node.dispatchEvent(new dom.window.Event(type, { bubbles: true }))
   await nextTick()
+}
+// прокрутить микро/макро-задачи: экраны грузят данные в setup (useDaily → fetch)
+async function flush(n = 6) {
+  for (let i = 0; i < n; i++) {
+    await new Promise((r) => setTimeout(r, 0))
+    await nextTick()
+  }
 }
 
 const NOW_MID = new Date(2025, 4, 16, 12, 0, 0) // 16.05.2025, пятница (mOhta/mIyun объявлены выше)
@@ -473,6 +491,171 @@ console.log('\n=== jsdom: «Вся сеть» — сигнал внутри ка
   const { el, app } = mount(bundle.DailyNetwork, { net: netBare })
   await nextTick()
   check('сеть без сигналов: плашек нет', el.querySelectorAll('[data-test="net-signal"]').length === 0)
+  app.unmount()
+}
+
+// ═══════════════ Сводки сети (net_summary): чистая логика ═══════════════
+console.log('\n=== Сводки сети: отбор записей и подписи периодов ===')
+const NS = data.net_summary
+check('мок содержит net_summary (day + week + month)',
+  Array.isArray(NS) && NS.length === 3 && new Set(NS.map((x) => x.cadence)).size === 3,
+  Array.isArray(NS) ? NS.map((x) => x.cadence).join(',') : 'нет')
+check('sortSummaries отбрасывает битые записи и чужой каденс',
+  sortSummaries([
+    null, 'x', { cadence: 'day' }, { cadence: 'quarter', date: '2025-05-16' },
+    { cadence: 'day', date: '16.05.2025' }, { cadence: 'day', date: '2025-05-16' },
+  ]).length === 1)
+check('актуальная запись каденса = max date ВНУТРИ каденса', (() => {
+  const s = sortSummaries([
+    { cadence: 'day', date: '2025-05-16', status: 'ok' },
+    { cadence: 'day', date: '2025-05-14', status: 'warn' },
+    { cadence: 'week', date: '2025-05-05', status: 'focus' },
+  ])
+  return latestOf(s, 'day').date === '2025-05-16' && latestOf(s, 'week').date === '2025-05-05'
+})())
+check('latestByCadence: порядок день → неделя → месяц',
+  latestByCadence(NS).map((x) => x.cadence).join(',') === 'day,week,month',
+  latestByCadence(NS).map((x) => x.cadence).join(','))
+check('нет net_summary → карточек нет (обратная совместимость)',
+  latestByCadence(undefined).length === 0 && latestByCadence([]).length === 0)
+check('незнакомые ключи внутри записи не мешают отбору',
+  latestByCadence([{ cadence: 'day', date: '2025-05-16', kind: 'x', extra: { a: 1 } }]).length === 1)
+
+check('подпись дня = ДД.ММ', periodLabel('day', '2025-05-16') === '16.05', periodLabel('day', '2025-05-16'))
+check('подпись недели = якорь…+6', periodLabel('week', '2025-05-12') === '12.05–18.05', periodLabel('week', '2025-05-12'))
+check('неделя через границу месяца считается верно', periodLabel('week', '2025-06-29') === '29.06–05.07', periodLabel('week', '2025-06-29'))
+check('неделя через границу года считается верно', periodLabel('week', '2025-12-29') === '29.12–04.01', periodLabel('week', '2025-12-29'))
+check('addDays через високосный февраль', addDays('2024-02-28', 2) === '2024-03-01', addDays('2024-02-28', 2))
+check('подпись месяца = русский месяц из массива (без Intl)', periodLabel('month', '2025-05-01') === 'Май 2025', periodLabel('month', '2025-05-01'))
+check('заголовок карточки собран из cadence+date',
+  cardTitle('week', '2025-05-12').replace(/ /g, ' ') === 'Сводка недели · 12.05–18.05',
+  cardTitle('week', '2025-05-12'))
+
+console.log('\n=== Сводки сети: метка блока (точка+пробел, кап) ===')
+check('обычная метка', (() => { const r = splitBlock('Данные. За пятницу 16.05 сдали все.'); return r.label === 'Данные' && r.rest.startsWith('За пятницу') })())
+check('точка ВНУТРИ даты метку не рвёт (боевой кейс месяца)', (() => {
+  const r = splitBlock('Итог месяца (на 16.05). Сеть факт 3,84 млн.')
+  return r.label === 'Итог месяца (на 16.05)' && r.rest === 'Сеть факт 3,84 млн.'
+})(), splitBlock('Итог месяца (на 16.05). Сеть факт 3,84 млн.').label)
+check(`метка длиннее ${LABEL_MAX} символов → не выделяем, абзац сплошной`, (() => {
+  const long = 'Очень длинное вступление без короткой метки в самом начале блока. Дальше текст.'
+  const r = splitBlock(long)
+  return r.label === null && r.rest === long
+})())
+check('нет точки вовсе → абзац сплошной', splitBlock('Просто текст без точки').label === null)
+check('пустой блок → пусто', splitBlock('').rest === '' && splitBlock(null).rest === '')
+check('blocksOf: 3 блока, первый — head', (() => {
+  const b = blocksOf(NS[0])
+  return b.length === 3 && b[0].head === true && b[1].head === false
+})())
+check('blocksOf: пустой блок отброшен, рендер не падает',
+  blocksOf({ block1: 'Данные. Есть.', block2: '', block3: null }).length === 1)
+check('ключ прочитанности — «summary:{cadence}:{date}»',
+  summaryKey('week', '2025-05-12') === 'summary:week:2025-05-12', summaryKey('week', '2025-05-12'))
+check('статусы сводок не пересекаются с парковыми', (() => {
+  const store = {}
+  markSummaryState(store, 'day', '2025-05-16', 'viewed')
+  markState(store, 'ohta', '2025-05-16', 'read')
+  return summaryStatusOf(store, 'day', '2025-05-16') === 'viewed' &&
+    statusOf(store, 'ohta', '2025-05-16') === 'read' &&
+    Object.keys(store).length === 2
+})())
+
+console.log('\n=== jsdom: карточка сводки (три блока, блок 1 свёрнут) ===')
+{
+  localStorage.clear()
+  const day = NS.find((x) => x.cadence === 'day')
+  const { el, app } = mount(bundle.NetSummaryCard, { cadence: 'day', entry: day })
+  await nextTick()
+  check('заголовок «Сводка дня · 16.05»', el.textContent.replace(/ /g, ' ').includes('Сводка дня · 16.05'))
+  check('точка статуса одна', el.querySelectorAll('[data-test="summary-dot"]').length === 1)
+  check('бейдж «новое» в первый заход', !!el.querySelector('[data-test="summary-new"]'))
+  check('видны блоки 2 и 3 (Оценка + Фокус)',
+    el.textContent.includes('Оценка') && el.textContent.includes('Фокус на субботу'))
+  check('это НЕ сигнал: ни headline/action, ни кнопки «Прочитала» (фаза 2)',
+    !el.querySelector('[data-test="signal-read"]') && !el.textContent.includes('Прочитала'))
+  const bodyBefore = el.querySelector('[data-test="summary-head-body"]')
+  check('блок 1 свёрнут по умолчанию (тело скрыто)', !bodyBefore)
+  const toggle = el.querySelector('[data-test="summary-head-toggle"]')
+  check('свёрнутый блок подписан своей меткой «Данные»', !!toggle && toggle.textContent.includes('Данные'))
+  await fire(toggle, 'click')
+  check('тап раскрывает блок 1', el.textContent.includes('За пятницу 16.05 отчёты сдали все три парка'))
+  check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
+  app.unmount()
+
+  const re = mount(bundle.NetSummaryCard, { cadence: 'day', entry: day })
+  await nextTick()
+  check('бейдж «новое» снят в следующий заход', !re.el.querySelector('[data-test="summary-new"]'))
+  re.app.unmount()
+}
+{
+  // месячная карточка: метка с точкой внутри даты не рвётся при живом рендере
+  localStorage.clear()
+  const month = NS.find((x) => x.cadence === 'month')
+  const { el, app } = mount(bundle.NetSummaryCard, { cadence: 'month', entry: month })
+  await nextTick()
+  check('заголовок месяца — русский месяц', el.textContent.replace(/ /g, ' ').includes('Сводка месяца · Май 2025'))
+  const toggle = el.querySelector('[data-test="summary-head-toggle"]')
+  check('метка свёрнутого блока = «Итог месяца (на 16.05)»', toggle.textContent.includes('Итог месяца (на 16.05)'))
+  check('метка не обрезана по точке внутри даты', toggle.textContent.trim().startsWith('Итог месяца (на 16.05)'),
+    toggle.textContent.trim())
+  const bold = [...el.querySelectorAll('[data-test="summary-block"] b')].map((b) => b.textContent)
+  check('жирные метки блоков 2/3 = «Траектория.» и «Вывод.»', bold.join('|') === 'Траектория.|Вывод.', bold.join('|'))
+  app.unmount()
+}
+{
+  // неизвестный статус и лишние ключи рендер не роняют
+  localStorage.clear()
+  const { el, app } = mount(bundle.NetSummaryCard, {
+    cadence: 'week',
+    entry: { cadence: 'week', date: '2025-05-12', status: 'wat', block1: 'Итог недели. Есть.', kind: 'x' },
+  })
+  await nextTick()
+  check('неизвестный статус → нейтральная точка, рендер жив',
+    el.querySelector('[data-test="summary-dot"]').getAttribute('style').includes('text-muted'))
+  check('единственный блок = head, блоков 2/3 нет', el.querySelectorAll('[data-test="summary-block"]').length === 0)
+  app.unmount()
+}
+
+console.log('\n=== jsdom: раздел «Сводки сети» и вход с Главной ===')
+{
+  localStorage.clear()
+  getPayload = { updated: '2025-05-20', sets: {}, net_summary: NS }
+  const { el, app } = mount(bundle.SummaryScreen, {})
+  await flush()
+  const cards = el.querySelectorAll('[data-test="summary-card"]')
+  check('три карточки: день → неделя → месяц', cards.length === 3 &&
+    [...cards].map((c) => c.getAttribute('data-cadence')).join(',') === 'day,week,month',
+    [...cards].map((c) => c.getAttribute('data-cadence')).join(','))
+  check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
+  app.unmount()
+}
+{
+  // обратная совместимость: payload без net_summary
+  localStorage.clear()
+  getPayload = { updated: '2025-05-20', sets: {} }
+  const { el, app } = mount(bundle.SummaryScreen, {})
+  await flush()
+  check('нет net_summary → карточек нет, пустой стейт', el.querySelectorAll('[data-test="summary-card"]').length === 0 &&
+    el.textContent.includes('Сводок пока нет'))
+  app.unmount()
+  getPayload = {}
+}
+{
+  // вход в раздел — первая плитка на Главной
+  localStorage.clear()
+  const nav = bundle.useAppNav()
+  bundle.clearSubView()
+  const { el, app } = mount(bundle.HomeScreen, {})
+  await flush()
+  const tiles = [...el.querySelectorAll('.grid button')]
+  check('плиток на Главной 4', tiles.length === 4, tiles.length)
+  check('«Сводки» — первая плитка', tiles[0]?.getAttribute('data-test') === 'tile-summary' && tiles[0].textContent.includes('Сводки'))
+  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Аналитика,Проекты,Материалы',
+    tiles.slice(1).map((t) => t.textContent.trim()).join(','))
+  await fire(tiles[0], 'click')
+  check('тап по плитке → под-страница «summary»', nav.subView.value === 'summary', nav.subView.value)
+  bundle.clearSubView()
   app.unmount()
 }
 

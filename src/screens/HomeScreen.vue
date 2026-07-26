@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Layers, Target } from 'lucide-vue-next'
+import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Layers, Newspaper, Target } from 'lucide-vue-next'
 import HomeWidget from '../components/home/HomeWidget.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { useDaily } from '../composables/useDaily.js'
@@ -8,6 +8,7 @@ import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
 import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, L } from '../i18n/home.js'
+import { L as LS } from '../i18n/summary.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
 // серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
@@ -18,6 +19,7 @@ import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, L } from '..
 
 const NM_DAILY = 'Контроль\nДня'
 const NM_GOALS = 'Цели и\nпланы'
+const SUMMARY_TILE = LS.home_tile
 
 const { data, loading } = useDaily()
 const sets = computed(() => data.value?.sets || {})
@@ -60,6 +62,7 @@ const paceInfo = computed(() => {
 })
 
 function goDaily() { setSubView('daily') }
+function goSummary() { setSubView('summary') }
 function goGoals() { setSubView('goals') }
 function goAnalytics() { setActive('analytics') }
 function goProjects() { setActive('projects') }
@@ -163,20 +166,26 @@ function goMaterials() { setActive('materials') }
       </div>
     </Transition>
 
-    <!-- карта-сетка: три серые плитки-приложения -->
+    <!-- карта-сетка: плитки-приложения. «Сводки» — первая (вход в сетевые сводки
+         дня/недели/месяца). Сетка на 4 колонки: на узких экранах (SE, 375px)
+         колонка ~80px, иконка 60px + подпись в одну строку помещаются. -->
     <div class="mt-3.5 rounded-[22px] bg-[var(--surface)] px-2.5 pb-3.5 pt-[18px] shadow-sm">
-      <div class="flex justify-around">
-        <button type="button" class="flex w-[92px] flex-col items-center gap-2.5" @click="goAnalytics">
-          <span class="flex h-[66px] w-[66px] items-center justify-center rounded-[18px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><ChartColumnBig class="h-[30px] w-[30px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="text-[0.84rem] font-medium text-[var(--text)]">Аналитика</span>
+      <div class="grid grid-cols-4 gap-1">
+        <button type="button" data-test="tile-summary" class="flex min-w-0 flex-col items-center gap-2.5" @click="goSummary">
+          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Newspaper class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">{{ SUMMARY_TILE }}</span>
         </button>
-        <button type="button" class="flex w-[92px] flex-col items-center gap-2.5" @click="goProjects">
-          <span class="flex h-[66px] w-[66px] items-center justify-center rounded-[18px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Layers class="h-[30px] w-[30px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="text-[0.84rem] font-medium text-[var(--text)]">Проекты</span>
+        <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goAnalytics">
+          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><ChartColumnBig class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Аналитика</span>
         </button>
-        <button type="button" class="flex w-[92px] flex-col items-center gap-2.5" @click="goMaterials">
-          <span class="flex h-[66px] w-[66px] items-center justify-center rounded-[18px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Folder class="h-[30px] w-[30px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="text-[0.84rem] font-medium text-[var(--text)]">Материалы</span>
+        <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goProjects">
+          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Layers class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Проекты</span>
+        </button>
+        <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goMaterials">
+          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Folder class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Материалы</span>
         </button>
       </div>
     </div>

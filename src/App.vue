@@ -8,6 +8,7 @@ import MaterialsScreen from './screens/MaterialsScreen.vue'
 import ParksScreen from './screens/ParksScreen.vue'
 import DailyScreen from './screens/DailyScreen.vue'
 import GoalsScreen from './screens/GoalsScreen.vue'
+import SummaryScreen from './screens/SummaryScreen.vue'
 import DailyReportScreen from './screens/DailyReportScreen.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import AccessKeyForm from './components/AccessKeyForm.vue'
@@ -49,6 +50,15 @@ const subViews = {
     showBack: true,
     backLabel: 'Главная',
     parkFilter: true,
+  },
+  // «Сводки сети» — сетевые сводки дня/недели/месяца. Парк-фильтра нет: содержимое
+  // всегда по сети целиком (итог сети = Σ парков считается на стороне данных).
+  summary: {
+    title: 'Сводки сети',
+    screen: SummaryScreen,
+    showBack: true,
+    backLabel: 'Главная',
+    parkFilter: false,
   },
   // «Отчёт Дня» (D-12) — единственная пишущая страница; открывается кнопкой
   // «Добавить отчёт» из «Контроля Дня». `backTo` — статический возврат на
