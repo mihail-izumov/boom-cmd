@@ -3,11 +3,11 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Check, ChevronDown, X } from 'lucide-vue-next'
 import { monthLabel } from '../../i18n/summary.js'
 
-// Селектор месяца раздела «Сводки сети» (v2.2).
-// Механика — ровно как у парк-фильтра (ParkFilterPill + ParkPickerSheet):
-// пилюля с шевроном открывает bottom-sheet со списком, выбранное помечено Check,
-// не цветом. Отличия по виду продиктованы самим разделом: обводок нет, пилюля
-// держится заливкой --surface-2.
+// Селектор месяца раздела «Сводки сети» (v2.2; с v2.3 живёт в правом верхнем углу
+// шапки через useNavTrailing — там же, где на других разделах парк-фильтр).
+// Механика и вид — ровно как у компактного парк-фильтра (ParkFilterPill +
+// ParkPickerSheet): пилюля с шевроном открывает bottom-sheet со списком,
+// выбранное помечено Check, не цветом.
 //
 // Список месяцев считает экран — сюда приходят только те, по которым есть хоть
 // одна запись любого каденса. Значений вне списка не бывает.
@@ -90,13 +90,13 @@ onBeforeUnmount(() => {
   <button
     type="button"
     data-test="summary-month-pill"
-    class="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-2)] px-4 text-[var(--text)] active:opacity-90"
-    style="min-height: 44px"
+    class="inline-flex items-center gap-1 rounded-full px-2 text-[var(--text)] active:bg-[var(--surface-2)]"
+    style="min-height: 44px; max-width: 10rem"
     :aria-label="`Месяц сводок: ${monthLabel(modelValue)}`"
     aria-haspopup="dialog"
     @click="open = true"
   >
-    <span class="text-[0.9375rem] font-medium leading-none">{{ monthLabel(modelValue) }}</span>
+    <span class="truncate text-[0.9375rem] font-medium leading-none">{{ monthLabel(modelValue) }}</span>
     <ChevronDown class="h-4 w-4 shrink-0 text-[var(--text-muted)]" :stroke-width="2" aria-hidden="true" />
   </button>
 

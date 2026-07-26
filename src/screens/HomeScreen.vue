@@ -7,7 +7,7 @@ import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, L } from '../i18n/home.js'
+import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, checkupsWord, signalsWord, L } from '../i18n/home.js'
 import { L as LS } from '../i18n/summary.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
@@ -83,13 +83,13 @@ function goMaterials() { setActive('materials') }
       <div class="flex flex-1 flex-col items-center py-2.5">
         <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
         <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.checkups ?? '—' }}</span>
-        <span class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ L.checkups }}</span>
+        <span data-test="home-checkups-word" class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ checkupsWord(counters.checkups) }}</span>
       </div>
       <div class="my-2 w-px bg-[var(--line)]"></div>
       <div class="flex flex-1 flex-col items-center py-2.5">
         <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
         <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.signals ?? '—' }}</span>
-        <span class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ L.signals }}</span>
+        <span data-test="home-signals-word" class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ signalsWord(counters.signals) }}</span>
       </div>
     </button>
 

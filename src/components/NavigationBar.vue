@@ -5,6 +5,7 @@ import ParkFilterPill from './navigation/ParkFilterPill.vue'
 import ParkPickerSheet from './navigation/ParkPickerSheet.vue'
 import SyncIcon from './icons/SyncIcon.vue'
 import { useNavCaption } from '../composables/useNavCaption.js'
+import { useNavTrailing } from '../composables/useNavTrailing.js'
 
 // Шапка навигации (TZ-3.2 + правка по запросу владельца):
 //   - sticky compact-bar сверху: back / leading-action слева, центрированный
@@ -31,6 +32,7 @@ defineProps({
 defineEmits(['back'])
 
 const { caption } = useNavCaption()
+const { trailing } = useNavTrailing()
 
 const pickerOpen = ref(false)
 function openPicker() {
@@ -109,8 +111,18 @@ async function hardReload() {
         <span class="truncate text-[1.0625rem] font-semibold text-[var(--text)]">{{ title }}</span>
       </div>
 
-      <!-- Правый угол: компактная пилюля парк-фильтра (виден при collapsed && parkFilter) -->
+      <!-- Правый угол: либо управляемый слот раздела (селектор месяца в «Сводках»),
+           либо компактная пилюля парк-фильтра (виден при collapsed && parkFilter).
+           Слот виден всегда: у раздела с ним нет второй копии контрола в потоке. -->
       <div
+        v-if="trailing"
+        data-test="nav-trailing"
+        class="flex min-w-0 items-center justify-self-end pr-1"
+      >
+        <component :is="trailing.component" v-bind="trailing.props" />
+      </div>
+      <div
+        v-else
         class="flex min-w-0 items-center justify-self-end pr-1 transition-opacity duration-200"
         :class="collapsed && parkFilter ? 'opacity-100' : 'pointer-events-none opacity-0'"
       >

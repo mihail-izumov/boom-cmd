@@ -97,6 +97,30 @@ export function monthKeyOf(entry) {
   return anchor.slice(0, 7)
 }
 
+// День недели по ISO-дате: Пн=1 … Вс=7 (как dow в dailyModel).
+function dowOf(iso) {
+  const t = new Date(`${iso}T00:00:00Z`)
+  const d = t.getUTCDay()
+  return d === 0 ? 7 : d
+}
+
+// Номер недели ВНУТРИ месяца — по тем же правилам, что «Контроль Дня» (dailyModel:
+// новая неделя начинается в понедельник, первая — та, с которой месяц начался,
+// даже если она неполная). Нужен для заголовка «Неделя 3» вместо «Сводка недели».
+export function weekIndexOf(entry) {
+  if (!entry || typeof entry !== 'object' || entry.cadence !== 'week') return null
+  const iso = String(entry.date || '')
+  if (!DATE_RE.test(iso)) return null
+  const first = `${monthKeyOf(entry)}-01`
+  // якорь в прошлом месяце (месяц начался среди недели) → это неделя №1
+  if (iso < first) return 1
+  const day = Number(iso.slice(8, 10))
+  const dow1 = dowOf(first)
+  if (dow1 === 1) return Math.floor((day - 1) / 7) + 1
+  const firstMonday = 9 - dow1 // число первого понедельника месяца
+  return 2 + Math.floor((day - firstMonday) / 7)
+}
+
 // Месяцы, по которым есть ХОТЬ ОДНА запись любого каденса. Новые сверху.
 export function monthsOf(raw) {
   const seen = new Set()

@@ -1,8 +1,9 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, ref, watchEffect } from 'vue'
 import { useDaily } from '../composables/useDaily.js'
 import { CADENCES, entryKey, feedByCadence, monthsOf } from '../composables/netSummary.js'
 import { CADENCE_SEG, L } from '../i18n/summary.js'
+import { clearTrailing, setTrailing } from '../composables/useNavTrailing.js'
 import NetSummaryCard from '../components/daily/NetSummaryCard.vue'
 import SummaryMonthPicker from '../components/daily/SummaryMonthPicker.vue'
 
@@ -10,10 +11,12 @@ import SummaryMonthPicker from '../components/daily/SummaryMonthPicker.vue'
 // Источник — тот же дневной payload (useDaily), отдельное верхнеуровневое поле
 // data.net_summary. Парк-контекст здесь не участвует: сводки сетевые.
 //
-// v2.2: сверху раздела — селектор месяца (пилюля + bottom-sheet, механика парк-
-// фильтра). В списке только месяцы, по которым есть хоть одна запись любого
-// каденса; умолчание — самый свежий. Месяц сужает ВСЕ каденсы разом, поэтому в
-// сегменте «Месяц» сводка ровно одна — отсюда и единственное число в подписи.
+// v2.2: селектор месяца (пилюля + bottom-sheet, механика парк-фильтра). В списке
+// только месяцы, по которым есть хоть одна запись любого каденса; умолчание —
+// самый свежий. Месяц сужает ВСЕ каденсы разом, поэтому в сегменте «Месяц» сводка
+// ровно одна — отсюда и единственное число в подписи.
+// v2.3: селектор переехал в правый верхний угол шапки (useNavTrailing) — туда же,
+// где на других разделах стоит парк-фильтр.
 //
 // v2 (ТЗ §3.1–3.2): сегментированный переключатель «Дни / Недели / Месяц» под
 // лид-текстом (таб-бар по HIG занят навигацией, туда каденс не выносим), внутри
@@ -41,18 +44,41 @@ const total = computed(() => CADENCES.reduce((a, c) => a + feeds.value[c].length
 const cadence = ref('day') // умолчание — «Дни»
 const entries = computed(() => feeds.value[cadence.value] || [])
 
-// Карта раскрытия: ключ записи → развёрнута. Ключа нет → умолчание «раскрыта
-// только первая (актуальная)». Ключ включает каденс, потому состояние сегментов
-// не смешивается.
-const open = ref({})
+// Раскрытие — аккордеон (v2.3): открыта РОВНО одна запись, открытие соседней
+// закрывает предыдущую, чтобы длинные сводки не мешали друг другу. Состояние
+// хранится по паре «месяц + каденс»: переключение сегмента или месяца не тащит
+// за собой чужой ключ и не оставляет ленту полностью свёрнутой.
+//   значения: undefined — умолчание «раскрыта первая», '' — свёрнуты все,
+//   иначе — ключ раскрытой записи.
+const openBy = ref({})
+const scope = computed(() => `${month.value || '—'}:${cadence.value}`)
 const keyOf = (entry, i) => entryKey(cadence.value, entry, i)
 function isOpen(entry, i) {
-  const k = keyOf(entry, i)
-  return k in open.value ? open.value[k] : i === 0
+  const cur = openBy.value[scope.value]
+  return cur === undefined ? i === 0 : cur === keyOf(entry, i)
 }
 function toggle(entry, i) {
-  open.value = { ...open.value, [keyOf(entry, i)]: !isOpen(entry, i) }
+  openBy.value = { ...openBy.value, [scope.value]: isOpen(entry, i) ? '' : keyOf(entry, i) }
 }
+
+// Селектор месяца живёт в правом верхнем углу шапки (v2.3) — там же, где на других
+// разделах парк-фильтр. Слот освобождаем, когда экран уходит: он общий на всю
+// оболочку.
+const active = ref(true)
+onActivated(() => { active.value = true })
+onDeactivated(() => { active.value = false; clearTrailing() })
+onBeforeUnmount(clearTrailing)
+watchEffect(() => {
+  if (!active.value || !months.value.length) {
+    clearTrailing()
+    return
+  }
+  setTrailing(SummaryMonthPicker, {
+    months: months.value,
+    modelValue: month.value,
+    'onUpdate:modelValue': (m) => { picked.value = m },
+  })
+})
 </script>
 
 <template>
@@ -83,11 +109,6 @@ function toggle(entry, i) {
     <!-- лид + сегменты + лента каденса -->
     <template v-else>
       <p class="bc-fade-in px-1 text-[0.8125rem] leading-snug text-[var(--text-muted)]">{{ L.lead }}</p>
-
-      <!-- месяц раздела: пилюля + bottom-sheet, как парк-фильтр в мастерплане -->
-      <div class="bc-fade-in flex justify-center">
-        <SummaryMonthPicker :months="months" :model-value="month" @update:model-value="(m) => (picked = m)" />
-      </div>
 
       <div
         data-test="summary-segments"

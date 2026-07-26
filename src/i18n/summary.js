@@ -67,7 +67,11 @@ export function monthLabel(key) {
 
 // Заголовок карточки — БЕЗ периода: период идёт отдельным бейджем рядом (v2.1),
 // разделителей «·» в разделе больше нет.
-export function cardTitle(cadence) {
+// Неделя называется по номеру внутри месяца — «Неделя 3», как в «Контроле Дня»
+// (v2.3). Номер считает слой данных (netSummary.weekIndexOf), сюда приходит готовым;
+// его нет (битая запись) — падаем на общее «Сводка недели».
+export function cardTitle(cadence, weekIdx = null) {
+  if (cadence === 'week' && weekIdx) return `Неделя ${weekIdx}`
   return CADENCE_TITLE[cadence] || 'Сводка'
 }
 

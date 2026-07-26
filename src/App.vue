@@ -21,7 +21,9 @@ import { useAccessKey } from './composables/useAccessKey.js'
 // (Аналитика/Проекты/Материалы). На Home и под-странице «Парки» фильтра нет.
 // `eyebrow` — бейдж над крупным заголовком (Home: «БУМБАСТИК», графит).
 const tabs = [
-  { id: 'home',      label: 'Главная',   title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
+  // Подпись вкладки — «Сегодня» (правка владельца 26.07). Идентификатор вкладки
+  // остался `home`: он живёт в useAppNav, в тестах и в глубоких ссылках.
+  { id: 'home',      label: 'Сегодня',   title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
   { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
   { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },

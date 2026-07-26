@@ -62,6 +62,32 @@ export function readCounters(data) {
   return { checkups: s ? num(s.checkups) : null, signals: s ? num(s.signals) : null }
 }
 
+// Русское склонение по числу: 1 чекап · 2 чекапа · 5 чекапов · 21 чекап.
+// Формы задаются тройкой [один, два, пять]. Число берём по модулю: 111 → «чекапов»
+// (11–14 всегда пятая форма), 121 → «чекап».
+export function plural(n, forms) {
+  const v = Math.abs(Number(n))
+  if (!Number.isFinite(v)) return forms[2]
+  const i = Math.floor(v) % 100
+  const j = i % 10
+  if (i > 10 && i < 20) return forms[2]
+  if (j > 1 && j < 5) return forms[1]
+  if (j === 1) return forms[0]
+  return forms[2]
+}
+
+const CHECKUPS = ['Чекап', 'Чекапа', 'Чекапов']
+const SIGNALS = ['Сигнал', 'Сигнала', 'Сигналов']
+
+// Подпись под счётчиком. Числа нет («—») → форма родительного множественного,
+// как было до склонения: «Чекапов», «Сигналов».
+export function checkupsWord(n) {
+  return n == null ? CHECKUPS[2] : plural(n, CHECKUPS)
+}
+export function signalsWord(n) {
+  return n == null ? SIGNALS[2] : plural(n, SIGNALS)
+}
+
 export const L = {
   daily: 'Контроль Дня',
   goals: 'Цели и планы',

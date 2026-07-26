@@ -18,11 +18,11 @@ import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
   buildSignalReadBody, postSignalRead,
 } from '../src/composables/dailySignals.js'
-import { readCounters } from '../src/i18n/home.js'
+import { readCounters, plural, checkupsWord, signalsWord } from '../src/i18n/home.js'
 import {
   sortSummaries, latestByCadence, latestOf, splitBlock, blocksOf,
   summaryKey, summaryStatusOf, markSummaryState, LABEL_MAX,
-  asofOf, feedOf, feedByCadence, entryKey, summaryInk, monthsOf, monthKeyOf,
+  asofOf, feedOf, feedByCadence, entryKey, summaryInk, monthsOf, monthKeyOf, weekIndexOf,
 } from '../src/composables/netSummary.js'
 import { cardTitle, periodLabel, addDays, monthLabel, CADENCE_SEG, L as LSUM } from '../src/i18n/summary.js'
 
@@ -650,6 +650,33 @@ check('фильтр месяца делит ленты без потерь', (()
   return n(may) + n(apr) === sortSummaries(NS).length
 })(), `${sortSummaries(NS).length} записей`)
 
+console.log('\n=== Сводки сети: номер недели внутри месяца (v2.3) ===')
+check('нумерация как в «Контроле Дня»: первая неделя — та, с которой месяц начался', (() => {
+  // май-2025: 1-е — четверг, первый понедельник 05.05
+  return weekIndexOf({ cadence: 'week', date: '2025-04-28' }) === 1 && // якорь в апреле → неделя 1 мая
+    weekIndexOf({ cadence: 'week', date: '2025-05-05' }) === 2 &&
+    weekIndexOf({ cadence: 'week', date: '2025-05-12' }) === 3
+})(), [ '2025-04-28', '2025-05-05', '2025-05-12' ].map((d) => weekIndexOf({ cadence: 'week', date: d })).join(','))
+check('боевой июль-2026 (месяц начался в среду): 29.06 → 1, 06.07 → 2, 13.07 → 3, 20.07 → 4',
+  ['2026-06-29', '2026-07-06', '2026-07-13', '2026-07-20']
+    .map((d) => weekIndexOf({ cadence: 'week', date: d })).join(',') === '1,2,3,4',
+  ['2026-06-29', '2026-07-06', '2026-07-13', '2026-07-20']
+    .map((d) => weekIndexOf({ cadence: 'week', date: d })).join(','))
+check('месяц начинается в понедельник → первая неделя без сдвига', (() => {
+  // 01.12.2025 — понедельник
+  return weekIndexOf({ cadence: 'week', date: '2025-12-01' }) === 1 &&
+    weekIndexOf({ cadence: 'week', date: '2025-12-08' }) === 2
+})())
+check('номер только у недель; день/месяц/битое → null',
+  weekIndexOf({ cadence: 'day', date: '2025-05-16' }) === null &&
+  weekIndexOf({ cadence: 'month', date: '2025-05-01' }) === null &&
+  weekIndexOf(null) === null && weekIndexOf({ cadence: 'week', date: '12.05.2025' }) === null)
+check('заголовок недели = «Неделя N», день и месяц не тронуты',
+  cardTitle('week', 3) === 'Неделя 3' && cardTitle('day') === 'Сводка дня' &&
+  cardTitle('month') === 'Сводка месяца', cardTitle('week', 3))
+check('номера нет (битая запись) → падаем на «Сводка недели»',
+  cardTitle('week', null) === 'Сводка недели')
+
 console.log('\n=== Сводки сети: подписи сегментов ===')
 check('подписи сегментов = Дни / Недели / Месяц (месяц в единственном числе)',
   CADENCE_SEG.day === 'Дни' && CADENCE_SEG.week === 'Недели' && CADENCE_SEG.month === 'Месяц',
@@ -720,20 +747,27 @@ const nsFeedDay = feedOf(sortSummaries(NS), 'day')
     !el.querySelector('[data-test="summary-new"]') && !el.textContent.includes('новое'))
   check('data_asof в UI не выводится (ни даты среза, ни времени)',
     !el.textContent.includes('17.05') && !el.textContent.includes('12:28') && !el.textContent.includes('2025-05-17'))
-  check('второй даты в карточке нет — период только в заголовке',
-    (el.textContent.match(/16\.05/g) || []).length === 1, (el.textContent.match(/16\.05/g) || []).length)
+  check('второй даты В ШАПКЕ нет — период только в бейдже', (() => {
+    const head = el.querySelector('h2').parentElement.textContent
+    return (head.match(/16\.05/g) || []).length === 1
+  })(), el.querySelector('h2').parentElement.textContent.trim())
   check('одиночная карточка не сворачивается (кнопки сворачивания нет)',
     !el.querySelector('[data-test="summary-collapse"]'))
   check('видны блоки 2 и 3 (Оценка + Фокус)',
     el.textContent.includes('Оценка') && el.textContent.includes('Фокус на субботу'))
   check('это НЕ сигнал: ни headline/action, ни кнопки «Прочитала» (фаза 2)',
     !el.querySelector('[data-test="signal-read"]') && !el.textContent.includes('Прочитала'))
-  const bodyBefore = el.querySelector('[data-test="summary-head-body"]')
-  check('блок 1 свёрнут по умолчанию (тело скрыто)', !bodyBefore)
-  const toggle = el.querySelector('[data-test="summary-head-toggle"]')
-  check('свёрнутый блок подписан своей меткой «Данные»', !!toggle && toggle.textContent.includes('Данные'))
-  await fire(toggle, 'click')
-  check('тап раскрывает блок 1', el.textContent.includes('За пятницу 16.05 отчёты сдали все три парка'))
+  check('все три блока видны сразу, своей свёртки у них нет',
+    el.querySelectorAll('[data-test="summary-block"]').length === 3 &&
+    !el.querySelector('[data-test="summary-head-toggle"]') &&
+    !el.querySelector('[data-test="summary-head-body"]'),
+    el.querySelectorAll('[data-test="summary-block"]').length)
+  check('блок 1 («Данные») развёрнут вместе с остальными',
+    el.textContent.includes('За пятницу 16.05 отчёты сдали все три парка'))
+  check('порядок блоков — 1 → 2 → 3',
+    [...el.querySelectorAll('[data-test="summary-block"] b')].map((b) => b.textContent).join('|')
+      === 'Данные.|Оценка.|Фокус на субботу.',
+    [...el.querySelectorAll('[data-test="summary-block"] b')].map((b) => b.textContent).join('|'))
   check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
   app.unmount()
 
@@ -780,12 +814,11 @@ const nsFeedDay = feedOf(sortSummaries(NS), 'day')
     el.textContent.includes('Сводка месяца') &&
     el.querySelector('[data-test="summary-badge"]').textContent.trim().replace(/ /g, ' ') === 'Май 2025',
     el.querySelector('[data-test="summary-badge"]').textContent.trim())
-  const toggle = el.querySelector('[data-test="summary-head-toggle"]')
-  check('метка свёрнутого блока = «Итог месяца (на 16.05)»', toggle.textContent.includes('Итог месяца (на 16.05)'))
-  check('метка не обрезана по точке внутри даты', toggle.textContent.trim().startsWith('Итог месяца (на 16.05)'),
-    toggle.textContent.trim())
   const bold = [...el.querySelectorAll('[data-test="summary-block"] b')].map((b) => b.textContent)
-  check('жирные метки блоков 2/3 = «Траектория.» и «Вывод.»', bold.join('|') === 'Траектория.|Вывод.', bold.join('|'))
+  check('жирные метки трёх блоков = «Итог месяца (на 16.05).» / «Траектория.» / «Вывод.»',
+    bold.join('|') === 'Итог месяца (на 16.05).|Траектория.|Вывод.', bold.join('|'))
+  check('метка не обрезана по точке внутри даты (боевой кейс месяца)',
+    bold[0] === 'Итог месяца (на 16.05).', bold[0])
   app.unmount()
 }
 {
@@ -800,7 +833,9 @@ const nsFeedDay = feedOf(sortSummaries(NS), 'day')
     const st = el.querySelector('[data-test="summary-badge"]').getAttribute('style')
     return st.includes('var(--text-muted)') && st.includes('var(--ink-on-color)')
   })(), el.querySelector('[data-test="summary-badge"]').getAttribute('style'))
-  check('единственный блок = head, блоков 2/3 нет', el.querySelectorAll('[data-test="summary-block"]').length === 0)
+  check('единственный блок отрисован как обычный абзац',
+    el.querySelectorAll('[data-test="summary-block"]').length === 1 &&
+    el.textContent.includes('Итог недели'))
   app.unmount()
 }
 
@@ -808,13 +843,16 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
 {
   localStorage.clear()
   getPayload = { updated: '2025-05-20', sets: {}, net_summary: NS }
+  // шапка монтируется рядом: селектор месяца живёт в её правом углу (v2.3)
+  const nav = mount(bundle.NavigationBar, { title: 'Сводки сети', collapsed: true, showBack: true, backLabel: 'Главная' })
   const { el, app } = mount(bundle.SummaryScreen, {})
   await flush()
 
-  // селектор месяца
-  const pill = el.querySelector('[data-test="summary-month-pill"]')
-  check('селектор месяца показан пилюлей и стоит НАД сегментами',
-    !!pill && !!(pill.compareDocumentPosition(el.querySelector('[data-test="summary-segments"]')) & 4))
+  // селектор месяца — в правом верхнем углу шапки, НЕ в теле раздела
+  const pill = nav.el.querySelector('[data-test="summary-month-pill"]')
+  check('селектор месяца стоит в правом углу шапки, как парк-фильтр',
+    !!pill && !!nav.el.querySelector('[data-test="nav-trailing"]'))
+  check('в теле раздела селектора больше нет', !el.querySelector('[data-test="summary-month-pill"]'))
   check('умолчание — самый свежий месяц', pill.textContent.trim() === 'Май\u00A02025', pill.textContent.trim())
   check('пилюля ≥44pt и открывает диалог',
     String(pill.getAttribute('style') || '').includes('44px') && pill.getAttribute('aria-haspopup') === 'dialog')
@@ -832,13 +870,14 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   await fire(opts[1], 'click')
   check('после выбора лист закрылся', !document.querySelector('[data-test="summary-month-sheet"]'))
   check('пилюля показывает выбранный месяц',
-    el.querySelector('[data-test="summary-month-pill"]').textContent.trim() === 'Апрель\u00A02025')
+    nav.el.querySelector('[data-test="summary-month-pill"]').textContent.trim() === 'Апрель\u00A02025',
+    nav.el.querySelector('[data-test="summary-month-pill"]').textContent.trim())
   check('лента «Дни» апреля = одна запись 29.04', (() => {
     const c = [...el.querySelectorAll('[data-test="summary-card"]')]
     return c.length === 1 && c[0].textContent.includes('29.04')
   })())
   {
-    const p2 = el.querySelector('[data-test="summary-month-pill"]')
+    const p2 = nav.el.querySelector('[data-test="summary-month-pill"]')
     await fire(p2, 'click')
     const back = [...document.querySelectorAll('[data-test="summary-month-option"]')][0]
     await fire(back, 'click')
@@ -894,10 +933,16 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
     cards[1].getAttribute('data-open') === 'true' &&
     cards[1].textContent.includes('Предварительно'),
     cards.map((c) => c.getAttribute('data-open')).join(','))
-  check('раскрытие соседней не свернуло актуальную', cards[0].getAttribute('data-open') === 'true')
+  check('аккордеон: раскрытие соседней СВЕРНУЛО прежнюю',
+    cards[0].getAttribute('data-open') === 'false' &&
+    cards.filter((c) => c.getAttribute('data-open') === 'true').length === 1,
+    cards.map((c) => c.getAttribute('data-open')).join(','))
   await fire(cards[1].querySelector('[data-test="summary-collapse"]'), 'click')
-  check('повторный тап сворачивает обратно',
-    el.querySelectorAll('[data-test="summary-card"]')[1].getAttribute('data-open') === 'false')
+  check('повторный тап сворачивает обратно — открытых нет',
+    [...el.querySelectorAll('[data-test="summary-card"]')].every((c) => c.getAttribute('data-open') === 'false'))
+  await fire(el.querySelectorAll('[data-test="summary-row"]')[0], 'click')
+  check('открытой всегда не больше одной',
+    [...el.querySelectorAll('[data-test="summary-card"]')].filter((c) => c.getAttribute('data-open') === 'true').length === 1)
 
   // переключение каденса
   await fire(segs[1], 'click')
@@ -908,6 +953,14 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   check('«Недели»: новое сверху (12.05 → 05.05 → 28.04)',
     cards[0].textContent.includes('12.05') && cards[1].textContent.includes('05.05') &&
     cards[2].textContent.includes('28.04'))
+  check('«Недели»: заголовки — «Неделя 3 / 2 / 1», а не «Сводка недели»',
+    cards.map((c) => c.querySelector('h2')?.textContent.trim()).filter(Boolean).join(',') === 'Неделя 3' &&
+    !cards[0].textContent.includes('Сводка недели'),
+    cards.map((c) => c.querySelector('h2')?.textContent.trim()).join(','))
+  check('«Недели»: в свёрнутых строках подпись — номер недели',
+    [...el.querySelectorAll('[data-test="summary-row"]')].map((r) => r.textContent.replace(/\s+/g, ' ').trim())
+      .join(' | ') === '05.05–11.05Неделя 2 | 28.04–04.05Неделя 1',
+    [...el.querySelectorAll('[data-test="summary-row"]')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '))
   check('«Недели»: aria-selected переехал на второй сегмент',
     el.querySelectorAll('[data-test^="summary-seg-"]')[1].getAttribute('aria-selected') === 'true')
   await fire(el.querySelectorAll('[data-test^="summary-seg-"]')[2], 'click')
@@ -916,11 +969,13 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
     cards.length === 1 && cards[0].getAttribute('data-cadence') === 'month' &&
     cards[0].getAttribute('data-open') === 'true' && !cards[0].querySelector('[data-test="summary-collapse"]'))
   await fire(el.querySelectorAll('[data-test^="summary-seg-"]')[0], 'click')
-  check('возврат в «Дни»: состояние ленты сохранено (раскрыта только актуальная)',
-    [...el.querySelectorAll('[data-test="summary-card"]')].map((c) => c.getAttribute('data-open')).join(',')
-      === ['true', ...Array(feeds.day.length - 1).fill('false')].join(','))
+  check('возврат в «Дни»: открыта ровно одна запись — та, что выбирали',
+    [...el.querySelectorAll('[data-test="summary-card"]')].filter((c) => c.getAttribute('data-open') === 'true').length === 1)
   check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
   app.unmount()
+  await nextTick()
+  check('экран ушёл — слот шапки освобождён', !nav.el.querySelector('[data-test="nav-trailing"]'))
+  nav.app.unmount()
 }
 {
   // каденс без записей → тот же пустой стейт, сегменты на месте
@@ -1023,6 +1078,49 @@ console.log('\n=== jsdom: компактный заголовок navigation bar
       el.querySelector('h1').textContent.trim() === title)
     app.unmount()
   }
+}
+
+console.log('\n=== Главная: склонение счётчиков и подпись вкладки (v2.3) ===')
+check('plural: 1 / 2 / 5', [1, 2, 5].map((n) => plural(n, ['чекап', 'чекапа', 'чекапов'])).join(',') === 'чекап,чекапа,чекапов')
+check('plural: 11–14 всегда пятая форма',
+  [11, 12, 13, 14].map((n) => plural(n, ['чекап', 'чекапа', 'чекапов'])).join(',') === 'чекапов,чекапов,чекапов,чекапов')
+check('plural: 21 / 22 / 25 / 101 / 111',
+  [21, 22, 25, 101, 111].map((n) => plural(n, ['чекап', 'чекапа', 'чекапов'])).join(',')
+    === 'чекап,чекапа,чекапов,чекап,чекапов',
+  [21, 22, 25, 101, 111].map((n) => plural(n, ['чекап', 'чекапа', 'чекапов'])).join(','))
+check('plural: 0 → пятая форма', plural(0, ['чекап', 'чекапа', 'чекапов']) === 'чекапов')
+check('checkupsWord/signalsWord: 2 чекапа, 3 сигнала',
+  checkupsWord(2) === 'Чекапа' && signalsWord(3) === 'Сигнала',
+  `${checkupsWord(2)} / ${signalsWord(3)}`)
+check('счётчик строкой (как отдаёт readCounters) тоже склоняется',
+  checkupsWord('137') === 'Чекапов' && signalsWord('42') === 'Сигнала',
+  `${checkupsWord('137')} / ${signalsWord('42')}`)
+check('числа нет → родительный множественного, как было',
+  checkupsWord(null) === 'Чекапов' && signalsWord(null) === 'Сигналов')
+{
+  localStorage.clear()
+  getPayload = { updated: '2025-05-20', sets: {}, stats: { checkups: 2, signals: 3 } }
+  const { el, app } = mount(bundle.HomeScreen, {})
+  await flush()
+  check('на Главной: «2 Чекапа» и «3 Сигнала»',
+    el.querySelector('[data-test="home-checkups-word"]').textContent.trim() === 'Чекапа' &&
+    el.querySelector('[data-test="home-signals-word"]').textContent.trim() === 'Сигнала',
+    [el.querySelector('[data-test="home-checkups-word"]').textContent.trim(),
+      el.querySelector('[data-test="home-signals-word"]').textContent.trim()].join(' / '))
+  app.unmount()
+  getPayload = {}
+}
+{
+  // конфиг вкладок живёт внутри <script setup> App.vue — проверяем по исходнику
+  const appSrc = readFileSync(resolve(root, 'src/App.vue'), 'utf8')
+  check('вкладка «home» подписана «Сегодня»', /id: 'home',\s+label: 'Сегодня'/.test(appSrc))
+  check('идентификатор вкладки не менялся (useAppNav/тесты/ссылки)', appSrc.includes("id: 'home'"))
+  check('подписи «Главная» в таб-баре не осталось', !/label: 'Главная'/.test(appSrc))
+  check('«Главная» осталась подписью кнопки «Назад» на под-страницах',
+    (appSrc.match(/backLabel: 'Главная'/g) || []).length >= 3,
+    (appSrc.match(/backLabel: 'Главная'/g) || []).length)
+  check('TabBar рендерит именно label вкладки',
+    readFileSync(resolve(root, 'src/components/TabBar.vue'), 'utf8').includes('tab.label'))
 }
 
 console.log('\n=== Vue warnings ===')
