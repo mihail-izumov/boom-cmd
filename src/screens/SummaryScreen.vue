@@ -108,7 +108,10 @@ watchEffect(() => {
 
     <!-- лид + сегменты + лента каденса -->
     <template v-else>
-      <p class="bc-fade-in px-1 text-[0.8125rem] leading-snug text-[var(--text-muted)]">{{ L.lead }}</p>
+      <p
+        data-test="summary-lead"
+        class="bc-fade-in px-4 pb-1 text-center text-[1rem] leading-snug text-[var(--text-muted)]"
+      >{{ L.lead }}</p>
 
       <div
         data-test="summary-segments"

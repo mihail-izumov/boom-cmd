@@ -733,6 +733,11 @@ const nsFeedDay = feedOf(sortSummaries(NS), 'day')
   await nextTick()
   check('заголовок каденса без периода и без «·»',
     el.textContent.includes('Сводка дня') && !el.textContent.includes('·'), el.textContent.slice(0, 40))
+  check('в шапке сперва заголовок, потом бейдж периода', (() => {
+    const head = el.querySelector('h2')
+    const b = el.querySelector('[data-test="summary-badge"]')
+    return !!(head.compareDocumentPosition(b) & 4) // b идёт ПОСЛЕ h2
+  })())
   check('период — бейдж «16.05», ровно один',
     el.querySelectorAll('[data-test="summary-badge"]').length === 1 &&
     el.querySelector('[data-test="summary-badge"]').textContent.trim() === '16.05',
@@ -890,6 +895,11 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   check('сегментов три, подписи «Дни / Недели / Месяц»',
     segs.length === 3 && segs.map((s) => s.textContent.trim()).join(' / ') === 'Дни / Недели / Месяц',
     segs.map((s) => s.textContent.trim()).join(' · '))
+  check('лид — одна фраза, по центру, крупнее прежнего', (() => {
+    const lead = el.querySelector('[data-test="summary-lead"]')
+    return !!lead && lead.textContent.trim() === 'Где парки сегодня и какой прогресс плана месяца' &&
+      lead.className.includes('text-center') && lead.className.includes('text-[1rem]')
+  })(), el.querySelector('[data-test="summary-lead"]')?.textContent.trim())
   check('сегменты — не таб-бар: role=tablist внутри раздела',
     el.querySelector('[data-test="summary-segments"]')?.getAttribute('role') === 'tablist')
   check('умолчание — «Дни»', segs[0].getAttribute('aria-selected') === 'true' &&
@@ -957,9 +967,9 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
     cards.map((c) => c.querySelector('h2')?.textContent.trim()).filter(Boolean).join(',') === 'Неделя 3' &&
     !cards[0].textContent.includes('Сводка недели'),
     cards.map((c) => c.querySelector('h2')?.textContent.trim()).join(','))
-  check('«Недели»: в свёрнутых строках подпись — номер недели',
+  check('«Недели»: в свёрнутых строках сперва номер недели, потом бейдж периода',
     [...el.querySelectorAll('[data-test="summary-row"]')].map((r) => r.textContent.replace(/\s+/g, ' ').trim())
-      .join(' | ') === '05.05–11.05Неделя 2 | 28.04–04.05Неделя 1',
+      .join(' | ') === 'Неделя 205.05–11.05 | Неделя 128.04–04.05',
     [...el.querySelectorAll('[data-test="summary-row"]')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '))
   check('«Недели»: aria-selected переехал на второй сегмент',
     el.querySelectorAll('[data-test^="summary-seg-"]')[1].getAttribute('aria-selected') === 'true')

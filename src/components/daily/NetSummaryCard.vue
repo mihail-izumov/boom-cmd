@@ -10,6 +10,7 @@ import { cardTitle, periodLabel, L } from '../../i18n/summary.js'
 // v2.1: обводок нет; период — БЕЙДЖ, его заливка и есть маркер статуса (отдельной
 // цветной точки нет), разделителей «·» нет. Текст на бейдже монохромный: тёмный ink
 // на светлой заливке, белый — на насыщенной (DESIGN-STANDARD §3.5).
+// v2.4: бейдж периода идёт ПОСЛЕ названия — и в шапке, и в свёрнутой строке.
 // v2.3: неделя называется «Неделя 3» — по номеру внутри месяца, как в «Контроле
 // Дня». Блоки («Данные», «Итог недели», «Оценка», «Фокус») больше НЕ сворачиваются
 // и своей стрелки не имеют: раскрытие живёт на уровне карточки, второй уровень
@@ -48,7 +49,7 @@ const blocks = computed(() => blocksOf(props.entry))
     :data-open="expanded ? 'true' : 'false'"
     class="overflow-hidden rounded-2xl bg-[var(--surface)]"
   >
-    <!-- свёрнутая строка ленты: бейдж периода (+ номер недели, если это неделя) -->
+    <!-- свёрнутая строка ленты: номер недели (если это неделя) + бейдж периода -->
     <button
       v-if="!expanded"
       type="button"
@@ -59,28 +60,29 @@ const blocks = computed(() => blocksOf(props.entry))
       @click="$emit('toggle')"
     >
       <span
+        v-if="rowNote"
+        class="min-w-0 truncate text-[0.9375rem] text-[var(--text-secondary)]"
+      >{{ rowNote }}</span>
+      <span
         data-test="summary-badge"
         class="inline-block shrink-0 rounded-lg px-2 py-1 text-[0.9375rem] font-semibold leading-none"
         :style="badge"
       >{{ period }}</span>
-      <span
-        v-if="rowNote"
-        class="min-w-0 flex-1 truncate text-[0.9375rem] text-[var(--text-secondary)]"
-      >{{ rowNote }}</span>
-      <span v-else class="flex-1" aria-hidden="true" />
+      <span class="flex-1" aria-hidden="true" />
       <ChevronDown class="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
     </button>
 
     <!-- раскрытая карточка -->
     <div v-else class="p-4">
-      <!-- шапка: бейдж периода (он же маркер статуса) · заголовок · сворачивание -->
+      <!-- шапка: заголовок, за ним бейдж периода (он же маркер статуса), сворачивание -->
       <div class="flex items-center gap-2">
+        <h2 class="min-w-0 truncate text-[1rem] font-semibold leading-snug text-[var(--text)]">{{ title }}</h2>
         <span
           data-test="summary-badge"
           class="inline-block shrink-0 rounded-lg px-2 py-1 text-[0.9375rem] font-semibold leading-none"
           :style="badge"
         >{{ period }}</span>
-        <h2 class="min-w-0 flex-1 truncate text-[1rem] font-semibold leading-snug text-[var(--text)]">{{ title }}</h2>
+        <span class="flex-1" aria-hidden="true" />
         <button
           v-if="collapsible"
           type="button"
