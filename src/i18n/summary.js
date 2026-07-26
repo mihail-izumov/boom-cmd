@@ -4,7 +4,9 @@
 
 import { ddmm } from './daily.js'
 
-const NBSP = ' '
+// Неразрывный пробел записан escape'ом намеренно: невидимый символ в исходнике
+// теряется при любой автоматической правке файла и молча ломает подписи.
+const NBSP = '\u00A0'
 
 const MONTH_NOM = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -50,18 +52,30 @@ export const CADENCE_TITLE = {
   month: 'Сводка месяца',
 }
 
-// Полный заголовок карточки: «Сводка недели · 12.05–18.05».
-export function cardTitle(cadence, date) {
-  const head = CADENCE_TITLE[cadence] || 'Сводка'
-  const per = periodLabel(cadence, date)
-  return per ? `${head}${NBSP}·${NBSP}${per}` : head
+// Подписи сегментированного переключателя каденса (ТЗ v2 §3.1).
+// Внутри выбранного месяца месячная сводка ровно одна — потому «Месяц», не «Месяцы».
+export const CADENCE_SEG = {
+  day: 'Дни',
+  week: 'Недели',
+  month: 'Месяц',
+}
+
+// Подпись месяца для селектора: «Июль 2026» из ключа 'YYYY-MM'.
+export function monthLabel(key) {
+  return periodLabel('month', `${String(key || '')}-01`)
+}
+
+// Заголовок карточки — БЕЗ периода: период идёт отдельным бейджем рядом (v2.1),
+// разделителей «·» в разделе больше нет.
+export function cardTitle(cadence) {
+  return CADENCE_TITLE[cadence] || 'Сводка'
 }
 
 export const L = {
   section: 'Сводки сети',
   home_tile: 'Сводки',
   back: 'Главная',
-  new: 'новое',
+  seg_aria: 'Период сводок',
   more: 'Подробнее',
   less: 'Свернуть',
   empty: 'Сводок пока нет',

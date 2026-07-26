@@ -22,8 +22,9 @@ import { readCounters } from '../src/i18n/home.js'
 import {
   sortSummaries, latestByCadence, latestOf, splitBlock, blocksOf,
   summaryKey, summaryStatusOf, markSummaryState, LABEL_MAX,
+  asofOf, feedOf, feedByCadence, entryKey, summaryInk, monthsOf, monthKeyOf,
 } from '../src/composables/netSummary.js'
-import { cardTitle, periodLabel, addDays } from '../src/i18n/summary.js'
+import { cardTitle, periodLabel, addDays, monthLabel, CADENCE_SEG, L as LSUM } from '../src/i18n/summary.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -248,6 +249,7 @@ export { default as DailyDayProgress } from '${root}/src/components/daily/DailyD
 export { default as DailyNetwork } from '${root}/src/components/daily/DailyNetwork.vue'
 export { default as NetSummaryCard } from '${root}/src/components/daily/NetSummaryCard.vue'
 export { default as SummaryScreen } from '${root}/src/screens/SummaryScreen.vue'
+export { default as NavigationBar } from '${root}/src/components/NavigationBar.vue'
 export { default as HomeScreen } from '${root}/src/screens/HomeScreen.vue'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
@@ -497,9 +499,23 @@ console.log('\n=== jsdom: «Вся сеть» — сигнал внутри ка
 // ═══════════════ Сводки сети (net_summary): чистая логика ═══════════════
 console.log('\n=== Сводки сети: отбор записей и подписи периодов ===')
 const NS = data.net_summary
+const nsDays = NS.filter((x) => x.cadence === 'day')
 check('мок содержит net_summary (day + week + month)',
-  Array.isArray(NS) && NS.length === 3 && new Set(NS.map((x) => x.cadence)).size === 3,
+  Array.isArray(NS) && new Set(NS.map((x) => x.cadence)).size === 3,
   Array.isArray(NS) ? NS.map((x) => x.cadence).join(',') : 'нет')
+check('мок: дневных строк ≥ 4 (ленту есть чем проверить)', nsDays.length >= 4, nsDays.length)
+check('мок: две дневные строки за ОДНУ дату (тай-брейк проверяем)', (() => {
+  const byDate = {}
+  for (const d of nsDays) byDate[d.date] = (byDate[d.date] || 0) + 1
+  return Object.values(byDate).some((n) => n >= 2)
+})(), nsDays.map((d) => d.date).join(','))
+check('мок: data_asof заполнен во ВСЕХ записях', NS.every((x) => asofOf(x) !== ''),
+  NS.filter((x) => asofOf(x) === '').length + ' без среза')
+check('мок: устаревшая дозаливка лежит ПОЗЖЕ актуальной в payload (наивный отбор бы её и взял)', (() => {
+  const i = NS.findIndex((x) => x.cadence === 'day' && x.date === '2025-05-16' && asofOf(x) === '2025-05-17 12:28')
+  const j = NS.findIndex((x) => x.cadence === 'day' && x.date === '2025-05-16' && asofOf(x) === '2025-05-16 21:40')
+  return i >= 0 && j >= 0 && j > i
+})())
 check('sortSummaries отбрасывает битые записи и чужой каденс',
   sortSummaries([
     null, 'x', { cadence: 'day' }, { cadence: 'quarter', date: '2025-05-16' },
@@ -521,15 +537,134 @@ check('нет net_summary → карточек нет (обратная совм
 check('незнакомые ключи внутри записи не мешают отбору',
   latestByCadence([{ cadence: 'day', date: '2025-05-16', kind: 'x', extra: { a: 1 } }]).length === 1)
 
+console.log('\n=== Сводки сети: тай-брейк по data_asof (v2 §4) ===')
+check('asofOf: нормальный срез', asofOf({ data_asof: '2026-07-25 12:28' }) === '2026-07-25 12:28')
+check('asofOf: голая дата допустима', asofOf({ data_asof: '2026-07-25' }) === '2026-07-25')
+check('asofOf: разделитель T нормализуется в пробел', asofOf({ data_asof: '2026-07-25T12:28' }) === '2026-07-25 12:28')
+check('asofOf: битое/пустое/нет поля → «»',
+  asofOf({ data_asof: '25.07.2026' }) === '' && asofOf({}) === '' && asofOf(null) === '' &&
+  asofOf({ data_asof: 42 }) === '')
+check('равные date → актуальная та, у кого max(data_asof) (порядок payload обратный)', (() => {
+  const s = sortSummaries([
+    { cadence: 'day', date: '2026-07-24', data_asof: '2026-07-25 12:28', block1: 'Данные. Свежая.' },
+    { cadence: 'day', date: '2026-07-24', data_asof: '2026-07-24 21:40', block1: 'Данные. Устаревшая.' },
+  ])
+  return latestOf(s, 'day').data_asof === '2026-07-25 12:28'
+})())
+check('max(date) главнее max(data_asof) (свежий срез у старой даты не перебивает)', (() => {
+  const s = sortSummaries([
+    { cadence: 'day', date: '2026-07-24', data_asof: '2026-07-25 12:28' },
+    { cadence: 'day', date: '2026-07-23', data_asof: '2026-07-26 09:00' },
+  ])
+  return latestOf(s, 'day').date === '2026-07-24'
+})())
+check('обратная совместимость: без data_asof отбор падает на max(date)', (() => {
+  const s = sortSummaries([
+    { cadence: 'day', date: '2026-07-22' },
+    { cadence: 'day', date: '2026-07-24' },
+    { cadence: 'day', date: '2026-07-23' },
+  ])
+  return latestOf(s, 'day').date === '2026-07-24' && s.every((x) => asofOf(x) === '')
+})())
+check('смесь: запись БЕЗ среза считается старше записи со срезом при равной дате', (() => {
+  const s = sortSummaries([
+    { cadence: 'day', date: '2026-07-24', data_asof: '2026-07-25 12:28' },
+    { cadence: 'day', date: '2026-07-24' },
+  ])
+  return latestOf(s, 'day').data_asof === '2026-07-25 12:28'
+})())
+check('мок: актуальная дневная = 16.05 со срезом 17.05 12:28 (устаревшая дозаливка отсеяна)', (() => {
+  const cur = latestOf(sortSummaries(NS), 'day')
+  return cur.date === '2025-05-16' && asofOf(cur) === '2025-05-17 12:28' && cur.status === 'warn'
+})(), asofOf(latestOf(sortSummaries(NS), 'day')))
+
+console.log('\n=== Сводки сети: лента каденса (v2 §3.2) ===')
+{
+  const MAY = '2025-05'
+  const sorted = sortSummaries(NS).filter((x) => monthKeyOf(x) === MAY)
+  const feedDay = feedOf(sorted, 'day')
+  check('лента дней: новое сверху', feedDay[0].date === '2025-05-16' &&
+    feedDay[feedDay.length - 1].date === '2025-05-13',
+    feedDay.map((x) => x.date).join(' > '))
+  check('лента дней: даты не возрастают сверху вниз',
+    feedDay.every((x, i) => i === 0 || String(feedDay[i - 1].date) >= String(x.date)))
+  check('лента дней: обе записи 16.05 в ленте, свежая первая',
+    feedDay[0].date === '2025-05-16' && feedDay[1].date === '2025-05-16' &&
+    asofOf(feedDay[0]) > asofOf(feedDay[1]))
+  check('первая запись ленты = latestOf (актуальная раскрывается)',
+    feedDay[0] === latestOf(sorted, 'day'))
+  const feeds = feedByCadence(NS, MAY)
+  check('feedByCadence отдаёт все три каденса',
+    Object.keys(feeds).join(',') === 'day,week,month', Object.keys(feeds).join(','))
+  check('feedByCadence(май): длины лент (день 5, неделя 3, месяц 1)',
+    feeds.day.length === 5 && feeds.week.length === 3 && feeds.month.length === 1,
+    `${feeds.day.length}/${feeds.week.length}/${feeds.month.length}`)
+  check('пустой каденс присутствует пустым массивом (сегмент показываем всегда)', (() => {
+    const f = feedByCadence([{ cadence: 'week', date: '2026-07-13', block1: 'Итог недели. Есть.' }], '2026-07')
+    return f.day.length === 0 && f.week.length === 1 && f.month.length === 0
+  })())
+  check('нет net_summary → все ленты пусты, ошибок нет', (() => {
+    const f = feedByCadence(undefined)
+    return f.day.length === 0 && f.week.length === 0 && f.month.length === 0
+  })())
+  check('entryKey различает две записи одной даты',
+    entryKey('day', feedDay[0], 0) !== entryKey('day', feedDay[1], 1),
+    `${entryKey('day', feedDay[0], 0)} | ${entryKey('day', feedDay[1], 1)}`)
+  check('entryKey без data_asof не ломается',
+    entryKey('day', { date: '2026-07-24' }, 0) === 'day:2026-07-24#0',
+    entryKey('day', { date: '2026-07-24' }, 0))
+  check('период дня = ДД.ММ', periodLabel('day', feedDay[0].date) === '16.05', periodLabel('day', feedDay[0].date))
+  check('период месяца — русский месяц', periodLabel('month', feeds.month[0].date) === 'Май\u00a02025')
+  check('заголовок карточки БЕЗ периода и без разделителя «·»',
+    cardTitle('week') === 'Сводка недели' && !cardTitle('week').includes('·'), cardTitle('week'))
+  check('ink бейджа: тёмный на светлой заливке, белый на насыщенной',
+    summaryInk('warn') === 'var(--accent-ink)' && summaryInk('ok') === 'var(--accent-ink)' &&
+    summaryInk('focus') === 'var(--ink-on-color)' && summaryInk('wat') === 'var(--ink-on-color)')
+}
+
+console.log('\n=== Сводки сети: месяц записи и список месяцев (v2.2) ===')
+check('месяц дня и месячной сводки — по своей дате',
+  monthKeyOf({ cadence: 'day', date: '2025-05-16' }) === '2025-05' &&
+  monthKeyOf({ cadence: 'month', date: '2025-04-01' }) === '2025-04')
+check('месяц недели — по ЧЕТВЕРГУ (якорь+3), а не по понедельнику', (() => {
+  // 31.03 (пн) → чт 03.04 → апрель; 28.04 (пн) → чт 01.05 → май
+  return monthKeyOf({ cadence: 'week', date: '2025-03-31' }) === '2025-04' &&
+    monthKeyOf({ cadence: 'week', date: '2025-04-28' }) === '2025-05'
+})(), [monthKeyOf({ cadence: 'week', date: '2025-03-31' }), monthKeyOf({ cadence: 'week', date: '2025-04-28' })].join(' / '))
+check('правило четверга = «большинство дней недели» (боевой кейс 29.06–05.07 → июль)',
+  monthKeyOf({ cadence: 'week', date: '2026-06-29' }) === '2026-07',
+  monthKeyOf({ cadence: 'week', date: '2026-06-29' }))
+check('битая запись → пустой ключ, не падаем',
+  monthKeyOf(null) === '' && monthKeyOf({ cadence: 'day', date: '16.05.2025' }) === '')
+check('monthsOf: месяцы с ЛЮБОЙ записью, новые сверху',
+  monthsOf(NS).join(',') === '2025-05,2025-04', monthsOf(NS).join(','))
+check('monthsOf: месяц попадает в список и по одной недельной записи',
+  monthsOf([{ cadence: 'week', date: '2025-03-31', block1: 'Итог недели. Есть.' }]).join(',') === '2025-04')
+check('monthsOf без данных → пустой список',
+  monthsOf(undefined).length === 0 && monthsOf([]).length === 0)
+check('monthLabel = русский месяц + год', monthLabel('2025-04') === 'Апрель\u00A02025', monthLabel('2025-04'))
+check('фильтр месяца делит ленты без потерь', (() => {
+  const may = feedByCadence(NS, '2025-05')
+  const apr = feedByCadence(NS, '2025-04')
+  const n = (f) => f.day.length + f.week.length + f.month.length
+  return n(may) + n(apr) === sortSummaries(NS).length
+})(), `${sortSummaries(NS).length} записей`)
+
+console.log('\n=== Сводки сети: подписи сегментов ===')
+check('подписи сегментов = Дни / Недели / Месяц (месяц в единственном числе)',
+  CADENCE_SEG.day === 'Дни' && CADENCE_SEG.week === 'Недели' && CADENCE_SEG.month === 'Месяц',
+  [CADENCE_SEG.day, CADENCE_SEG.week, CADENCE_SEG.month].join(' · '))
+check('строки «новое» в словаре раздела больше нет', !('new' in LSUM), Object.keys(LSUM).join(','))
+
 check('подпись дня = ДД.ММ', periodLabel('day', '2025-05-16') === '16.05', periodLabel('day', '2025-05-16'))
 check('подпись недели = якорь…+6', periodLabel('week', '2025-05-12') === '12.05–18.05', periodLabel('week', '2025-05-12'))
 check('неделя через границу месяца считается верно', periodLabel('week', '2025-06-29') === '29.06–05.07', periodLabel('week', '2025-06-29'))
 check('неделя через границу года считается верно', periodLabel('week', '2025-12-29') === '29.12–04.01', periodLabel('week', '2025-12-29'))
 check('addDays через високосный февраль', addDays('2024-02-28', 2) === '2024-03-01', addDays('2024-02-28', 2))
-check('подпись месяца = русский месяц из массива (без Intl)', periodLabel('month', '2025-05-01') === 'Май 2025', periodLabel('month', '2025-05-01'))
-check('заголовок карточки собран из cadence+date',
-  cardTitle('week', '2025-05-12').replace(/ /g, ' ') === 'Сводка недели · 12.05–18.05',
-  cardTitle('week', '2025-05-12'))
+check('подпись месяца = русский месяц + неразрывный пробел (без Intl)',
+  periodLabel('month', '2025-05-01') === 'Май\u00A02025', JSON.stringify(periodLabel('month', '2025-05-01')))
+check('заголовок карточки — только каденс, период вынесен в бейдж',
+  cardTitle('week') === 'Сводка недели' && !cardTitle('week').includes('·'), cardTitle('week'))
 
 console.log('\n=== Сводки сети: метка блока (точка+пробел, кап) ===')
 check('обычная метка', (() => { const r = splitBlock('Данные. За пятницу 16.05 сдали все.'); return r.label === 'Данные' && r.rest.startsWith('За пятницу') })())
@@ -562,14 +697,33 @@ check('статусы сводок не пересекаются с парков
 })())
 
 console.log('\n=== jsdom: карточка сводки (три блока, блок 1 свёрнут) ===')
+const nsDayLatest = latestOf(sortSummaries(NS), 'day')
+const nsFeedDay = feedOf(sortSummaries(NS), 'day')
 {
   localStorage.clear()
-  const day = NS.find((x) => x.cadence === 'day')
+  const day = nsDayLatest
   const { el, app } = mount(bundle.NetSummaryCard, { cadence: 'day', entry: day })
   await nextTick()
-  check('заголовок «Сводка дня · 16.05»', el.textContent.replace(/ /g, ' ').includes('Сводка дня · 16.05'))
-  check('точка статуса одна', el.querySelectorAll('[data-test="summary-dot"]').length === 1)
-  check('бейдж «новое» в первый заход', !!el.querySelector('[data-test="summary-new"]'))
+  check('заголовок каденса без периода и без «·»',
+    el.textContent.includes('Сводка дня') && !el.textContent.includes('·'), el.textContent.slice(0, 40))
+  check('период — бейдж «16.05», ровно один',
+    el.querySelectorAll('[data-test="summary-badge"]').length === 1 &&
+    el.querySelector('[data-test="summary-badge"]').textContent.trim() === '16.05',
+    el.querySelector('[data-test="summary-badge"]')?.textContent.trim())
+  check('заливка бейджа = статус, текст на нём монохромный (ink)', (() => {
+    const st = el.querySelector('[data-test="summary-badge"]').getAttribute('style')
+    return st.includes('var(--warning)') && st.includes('var(--accent-ink)')
+  })(), el.querySelector('[data-test="summary-badge"]').getAttribute('style'))
+  check('отдельной цветной точки больше нет', !el.querySelector('[data-test="summary-dot"]'))
+  check('обводок в карточке нет', !el.innerHTML.includes('border-[var(--line)]'))
+  check('бейджа «новое» нет (ТЗ v2 §3.3)',
+    !el.querySelector('[data-test="summary-new"]') && !el.textContent.includes('новое'))
+  check('data_asof в UI не выводится (ни даты среза, ни времени)',
+    !el.textContent.includes('17.05') && !el.textContent.includes('12:28') && !el.textContent.includes('2025-05-17'))
+  check('второй даты в карточке нет — период только в заголовке',
+    (el.textContent.match(/16\.05/g) || []).length === 1, (el.textContent.match(/16\.05/g) || []).length)
+  check('одиночная карточка не сворачивается (кнопки сворачивания нет)',
+    !el.querySelector('[data-test="summary-collapse"]'))
   check('видны блоки 2 и 3 (Оценка + Фокус)',
     el.textContent.includes('Оценка') && el.textContent.includes('Фокус на субботу'))
   check('это НЕ сигнал: ни headline/action, ни кнопки «Прочитала» (фаза 2)',
@@ -585,8 +739,36 @@ console.log('\n=== jsdom: карточка сводки (три блока, бл
 
   const re = mount(bundle.NetSummaryCard, { cadence: 'day', entry: day })
   await nextTick()
-  check('бейдж «новое» снят в следующий заход', !re.el.querySelector('[data-test="summary-new"]'))
+  check('бейджа «новое» нет и в следующий заход (логика снимка снята)',
+    !re.el.querySelector('[data-test="summary-new"]') && !re.el.textContent.includes('новое'))
+  check('на монтировании карточка больше ничего не пишет в прочитанность',
+    !JSON.stringify(dom.window.localStorage).includes('summary:'),
+    JSON.stringify(dom.window.localStorage).slice(0, 80))
   re.app.unmount()
+}
+{
+  // свёрнутая строка ленты: «дата · метка первого блока», тап раскрывает
+  const prev = nsFeedDay[2] // 15.05
+  const { el, app } = mount(bundle.NetSummaryCard, {
+    cadence: 'day', entry: prev, expanded: false, collapsible: true,
+  })
+  await nextTick()
+  const row = el.querySelector('[data-test="summary-row"]')
+  const card = el.querySelector('[data-test="summary-card"]')
+  check('свёрнутая строка — только бейдж периода, без повторяющейся метки',
+    !!row && row.textContent.replace(/\s+/g, ' ').trim() === '15.05',
+    row && row.textContent.replace(/\s+/g, ' ').trim())
+  check('свёрнутая: метки первого блока в строке нет', !row.textContent.includes('Данные'))
+  check('свёрнутая: тел блоков в DOM нет',
+    el.querySelectorAll('[data-test="summary-block"]').length === 0 &&
+    !el.querySelector('[data-test="summary-head-toggle"]'))
+  check('свёрнутая: статус несёт заливка бейджа, точки нет',
+    !el.querySelector('[data-test="summary-dot"]') &&
+    el.querySelector('[data-test="summary-badge"]').getAttribute('style').includes('var(--warning)'))
+  check('свёрнутая: data-open="false"', card.getAttribute('data-open') === 'false', card.getAttribute('data-open'))
+  check('свёрнутая: тач-таргет ≥44pt', String(row.getAttribute('style') || '').includes('44px'))
+  check('свёрнутая: без NaN/undefined/Infinity', !BAD.test(el.textContent))
+  app.unmount()
 }
 {
   // месячная карточка: метка с точкой внутри даты не рвётся при живом рендере
@@ -594,7 +776,10 @@ console.log('\n=== jsdom: карточка сводки (три блока, бл
   const month = NS.find((x) => x.cadence === 'month')
   const { el, app } = mount(bundle.NetSummaryCard, { cadence: 'month', entry: month })
   await nextTick()
-  check('заголовок месяца — русский месяц', el.textContent.replace(/ /g, ' ').includes('Сводка месяца · Май 2025'))
+  check('месяц: заголовок каденса + бейдж «Май 2025»',
+    el.textContent.includes('Сводка месяца') &&
+    el.querySelector('[data-test="summary-badge"]').textContent.trim().replace(/ /g, ' ') === 'Май 2025',
+    el.querySelector('[data-test="summary-badge"]').textContent.trim())
   const toggle = el.querySelector('[data-test="summary-head-toggle"]')
   check('метка свёрнутого блока = «Итог месяца (на 16.05)»', toggle.textContent.includes('Итог месяца (на 16.05)'))
   check('метка не обрезана по точке внутри даты', toggle.textContent.trim().startsWith('Итог месяца (на 16.05)'),
@@ -611,8 +796,10 @@ console.log('\n=== jsdom: карточка сводки (три блока, бл
     entry: { cadence: 'week', date: '2025-05-12', status: 'wat', block1: 'Итог недели. Есть.', kind: 'x' },
   })
   await nextTick()
-  check('неизвестный статус → нейтральная точка, рендер жив',
-    el.querySelector('[data-test="summary-dot"]').getAttribute('style').includes('text-muted'))
+  check('неизвестный статус → нейтральная заливка бейджа + белый ink, рендер жив', (() => {
+    const st = el.querySelector('[data-test="summary-badge"]').getAttribute('style')
+    return st.includes('var(--text-muted)') && st.includes('var(--ink-on-color)')
+  })(), el.querySelector('[data-test="summary-badge"]').getAttribute('style'))
   check('единственный блок = head, блоков 2/3 нет', el.querySelectorAll('[data-test="summary-block"]').length === 0)
   app.unmount()
 }
@@ -623,11 +810,154 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   getPayload = { updated: '2025-05-20', sets: {}, net_summary: NS }
   const { el, app } = mount(bundle.SummaryScreen, {})
   await flush()
-  const cards = el.querySelectorAll('[data-test="summary-card"]')
-  check('три карточки: день → неделя → месяц', cards.length === 3 &&
-    [...cards].map((c) => c.getAttribute('data-cadence')).join(',') === 'day,week,month',
-    [...cards].map((c) => c.getAttribute('data-cadence')).join(','))
+
+  // селектор месяца
+  const pill = el.querySelector('[data-test="summary-month-pill"]')
+  check('селектор месяца показан пилюлей и стоит НАД сегментами',
+    !!pill && !!(pill.compareDocumentPosition(el.querySelector('[data-test="summary-segments"]')) & 4))
+  check('умолчание — самый свежий месяц', pill.textContent.trim() === 'Май\u00A02025', pill.textContent.trim())
+  check('пилюля ≥44pt и открывает диалог',
+    String(pill.getAttribute('style') || '').includes('44px') && pill.getAttribute('aria-haspopup') === 'dialog')
+  check('лист месяцев закрыт до тапа', !document.querySelector('[data-test="summary-month-sheet"]'))
+  await fire(pill, 'click')
+  const sheet = document.querySelector('[data-test="summary-month-sheet"]')
+  const opts = [...document.querySelectorAll('[data-test="summary-month-option"]')]
+  check('лист открылся: role=dialog + aria-modal',
+    !!sheet && sheet.getAttribute('role') === 'dialog' && sheet.getAttribute('aria-modal') === 'true')
+  check('в списке только месяцы с данными, новые сверху',
+    opts.map((o) => o.textContent.trim().replace(/\u00A0/g, ' ')).join(' | ') === 'Май 2025 | Апрель 2025',
+    opts.map((o) => o.textContent.trim()).join(' | '))
+  check('выбранный помечен галкой, не цветом',
+    opts[0].querySelector('svg') && !opts[1].querySelector('svg'))
+  await fire(opts[1], 'click')
+  check('после выбора лист закрылся', !document.querySelector('[data-test="summary-month-sheet"]'))
+  check('пилюля показывает выбранный месяц',
+    el.querySelector('[data-test="summary-month-pill"]').textContent.trim() === 'Апрель\u00A02025')
+  check('лента «Дни» апреля = одна запись 29.04', (() => {
+    const c = [...el.querySelectorAll('[data-test="summary-card"]')]
+    return c.length === 1 && c[0].textContent.includes('29.04')
+  })())
+  {
+    const p2 = el.querySelector('[data-test="summary-month-pill"]')
+    await fire(p2, 'click')
+    const back = [...document.querySelectorAll('[data-test="summary-month-option"]')][0]
+    await fire(back, 'click')
+  }
+  check('возврат в май восстановил ленту мая',
+    el.querySelectorAll('[data-test="summary-card"]').length === feedByCadence(NS, '2025-05').day.length)
+
+  // сегменты
+  const segs = [...el.querySelectorAll('[data-test^="summary-seg-"]')]
+  check('сегментов три, подписи «Дни / Недели / Месяц»',
+    segs.length === 3 && segs.map((s) => s.textContent.trim()).join(' / ') === 'Дни / Недели / Месяц',
+    segs.map((s) => s.textContent.trim()).join(' · '))
+  check('сегменты — не таб-бар: role=tablist внутри раздела',
+    el.querySelector('[data-test="summary-segments"]')?.getAttribute('role') === 'tablist')
+  check('умолчание — «Дни»', segs[0].getAttribute('aria-selected') === 'true' &&
+    segs[1].getAttribute('aria-selected') === 'false' && segs[2].getAttribute('aria-selected') === 'false')
+  check('сегменты ≥44pt', segs.every((s) => String(s.getAttribute('style') || '').includes('44px')))
+
+  // лента внутри сегмента «Дни»
+  const feeds = feedByCadence(NS, '2025-05')
+  let cards = [...el.querySelectorAll('[data-test="summary-card"]')]
+  check('лента «Дни»: карточек = записей каденса (не одна)',
+    cards.length === feeds.day.length && cards.length > 1, `${cards.length} / ${feeds.day.length}`)
+  check('лента «Дни»: все карточки каденса day',
+    cards.every((c) => c.getAttribute('data-cadence') === 'day'))
+  check('лента: раскрыта только первая (актуальная)',
+    cards[0].getAttribute('data-open') === 'true' &&
+    cards.slice(1).every((c) => c.getAttribute('data-open') === 'false'),
+    cards.map((c) => c.getAttribute('data-open')).join(','))
+  check('лента: новое сверху — первая строка 16.05, последняя 13.05',
+    cards[0].textContent.includes('16.05') &&
+    cards[cards.length - 1].textContent.replace(/\s+/g, ' ').includes('13.05'))
+  check('лента: актуальная = свежая дозаливка, устаревшая свёрнута ниже',
+    cards[0].textContent.includes('Фокус на субботу') &&
+    !cards[0].textContent.includes('Предварительно'))
+  check('лента: свёрнутых строк = карточек − 1',
+    el.querySelectorAll('[data-test="summary-row"]').length === cards.length - 1)
+  check('разделителей «·» в разделе нет', !el.textContent.includes('·'))
+  check('обводок в разделе нет (ни у карточек, ни у трека сегментов)',
+    !el.innerHTML.includes('border-[var(--line)]') && !el.innerHTML.includes('border border'))
+  check('у каждой карточки ленты — свой бейдж периода с заливкой статуса',
+    [...el.querySelectorAll('[data-test="summary-badge"]')].length === cards.length &&
+    [...el.querySelectorAll('[data-test="summary-badge"]')].every((b) => /background:\s*var\(--/.test(b.getAttribute('style'))))
+  check('бейджа «новое» в ленте нет',
+    !el.querySelector('[data-test="summary-new"]') && !el.textContent.includes('новое'))
+  check('data_asof нигде в разделе не выводится',
+    !el.textContent.includes('12:28') && !el.textContent.includes('21:40') && !el.textContent.includes('2025-05-17'))
+
+  // тап по свёрнутой раскрывает её; остальные не трогаются
+  await fire(el.querySelectorAll('[data-test="summary-row"]')[0], 'click')
+  cards = [...el.querySelectorAll('[data-test="summary-card"]')]
+  check('тап по свёрнутой раскрывает её',
+    cards[1].getAttribute('data-open') === 'true' &&
+    cards[1].textContent.includes('Предварительно'),
+    cards.map((c) => c.getAttribute('data-open')).join(','))
+  check('раскрытие соседней не свернуло актуальную', cards[0].getAttribute('data-open') === 'true')
+  await fire(cards[1].querySelector('[data-test="summary-collapse"]'), 'click')
+  check('повторный тап сворачивает обратно',
+    el.querySelectorAll('[data-test="summary-card"]')[1].getAttribute('data-open') === 'false')
+
+  // переключение каденса
+  await fire(segs[1], 'click')
+  cards = [...el.querySelectorAll('[data-test="summary-card"]')]
+  check('переключение на «Недели»: карточки week, их 3 (включая стыковую 28.04)',
+    cards.length === feeds.week.length && cards.every((c) => c.getAttribute('data-cadence') === 'week'),
+    `${cards.length} × ${cards[0]?.getAttribute('data-cadence')}`)
+  check('«Недели»: новое сверху (12.05 → 05.05 → 28.04)',
+    cards[0].textContent.includes('12.05') && cards[1].textContent.includes('05.05') &&
+    cards[2].textContent.includes('28.04'))
+  check('«Недели»: aria-selected переехал на второй сегмент',
+    el.querySelectorAll('[data-test^="summary-seg-"]')[1].getAttribute('aria-selected') === 'true')
+  await fire(el.querySelectorAll('[data-test^="summary-seg-"]')[2], 'click')
+  cards = [...el.querySelectorAll('[data-test="summary-card"]')]
+  check('переключение на «Месяц»: одна карточка month, раскрыта, без сворачивания',
+    cards.length === 1 && cards[0].getAttribute('data-cadence') === 'month' &&
+    cards[0].getAttribute('data-open') === 'true' && !cards[0].querySelector('[data-test="summary-collapse"]'))
+  await fire(el.querySelectorAll('[data-test^="summary-seg-"]')[0], 'click')
+  check('возврат в «Дни»: состояние ленты сохранено (раскрыта только актуальная)',
+    [...el.querySelectorAll('[data-test="summary-card"]')].map((c) => c.getAttribute('data-open')).join(',')
+      === ['true', ...Array(feeds.day.length - 1).fill('false')].join(','))
   check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
+  app.unmount()
+}
+{
+  // каденс без записей → тот же пустой стейт, сегменты на месте
+  localStorage.clear()
+  getPayload = {
+    updated: '2025-05-20',
+    sets: {},
+    net_summary: NS.filter((x) => x.cadence === 'week'),
+  }
+  const { el, app } = mount(bundle.SummaryScreen, {})
+  await flush()
+  check('пустой каденс: сегменты показаны', el.querySelectorAll('[data-test^="summary-seg-"]').length === 3)
+  check('пустой каденс «Дни»: карточек нет, показан пустой стейт раздела',
+    el.querySelectorAll('[data-test="summary-card"]').length === 0 &&
+    !!el.querySelector('[data-test="summary-empty-cadence"]') &&
+    el.textContent.includes('Сводок пока нет'))
+  await fire(el.querySelectorAll('[data-test^="summary-seg-"]')[1], 'click')
+  check('переключение на «Недели»: карточки появились',
+    el.querySelectorAll('[data-test="summary-card"]').length >= 1 &&
+    !el.querySelector('[data-test="summary-empty-cadence"]'))
+  app.unmount()
+}
+{
+  // обратная совместимость: payload БЕЗ data_asof (старый контур)
+  localStorage.clear()
+  getPayload = {
+    updated: '2025-05-20',
+    sets: {},
+    net_summary: NS.map(({ data_asof, ...rest }) => rest), // eslint-disable-line no-unused-vars
+  }
+  const { el, app } = mount(bundle.SummaryScreen, {})
+  await flush()
+  const cards = [...el.querySelectorAll('[data-test="summary-card"]')]
+  check('без data_asof: раздел живой, лента строится по max(date)',
+    cards.length === feedByCadence(NS, '2025-05').day.length &&
+    cards[0].getAttribute('data-open') === 'true')
+  check('без data_asof: без NaN/undefined/Infinity', !BAD.test(el.textContent))
   app.unmount()
 }
 {
@@ -667,6 +997,33 @@ check('readCounters без stats → null (покажем «—»)',
 check('readCounters битые значения → null',
   (() => { const c = readCounters({ stats: { checkups: 'x', signals: null } }); return c.checkups === null && c.signals === null })())
 check('мок содержит stats (чекапов ≥ сигналов)', !!data.stats && Number(data.stats.checkups) >= Number(data.stats.signals))
+
+console.log('\n=== jsdom: компактный заголовок navigation bar (ТЗ v2 §3.5) ===')
+{
+  const navSrc = readFileSync(resolve(root, 'src/components/NavigationBar.vue'), 'utf8')
+  check('зажимающего px-[10rem] в компактном заголовке больше нет', !navSrc.includes('px-[10rem]'))
+  check('заголовку отдана центральная колонка grid (боковым — по 44pt минимум)',
+    navSrc.includes('grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)]'))
+  check('подпись слота «Назад» сжимается по многоточию, а не давит заголовок',
+    /truncate text-\[1\.0625rem\] leading-none/.test(navSrc))
+
+  // все разделы, где заголовок резался: «Сводки сети» 121px, «Контроль Дня» 138px, «Мастерплан» 119px
+  for (const [title, props] of [
+    ['Сводки сети', { showBack: true, backLabel: 'Главная', parkFilter: false }],
+    ['Контроль Дня', { showBack: true, backLabel: 'Главная', parkFilter: true }],
+    ['Мастерплан', { leadingAction: 'hardReload', parkFilter: false, eyebrow: 'БУМБАСТИК' }],
+    ['Отчёт Дня', { showBack: true, backLabel: 'Контроль Дня', parkFilter: false }],
+  ]) {
+    const { el, app } = mount(bundle.NavigationBar, { title, collapsed: true, ...props })
+    await nextTick()
+    const compact = el.querySelector('[data-test="nav-compact-title"]')
+    check(`«${title}»: компактный заголовок в DOM целиком, без обрезки разметкой`,
+      !!compact && compact.textContent.trim() === title, compact && compact.textContent.trim())
+    check(`«${title}»: крупный заголовок в потоке на месте`,
+      el.querySelector('h1').textContent.trim() === title)
+    app.unmount()
+  }
+}
 
 console.log('\n=== Vue warnings ===')
 check('нет [Vue warn]', vueWarns.length === 0, vueWarns[0] || 'чисто')

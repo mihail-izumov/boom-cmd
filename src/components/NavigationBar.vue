@@ -68,17 +68,24 @@ async function hardReload() {
       ? 'backdrop-blur bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] border-b border-[var(--line)]'
       : 'bg-transparent border-b border-transparent'"
   >
-    <div class="relative h-11 w-full">
+    <!-- Три колонки: слот «Назад» · заголовок · пилюля.
+         Заголовок — колонка `auto`: занимает СВОЮ ширину и остаётся ровно по
+         центру, потому что боковые колонки `minmax(2.75rem, 1fr)` делят остаток
+         поровну. Так компактный заголовок не обрезается ни на одном разделе
+         (прежние боковые отступы по 10rem зажимали его в ~73px при нужных 121–138px).
+         Узко (375px) — сжимается и обрезается по многоточию подпись «Назад»,
+         а не заголовок; 2.75rem = 44pt тач-таргета боковым слотам гарантированы. -->
+    <div class="grid h-11 w-full grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)] items-center">
       <!-- Левый угол: back или leadingAction (взаимоисключающие) -->
-      <div class="absolute left-1 top-0 flex h-11 items-center">
+      <div class="flex min-w-0 items-center justify-self-start pl-1">
         <button
           v-if="showBack"
           type="button"
-          class="flex min-h-[44px] min-w-[44px] items-center gap-0.5 rounded-lg px-1 text-[var(--text)] active:bg-[var(--surface-2)]"
+          class="flex min-h-[44px] min-w-0 items-center gap-0.5 rounded-lg px-1 text-[var(--text)] active:bg-[var(--surface-2)]"
           @click="$emit('back')"
         >
-          <ChevronLeft class="h-6 w-6" :stroke-width="2.25" />
-          <span v-if="backLabel" class="text-[1.0625rem] leading-none">{{ backLabel }}</span>
+          <ChevronLeft class="h-6 w-6 shrink-0" :stroke-width="2.25" />
+          <span v-if="backLabel" class="truncate text-[1.0625rem] leading-none">{{ backLabel }}</span>
         </button>
         <button
           v-else-if="leadingAction === 'hardReload'"
@@ -93,20 +100,21 @@ async function hardReload() {
         <div v-else class="min-h-[44px] min-w-[44px]" aria-hidden="true"></div>
       </div>
 
-      <!-- Правый угол: компактная пилюля парк-фильтра (виден при collapsed && parkFilter) -->
+      <!-- Компактный заголовок: центральная колонка по ширине текста -->
       <div
-        class="absolute right-1 top-0 flex h-11 items-center transition-opacity duration-200"
-        :class="collapsed && parkFilter ? 'opacity-100' : 'pointer-events-none opacity-0'"
-      >
-        <ParkFilterPill v-if="parkFilter" :compact="true" @open="openPicker" />
-      </div>
-
-      <!-- Компактный заголовок: absolute по центру всего бара. -->
-      <div
-        class="pointer-events-none absolute inset-0 flex h-11 items-center justify-center px-[10rem] transition-opacity duration-200"
+        data-test="nav-compact-title"
+        class="pointer-events-none flex min-w-0 items-center justify-center px-2 transition-opacity duration-200"
         :class="collapsed ? 'opacity-100' : 'opacity-0'"
       >
         <span class="truncate text-[1.0625rem] font-semibold text-[var(--text)]">{{ title }}</span>
+      </div>
+
+      <!-- Правый угол: компактная пилюля парк-фильтра (виден при collapsed && parkFilter) -->
+      <div
+        class="flex min-w-0 items-center justify-self-end pr-1 transition-opacity duration-200"
+        :class="collapsed && parkFilter ? 'opacity-100' : 'pointer-events-none opacity-0'"
+      >
+        <ParkFilterPill v-if="parkFilter" :compact="true" @open="openPicker" />
       </div>
     </div>
   </header>
