@@ -151,6 +151,163 @@ export function entryKey(cadence, entry, i = 0) {
   return `${cadence}:${entry && entry.date}${a ? `@${a}` : ''}#${i}`
 }
 
+// ── Под-метки внутри блока (v2.6, ЗАДАНИЕ-фронт-рендер-сводок §3.1) ──
+// Недельные и месячные блоки выросли до 1–1,5 тыс. знаков и читаются сплошняком.
+// Внутри они уже структурны: смысловой кусок открывается короткой фразой с
+// двоеточием («Главное:», «Факт недели:», «Охта Молл:»). Это КОНВЕНЦИЯ регламента,
+// а не поле контракта, поэтому рендер обязан работать и без под-меток.
+//
+// Lookbehind из задания (проверка «перед этим была точка с пробелом») НЕ
+// используем намеренно: browserslist проекта
+// держит iOS ≥15, а Safari выучил lookbehind только в 16.4 — регэксп упал бы при
+// разборе бандла и уронил всё приложение. Позиции считаем сканом.
+export const SUBLABEL_MAX = 32
+// Под-метка: с заглавной, без точек и двоеточий внутри, длиной 3…32 вместе с ней.
+const SUB_RE = /^([А-ЯЁA-Z][^.:]{2,31}):\s/u
+
+// [{ label, text }] — под-пункты блока. Под-меток меньше двух → пустой массив:
+// блок рендерится сплошным абзацем, как раньше (обратная совместимость с днями и
+// со всей исторической лентой).
+export function splitSubItems(rest) {
+  const s = typeof rest === 'string' ? rest.trim() : ''
+  if (!s) return []
+  // кандидаты на под-метку: начало текста и позиции сразу после «. »
+  const starts = [0]
+  const re = /\.\s+/g
+  let m
+  while ((m = re.exec(s))) starts.push(m.index + m[0].length)
+
+  const hits = []
+  for (const at of starts) {
+    const mm = SUB_RE.exec(s.slice(at))
+    if (mm) hits.push({ at, label: mm[1], from: at + mm[0].length })
+  }
+  if (hits.length < 2) return []
+
+  const items = []
+  const intro = s.slice(0, hits[0].at).trim()
+  if (intro) items.push({ label: null, text: intro })
+  hits.forEach((h, i) => {
+    const end = i + 1 < hits.length ? hits[i + 1].at : s.length
+    items.push({ label: h.label, text: s.slice(h.from, end).trim() })
+  })
+  return items
+}
+
+// ── Разбивка последнего блока на абзацы (v2.5) ──
+// Данные приходят ОДНИМ абзацем (перевод строки ломает пайплайн контура), поэтому
+// «Сеть суммарно… / по сети надо…» и финальную директиву разносит РЕНДЕР.
+// Порядок предложений не меняем — только вставляем разрывы.
+
+// Предложения по тому же правилу, что метка блока: точка, ЗА которой пробел.
+// «Итог месяца (на 23.07)» и «1,01 млн ₽» не рвутся: там за точкой не пробел.
+export function splitSentences(text) {
+  const s = typeof text === 'string' ? text.trim() : ''
+  if (!s) return []
+  const out = []
+  let start = 0
+  const re = /\.\s+/g
+  let m
+  while ((m = re.exec(s))) {
+    out.push(s.slice(start, m.index + 1).trim())
+    start = m.index + m[0].length
+  }
+  const tail = s.slice(start).trim()
+  if (tail) out.push(tail)
+  // Хвост без букв (эмодзи, «🚀») — не предложение: приклеиваем к предыдущему.
+  return out.reduce((acc, x) => {
+    if (acc.length && !/[\p{L}]/u.test(x)) acc[acc.length - 1] += ` ${x}`
+    else acc.push(x)
+    return acc
+  }, [])
+}
+
+// Предложение с сетевым итогом — то, что владелец просит вынести отдельной строкой.
+export const TOTAL_RE = /(по\s+сети\s+надо|сет[иь]\s+суммарно|суммарно\s+по\s+сети)/i
+
+// Блоки записи, где ПОСЛЕДНИЙ («Фокус» / «Вывод») разложен на абзацы:
+//   kind: 'text'  — обычный абзац (метка блока остаётся на первом),
+//         'total' — строка сетевого итога,
+//         'final' — финальная директива, отдельным абзацем.
+// Меньше двух предложений — делить нечего, блок остаётся как был.
+function splitFocus(last) {
+  const sents = splitSentences(last.rest)
+  if (sents.length < 2) return [{ ...last, kind: 'text' }]
+
+  const totalIdx = sents.findIndex((x) => TOTAL_RE.test(x))
+  const lastIdx = sents.length - 1
+  const parts = []
+  let cur = null
+  sents.forEach((x, i) => {
+    // разрыв перед итогом, СРАЗУ ПОСЛЕ него (итог — своя строка, а не начало
+    // абзаца) и перед финальной директивой
+    if (!cur || i === totalIdx || i === totalIdx + 1 || i === lastIdx) {
+      cur = {
+        key: `${last.key}-${i}`,
+        head: false,
+        label: null,
+        sep: '.',
+        kind: i === totalIdx ? 'total' : i === lastIdx ? 'final' : 'text',
+        rest: '',
+      }
+      parts.push(cur)
+    }
+    cur.rest = cur.rest ? `${cur.rest} ${x}` : x
+  })
+
+  // Метка блока («Фокус на субботу») остаётся у первого абзаца. Если первым идёт
+  // сам итог — метку выносим в отдельную строку над ним, иначе итог перестаёт
+  // быть отдельной строкой, ради чего всё и делалось.
+  if (last.label) {
+    if (parts[0].kind === 'total') {
+      parts.unshift({ key: `${last.key}-label`, head: false, label: last.label, sep: '.', kind: 'text', rest: '' })
+    } else {
+      parts[0].label = last.label
+    }
+  }
+  return parts
+}
+
+export function focusBlocks(entry) {
+  const all = blocksOf(entry)
+  if (!all.length) return all
+  const parts = splitFocus(all[all.length - 1])
+  if (parts.length < 2) return all
+  return [...all.slice(0, -1), ...parts]
+}
+
+// Итоговый список абзацев карточки (v2.6). Порядок разбора для КАЖДОГО блока:
+//   1) есть под-метки (≥2) → метка блока своей строкой + строка на под-пункт;
+//   2) иначе последний блок → разбивка «Фокуса» по предложениям (v2.5);
+//   3) иначе — блок как есть, одним абзацем.
+// kind: 'text' — обычный абзац · 'sub' — под-пункт · 'total' — сетевой итог ·
+// 'final' — финальная директива. sep — чем возвращать разделитель метки.
+export function renderBlocks(entry) {
+  const all = blocksOf(entry)
+  if (!all.length) return []
+  const out = []
+  all.forEach((b, i) => {
+    const subs = splitSubItems(b.rest)
+    if (subs.length) {
+      if (b.label) out.push({ key: `${b.key}-h`, label: b.label, sep: '.', kind: 'text', rest: '' })
+      subs.forEach((it, j) => out.push({
+        key: `${b.key}-s${j}`,
+        label: it.label,
+        sep: ':',
+        kind: it.label ? 'sub' : 'text',
+        rest: it.text,
+      }))
+      return
+    }
+    if (i === all.length - 1) {
+      out.push(...splitFocus(b))
+      return
+    }
+    out.push({ ...b, sep: '.', kind: 'text' })
+  })
+  return out
+}
+
 // ── Бейдж периода (v2.1) ──
 // Статус несёт ЗАЛИВКА бейджа с датой, отдельной цветной точки больше нет.
 // Текст на бейдже монохромный (DESIGN-STANDARD §3.5): тёмный ink на светлой
