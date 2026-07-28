@@ -61,12 +61,14 @@ const paceInfo = computed(() => {
   return `Сейчас ${pace.value} — по прогнозу выйдем ровно к цели.`
 })
 
+// 28.07: «Тренды» — теперь вкладка таб-бара (setActive), «Материалы» — наоборот,
+// под-страница (setSubView); остальные входы не менялись.
 function goDaily() { setSubView('daily') }
-function goSummary() { setSubView('summary') }
+function goSummary() { setActive('summary') }
 function goGoals() { setSubView('goals') }
 function goAnalytics() { setActive('analytics') }
 function goProjects() { setActive('projects') }
-function goMaterials() { setActive('materials') }
+function goMaterials() { setSubView('materials') }
 </script>
 
 <template>

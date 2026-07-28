@@ -23,7 +23,8 @@ const gs = computed(() => GOAL_STATE[props.m.goalState] || GOAL_STATE.ok)
     <!-- прогноз (слева) · достижимость + остаток (справа) -->
     <div class="mt-3 grid grid-cols-2 items-start gap-4">
       <div class="min-w-0">
-        <div class="text-[0.75rem] leading-snug text-[var(--text-muted)]">{{ L.forecast }} · {{ L.forecast_hint }}</div>
+        <!-- 28.07: подпись в две строки без разделителя «·» (он ломался при переносе) -->
+        <div class="text-[0.75rem] leading-snug text-[var(--text-muted)]">{{ L.forecast }}<br>{{ L.forecast_hint }}</div>
         <div class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: fcColor }" />
           <span class="text-[1.375rem] font-bold leading-none tracking-tight text-[var(--text)]">{{ mln(m.landing) }}</span>
@@ -31,9 +32,11 @@ const gs = computed(() => GOAL_STATE[props.m.goalState] || GOAL_STATE.ok)
         </div>
       </div>
       <div class="min-w-0 text-right">
-        <div class="flex items-center justify-end gap-1.5 text-[0.75rem] leading-snug text-[var(--text-muted)]">
-          <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: gs.dot }" />
-          {{ gs.label }}
+        <!-- 28.07: точка статуса — В ПОТОКЕ текста (перед первым словом), а не во
+             flex-строке: при переносе двухстрочной подписи flex центрировал точку
+             по вертикали блока, и она «висела» посреди карточки как артефакт. -->
+        <div class="text-[0.75rem] leading-snug text-[var(--text-muted)]">
+          <span class="mr-1 inline-block h-2 w-2 rounded-full align-baseline" :style="{ background: gs.dot }" />{{ gs.label }}
         </div>
         <div class="mt-1 text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ mln(m.remainTarget) }}</div>
         <div class="mt-0.5 text-[0.75rem] text-[var(--text-muted)]">{{ L.to_earn }}</div>

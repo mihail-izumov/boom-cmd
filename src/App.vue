@@ -1,5 +1,5 @@
 <script setup>
-import { ChartColumnBig, Folder, Layers } from 'lucide-vue-next'
+import { ChartColumnBig, Layers, Newspaper } from 'lucide-vue-next'
 import AppShell from './components/AppShell.vue'
 import HomeScreen from './screens/HomeScreen.vue'
 import AnalyticsScreen from './screens/AnalyticsScreen.vue'
@@ -18,17 +18,25 @@ import { useAccessKey } from './composables/useAccessKey.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
 // активного парк-фильтра (TZ-3.1 §5). `parkFilter: true` у рабочих разделов
-// (Прогресс/Проекты/Материалы). На Home и под-странице «Парки» фильтра нет.
+// (Прогресс/Проекты). На Home, «Трендах» (контент сетевой) и под-страницах
+// «Парки»/«Материалы»* фильтра/бейджа по правилам ниже.
 // `eyebrow` — бейдж над крупным заголовком (Home: «БУМБАСТИК», графит).
+//
+// Состав таб-бара — правка владельца 28.07: Сегодня · Тренды · Прогресс · Проекты.
+// «Тренды» подняты из под-страницы во вкладку (id остался `summary` — он живёт в
+// useAppNav и тестах); «Материалы» убраны из таб-бара и стали под-страницей
+// (вход — плиткой с Главной, см. subViews ниже).
 const tabs = [
   // Подпись вкладки — «Сегодня» (правка владельца 26.07). Идентификатор вкладки
   // остался `home`: он живёт в useAppNav, в тестах и в глубоких ссылках.
-  { id: 'home',      label: 'Сегодня',   title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
+  { id: 'home',      label: 'Сегодня',  title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
+  // «Тренды» (бывш. «Сводки сети») — сетевые сводки, парк-фильтра нет:
+  // содержимое всегда по сети целиком. Селектор месяца живёт в правом углу шапки.
+  { id: 'summary',   label: 'Тренды',   title: 'Тренды',    icon: Newspaper,      screen: SummaryScreen,   parkFilter: false },
   // Раздел переименован «Аналитика» → «Прогресс» (правка владельца 28.07).
   // Идентификатор вкладки остался `analytics`: он живёт в useAppNav и тестах.
-  { id: 'analytics', label: 'Прогресс',  title: 'Прогресс',  icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
-  { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
-  { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },
+  { id: 'analytics', label: 'Прогресс', title: 'Прогресс',  icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
+  { id: 'projects',  label: 'Проекты',  title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
 ]
 
 // Под-страницы (мини-стек глубиной 1). На под-странице бедж-фильтра нет — кроме
@@ -55,15 +63,14 @@ const subViews = {
     backLabel: 'Главная',
     parkFilter: true,
   },
-  // «Тренды» (бывш. «Сводки сети», правка владельца 28.07) — сетевые сводки
-  // дня/недели/месяца. Парк-фильтра нет: содержимое всегда по сети целиком
-  // (итог сети = Σ парков считается на стороне данных). Идентификатор — `summary`.
-  summary: {
-    title: 'Тренды',
-    screen: SummaryScreen,
+  // «Материалы» — с 28.07 не вкладка, а под-страница (вход плиткой с Главной).
+  // Парк-контекст ведёт контент — бейдж фильтра показываем (parkFilter: true).
+  materials: {
+    title: 'Материалы',
+    screen: MaterialsScreen,
     showBack: true,
     backLabel: 'Главная',
-    parkFilter: false,
+    parkFilter: true,
   },
   // «Отчёт Дня» (D-12) — единственная пишущая страница; открывается кнопкой
   // «Добавить отчёт» из «Контроля Дня». `backTo` — статический возврат на

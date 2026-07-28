@@ -372,8 +372,10 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
   check('headline актуального виден', el.textContent.includes('Темп восстановлен к выходным'))
   check('бейдж «новое» на первом заходе', el.textContent.includes('новое'))
   const btn = el.querySelector('[data-test="signal-read"]')
-  check('кнопка «Прочитала» активна (не «Прочитано»)',
-    !!btn && btn.disabled === false && el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
+  // 28.07: текст кнопки — «Прочитано» в обоих состояниях; активную от нажатой
+  // отличаем по disabled и галке «✓».
+  check('кнопка «Прочитано» активна (без «✓»)',
+    !!btn && btn.disabled === false && el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
   check('«Как идёт день» влит в блок', el.textContent.includes('Как идёт день'))
   check('день-строки влиты (4 на моке)', el.querySelectorAll('[data-test="day-line"]').length === 4,
     el.querySelectorAll('[data-test="day-line"]').length)
@@ -395,16 +397,17 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
 // v3.2: модалка оценки телепортируется в body — ищем её по document, не по el.
 const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]')
 {
-  // «Прочитала» → модалка оценки; отправка → POST со score → «Прочитано ✓»
+  // «Прочитано» → модалка оценки; отправка → POST со score → «Прочитано ✓»
   localStorage.clear()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('до клика модалки нет', !rateSheet())
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
-  check('клик «Прочитала» → модалка открыта, POST ещё не ушёл',
+  check('клик по кнопке → модалка открыта, POST ещё не ушёл',
     !!rateSheet() && postedBodies.length === 0)
-  check('вопрос модалки дословно', rateSheet().textContent.includes('Оцените пользу Сигнала?'))
+  check('вопрос модалки дословно (28.07: без «?», сигнала со строчной)',
+    rateSheet().textContent.includes('Оцените пользу сигнала') && !rateSheet().textContent.includes('Сигнала?'))
   const slider = rateSheet().querySelector('[data-test="signal-rate-slider"]')
   check('ползунок 0–10 шаг 1, старт с середины (5)',
     !!slider && slider.min === '0' && slider.max === '10' && slider.step === '1' && slider.value === '5')
@@ -419,12 +422,12 @@ const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]'
     body.key === 'test-phrase' && body.type === 'signal_read' && body.park === 'ohta' &&
     body.signal_date === '2025-05-16' && body.score === 8)
   check('после успеха: модалка закрыта, «Прочитано ✓», кнопка неактивна',
-    !rateSheet() && el.textContent.includes('Прочитано') &&
+    !rateSheet() && el.textContent.includes('Прочитано ✓') &&
     el.querySelector('[data-test="signal-read"]').disabled === true)
   app.unmount()
   const re = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
-  check('прочитано и при следующих заходах', re.el.textContent.includes('Прочитано'))
+  check('прочитано и при следующих заходах', re.el.textContent.includes('Прочитано ✓'))
   re.app.unmount()
 }
 {
@@ -440,7 +443,7 @@ const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]'
   check('закрытие крестом: POST не ушёл, прочтение не зафиксировано',
     !rateSheet() && postedBodies.length === 0 &&
     el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
+    el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
   app.unmount()
 }
 {
@@ -455,7 +458,7 @@ const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]'
   check('красная плашка дословно', el.textContent.includes('Не удалось отметить. Проверьте связь и попробуйте ещё раз.'))
   check('кнопка осталась активной (повтор разрешён), модалка закрыта',
     !rateSheet() && el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
+    el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
   app.unmount()
   postMode = 'ok'
 }
@@ -936,8 +939,8 @@ const nsFeedDay = feedOf(sortSummaries(NS), 'day')
     !el.querySelector('[data-test="summary-row"] svg'))
   check('видны блоки 2 и 3 (Оценка + Фокус)',
     el.textContent.includes('Оценка') && el.textContent.includes('Фокус на субботу'))
-  check('это НЕ сигнал: ни headline/action, ни кнопки «Прочитала» (фаза 2)',
-    !el.querySelector('[data-test="signal-read"]') && !el.textContent.includes('Прочитала'))
+  check('это НЕ сигнал: ни headline/action, ни кнопки «Прочитано» (фаза 2)',
+    !el.querySelector('[data-test="signal-read"]') && !el.textContent.includes('Прочитано'))
   check('блоки видны сразу, своей свёртки у них нет',
     el.querySelectorAll('[data-test="summary-block"]').length >= 3 &&
     !el.querySelector('[data-test="summary-head-toggle"]') &&
@@ -1083,7 +1086,7 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
     segs.map((s) => s.textContent.trim()).join(' · '))
   check('лид — одна фраза в две строки, по центру, крупнее прежнего', (() => {
     const lead = el.querySelector('[data-test="summary-lead"]')
-    return !!lead && lead.textContent.trim() === 'Где парки сегодня и\nкакой прогресс за месяц' &&
+    return !!lead && lead.textContent.trim() === 'Где парки сегодня и\nкакой прогноз месяца' &&
       lead.className.includes('text-center') && lead.className.includes('text-[1rem]') &&
       lead.className.includes('whitespace-pre-line')
   })(), el.querySelector('[data-test="summary-lead"]')?.textContent.trim())
@@ -1248,7 +1251,10 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Проекты,Материалы',
     tiles.slice(1).map((t) => t.textContent.trim()).join(','))
   await fire(tiles[0], 'click')
-  check('тап по плитке → под-страница «summary»', nav.subView.value === 'summary', nav.subView.value)
+  // 28.07: «Тренды» — вкладка таб-бара, тап по плитке активирует её (не под-страницу)
+  check('тап по плитке «Тренды» → вкладка «summary», под-страницы нет',
+    nav.active.value === 'summary' && nav.subView.value === null, nav.active.value)
+  nav.setActive('home')
   bundle.clearSubView()
   app.unmount()
 }
