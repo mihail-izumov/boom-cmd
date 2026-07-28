@@ -30,6 +30,15 @@ const PRECACHE = [
   BASE + 'icon-512.png',
   BASE + 'apple-touch-icon.png',
   BASE + 'manifest.json',
+  // D-21: бренд-ассеты экрана входа. Шрифты самозахощены (с CDN ничего не грузим),
+  // поэтому в оффлайне их обязан отдать кэш — иначе логотип и ярлыки уедут на
+  // системный фолбэк. Кладём только woff2: .woff — фолбэк для древних браузеров,
+  // он подтянется по требованию через cache-first ниже.
+  BASE + 'runscale_logo.svg',
+  BASE + 'runscale_chevron.svg',
+  BASE + 'fonts/UniversLTCYR-67BoldCond.woff2',
+  BASE + 'fonts/UniversLTCYR-57Condensed.woff2',
+  BASE + 'fonts/RobotoMono-Regular.woff2',
 ];
 
 self.addEventListener('install', (event) => {

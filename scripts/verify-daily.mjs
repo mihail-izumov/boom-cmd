@@ -9,7 +9,7 @@
 // journal[-1].landing === round(model.landing) · адаптивные колонки метрик ·
 // goalState v2.1 §5 (out/record/ok, границы ×1.001 к maxObs и ×1.25 к implied).
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { computeDaily, computeNetwork, sigClass } from '../src/composables/dailyModel.js'
@@ -19,6 +19,12 @@ import {
   buildSignalReadBody, postSignalRead,
 } from '../src/composables/dailySignals.js'
 import { readCounters, plural, checkupsWord, signalsWord, reviewsWord } from '../src/i18n/home.js'
+// ВНИМАНИЕ: useConnectRequest.js импортирует vue — статически его сюда тянуть НЕЛЬЗЯ.
+// runtime-dom кэширует `document` в момент загрузки, а jsdom-глобали ставятся ниже:
+// ранний импорт vue = `document === null` и падение на первом же mount().
+// Поэтому его хелперы приезжают через тестовый бандл (bundle.buildConnectBody и т.д.).
+// businesses.js — чистые данные без vue, его импортировать статически безопасно.
+import { BUSINESSES, ACTIVE_BUSINESS } from '../src/data/businesses.js'
 import { sortReviews, reviewCount } from '../src/composables/reviews.js'
 import {
   sortSummaries, latestByCadence, latestOf, splitBlock, blocksOf,
@@ -265,9 +271,13 @@ export { default as DailyNetwork } from '${root}/src/components/daily/DailyNetwo
 export { default as NetSummaryCard } from '${root}/src/components/daily/NetSummaryCard.vue'
 export { default as SummaryScreen } from '${root}/src/screens/SummaryScreen.vue'
 export { default as NavigationBar } from '${root}/src/components/NavigationBar.vue'
+export { default as BusinessChip } from '${root}/src/components/business/BusinessChip.vue'
+export { default as AccessKeyForm } from '${root}/src/components/AccessKeyForm.vue'
+export { default as ConnectBusinessModal } from '${root}/src/components/business/ConnectBusinessModal.vue'
 export { default as HomeScreen } from '${root}/src/screens/HomeScreen.vue'
 export { default as ReviewsScreen } from '${root}/src/screens/ReviewsScreen.vue'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
+export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
 export { useAppNav, clearSubView } from '${root}/src/composables/useAppNav.js'
 `)
@@ -1279,11 +1289,11 @@ console.log('\n=== jsdom: компактный заголовок navigation bar
   check('подпись слота «Назад» сжимается по многоточию, а не давит заголовок',
     /truncate text-\[1\.0625rem\] leading-none/.test(navSrc))
 
-  // все разделы, где заголовок резался: «Сводки сети» 121px, «Контроль Дня» 138px, «Мастерплан» 119px
+  // все разделы, где заголовок резался: «Сводки сети» 121px, «Контроль Дня» 138px.
+  // Главной в этом списке больше нет — с D-20 у неё заголовка нет вовсе (см. ниже).
   for (const [title, props] of [
     ['Сводки сети', { showBack: true, backLabel: 'Главная', parkFilter: false }],
     ['Контроль Дня', { showBack: true, backLabel: 'Главная', parkFilter: true }],
-    ['Мастерплан', { leadingAction: 'hardReload', parkFilter: false, eyebrow: 'БУМБАСТИК' }],
     ['Отчёт Дня', { showBack: true, backLabel: 'Контроль Дня', parkFilter: false }],
   ]) {
     const { el, app } = mount(bundle.NavigationBar, { title, collapsed: true, ...props })
@@ -1417,6 +1427,353 @@ console.log('\n=== jsdom: D-19 — полоса Главной и журнал �
     (appSrc.match(/backLabel: 'Главная'/g) || []).length)
   check('TabBar рендерит именно label вкладки',
     readFileSync(resolve(root, 'src/components/TabBar.vue'), 'utf8').includes('tab.label'))
+}
+
+// ═══════════════ D-20: шапка Главной, переключатель бизнесов, заявка ═══════════════
+console.log('\n=== D-20: имя продукта ушло из шапки Главной ===')
+{
+  const appSrc = readFileSync(resolve(root, 'src/App.vue'), 'utf8')
+  check('у вкладки «home» пустой title (заголовка на Главной нет)', /id: 'home',[\s\S]{0,80}?title: ''/.test(appSrc))
+  // слово может остаться в комментарии-объяснении — важно, что его нет в ЗНАЧЕНИЯХ конфига
+  check('«Мастерплан» не значится ни заголовком, ни подписью вкладки',
+    !/(title|label|eyebrow):\s*'[^']*Мастерплан/.test(appSrc))
+  check('чип «БУМБАСТИК» остался (eyebrow)', appSrc.includes("eyebrow: 'БУМБАСТИК'"))
+
+  // Главная: ни крупного h1, ни компактного заголовка; чип на месте
+  const { el, app } = mount(bundle.NavigationBar, {
+    title: '', collapsed: true, leadingAction: 'hardReload', parkFilter: false, eyebrow: 'БУМБАСТИК',
+  })
+  await nextTick()
+  check('Главная: крупного заголовка нет', !el.querySelector('h1'))
+  check('Главная: компактного заголовка нет', !el.querySelector('[data-test="nav-compact-title"]'))
+  check('Главная: чип бизнеса в шапке есть', !!el.querySelector('[data-test="business-chip"]'))
+  check('Главная: слова «Мастерплан» в шапке нет', !el.textContent.includes('Мастерплан'))
+  app.unmount()
+
+  // регресс: у разделов с заголовком всё как было
+  const nb = mount(bundle.NavigationBar, { title: 'Тренды', collapsed: true })
+  await nextTick()
+  check('регресс: раздел с заголовком по-прежнему рендерит h1 и компактный заголовок',
+    nb.el.querySelector('h1')?.textContent.trim() === 'Тренды' &&
+    nb.el.querySelector('[data-test="nav-compact-title"]')?.textContent.trim() === 'Тренды')
+  nb.app.unmount()
+}
+
+console.log('\n=== D-20: «Мастерплан» → «Ранскейл» в PWA ===')
+{
+  const banner = readFileSync(resolve(root, 'src/components/home/InstallPwaBanner.vue'), 'utf8')
+  // смотрим ВИДИМЫЙ текст: <template> + строки шагов, а не комментарии-объяснения
+  const bannerVisible = banner.slice(banner.indexOf('const steps'))
+  check('в видимом тексте PWA-баннера «Мастерплана» нет', !bannerVisible.includes('Мастерплан'))
+  check('во всех четырёх местах баннера теперь «Ранскейл»',
+    (bannerVisible.match(/Ранскейл/g) || []).length === 4, (bannerVisible.match(/Ранскейл/g) || []).length)
+  check('баннер зовёт открыть Ранскейл', /Откройте Ранскейл/.test(banner))
+  const mf = JSON.parse(readFileSync(resolve(root, 'public/manifest.json'), 'utf8'))
+  check('manifest.name / short_name = «Ранскейл»', mf.name === 'Ранскейл' && mf.short_name === 'Ранскейл')
+  check('иконки манифеста НЕ трогали (отдельная задача владельца)',
+    mf.icons.length === 4 && mf.icons.every((i) => /icon-(192|512)\.png$/.test(i.src)))
+}
+
+console.log('\n=== D-21: экран входа — логотип Ранскейл ===')
+{
+  const { el, app } = mount(bundle.AccessKeyForm, {})
+  await nextTick()
+
+  // 1. логотип вместо слогана
+  const logo = el.querySelector('[data-test="access-logo"]')
+  const chev = el.querySelector('[data-test="access-chevron"]')
+  const word = el.querySelector('[data-test="access-wordmark"]')
+  check('слогана «Расти с планом» больше нет', !el.textContent.includes('Расти'))
+  check('логотип озвучен для скринридера один раз (role=img + aria-label)',
+    !!logo && logo.getAttribute('role') === 'img' && logo.getAttribute('aria-label') === 'Ранскейл' &&
+    word.getAttribute('aria-hidden') === 'true')
+  check('шеврон — SVG-маска, цвет из токена (не хардкод #111)',
+    !!chev && /mask-image/i.test(chev.getAttribute('style') || '') &&
+    chev.className.includes('bg-[var(--text)]'))
+  // 53px — промерено по утверждённому мокапу v2 (780×1500 = 390×750 @2x:
+  // знак 106px = 53px CSS). Вариант A на 72px отклонён владельцем 28.07.
+  check('шеврон 53px на мобайле и ×1.5 (80px) на ≥768px',
+    chev.className.includes('h-[53px]') && chev.className.includes('md:h-[80px]'))
+  check('пропорция шеврона задана явно (бокс = знак, без прозрачных полей)',
+    /aspect-ratio:\s*1080\s*\/\s*923\.72/.test(chev.getAttribute('style') || ''))
+  check('слово «Ранскейл» — голос бренда, капс, 28px, трекинг 0.06em',
+    word.textContent.trim() === 'Ранскейл' && word.className.includes('font-brand') &&
+    word.className.includes('uppercase') && word.className.includes('text-[1.75rem]') &&
+    word.className.includes('tracking-[0.06em]'))
+  check('зазор шеврон→слово 12px, на десктопе 18px (×1.5)',
+    word.className.includes('mt-[12px]') && word.className.includes('md:mt-[18px]'))
+  check('десктоп: слово ×1.5 = 42px', word.className.includes('md:text-[2.625rem]'))
+
+  // 2. карточка
+  const cardLabel = el.querySelector('[data-test="access-card-label"]')
+  check('вместо вывески «БУМБАСТИК» — ярлык «ДОСТУП В СИСТЕМУ»',
+    !!cardLabel && cardLabel.textContent.trim() === 'ДОСТУП В СИСТЕМУ' &&
+    !el.textContent.includes('БУМБАСТИК'))
+  check('ярлык — начертание подписей, капс, разрядка 10% (v2), вторичный цвет',
+    cardLabel.className.includes('font-label') && cardLabel.className.includes('uppercase') &&
+    cardLabel.className.includes('tracking-[0.1em]') &&
+    cardLabel.className.includes('text-[var(--text-secondary)]'))
+  const login = el.querySelector('[data-test="access-login"]')
+  const phrase = el.querySelector('[data-test="access-phrase"]')
+  check('placeholder логина — реальный формат «boombastic», не шутка',
+    login.getAttribute('placeholder') === 'boombastic')
+  check('placeholder пароля — «код доступа»', phrase.getAttribute('placeholder') === 'код доступа')
+  check('оба поля — терминальный моно, 16px (меньше нельзя: iOS зумит при фокусе)',
+    login.className.includes('font-mono') && login.className.includes('text-[1rem]') &&
+    phrase.className.includes('font-mono') && phrase.className.includes('text-[1rem]'))
+  const submit = el.querySelector('[data-test="access-submit"]')
+  check('кнопка «СТАРТ» голосом бренда, капс, разрядка 12% (v2)',
+    submit.textContent.trim() === 'СТАРТ' && submit.className.includes('font-brand') &&
+    submit.className.includes('uppercase') && submit.className.includes('tracking-[0.12em]'))
+  check('форма и высота кнопки не тронуты; цвет — из токена, а не хардкодом',
+    submit.className.includes('bg-[var(--accent)]') && submit.className.includes('rounded-2xl') &&
+    /min-height:\s*52px/.test(submit.getAttribute('style') || ''))
+
+  // 3. подвал
+  check('плашки с именем продукта в подвале нет',
+    !el.textContent.includes('МАСТЕРПЛАН') && !el.textContent.includes('Мастерплан') &&
+    !el.textContent.includes('УЛЬТРА') && !el.querySelector('.rounded-full.border-2'))
+  check('логотип «Модуль роста» на месте', !!el.querySelector('[aria-label="Модуль роста"]'))
+
+  // 4. v2: тёмная витрина — скоупом, а не глобальной темой
+  const rootEl = el.querySelector('[data-test="access-root"]')
+  check('тёмная витрина навешена на корень экрана, а не на <html>',
+    !!rootEl && rootEl.getAttribute('data-theme') === 'auth-dark' &&
+    document.documentElement.getAttribute('data-theme') === null)
+  const akSrc = readFileSync(resolve(root, 'src/components/AccessKeyForm.vue'), 'utf8')
+  const tpl = akSrc.slice(akSrc.indexOf('<template>'))
+  // комментарии-объяснения цитируют значения токенов — смотрим только саму разметку
+  const tplCode = tpl.replace(/<!--[\s\S]*?-->/g, '')
+  check('в разметке экрана нет ни одного hex — только токены',
+    !/#[0-9a-fA-F]{3,8}\b/.test(tplCode), (tplCode.match(/#[0-9a-fA-F]{3,8}\b/) || [])[0])
+  check('поля темнее карточки (--surface-2 на --surface), как на мокапе',
+    tpl.includes('bg-[var(--surface-2)]') && tpl.includes('bg-[var(--surface)]'))
+  check('placeholder ходит по своему токену (поднят по контрасту отдельно от подписи)',
+    (tpl.match(/placeholder:text-\[var\(--placeholder\)\]/g) || []).length === 2)
+
+  // ошибка — единственный цветной элемент
+  const er = mount(bundle.AccessKeyForm, { error: true })
+  await nextTick()
+  const errEl = er.el.querySelector('[data-test="access-error"]')
+  check('текст ошибки — «Неверный код доступа» (поле и ошибка одним словом)',
+    !!errEl && errEl.textContent.includes('Неверный код доступа'))
+  check('ошибка красная — единственный цвет экрана',
+    errEl.className.includes('text-[var(--negative)]'))
+  const colored = [...er.el.querySelectorAll('*')].filter((n) =>
+    /--negative|--positive|--info|--warning|--accent\)/.test(n.className || ''))
+  check('кроме ошибки и главной кнопки цветных элементов нет',
+    colored.every((n) => n.closest('[data-test="access-error"]') || n.dataset.test === 'access-submit'),
+    colored.length + ' шт')
+  er.app.unmount()
+  app.unmount()
+}
+
+console.log('\n=== D-21 v2: тёмная витрина входа ===')
+{
+  const css = readFileSync(resolve(root, 'src/styles/main.css'), 'utf8')
+  const scope = (css.match(/\[data-theme="auth-dark"\]\s*{[^}]*}/) || [])[0] || ''
+  check('скоуп auth-dark объявлен в токенах (единственное место с hex)', !!scope)
+  const tok = (name) => (scope.match(new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1]
+  const want = { bg: '#0A0A0A', surface: '#161616', 'surface-2': '#0F0F0F', line: '#2A2A2A', text: '#F2F2F2' }
+  for (const [k, v] of Object.entries(want))
+    check(`--${k} = ${v} (по палитре v2)`, tok(k) === v, tok(k))
+  check('жёлтого на витрине входа нет: --accent переопределён в белый',
+    tok('accent') === '#F2F2F2' && tok('accent-ink') === '#0A0A0A')
+  check('тёмная тема НЕ разлита по приложению (скоуп на компоненте, html чист)',
+    !/^html\[data-theme|:root\s*{[^}]*#0A0A0A/m.test(css))
+
+  const app = readFileSync(resolve(root, 'src/App.vue'), 'utf8')
+  check('theme-color переключает App по состоянию гейта, а не форма входа',
+    /setThemeColor\(authed\.value \? APP_THEME_COLOR : AUTH_THEME_COLOR\)/.test(app))
+  check('экран загрузки тоже тёмный — между ним и входом не мигает',
+    /data-theme="auth-dark"[\s\S]{0,160}aria-busy/.test(app))
+  const mf = JSON.parse(readFileSync(resolve(root, 'public/manifest.json'), 'utf8'))
+  check('сплэш тёмный: theme_color и background_color манифеста = #0A0A0A',
+    mf.theme_color === '#0A0A0A' && mf.background_color === '#0A0A0A')
+  check('стартовый theme-color в index.html тёмный (приложение открывается входом)',
+    /name="theme-color"\s+content="#0A0A0A"/.test(readFileSync(resolve(root, 'index.html'), 'utf8')))
+}
+
+console.log('\n=== D-21 v2: контраст тёмной витрины (WCAG, посчитан) ===')
+{
+  const lum = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+  }
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p)
+    return (x + 0.05) / (y + 0.05)
+  }
+  const D = {
+    bg: '#0A0A0A', card: '#161616', field: '#0F0F0F', text: '#F2F2F2',
+    sec: '#9A9A9A', ph: '#808080', btn: '#F2F2F2', btnInk: '#0A0A0A', err: '#FF5C4D',
+  }
+  for (const [name, fg, bg] of [
+    ['логотип: --text на --bg', D.text, D.bg],
+    ['ярлык ДОСТУП В СИСТЕМУ: --text-secondary на карточке', D.sec, D.card],
+    ['вводимый текст: --text на поле', D.text, D.field],
+    ['placeholder: --placeholder на поле', D.ph, D.field],
+    ['кнопка СТАРТ: --accent-ink на --accent', D.btnInk, D.btn],
+    ['ошибка: --negative на карточке', D.err, D.card],
+  ]) {
+    const r = ratio(fg, bg)
+    check(`${name} ≥ 4.5:1`, r >= 4.5, r.toFixed(2) + ':1')
+  }
+  // почему не взяли значения из ТЗ буквально — числа, а не мнение
+  check('placeholder из ТЗ (#5C5C5C) провалил бы порог — поднят осознанно',
+    ratio('#5C5C5C', D.field) < 4.5, ratio('#5C5C5C', D.field).toFixed(2) + ':1')
+  check('брендовый красный #D92D20 на карточке провалил бы порог — поднят осознанно',
+    ratio('#D92D20', D.card) < 4.5, ratio('#D92D20', D.card).toFixed(2) + ':1')
+}
+
+console.log('\n=== D-21: самохостинг шрифтов и оффлайн ===')
+{
+  const css = readFileSync(resolve(root, 'src/styles/main.css'), 'utf8')
+  const faces = css.match(/@font-face\s*{[^}]*}/g) || []
+  check('объявлены три начертания: бренд, ярлыки, моно', faces.length === 3, faces.length)
+  check('у всех font-display: swap (текст виден, пока грузится шрифт)',
+    faces.every((f) => /font-display:\s*swap/.test(f)))
+  check('все источники — свои файлы из /fonts', faces.every((f) => /url\('\/fonts\//.test(f)))
+  // «с CDN ничего не грузится» — проверяем весь текстовый исходник, а не один файл
+  const CDN = /fonts\.googleapis|fonts\.gstatic|use\.typekit|fonts\.bunny|cdn\.jsdelivr[^\s'"]*font/i
+  const walk = (dir, acc = []) => {
+    for (const name of readdirSync(dir)) {
+      const p = resolve(dir, name)
+      if (statSync(p).isDirectory()) walk(p, acc)
+      else if (/\.(vue|js|css|html|json)$/.test(name)) acc.push(p)
+    }
+    return acc
+  }
+  // Автономные пульты в public/*.html — отдельные статические страницы, не часть
+  // приложения (свой рендер чисел, открываются напрямую). Требование ТЗ про CDN
+  // относится к приложению; пульты считаем отдельно и НЕ прячем — если там появится
+  // внешний шрифт, чек это назовёт, а не промолчит.
+  const isPult = (p) => /public\/[^/]+\.html$/.test(p)
+  const sources = [...walk(resolve(root, 'src')), ...walk(resolve(root, 'public')), resolve(root, 'index.html')]
+  const appSources = sources.filter((p) => !isPult(p))
+  const cdnHits = appSources.filter((p) => CDN.test(readFileSync(p, 'utf8')))
+  check(`приложение: шрифты ниоткуда не подгружаются извне (файлов: ${appSources.length})`,
+    cdnHits.length === 0, cdnHits[0] || 'чисто')
+  const pultHits = sources.filter((p) => isPult(p) && CDN.test(readFileSync(p, 'utf8')))
+  // НЕ роняем приёмку: это не регресс этой задачи, а унаследованное состояние
+  // (пульт тянет Inter/Montserrat/Space Mono с Google Fonts — их у нас нет в
+  // самохостинге, замена = отдельная задача, заведена в BACKLOG п. 7).
+  // Но и молчать нельзя: строка печатается каждый прогон.
+  console.log(pultHits.length === 0
+    ? '✓  автономные пульты public/*.html: внешних шрифтов нет'
+    : `ℹ  автономные пульты грузят шрифты с CDN — вне этой задачи, см. BACKLOG п. 7  (${pultHits.map((p) => p.split('/').pop()).join(', ')})`)
+  const fonts = ['UniversLTCYR-67BoldCond.woff2', 'UniversLTCYR-67BoldCond.woff',
+    'UniversLTCYR-57Condensed.woff2', 'UniversLTCYR-57Condensed.woff', 'RobotoMono-Regular.woff2']
+  check('файлы шрифтов лежат в public/fonts (попадут в сборку и в репо)',
+    fonts.every((f) => existsSync(resolve(root, 'public/fonts', f))), fonts.length + ' шт')
+  check('шеврон лежит в public (docs/ в .gitignore — оттуда бы не задеплоился)',
+    existsSync(resolve(root, 'public/runscale_chevron.svg')))
+  const sw = readFileSync(resolve(root, 'public/sw.js'), 'utf8')
+  check('woff2 и шеврон в precache — иначе в оффлайне лого уедет на фолбэк',
+    ['UniversLTCYR-67BoldCond.woff2', 'UniversLTCYR-57Condensed.woff2', 'RobotoMono-Regular.woff2',
+      'runscale_chevron.svg'].every((f) => sw.includes(f)))
+  const tw = readFileSync(resolve(root, 'tailwind.config.js'), 'utf8')
+  check('роли начертаний заведены в tailwind (font-brand / font-label / font-mono)',
+    /brand:\s*\[/.test(tw) && /label:\s*\[/.test(tw) && /mono:\s*\[/.test(tw))
+  check('у каждой роли есть фолбэк на время swap',
+    (tw.match(/Ranscale (Display|Label|Mono)"',\s*'/g) || []).length === 3)
+}
+
+console.log('\n=== D-20: чип-переключатель бизнесов ===')
+{
+  check('в списке ровно один бизнес и он активный',
+    BUSINESSES.length === 1 && ACTIVE_BUSINESS && ACTIVE_BUSINESS.id === 'bumbastik' && ACTIVE_BUSINESS.active === true)
+
+  const { el, app } = mount(bundle.BusinessChip, { label: 'БУМБАСТИК' })
+  await nextTick()
+  const chip = el.querySelector('[data-test="business-chip"]')
+  check('чип — кнопка с текстом «БУМБАСТИК»', !!chip && chip.tagName === 'BUTTON' && chip.textContent.includes('БУМБАСТИК'))
+  check('до тапа выпадашки нет', !el.querySelector('[data-test="business-menu"]'))
+  check('тач-таргет чипа ≥44pt (min-h-[44px])', chip.className.includes('min-h-[44px]'))
+
+  await fire(chip, 'click')
+  const menu = el.querySelector('[data-test="business-menu"]')
+  check('тап открыл выпадающий список', !!menu)
+  check('в списке активный бизнес «Бумбастик» с галкой',
+    !!menu && menu.textContent.includes('Бумбастик') && !!menu.querySelector('[aria-label="Активный бизнес"]'))
+  check('есть разделитель между списком и действием', !!menu.querySelector('[aria-hidden="true"]'))
+  const connect = el.querySelector('[data-test="business-connect"]')
+  check('пункт «Подключить бизнес» с подписью «с экспертом»',
+    !!connect && connect.textContent.includes('Подключить бизнес') && connect.textContent.includes('с экспертом'))
+  check('aria-expanded переключился', chip.getAttribute('aria-expanded') === 'true')
+
+  await fire(connect, 'click')
+  check('пункт закрыл список и открыл модалку',
+    !el.querySelector('[data-test="business-menu"]') && !!document.querySelector('[data-test="connect-modal"]'))
+  check('пункт виден без ролей + TODO на скрытие заложен комментарием, а не логикой',
+    /TODO\(роли\)/.test(readFileSync(resolve(root, 'src/components/business/BusinessChip.vue'), 'utf8')))
+  app.unmount()
+  document.querySelectorAll('[data-test="connect-modal"]').forEach((n) => n.remove())
+}
+
+console.log('\n=== D-20: модалка «Подключить бизнес» ===')
+{
+  const { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } = bundle
+  check('normalizeBusinessName: обрезка по краям', normalizeBusinessName('  Кофейня  ') === 'Кофейня')
+  check('normalizeBusinessName: пусто → пустая строка',
+    normalizeBusinessName('   ') === '' && normalizeBusinessName(null) === '' && normalizeBusinessName(undefined) === '')
+  check(`normalizeBusinessName: лимит ${BUSINESS_NAME_MAX} символов`,
+    normalizeBusinessName('Я'.repeat(300)).length === BUSINESS_NAME_MAX)
+  const body = buildConnectBody({ key: 'k', businessName: ' Бар Два ' })
+  check('тело запроса: action=connect_request, business_name, source=front по умолчанию',
+    body.action === 'connect_request' && body.business_name === 'Бар Два' && body.source === 'front' && body.key === 'k')
+
+  const { el, app } = mount(bundle.ConnectBusinessModal, { open: true })
+  await nextTick()
+  const dlg = document.querySelector('[data-test="connect-modal"]')
+  check('модалка: текст про эксперта Модуля Роста',
+    !!dlg && dlg.textContent.includes('Эксперт Модуля Роста свяжется с вами'))
+  const input = dlg.querySelector('[data-test="connect-input"]')
+  const btn = dlg.querySelector('[data-test="connect-submit"]')
+  check('модалка: ровно одно поле ввода', dlg.querySelectorAll('input').length === 1)
+  check('модалка: поле «Название бизнеса» обязательное', !!input && input.hasAttribute('required'))
+  check('модалка: ни тарифов, ни конфигуратора',
+    !/тариф|Тариф|подписк|Подписк/.test(dlg.textContent))
+  check('пустое поле → кнопка «Оставить заявку» заблокирована', btn.disabled === true)
+
+  // отправка идёт через @submit.prevent формы; синтетический click по кнопке
+  // в jsdom submit НЕ порождает — дёргаем событие формы напрямую
+  const form = dlg.querySelector('form')
+  const before = postedBodies.length
+  await fire(form, 'submit')
+  await flush()
+  check('пустое название не уходит на бэк (и письма не будет)', postedBodies.length === before)
+
+  // ошибка бэка: плашка есть, введённое название НЕ потеряно
+  postMode = 'reject'
+  input.value = 'Кофейня на Невском'
+  await fire(input, 'input')
+  await nextTick()
+  check('поле заполнено → кнопка активна', btn.disabled === false)
+  await fire(form, 'submit')
+  await flush()
+  check('ошибка бэка → плашка «Не удалось отправить, попробуйте ещё раз»',
+    !!dlg.querySelector('[data-test="connect-error"]') &&
+    dlg.querySelector('[data-test="connect-error"]').textContent.includes('Не удалось отправить'))
+  check('после ошибки название в поле не потеряно',
+    dlg.querySelector('[data-test="connect-input"]').value === 'Кофейня на Невском')
+
+  // успех: тело контракта и состояние «Заявка отправлена»
+  postMode = 'ok'
+  await fire(dlg.querySelector('form'), 'submit')
+  await flush()
+  const sentBody = JSON.parse(postedBodies[postedBodies.length - 1])
+  check('POST ушёл с action=connect_request и названием бизнеса',
+    sentBody.action === 'connect_request' && sentBody.business_name === 'Кофейня на Невском', JSON.stringify(sentBody))
+  check('POST несёт source=front и фразу доступа', sentBody.source === 'front' && !!sentBody.key)
+  check('успех → «Заявка отправлена. Эксперт свяжется с вами.»',
+    !!document.querySelector('[data-test="connect-done"]') &&
+    document.querySelector('[data-test="connect-done"]').textContent.includes('Заявка отправлена'))
+  check('после успеха форма схлопнулась (закрытие по таймеру)',
+    !document.querySelector('[data-test="connect-input"]'))
+  app.unmount()
+  document.querySelectorAll('[data-test="connect-modal"]').forEach((n) => n.remove())
 }
 
 console.log('\n=== Vue warnings ===')

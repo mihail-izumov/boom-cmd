@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { ChevronLeft } from 'lucide-vue-next'
 import ParkFilterPill from './navigation/ParkFilterPill.vue'
 import ParkPickerSheet from './navigation/ParkPickerSheet.vue'
+import BusinessChip from './business/BusinessChip.vue'
 import SyncIcon from './icons/SyncIcon.vue'
 import { useNavCaption } from '../composables/useNavCaption.js'
 import { useNavTrailing } from '../composables/useNavTrailing.js'
@@ -15,13 +16,21 @@ import { useNavTrailing } from '../composables/useNavTrailing.js'
 //   - в потоке скролла: большая пилюля по центру под заголовком (если parkFilter).
 //
 // `eyebrow` — короткий бейдж НАД крупным заголовком (на Главной — «БУМБАСТИК»,
-// графитовая заливка --graphite). Рендерится только когда задан.
+// графитовая заливка --graphite). Рендерится только когда задан. С D-20 это не
+// статичный бейдж, а BusinessChip: кнопка-переключатель бизнесов с пунктом
+// «Подключить бизнес». Внешний вид капсулы не менялся.
+//
+// `title` С D-20 НЕОБЯЗАТЕЛЕН. На Главной заголовка нет вовсе (правка владельца
+// 28.07: имя продукта внутри приложения не пишется нигде, а «Мастерплан» ушёл
+// в модули; экран и так подписан «Сегодня» в таб-баре). Пустой title → не
+// рендерим ни крупный h1, ни компактный заголовок; шапка Главной = чип + период
+// «<Месяц Год>: парки», который живёт в самом экране.
 //
 // `leadingAction` — конфигурируемая кнопка слева вместо back-кнопки, когда
 // `showBack=false`. Сейчас единственный вариант — 'hardReload' на Главной.
 
 defineProps({
-  title: { type: String, required: true },
+  title: { type: String, default: '' },
   collapsed: { type: Boolean, default: false },
   parkFilter: { type: Boolean, default: false },
   showBack: { type: Boolean, default: false },
@@ -102,14 +111,18 @@ async function hardReload() {
         <div v-else class="min-h-[44px] min-w-[44px]" aria-hidden="true"></div>
       </div>
 
-      <!-- Компактный заголовок: центральная колонка по ширине текста -->
+      <!-- Компактный заголовок: центральная колонка по ширине текста.
+           Нет title (Главная) — блок не рендерится вовсе, колонка схлопывается. -->
       <div
+        v-if="title"
         data-test="nav-compact-title"
         class="pointer-events-none flex min-w-0 items-center justify-center px-2 transition-opacity duration-200"
         :class="collapsed ? 'opacity-100' : 'opacity-0'"
       >
         <span class="truncate text-[1.0625rem] font-semibold text-[var(--text)]">{{ title }}</span>
       </div>
+      <!-- заглушка центральной колонки: без неё правый слот съезжает в центр grid -->
+      <div v-else aria-hidden="true"></div>
 
       <!-- Правый угол: либо управляемый слот раздела (селектор месяца в «Сводках»),
            либо компактная пилюля парк-фильтра (виден при collapsed && parkFilter).
@@ -134,15 +147,15 @@ async function hardReload() {
   <!-- Крупный центрированный заголовок — в потоке скролла.
        eyebrow (опц., напр. «БУМБАСТИК») — графитовый бейдж НАД заголовком.
        caption ('данные от …') — absolute НАД заголовком, не сдвигает h1. -->
-  <div class="relative px-4 pb-3 pt-2 text-center">
+  <div v-if="title || eyebrow || caption" class="relative px-4 pb-3 pt-2 text-center">
     <p
       v-if="caption"
       class="pointer-events-none absolute inset-x-0 -top-2 text-[0.75rem] leading-none text-[var(--text-muted)]"
     >{{ caption }}</p>
-    <div v-if="eyebrow" class="mb-1.5 flex justify-center">
-      <span class="rounded-full bg-[var(--graphite)] py-1 pl-4 pr-3 text-[0.75rem] font-medium uppercase tracking-[0.32em] text-[var(--ink-on-color)]">{{ eyebrow }}</span>
+    <div v-if="eyebrow" class="flex justify-center" :class="title ? 'mb-1.5' : ''">
+      <BusinessChip :label="eyebrow" />
     </div>
-    <h1 class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
+    <h1 v-if="title" class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
       {{ title }}
     </h1>
   </div>

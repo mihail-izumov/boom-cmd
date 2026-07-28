@@ -12,7 +12,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="БУМБАСТИК" />
     <meta name="application-name" content="БУМБАСТИК" />
-    <meta name="theme-color" content="#F7F6F3" />
+    <!-- D-21 v2: старт приложения — тёмный экран входа, поэтому первичный
+         theme-color тёмный. Как только гейт пройден, AccessKeyForm возвращает
+         светлый (внутри приложения тема не менялась) — см. onBeforeUnmount там же. -->
+    <meta name="theme-color" content="#0A0A0A" />
     <title>БУМБАСТИК</title>
   </head>
   <body>

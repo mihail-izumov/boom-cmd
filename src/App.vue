@@ -1,4 +1,5 @@
 <script setup>
+import { watchEffect } from 'vue'
 import { ChartColumnBig, Layers, Newspaper } from 'lucide-vue-next'
 import AppShell from './components/AppShell.vue'
 import HomeScreen from './screens/HomeScreen.vue'
@@ -16,6 +17,7 @@ import AccessKeyForm from './components/AccessKeyForm.vue'
 import ReporterShell from './components/report/ReporterShell.vue'
 import { useAppNav, setActive, setSubView, clearSubView } from './composables/useAppNav.js'
 import { useAccessKey } from './composables/useAccessKey.js'
+import { setThemeColor, AUTH_THEME_COLOR, APP_THEME_COLOR } from './composables/useThemeColor.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
 // активного парк-фильтра (TZ-3.1 §5). `parkFilter: true` у рабочих разделов
@@ -30,7 +32,13 @@ import { useAccessKey } from './composables/useAccessKey.js'
 const tabs = [
   // Подпись вкладки — «Сегодня» (правка владельца 26.07). Идентификатор вкладки
   // остался `home`: он живёт в useAppNav, в тестах и в глубоких ссылках.
-  { id: 'home',      label: 'Сегодня',  title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
+  //
+  // D-20 (28.07): заголовка у Главной НЕТ — `title: ''`. «Мастерплан» ушёл: это
+  // внутреннее имя модуля, а имя продукта («Ранскейл») внутри приложения не
+  // пишется нигде — на Главной живёт клиент. Экран подписан «Сегодня» в таб-баре,
+  // дублировать нечем. Шапка Главной = чип бизнеса (eyebrow → BusinessChip) плюс
+  // строка периода «<Месяц Год>: парки», которая живёт в самом HomeScreen.
+  { id: 'home',      label: 'Сегодня',  title: '',          icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
   // «Тренды» (бывш. «Сводки сети») — сетевые сводки, парк-фильтра нет:
   // содержимое всегда по сети целиком. Селектор месяца живёт в правом углу шапки.
   { id: 'summary',   label: 'Тренды',   title: 'Тренды',    icon: Newspaper,      screen: SummaryScreen,   parkFilter: false },
@@ -113,16 +121,23 @@ function onBack() {
 const { authed, role, ready, checking, keyError, netError, notice, init, submitKey } =
   useAccessKey()
 init()
+
+// D-21 v2: пока идёт вход (и стартовая проверка фразы) — тёмная системная шапка,
+// как только вошли — светлая. Тёмная витрина живёт ТОЛЬКО на входе и сплэше.
+watchEffect(() => setThemeColor(authed.value ? APP_THEME_COLOR : AUTH_THEME_COLOR))
 </script>
 
 <template>
-  <!-- стартовая проверка фразы — чтобы не мигать формой входа -->
+  <!-- стартовая проверка фразы — чтобы не мигать формой входа.
+       Тёмный скоуп тот же, что у входа: иначе между загрузкой и формой
+       мигало бы светлым (эта фаза — часть витрины входа, а не приложения). -->
   <div
     v-if="!ready"
+    data-theme="auth-dark"
     class="flex min-h-[100svh] items-center justify-center bg-[var(--bg)]"
     aria-busy="true"
   >
-    <p class="text-[0.9375rem] text-[var(--text-muted)]">Загрузка…</p>
+    <p class="text-[0.9375rem] text-[var(--text-secondary)]">Загрузка…</p>
   </div>
 
   <!-- гейт на весь вход: без подтверждённой фразы оболочка не показывается -->

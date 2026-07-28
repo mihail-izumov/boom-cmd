@@ -1,3 +1,38 @@
+/* ===== Шрифты бренда — самохостинг (D-21, ТЗ «экран входа: логотип Ранскейл») =====
+   Ничего с Google Fonts CDN не грузим: PWA должна работать оффлайн и не зависеть
+   от внешнего хоста. Файлы лежат в public/fonts (оригиналы — boom-cmd-data/docs/brand),
+   в precache service worker'а добавлены woff2 (см. public/sw.js).
+   font-display: swap — текст виден системным шрифтом, пока грузится брендовый.
+   Роли начертаний (применять и за пределами экрана входа):
+     Ranscale Display  — Univers 67 Bold Cond: голос бренда, крупные действия (РАНСКЕЙЛ, СТАРТ);
+     Ranscale Label    — Univers 57 Cond: ярлыки приборов, подписи (ДОСТУП);
+     Roboto Mono       — данные и ввод: поля, placeholder'ы, логины, коды, цифры;
+     системный         — проза для человека (описания, сообщения) — как было.
+   Правило: ввёл или измерил компьютер → моно; сказал человек → проза. */
+@font-face {
+  font-family: 'Ranscale Display';
+  src: url('/fonts/UniversLTCYR-67BoldCond.woff2') format('woff2'),
+       url('/fonts/UniversLTCYR-67BoldCond.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ranscale Label';
+  src: url('/fonts/UniversLTCYR-57Condensed.woff2') format('woff2'),
+       url('/fonts/UniversLTCYR-57Condensed.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ranscale Mono';
+  src: url('/fonts/RobotoMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===== Design tokens — единственное место с hex (DESIGN-STANDARD §3.6) ===== */
 :root {
   /* нейтрали (светлый холст) */
@@ -17,6 +52,9 @@
   --ink-on-color: #FFFFFF;
   /* затемнение под модалкой (производное от --text) */
   --scrim: rgba(28, 27, 24, 0.45);
+  /* цвет placeholder'ов — отдельно от --text-muted: на тёмной витрине входа
+     подпись компании и placeholder расходятся по требованиям контраста */
+  --placeholder: #6F6D66;
 }
 
 /* тёмная тема — будущий свап (значения предварительные, §3.6) */
@@ -24,6 +62,37 @@
   --bg: #1C1B18;  --surface: #232220;  --surface-2: #2C2B27;
   --line: #34322C;
   --text: #F7F6F3;  --text-secondary: #C9C6BD;  --text-muted: #9A968D;
+  --placeholder: #9A968D;
+}
+
+/* ===== Тёмная витрина входа (D-21 v2, референс docs/brand/ranskeil-login-dark-v2.png) =====
+   ВАЖНО: это НЕ тёмная тема приложения. Скоуп — корневой элемент AccessKeyForm,
+   внутрь приложения не распространяется: «Сегодня» и остальные экраны остаются
+   светлыми (явная граница в ТЗ). Поэтому атрибут вешается на компонент, а не на <html>.
+   Нейтральный монохром без синего подмеса; цвет = сигнал, а не декорация —
+   единственный цветной элемент экрана — текст ошибки. */
+[data-theme="auth-dark"] {
+  --bg: #0A0A0A;          /* фон экрана */
+  --surface: #161616;     /* карточка входа */
+  --surface-2: #0F0F0F;   /* фон полей ввода (темнее карточки — как на мокапе) */
+  --line: #2A2A2A;        /* обводка полей */
+  --text: #F2F2F2;        /* лого и вводимый текст */
+  --text-secondary: #9A9A9A; /* ярлык «ДОСТУП В СИСТЕМУ» — 6.43:1 на карточке */
+  --text-muted: #5C5C5C;  /* подпись «Модуль Роста» (логотип компании, не текст UI) */
+  /* Placeholder ПОДНЯТ против ТЗ: #5C5C5C на #0F0F0F даёт 2.87:1 — это
+     функциональный текст, а не декор, и порог 4.5:1 он проваливает.
+     #808080 = 4.85:1, на глаз от мокапа неотличим. */
+  --placeholder: #808080;
+  /* Главное действие на этом экране — белое, а не жёлтое: жёлтый остаётся
+     цветом клиента ВНУТРИ приложения. Переопределяем токены, а не классы,
+     чтобы разметка кнопки не расходилась с остальным приложением. */
+  --accent: #F2F2F2;  --accent-ink: #0A0A0A;
+  /* Красный поднят под тёмный фон: брендовый #D92D20 даёт на карточке 3.75:1
+     (провал). #FF5C4D — тот же тон (H≈4°), 5.94:1 на карточке. */
+  --negative: #FF5C4D;
+  /* маска логотипа «Модуль Роста» в подвале */
+  --graphite: #5C5C5C;
+  --scrim: rgba(0, 0, 0, 0.6);
 }
 
 @tailwind base;
