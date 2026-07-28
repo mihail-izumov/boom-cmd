@@ -78,14 +78,18 @@ export function plural(n, forms) {
 
 const CHECKUPS = ['Чекап', 'Чекапа', 'Чекапов']
 const SIGNALS = ['Сигнал', 'Сигнала', 'Сигналов']
+const REVIEWS = ['Разбор', 'Разбора', 'Разборов'] // D-19: журнал «Разбор полёта»
 
 // Подпись под счётчиком. Числа нет («—») → форма родительного множественного,
-// как было до склонения: «Чекапов», «Сигналов».
+// как было до склонения: «Чекапов», «Сигналов», «Разборов».
 export function checkupsWord(n) {
   return n == null ? CHECKUPS[2] : plural(n, CHECKUPS)
 }
 export function signalsWord(n) {
   return n == null ? SIGNALS[2] : plural(n, SIGNALS)
+}
+export function reviewsWord(n) {
+  return n == null ? REVIEWS[2] : plural(n, REVIEWS)
 }
 
 export const L = {

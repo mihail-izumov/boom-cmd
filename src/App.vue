@@ -10,6 +10,7 @@ import DailyScreen from './screens/DailyScreen.vue'
 import GoalsScreen from './screens/GoalsScreen.vue'
 import SummaryScreen from './screens/SummaryScreen.vue'
 import DailyReportScreen from './screens/DailyReportScreen.vue'
+import ReviewsScreen from './screens/ReviewsScreen.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import AccessKeyForm from './components/AccessKeyForm.vue'
 import ReporterShell from './components/report/ReporterShell.vue'
@@ -36,7 +37,9 @@ const tabs = [
   // Раздел переименован «Аналитика» → «Прогресс» (правка владельца 28.07).
   // Идентификатор вкладки остался `analytics`: он живёт в useAppNav и тестах.
   { id: 'analytics', label: 'Прогресс', title: 'Прогресс',  icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
-  { id: 'projects',  label: 'Проекты',  title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
+  // Раздел переименован «Проекты» → «Задачи» (правка владельца 28.07, только
+  // название). Идентификатор остался `projects` — живёт в useAppNav и тестах.
+  { id: 'projects',  label: 'Задачи',   title: 'Задачи',    icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
 ]
 
 // Под-страницы (мини-стек глубиной 1). На под-странице бедж-фильтра нет — кроме
@@ -62,6 +65,16 @@ const subViews = {
     showBack: true,
     backLabel: 'Главная',
     parkFilter: true,
+  },
+  // «Разборы» (D-19) — журнал «Разбор полёта». Вход ТОЛЬКО с Главной
+  // (плитка-счётчик в полосе чекапы/сигналы/разборы); в таб-баре раздела нет.
+  // Разборы общесистемные — парк-фильтра нет.
+  reviews: {
+    title: 'Разборы',
+    screen: ReviewsScreen,
+    showBack: true,
+    backLabel: 'Главная',
+    parkFilter: false,
   },
   // «Материалы» — с 28.07 не вкладка, а под-страница (вход плиткой с Главной).
   // Парк-контекст ведёт контент — бейдж фильтра показываем (parkFilter: true).

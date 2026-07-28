@@ -18,7 +18,8 @@ import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
   buildSignalReadBody, postSignalRead,
 } from '../src/composables/dailySignals.js'
-import { readCounters, plural, checkupsWord, signalsWord } from '../src/i18n/home.js'
+import { readCounters, plural, checkupsWord, signalsWord, reviewsWord } from '../src/i18n/home.js'
+import { sortReviews, reviewCount } from '../src/composables/reviews.js'
 import {
   sortSummaries, latestByCadence, latestOf, splitBlock, blocksOf,
   summaryKey, summaryStatusOf, markSummaryState, LABEL_MAX,
@@ -265,6 +266,7 @@ export { default as NetSummaryCard } from '${root}/src/components/daily/NetSumma
 export { default as SummaryScreen } from '${root}/src/screens/SummaryScreen.vue'
 export { default as NavigationBar } from '${root}/src/components/NavigationBar.vue'
 export { default as HomeScreen } from '${root}/src/screens/HomeScreen.vue'
+export { default as ReviewsScreen } from '${root}/src/screens/ReviewsScreen.vue'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
 export { useAppNav, clearSubView } from '${root}/src/composables/useAppNav.js'
@@ -1086,7 +1088,7 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
     segs.map((s) => s.textContent.trim()).join(' · '))
   check('лид — одна фраза в две строки, по центру, крупнее прежнего', (() => {
     const lead = el.querySelector('[data-test="summary-lead"]')
-    return !!lead && lead.textContent.trim() === 'Где парки сегодня и\nкакой прогноз месяца' &&
+    return !!lead && lead.textContent.trim() === 'Где парки сегодня и\nкакой прогноз на месяц' &&
       lead.className.includes('text-center') && lead.className.includes('text-[1rem]') &&
       lead.className.includes('whitespace-pre-line')
   })(), el.querySelector('[data-test="summary-lead"]')?.textContent.trim())
@@ -1248,7 +1250,7 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   check('плиток на Главной 4', tiles.length === 4, tiles.length)
   // Переименования владельца 28.07: плитка «Тренды» (бывш. «Сводки»), «Прогресс» (бывш. «Аналитика»).
   check('«Тренды» — первая плитка', tiles[0]?.getAttribute('data-test') === 'tile-summary' && tiles[0].textContent.includes('Тренды'))
-  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Проекты,Материалы',
+  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Задачи,Материалы',
     tiles.slice(1).map((t) => t.textContent.trim()).join(','))
   await fire(tiles[0], 'click')
   // 28.07: «Тренды» — вкладка таб-бара, тап по плитке активирует её (не под-страницу)
@@ -1322,6 +1324,85 @@ check('числа нет → родительный множественного
     el.querySelector('[data-test="home-signals-word"]').textContent.trim() === 'Сигнала',
     [el.querySelector('[data-test="home-checkups-word"]').textContent.trim(),
       el.querySelector('[data-test="home-signals-word"]').textContent.trim()].join(' / '))
+  // D-19: ключа reviews нет → «—» + родительный множественного
+  check('разборов нет в payload → «—» и «Разборов»',
+    el.querySelector('[data-test="home-reviews"]').textContent.includes('—') &&
+    el.querySelector('[data-test="home-reviews-word"]').textContent.trim() === 'Разборов')
+  app.unmount()
+  getPayload = {}
+}
+
+// ═══════════════ D-19: журнал разборов («Разбор полёта») ═══════════════
+console.log('\n=== D-19: разборы — чистые хелперы ===')
+{
+  const raw = [
+    { date: '2025-05-09', title: '' },
+    { date: '2025-05-16' },
+    { date: 'мусор' },
+    'не-объект',
+    null,
+    { date: '2025-05-02', title: 'Именованный' },
+  ]
+  const sorted = sortReviews(raw)
+  check('sortReviews: битые/не-объекты отброшены (3 из 6)', sorted.length === 3, sorted.length)
+  check('sortReviews: ПО УБЫВАНИЮ даты (свежие сверху)',
+    sorted.map((r) => r.date).join(',') === '2025-05-16,2025-05-09,2025-05-02')
+  check('sortReviews: не-массив → []', sortReviews(undefined).length === 0 && sortReviews(null).length === 0)
+  check('reviewCount: считает только валидные, строкой', reviewCount(raw) === '3', reviewCount(raw))
+  check('reviewCount: ключа нет → null (полоса покажет «—»)', reviewCount(undefined) === null)
+  check('reviewCount: пустой массив → «0» (журнал заведён, разборов нет)', reviewCount([]) === '0')
+  check('reviewsWord: 1/2/5 и null',
+    reviewsWord(1) === 'Разбор' && reviewsWord(2) === 'Разбора' && reviewsWord(5) === 'Разборов' &&
+    reviewsWord(null) === 'Разборов')
+  check('мок содержит reviews (3 записи, перемешаны)', Array.isArray(data.reviews) && data.reviews.length === 3)
+}
+
+console.log('\n=== jsdom: D-19 — полоса Главной и журнал разборов ===')
+{
+  // счётчик разборов из payload.reviews + тап → под-страница reviews
+  localStorage.clear()
+  getPayload = { updated: '2025-05-20', sets: {}, stats: { checkups: 2, signals: 3 },
+    reviews: [{ date: '2025-05-09' }, { date: '2025-05-16' }] }
+  const nav = bundle.useAppNav()
+  bundle.clearSubView()
+  const { el, app } = mount(bundle.HomeScreen, {})
+  await flush()
+  const rv = el.querySelector('[data-test="home-reviews"]')
+  check('счётчик разборов из журнала: «2 Разбора»',
+    !!rv && rv.textContent.includes('2') &&
+    el.querySelector('[data-test="home-reviews-word"]').textContent.trim() === 'Разбора',
+    el.querySelector('[data-test="home-reviews-word"]')?.textContent.trim())
+  check('полоса-счётчик: три кнопки (чекапы/сигналы/разборы)',
+    el.querySelectorAll('[aria-label="Открыть Контроль Дня"]').length === 2 && !!rv)
+  await fire(rv, 'click')
+  check('тап по разборам → под-страница «reviews» (вход только с Главной)',
+    nav.subView.value === 'reviews', nav.subView.value)
+  bundle.clearSubView()
+  app.unmount()
+}
+{
+  // журнал: свежие сверху, подпись «Разбор полёта», title из строки приоритетнее
+  getPayload = { updated: '2025-05-20', sets: {},
+    reviews: [{ date: '2025-05-02', title: 'Именованный' }, { date: '2025-05-16' }, { date: '2025-05-09' }] }
+  const { el, app } = mount(bundle.ReviewsScreen, {})
+  await flush()
+  const rows = [...el.querySelectorAll('[data-test="review-row"]')]
+  check('журнал: строк = записей', rows.length === 3, rows.length)
+  check('журнал: свежие сверху (16.05 → 09.05 → 02.05)',
+    rows[0].textContent.includes('16.05') && rows[2].textContent.includes('02.05'))
+  check('журнал: подпись по умолчанию — «Разбор полёта»', rows[0].textContent.includes('Разбор полёта'))
+  check('журнал: title из строки приоритетнее', rows[2].textContent.includes('Именованный'))
+  check('журнал: день недели из даты (16.05.2025 — Пятница)', rows[0].textContent.includes('Пятница'))
+  check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
+  app.unmount()
+}
+{
+  // пустой стейт журнала: ключа нет
+  getPayload = { updated: '2025-05-20', sets: {} }
+  const { el, app } = mount(bundle.ReviewsScreen, {})
+  await flush()
+  check('журнал без данных: пустой стейт дословно',
+    el.textContent.includes('Разборов пока нет') && !el.querySelector('[data-test="review-row"]'))
   app.unmount()
   getPayload = {}
 }

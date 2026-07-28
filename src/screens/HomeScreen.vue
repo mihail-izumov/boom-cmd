@@ -7,8 +7,9 @@ import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, checkupsWord, signalsWord, L } from '../i18n/home.js'
+import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, checkupsWord, signalsWord, reviewsWord, L } from '../i18n/home.js'
 import { L as LS } from '../i18n/summary.js'
+import { reviewCount } from '../composables/reviews.js'
 
 // Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
 // серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
@@ -35,6 +36,9 @@ const parkNames = computed(() =>
 )
 const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : ''))
 const counters = computed(() => readCounters(data.value)) // v3.1: чекапы/сигналы (система)
+// D-19: счётчик разборов — из журнала payload.reviews (длина массива), а не из
+// stats: журнал грузится во фронт целиком, отдельного счётчика на бэке не нужно.
+const reviews = computed(() => reviewCount(data.value && data.value.reviews))
 
 const planFact = computed(() => (ready.value ? pct1(t.value.onPlanAvg) : '—'))
 const planFactTrend = computed(() => (ready.value ? t.value.trendPlanFact || null : null))
@@ -64,6 +68,7 @@ const paceInfo = computed(() => {
 // 28.07: «Тренды» — теперь вкладка таб-бара (setActive), «Материалы» — наоборот,
 // под-страница (setSubView); остальные входы не менялись.
 function goDaily() { setSubView('daily') }
+function goReviews() { setSubView('reviews') } // D-19: журнал разборов, вход только отсюда
 function goSummary() { setActive('summary') }
 function goGoals() { setSubView('goals') }
 function goAnalytics() { setActive('analytics') }
@@ -73,27 +78,45 @@ function goMaterials() { setSubView('materials') }
 
 <template>
   <section class="flex flex-col px-4 pb-6 pt-0">
-    <!-- v3.1: полоса-счётчик (система): всего чекапов · всего сигналов.
-         Тап → «Контроль Дня» (заглушка — своей страницы чекапов/сигналов пока нет,
-         бэклог: boom-cmd-data/tasks/ЗАДАНИЕ-фронт-экран-Чекапы-Сигналы.md). -->
-    <button
-      type="button"
-      aria-label="Открыть Контроль Дня"
-      class="mb-3 flex w-full items-stretch overflow-hidden rounded-2xl bg-[var(--surface)] shadow-sm transition-opacity active:opacity-90"
-      @click="goDaily"
-    >
-      <div class="flex flex-1 flex-col items-center py-2.5">
+    <!-- v3.1/D-19: полоса-счётчик (система): чекапы · сигналы · разборы.
+         Чекапы/сигналы → «Контроль Дня» (заглушка — своей страницы пока нет,
+         бэклог: boom-cmd-data/tasks/ЗАДАНИЕ-фронт-экран-Чекапы-Сигналы.md);
+         разборы → журнал «Разбор полёта» (под-страница reviews, вход только отсюда). -->
+    <div class="mb-3 flex w-full items-stretch overflow-hidden rounded-2xl bg-[var(--surface)] shadow-sm">
+      <button
+        type="button"
+        aria-label="Открыть Контроль Дня"
+        class="flex flex-1 flex-col items-center py-2.5 transition-opacity active:opacity-90"
+        @click="goDaily"
+      >
         <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
         <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.checkups ?? '—' }}</span>
         <span data-test="home-checkups-word" class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ checkupsWord(counters.checkups) }}</span>
-      </div>
+      </button>
       <div class="my-2 w-px bg-[var(--line)]"></div>
-      <div class="flex flex-1 flex-col items-center py-2.5">
+      <button
+        type="button"
+        aria-label="Открыть Контроль Дня"
+        class="flex flex-1 flex-col items-center py-2.5 transition-opacity active:opacity-90"
+        @click="goDaily"
+      >
         <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
         <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ counters.signals ?? '—' }}</span>
         <span data-test="home-signals-word" class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ signalsWord(counters.signals) }}</span>
-      </div>
-    </button>
+      </button>
+      <div class="my-2 w-px bg-[var(--line)]"></div>
+      <button
+        type="button"
+        data-test="home-reviews"
+        aria-label="Открыть журнал разборов"
+        class="flex flex-1 flex-col items-center py-2.5 transition-opacity active:opacity-90"
+        @click="goReviews"
+      >
+        <span v-if="loading" class="bc-skeleton h-[22px] w-10 rounded"></span>
+        <span v-else class="text-[1.25rem] font-bold leading-none text-[var(--text)]">{{ reviews ?? '—' }}</span>
+        <span data-test="home-reviews-word" class="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{{ reviewsWord(reviews) }}</span>
+      </button>
+    </div>
 
     <!-- <Месяц Год>: парки в данных. Пока грузится — переливы. -->
     <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center justify-center gap-[7px]">
@@ -183,7 +206,7 @@ function goMaterials() { setSubView('materials') }
         </button>
         <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goProjects">
           <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Layers class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Проекты</span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Задачи</span>
         </button>
         <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goMaterials">
           <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Folder class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
