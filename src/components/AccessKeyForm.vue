@@ -30,8 +30,9 @@ import { ACCESS_RU } from '../i18n/access.js'
 // Токены DESIGN-STANDARD, текст монохром, цвет только по функции (ошибка —
 // --negative; кнопка — --accent). Хардкод `#111` из ТЗ заменён на var(--text):
 // хардкод hex запрещён, а токен ещё и позволил переключить экран в тёмный одним блоком.
-// Поле «логин» — ДЕКОРАТИВНОЕ, в проверке не участвует: вход по-прежнему по
-// фразе доступа. Placeholder показывает реальный формат логина, а не шутку.
+// Поле «логин» в проверке не участвует и с 28.07 НЕ редактируется: значение
+// проставлено (`b00mbastic`) и заблокировано. Раньше пустое редактируемое поле
+// обещало, что от него что-то зависит, — обещание ложное: вход только по коду.
 
 const props = defineProps({
   error: { type: Boolean, default: false },
@@ -41,7 +42,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['submit'])
 
-const login = ref('') // декоративное поле, не валидируется
+// Логин больше не состояние: он фиксирован (ACCESS_RU.login) и не редактируется.
 const phrase = ref('')
 const show = ref(false)
 
@@ -64,7 +65,12 @@ const maskOf = (file) => {
 }
 const logoMask = maskOf('runscale_logo.svg') // «Модуль роста», подвал
 // Шеврон Ранскейл. viewBox обрезан по знаку (см. комментарий в самом svg),
-// поэтому aspect-ratio = ровно пропорция знака, а height = его реальная высота.
+// поэтому height бокса = реальная высота знака.
+// ШИРИНА ЗАДАНА ЯВНО (62 / 94px), и это не украшательство: пустой div без контента
+// внутри flex-колонки с align-items:center получает ширину по содержимому, то есть
+// НОЛЬ — знак просто не рисовался (ровно этот баг был виден на проде: слово есть,
+// шеврона нет). aspect-ratio оставлен как страховка, но опираться на него нельзя.
+// 62 = 53 × 1080/923.72, 94 = 80 × 1080/923.72.
 const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 923.72' }
 
 // Тёмный theme-color системной шапки ставит НЕ этот компонент, а App.vue по
@@ -88,7 +94,7 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
       >
         <div
           data-test="access-chevron"
-          class="h-[53px] bg-[var(--text)] md:h-[80px]"
+          class="h-[53px] w-[62px] bg-[var(--text)] md:h-[80px] md:w-[94px]"
           :style="chevronMask"
         ></div>
         <!-- mr компенсирует трекинг после последней буквы: без него связка
@@ -103,7 +109,13 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
 
     <!-- карта ввода (строго по центру экрана за счёт равных flex-зон) -->
     <form class="mx-auto w-full max-w-[20rem]" @submit.prevent="onSubmit">
-      <div class="flex flex-col gap-4 rounded-[26px] bg-[var(--surface)] p-6 shadow-[0_2px_14px_rgba(28,27,24,0.08)]">
+      <!-- Радиусы уменьшены (26/16/16 → 20/12/12): крупные скругления читаются как
+           «мягкий потребительский» тон, мелкие — как приборная панель. Иерархия
+           сохранена: карточка скруглена сильнее, чем поля внутри неё. -->
+      <div
+        data-test="access-card"
+        class="flex flex-col gap-4 rounded-[20px] border border-[var(--rim)] bg-[var(--surface)] p-6 shadow-[var(--card-shadow)]"
+      >
         <!-- ярлык функции, а не вывеска: тише и мельче прежнего «БУМБАСТИК».
              v2: разрядка 6% → 10%, цвет --text-secondary = #9A9A9A на карточке
              #161616 → 6.43:1 (посчитано по WCAG, не на память) -->
@@ -113,22 +125,42 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
         >{{ ACCESS_RU.card_label }}</p>
 
         <!-- объединённое поле: логин / разделитель / фраза, единая обводка.
-             v2: фон полей темнее карточки (--surface-2 #0F0F0F на --surface #161616) -->
-        <div class="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]">
+             v2: фон полей темнее карточки (--surface-2 #0F0F0F на --surface #161616).
+             Ошибка красит обводку в --negative: сообщение под полем говорит ЧТО не так,
+             рамка — ГДЕ. Обводка общая на оба поля (структура карточки по ТЗ не
+             менялась), поэтому подсвечивается вся пара. -->
+        <div
+          data-test="access-fields"
+          class="overflow-hidden rounded-xl border bg-[var(--surface-2)] shadow-[inset_0_1px_0_var(--rim-glow)]"
+          :class="error ? 'border-[var(--negative)]' : 'border-[var(--line)]'"
+        >
+          <!-- Логин НЕ редактируется: значение проставлено и заблокировано.
+               readonly, а не disabled — disabled выключает поле из чтения
+               скринридером и глушит его через disabled:opacity, а логин должен
+               оставаться читаемым: это контекст входа. tabindex=-1 уводит фокус
+               сразу на код доступа — табать по неизменяемому полю незачем.
+               Цвет вторичный: яркий читался бы как «здесь ждут ввода». -->
           <div class="flex min-h-[52px] items-center px-4">
             <input
-              v-model="login"
               type="text"
+              :value="ACCESS_RU.login"
+              readonly
+              tabindex="-1"
+              aria-readonly="true"
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
-              :placeholder="ACCESS_RU.login_ph"
-              :disabled="loading"
               data-test="access-login"
-              class="w-full border-none bg-transparent font-mono text-[1rem] text-[var(--text)] placeholder:text-[var(--placeholder)] outline-none disabled:opacity-60"
+              class="w-full cursor-default select-none border-none bg-transparent font-mono text-[1rem] text-[var(--text-secondary)] outline-none"
             />
           </div>
           <div class="h-px bg-[var(--line)]" aria-hidden="true"></div>
+          <!-- Символ маски пароля рисует БРАУЗЕР (U+2022), поменять его на «*»
+               средствами CSS нельзя — только полностью самодельной маской, а это
+               ломает нативный ввод (каретка при правке в середине, вставка,
+               менеджеры паролей). Поэтому маска сделана КРУПНОЙ: кегль 24px и
+               разрядка 0.28em вместо 16px. Placeholder остаётся 16px без разрядки —
+               иначе «код доступа» разъезжается. -->
           <div class="relative flex min-h-[52px] items-center pl-4 pr-1">
             <input
               v-model="phrase"
@@ -140,7 +172,8 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
               :aria-invalid="error ? 'true' : 'false'"
               :disabled="loading"
               data-test="access-phrase"
-              class="w-full border-none bg-transparent pr-2 font-mono text-[1rem] text-[var(--text)] placeholder:text-[var(--placeholder)] outline-none disabled:opacity-60"
+              class="w-full border-none bg-transparent pr-2 font-mono text-[var(--text)] placeholder:text-[1rem] placeholder:tracking-normal placeholder:text-[var(--placeholder)] outline-none disabled:opacity-60"
+              :class="show ? 'text-[1rem]' : 'text-[1.5rem] leading-[1] tracking-[0.28em]'"
             />
             <button
               type="button"
@@ -171,16 +204,21 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
         </p>
         <p v-else-if="notice" class="text-center text-[0.875rem] text-[var(--text-muted)]">{{ notice }}</p>
 
-        <!-- Форма/размер кнопки не тронуты. v2: цвет пришёл из скоупных токенов
-             (--accent стал белым, --accent-ink чёрным), разрядка 6% → 12%. -->
+        <!-- Цвет — из скоупных токенов (--accent белый, --accent-ink чёрный),
+             разрядка 12%, радиус приведён к полям (12px).
+             ОПТИЧЕСКИЙ ЦЕНТР: капс без выносных элементов геометрически центруется
+             слишком высоко — глаз читает это как «текст уехал вверх». Сдвигаем на
+             2px вниз (pt-[2px] при flex-центрировании), а не правим line-height:
+             так центр не зависит от метрик шрифта. mr компенсирует трекинг после
+             последней буквы — иначе слово смещено влево на пол-интервала. -->
         <button
           type="submit"
           data-test="access-submit"
           :disabled="loading"
-          class="w-full rounded-2xl bg-[var(--accent)] px-4 font-brand text-[1.125rem] uppercase tracking-[0.12em] text-[var(--accent-ink)] active:opacity-90 disabled:opacity-60"
+          class="flex w-full items-center justify-center rounded-xl bg-[var(--accent)] px-4 pt-[2px] font-brand text-[1.125rem] uppercase tracking-[0.12em] text-[var(--accent-ink)] active:opacity-90 disabled:opacity-60"
           style="min-height: 52px"
         >
-          {{ loading ? ACCESS_RU.checking : ACCESS_RU.submit }}
+          <span class="mr-[-0.12em]">{{ loading ? ACCESS_RU.checking : ACCESS_RU.submit }}</span>
         </button>
       </div>
     </form>
@@ -191,7 +229,20 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
          v2: прежний opacity 0.62 снят — он был подобран под светлый фон и на
          тёмном утопил бы подпись совсем; приглушение теперь даёт сам токен. -->
     <div class="flex flex-1 flex-col items-center justify-end pb-10">
-      <div class="h-7 w-[99px] bg-[var(--graphite)]" :style="logoMask" role="img" aria-label="Модуль роста"></div>
+      <!-- Логотип кликабелен: ведёт на сайт Ранскейла в новой вкладке.
+           rel="noopener noreferrer" обязателен при target="_blank" — иначе
+           открытая страница получает доступ к window.opener.
+           Обёртка добирает тач-таргет до 44pt: сам знак 28px высотой. -->
+      <a
+        data-test="access-footer-link"
+        href="https://runscale.ru"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex min-h-[44px] items-center justify-center px-4 active:opacity-70"
+        aria-label="Модуль роста — открыть runscale.ru"
+      >
+        <span class="block h-7 w-[99px] bg-[var(--graphite)]" :style="logoMask" aria-hidden="true"></span>
+      </a>
     </div>
   </div>
 </template>

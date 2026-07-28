@@ -1494,6 +1494,12 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
   // знак 106px = 53px CSS). Вариант A на 72px отклонён владельцем 28.07.
   check('шеврон 53px на мобайле и ×1.5 (80px) на ≥768px',
     chev.className.includes('h-[53px]') && chev.className.includes('md:h-[80px]'))
+  // РЕГРЕСС-ЧЕК на боевой баг: без явной ширины пустой div во flex-колонке с
+  // align-items:center получает ширину 0 — знак пропадал совсем (было видно на проде).
+  check('у шеврона ЯВНАЯ ширина (62/94px), а не только aspect-ratio',
+    chev.className.includes('w-[62px]') && chev.className.includes('md:w-[94px]'))
+  check('ширина совпадает с пропорцией знака 1080:923.72',
+    Math.round(53 * 1080 / 923.72) === 62 && Math.round(80 * 1080 / 923.72) === 94)
   check('пропорция шеврона задана явно (бокс = знак, без прозрачных полей)',
     /aspect-ratio:\s*1080\s*\/\s*923\.72/.test(chev.getAttribute('style') || ''))
   check('слово «Ранскейл» — голос бренда, капс, 28px, трекинг 0.06em',
@@ -1515,25 +1521,61 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     cardLabel.className.includes('text-[var(--text-secondary)]'))
   const login = el.querySelector('[data-test="access-login"]')
   const phrase = el.querySelector('[data-test="access-phrase"]')
-  check('placeholder логина — реальный формат «boombastic», не шутка',
-    login.getAttribute('placeholder') === 'boombastic')
+  check('логин проставлен значением «b00mbastic», а не placeholder\'ом',
+    login.value === 'b00mbastic' && !login.getAttribute('placeholder'))
+  check('логин нельзя изменить: readonly (не disabled — поле должно читаться)',
+    login.hasAttribute('readonly') && !login.hasAttribute('disabled') &&
+    login.getAttribute('aria-readonly') === 'true')
+  check('фокус по Tab минует логин и идёт сразу на код доступа',
+    login.getAttribute('tabindex') === '-1')
+  check('логин приглушён: яркий читался бы как «здесь ждут ввода»',
+    login.className.includes('text-[var(--text-secondary)]'))
   check('placeholder пароля — «код доступа»', phrase.getAttribute('placeholder') === 'код доступа')
-  check('оба поля — терминальный моно, 16px (меньше нельзя: iOS зумит при фокусе)',
-    login.className.includes('font-mono') && login.className.includes('text-[1rem]') &&
-    phrase.className.includes('font-mono') && phrase.className.includes('text-[1rem]'))
+  check('оба поля — терминальный моно, ввод не мельче 16px (иначе iOS зумит при фокусе)',
+    login.className.includes('font-mono') &&
+    phrase.className.includes('font-mono') &&
+    (phrase.className.includes('text-[1.5rem]') || phrase.className.includes('text-[1rem]')))
+  check('маска пароля крупная: 24px с разрядкой (символ «*» браузер рисовать не даёт)',
+    phrase.className.includes('text-[1.5rem]') && phrase.className.includes('tracking-[0.28em]'))
+  check('placeholder пароля остался 16px без разрядки — иначе разъезжается',
+    phrase.className.includes('placeholder:text-[1rem]') &&
+    phrase.className.includes('placeholder:tracking-normal'))
   const submit = el.querySelector('[data-test="access-submit"]')
   check('кнопка «СТАРТ» голосом бренда, капс, разрядка 12% (v2)',
     submit.textContent.trim() === 'СТАРТ' && submit.className.includes('font-brand') &&
     submit.className.includes('uppercase') && submit.className.includes('tracking-[0.12em]'))
-  check('форма и высота кнопки не тронуты; цвет — из токена, а не хардкодом',
-    submit.className.includes('bg-[var(--accent)]') && submit.className.includes('rounded-2xl') &&
+  check('высота кнопки 52px; цвет — из токена, а не хардкодом',
+    submit.className.includes('bg-[var(--accent)]') &&
     /min-height:\s*52px/.test(submit.getAttribute('style') || ''))
+  check('«СТАРТ» центрирован оптически: сдвиг на 2px вниз от геометрии',
+    submit.className.includes('items-center') && submit.className.includes('justify-center') &&
+    submit.className.includes('pt-[2px]'))
+  check('радиусы уменьшены: карточка 20px, поля и кнопка 12px',
+    submit.className.includes('rounded-xl') &&
+    el.querySelector('[data-test="access-fields"]').className.includes('rounded-xl') &&
+    /rounded-\[20px\]/.test(readFileSync(resolve(root, 'src/components/AccessKeyForm.vue'), 'utf8')))
+  // кант: карточка на фоне отличается всего на четыре ступени яркости — без
+  // обводки и верхнего блика край теряется и блок выглядит плоским пятном
+  const card = el.querySelector('[data-test="access-card"]')
+  check('у карточки есть кант: обводка --rim и тень из токена',
+    !!card && card.className.includes('border-[var(--rim)]') &&
+    card.className.includes('shadow-[var(--card-shadow)]'))
+  check('блик идёт по ВЕРХНЕЙ кромке (inset 0 1px), а не по всему периметру',
+    el.querySelector('[data-test="access-fields"]').className.includes('shadow-[inset_0_1px_0_var(--rim-glow)]'))
+  const link = el.querySelector('[data-test="access-footer-link"]')
+  check('лого «Модуль Роста» ведёт на runscale.ru в новой вкладке',
+    !!link && link.getAttribute('href') === 'https://runscale.ru' &&
+    link.getAttribute('target') === '_blank')
+  check('внешняя ссылка защищена rel=noopener noreferrer',
+    /noopener/.test(link.getAttribute('rel') || '') && /noreferrer/.test(link.getAttribute('rel') || ''))
+  check('тач-таргет ссылки ≥44pt', link.className.includes('min-h-[44px]'))
 
   // 3. подвал
   check('плашки с именем продукта в подвале нет',
     !el.textContent.includes('МАСТЕРПЛАН') && !el.textContent.includes('Мастерплан') &&
     !el.textContent.includes('УЛЬТРА') && !el.querySelector('.rounded-full.border-2'))
-  check('логотип «Модуль роста» на месте', !!el.querySelector('[aria-label="Модуль роста"]'))
+  check('логотип «Модуль роста» на месте',
+    /Модуль роста/.test(el.querySelector('[data-test="access-footer-link"]')?.getAttribute('aria-label') || ''))
 
   // 4. v2: тёмная витрина — скоупом, а не глобальной темой
   const rootEl = el.querySelector('[data-test="access-root"]')
@@ -1548,8 +1590,9 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     !/#[0-9a-fA-F]{3,8}\b/.test(tplCode), (tplCode.match(/#[0-9a-fA-F]{3,8}\b/) || [])[0])
   check('поля темнее карточки (--surface-2 на --surface), как на мокапе',
     tpl.includes('bg-[var(--surface-2)]') && tpl.includes('bg-[var(--surface)]'))
+  // placeholder остался ровно один — у кода доступа: логин теперь фиксирован
   check('placeholder ходит по своему токену (поднят по контрасту отдельно от подписи)',
-    (tpl.match(/placeholder:text-\[var\(--placeholder\)\]/g) || []).length === 2)
+    (tpl.match(/placeholder:text-\[var\(--placeholder\)\]/g) || []).length === 1)
 
   // ошибка — единственный цветной элемент
   const er = mount(bundle.AccessKeyForm, { error: true })
@@ -1561,8 +1604,16 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     errEl.className.includes('text-[var(--negative)]'))
   const colored = [...er.el.querySelectorAll('*')].filter((n) =>
     /--negative|--positive|--info|--warning|--accent\)/.test(n.className || ''))
-  check('кроме ошибки и главной кнопки цветных элементов нет',
-    colored.every((n) => n.closest('[data-test="access-error"]') || n.dataset.test === 'access-submit'),
+  check('красным подсвечена и рамка полей — сообщение говорит ЧТО, рамка ГДЕ',
+    (er.el.querySelector('[data-test="access-fields"]').className || '').includes('border-[var(--negative)]'))
+  const ok = mount(bundle.AccessKeyForm, { error: false })
+  await nextTick()
+  check('без ошибки рамка обычная',
+    (ok.el.querySelector('[data-test="access-fields"]').className || '').includes('border-[var(--line)]'))
+  ok.app.unmount()
+  check('цветное — только сигнал ошибки и главная кнопка, больше ничего',
+    colored.every((n) => n.closest('[data-test="access-error"]') ||
+      n.dataset.test === 'access-submit' || n.dataset.test === 'access-fields'),
     colored.length + ' шт')
   er.app.unmount()
   app.unmount()
@@ -1574,7 +1625,7 @@ console.log('\n=== D-21 v2: тёмная витрина входа ===')
   const scope = (css.match(/\[data-theme="auth-dark"\]\s*{[^}]*}/) || [])[0] || ''
   check('скоуп auth-dark объявлен в токенах (единственное место с hex)', !!scope)
   const tok = (name) => (scope.match(new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1]
-  const want = { bg: '#0A0A0A', surface: '#161616', 'surface-2': '#0F0F0F', line: '#2A2A2A', text: '#F2F2F2' }
+  const want = { bg: '#0A0A0A', surface: '#161616', 'surface-2': '#0F0F0F', line: '#2A2A2A', text: '#F2F2F2', rim: '#2E2E2E' }
   for (const [k, v] of Object.entries(want))
     check(`--${k} = ${v} (по палитре v2)`, tok(k) === v, tok(k))
   check('жёлтого на витрине входа нет: --accent переопределён в белый',
@@ -1613,6 +1664,7 @@ console.log('\n=== D-21 v2: контраст тёмной витрины (WCAG, 
     ['логотип: --text на --bg', D.text, D.bg],
     ['ярлык ДОСТУП В СИСТЕМУ: --text-secondary на карточке', D.sec, D.card],
     ['вводимый текст: --text на поле', D.text, D.field],
+    ['логин (readonly): --text-secondary на поле', D.sec, D.field],
     ['placeholder: --placeholder на поле', D.ph, D.field],
     ['кнопка СТАРТ: --accent-ink на --accent', D.btnInk, D.btn],
     ['ошибка: --negative на карточке', D.err, D.card],
@@ -1691,6 +1743,21 @@ console.log('\n=== D-20: чип-переключатель бизнесов ==='
   check('чип — кнопка с текстом «БУМБАСТИК»', !!chip && chip.tagName === 'BUTTON' && chip.textContent.includes('БУМБАСТИК'))
   check('до тапа выпадашки нет', !el.querySelector('[data-test="business-menu"]'))
   check('тач-таргет чипа ≥44pt (min-h-[44px])', chip.className.includes('min-h-[44px]'))
+  // ревизия по референсу money.x.com
+  const pill = el.querySelector('[data-test="business-chip-pill"]')
+  check('капсула ниже кнопки (26px) — красится она, а не весь тач-таргет',
+    !!pill && pill.className.includes('h-[26px]') && pill.className.includes('bg-[var(--graphite)]') &&
+    !chip.className.includes('bg-['))
+  check('стрелка двойная (вверх-вниз) — «переключить», а не «раскрыть»',
+    !!chip.querySelector('svg') && !/rotate-180/.test(chip.innerHTML))
+  const bcSrc = readFileSync(resolve(root, 'src/components/business/BusinessChip.vue'), 'utf8')
+  check('иконка — ChevronsUpDown, одинарного ChevronDown не осталось',
+    bcSrc.includes('ChevronsUpDown') && !/\bChevronDown\b/.test(bcSrc))
+  check('ховер-подсветка строк только для мыши (на тач-экране :hover залипает)',
+    /@media \(hover: hover\) and \(pointer: fine\)/.test(bcSrc) && /\.bc-menu-item:hover/.test(bcSrc))
+  const navSrc2 = readFileSync(resolve(root, 'src/components/NavigationBar.vue'), 'utf8')
+  check('чип выровнен по левому краю, а не по центру',
+    /BusinessChip/.test(navSrc2) && /flex justify-start"[\s\S]{0,120}BusinessChip/.test(navSrc2))
 
   await fire(chip, 'click')
   const menu = el.querySelector('[data-test="business-menu"]')

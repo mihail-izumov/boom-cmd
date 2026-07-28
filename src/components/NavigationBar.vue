@@ -152,7 +152,11 @@ async function hardReload() {
       v-if="caption"
       class="pointer-events-none absolute inset-x-0 -top-2 text-[0.75rem] leading-none text-[var(--text-muted)]"
     >{{ caption }}</p>
-    <div v-if="eyebrow" class="flex justify-center" :class="title ? 'mb-1.5' : ''">
+    <!-- Чип бизнеса выровнен ПО ЛЕВОМУ КРАЮ (правка 28.07). По центру он читался
+         как логотип-вывеска, хотя это контрол выбора контекста: у контролов место
+         у края, как в переключателе аккаунтов X. Центр экрана освобождён под
+         содержательную строку периода «<Месяц Год>: парки». -->
+    <div v-if="eyebrow" class="flex justify-start" :class="title ? 'mb-1.5' : ''">
       <BusinessChip :label="eyebrow" />
     </div>
     <h1 v-if="title" class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
