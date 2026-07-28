@@ -80,18 +80,29 @@ export function markState(store, park, date, state) {
 }
 
 // ── Запись прочтения (signal_read) ──
-// Тело POST по контракту ТЗ §2. redirect:'follow', без кастомных заголовков —
-// как форма. read-only не нарушаем: пишем только в inbox-канал VITE_REPORT_API.
-export function buildSignalReadBody(key, park, signalDate) {
-  return { key, type: 'signal_read', park, signal_date: signalDate }
+// Тело POST по контракту ТЗ §2 + v3.2: опциональная оценка пользы `score` (0–10,
+// целое) из модалки «Оцените пользу Сигнала?». score валидируем здесь и кладём в
+// тело ТОЛЬКО валидным — иначе поле опускаем (обратная совместимость: старый бэк
+// лишнее поле игнорирует, новый пишет его в лист signal_scores). redirect:'follow',
+// без кастомных заголовков — как форма. read-only не нарушаем: пишем только в
+// inbox-канал VITE_REPORT_API.
+export function normalizeScore(score) {
+  const n = Number(score)
+  return Number.isInteger(n) && n >= 0 && n <= 10 ? n : null
+}
+export function buildSignalReadBody(key, park, signalDate, score) {
+  const body = { key, type: 'signal_read', park, signal_date: signalDate }
+  const s = normalizeScore(score)
+  if (s !== null) body.score = s
+  return body
 }
 // Отправка. fetchImpl инъектируется в тестах (реального URL в тестах нет, §6).
-export async function postSignalRead({ api, key, park, signalDate, fetchImpl }) {
+export async function postSignalRead({ api, key, park, signalDate, score, fetchImpl }) {
   const f = fetchImpl || (typeof fetch !== 'undefined' ? fetch : null)
   if (!f) throw new Error('fetch недоступен')
   const res = await f(api, {
     method: 'POST',
-    body: JSON.stringify(buildSignalReadBody(key, park, signalDate)),
+    body: JSON.stringify(buildSignalReadBody(key, park, signalDate, score)),
     redirect: 'follow',
   })
   if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)

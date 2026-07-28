@@ -18,13 +18,15 @@ import { useAccessKey } from './composables/useAccessKey.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
 // активного парк-фильтра (TZ-3.1 §5). `parkFilter: true` у рабочих разделов
-// (Аналитика/Проекты/Материалы). На Home и под-странице «Парки» фильтра нет.
+// (Прогресс/Проекты/Материалы). На Home и под-странице «Парки» фильтра нет.
 // `eyebrow` — бейдж над крупным заголовком (Home: «БУМБАСТИК», графит).
 const tabs = [
   // Подпись вкладки — «Сегодня» (правка владельца 26.07). Идентификатор вкладки
   // остался `home`: он живёт в useAppNav, в тестах и в глубоких ссылках.
   { id: 'home',      label: 'Сегодня',   title: 'Мастерплан', icon: SharkEyesIcon,  screen: HomeScreen,      parkFilter: false, leadingAction: 'hardReload', eyebrow: 'БУМБАСТИК' },
-  { id: 'analytics', label: 'Аналитика', title: 'Аналитика', icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
+  // Раздел переименован «Аналитика» → «Прогресс» (правка владельца 28.07).
+  // Идентификатор вкладки остался `analytics`: он живёт в useAppNav и тестах.
+  { id: 'analytics', label: 'Прогресс',  title: 'Прогресс',  icon: ChartColumnBig, screen: AnalyticsScreen, parkFilter: true  },
   { id: 'projects',  label: 'Проекты',   title: 'Проекты',   icon: Layers,         screen: ProjectsScreen,  parkFilter: true  },
   { id: 'materials', label: 'Материалы', title: 'Материалы', icon: Folder,         screen: MaterialsScreen, parkFilter: true  },
 ]
@@ -53,10 +55,11 @@ const subViews = {
     backLabel: 'Главная',
     parkFilter: true,
   },
-  // «Сводки сети» — сетевые сводки дня/недели/месяца. Парк-фильтра нет: содержимое
-  // всегда по сети целиком (итог сети = Σ парков считается на стороне данных).
+  // «Тренды» (бывш. «Сводки сети», правка владельца 28.07) — сетевые сводки
+  // дня/недели/месяца. Парк-фильтра нет: содержимое всегда по сети целиком
+  // (итог сети = Σ парков считается на стороне данных). Идентификатор — `summary`.
   summary: {
-    title: 'Сводки сети',
+    title: 'Тренды',
     screen: SummaryScreen,
     showBack: true,
     backLabel: 'Главная',

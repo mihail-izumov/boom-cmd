@@ -27,7 +27,9 @@ export function useSignalRead() {
   const isDev =
     typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
 
-  async function markRead({ park, signal_date }) {
+  // v3.2: score (0–10) — оценка пользы из модалки; уходит тем же POST signal_read
+  // (одно тело, одна запись фронта). Валидация/усечение score — в dailySignals.
+  async function markRead({ park, signal_date, score }) {
     if (posting.value) return false
     postError.value = false
     posting.value = true
@@ -41,7 +43,7 @@ export function useSignalRead() {
       }
       const key = getKey()
       if (!key) throw new Error('Нет фразы доступа')
-      await postSignalRead({ api: API, key, park, signalDate: signal_date })
+      await postSignalRead({ api: API, key, park, signalDate: signal_date, score })
       return true
     } catch (e) {
       if (typeof console !== 'undefined') console.warn('signal_read failed:', e)

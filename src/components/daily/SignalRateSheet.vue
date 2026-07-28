@@ -1,0 +1,122 @@
+<script setup>
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { X } from 'lucide-vue-next'
+import { L } from '../../i18n/daily.js'
+
+// v3.2: модалка оценки пользы «Сигнала Дня». Открывается кнопкой «Прочитала»
+// (DailySignalCard): вопрос «Оцените пользу Сигнала?» + ползунок 0–10 + «Отправить».
+// Controlled по образцу ParkPickerSheet: prop `open`, emit `close`/`submit(score)`.
+// Отправка и отметка прочтения — у родителя (одно тело signal_read + score);
+// закрытие фоном/крестом/Esc = отмена, прочтение НЕ фиксируется.
+// Ползунок монохромный (accent-color: var(--text)) — цветного не-статусного
+// управления не заводим (DESIGN-STANDARD §3.3); значение — крупной цифрой.
+const props = defineProps({
+  open: { type: Boolean, default: false },
+  posting: { type: Boolean, default: false },
+})
+const emit = defineEmits(['close', 'submit'])
+
+const score = ref(5)
+
+function hide() {
+  if (props.posting) return
+  emit('close')
+}
+function send() {
+  if (props.posting) return
+  emit('submit', Number(score.value))
+}
+function onKey(e) {
+  if (props.open && e.key === 'Escape') {
+    e.preventDefault()
+    hide()
+  }
+}
+
+// Каждое открытие — с середины шкалы; плюс scroll-lock тела, как у шитов.
+let prevOverflow = ''
+watch(
+  () => props.open,
+  (v) => {
+    if (v) {
+      score.value = 5
+      prevOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      document.addEventListener('keydown', onKey)
+    } else {
+      document.body.style.overflow = prevOverflow
+      document.removeEventListener('keydown', onKey)
+    }
+  },
+)
+onBeforeUnmount(() => {
+  if (props.open) {
+    document.body.style.overflow = prevOverflow
+    document.removeEventListener('keydown', onKey)
+  }
+})
+</script>
+
+<template>
+  <Teleport to="body">
+    <div
+      v-if="open"
+      data-test="signal-rate-sheet"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-[var(--scrim)] backdrop-blur-sm sm:items-center"
+      role="presentation"
+      @click.self="hide"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        :aria-label="L.signal_rate_q"
+        class="flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-2xl bg-[var(--surface)] shadow-2xl sm:rounded-2xl"
+        style="padding-bottom: env(safe-area-inset-bottom)"
+      >
+        <header class="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
+          <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ L.signal_rate_q }}</h2>
+          <button
+            type="button"
+            class="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-[var(--surface-2)]"
+            aria-label="Закрыть"
+            @click="hide"
+          >
+            <X class="h-5 w-5" :stroke-width="2" />
+          </button>
+        </header>
+
+        <div class="px-4 pb-4 pt-3">
+          <!-- крупное значение — единственный «ответ» модалки -->
+          <p class="text-center text-[2.25rem] font-bold leading-none tabular-nums text-[var(--text)]" aria-hidden="true">{{ score }}</p>
+
+          <input
+            v-model.number="score"
+            data-test="signal-rate-slider"
+            type="range"
+            min="0"
+            max="10"
+            step="1"
+            :aria-label="L.signal_rate_aria"
+            class="mt-3 w-full"
+            style="accent-color: var(--text); min-height: 44px"
+          />
+          <div class="mt-1 flex justify-between text-[0.75rem] text-[var(--text-muted)]">
+            <span>{{ L.signal_rate_min }}</span>
+            <span>{{ L.signal_rate_max }}</span>
+          </div>
+
+          <button
+            type="button"
+            data-test="signal-rate-submit"
+            :disabled="posting"
+            class="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-[0.9375rem] font-semibold text-[var(--accent-ink)] transition-opacity active:opacity-90 disabled:opacity-60"
+            style="min-height: 48px"
+            @click="send"
+          >
+            {{ L.signal_rate_send }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+</template>

@@ -8,6 +8,7 @@ import {
 import { useSignalRead } from '../../composables/useSignalRead.js'
 import { L, ddmm } from '../../i18n/daily.js'
 import DailyDayProgress from './DailyDayProgress.vue'
+import SignalRateSheet from './SignalRateSheet.vue'
 
 // v3.1: «Сигнал Дня» — единый блок. Сверху разбор аналитика из payload (m.signals,
 // если есть) + лента месяца + кнопка «Прочитала»; ниже — «Как идёт день» (авто-
@@ -45,9 +46,18 @@ function persist(date, state) {
 onMounted(() => {
   if (latest.value && statusFor(latest.value.date) === 'none') persist(latest.value.date, 'viewed')
 })
-async function onRead() {
+// v3.2: «Прочитала» открывает модалку оценки пользы (0–10); POST уходит из
+// сабмита модалки одним телом signal_read + score. Закрытие без отправки =
+// отмена: прочтение не фиксируется, кнопка остаётся активной.
+const rateOpen = ref(false)
+function onRead() {
   if (!latest.value || latestRead.value || posting.value) return
-  const okres = await markRead({ park: park.value, signal_date: latest.value.date })
+  rateOpen.value = true
+}
+async function onRateSubmit(score) {
+  if (!latest.value || latestRead.value || posting.value) return
+  const okres = await markRead({ park: park.value, signal_date: latest.value.date, score })
+  rateOpen.value = false
   if (okres) persist(latest.value.date, 'read')
 }
 function toggleFeed() { feedOpen.value = !feedOpen.value }
@@ -95,6 +105,9 @@ function rowMarker(date) {
       </button>
 
       <p v-if="postError" class="mt-2 rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]" style="background: color-mix(in srgb, var(--negative) 12%, var(--surface))">{{ L.signal_error }}</p>
+
+      <!-- v3.2: модалка «Оцените пользу Сигнала?» (ползунок 0–10) -->
+      <SignalRateSheet :open="rateOpen" :posting="posting" @close="rateOpen = false" @submit="onRateSubmit" />
 
       <div v-if="feed.length" class="mt-3 border-t border-[var(--line)] pt-1">
         <button

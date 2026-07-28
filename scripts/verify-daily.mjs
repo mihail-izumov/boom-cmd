@@ -194,23 +194,36 @@ console.log('\n=== Сигналы дня (v3): выбор / лента / ста�
   check("после read = 'read' (Прочитано ✓)", statusOf(store, 'ohta', '2025-05-16') === 'read')
   check('ключ хранилища — пара «park:date» (фраза не хранится)', stateKey('ohta', '2025-05-16') === 'ohta:2025-05-16')
 
-  // тело signal_read по контракту §2
-  const body = buildSignalReadBody('phrase-x', 'ohta', '2025-05-16')
-  check('тело signal_read: key/type/park/signal_date по контракту',
-    body.key === 'phrase-x' && body.type === 'signal_read' && body.park === 'ohta' && body.signal_date === '2025-05-16')
-  check('в теле ровно 4 ключа (без лишнего)', Object.keys(body).sort().join(',') === 'key,park,signal_date,type')
+  // тело signal_read по контракту §2 + v3.2 (score из модалки оценки)
+  const body = buildSignalReadBody('phrase-x', 'ohta', '2025-05-16', 7)
+  check('тело signal_read: key/type/park/signal_date/score по контракту',
+    body.key === 'phrase-x' && body.type === 'signal_read' && body.park === 'ohta' &&
+    body.signal_date === '2025-05-16' && body.score === 7)
+  check('в теле ровно 5 ключей (без лишнего)', Object.keys(body).sort().join(',') === 'key,park,score,signal_date,type')
+  // обратная совместимость: без score / с мусорным score поле опускается
+  check('без score → ровно 4 ключа (обратная совместимость)',
+    Object.keys(buildSignalReadBody('k', 'ohta', '2025-05-16')).sort().join(',') === 'key,park,signal_date,type')
+  check('мусорный score (11 / -1 / 3.5 / "x") опускается',
+    buildSignalReadBody('k', 'ohta', 'd', 11).score === undefined &&
+    buildSignalReadBody('k', 'ohta', 'd', -1).score === undefined &&
+    buildSignalReadBody('k', 'ohta', 'd', 3.5).score === undefined &&
+    buildSignalReadBody('k', 'ohta', 'd', 'x').score === undefined)
+  check('границы шкалы валидны: 0 и 10 уходят',
+    buildSignalReadBody('k', 'ohta', 'd', 0).score === 0 &&
+    buildSignalReadBody('k', 'ohta', 'd', 10).score === 10)
 
   // postSignalRead с мокнутым fetch (реального URL нет)
   let cap = null
   const okres = await postSignalRead({
-    api: 'https://mock.invalid/report', key: 'phrase-x', park: 'ohta', signalDate: '2025-05-16',
+    api: 'https://mock.invalid/report', key: 'phrase-x', park: 'ohta', signalDate: '2025-05-16', score: 7,
     fetchImpl: async (url, opts) => { cap = { url, opts }; return { ok: true, status: 200, json: async () => ({ ok: true }) } },
   })
   check('postSignalRead: {ok:true} → true', okres === true)
-  check('postSignalRead: redirect follow + тело по контракту',
+  check('postSignalRead: redirect follow + тело по контракту (со score)',
     cap.opts.redirect === 'follow' &&
     JSON.parse(cap.opts.body).type === 'signal_read' &&
-    JSON.parse(cap.opts.body).signal_date === '2025-05-16')
+    JSON.parse(cap.opts.body).signal_date === '2025-05-16' &&
+    JSON.parse(cap.opts.body).score === 7)
   let threw = false
   try {
     await postSignalRead({ api: 'x', key: 'k', park: 'ohta', signalDate: '2025-05-16',
@@ -379,25 +392,56 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
   check('строк ленты = 3 (кроме актуального)', el.querySelectorAll('[data-test="signal-feed-row"]').length === 3)
   app.unmount()
 }
+// v3.2: модалка оценки телепортируется в body — ищем её по document, не по el.
+const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]')
 {
-  // успех POST → «Прочитано ✓», кнопка неактивна; тело по контракту §2
+  // «Прочитала» → модалка оценки; отправка → POST со score → «Прочитано ✓»
   localStorage.clear()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
+  check('до клика модалки нет', !rateSheet())
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  check('клик «Прочитала» → модалка открыта, POST ещё не ушёл',
+    !!rateSheet() && postedBodies.length === 0)
+  check('вопрос модалки дословно', rateSheet().textContent.includes('Оцените пользу Сигнала?'))
+  const slider = rateSheet().querySelector('[data-test="signal-rate-slider"]')
+  check('ползунок 0–10 шаг 1, старт с середины (5)',
+    !!slider && slider.min === '0' && slider.max === '10' && slider.step === '1' && slider.value === '5')
+  slider.value = '8'
+  await fire(slider, 'input')
+  check('значение видно крупно', rateSheet().textContent.includes('8'))
+  await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
   await new Promise((r) => setTimeout(r, 20)); await nextTick()
   check('POST ушёл ровно один', postedBodies.length === 1)
   const body = JSON.parse(postedBodies[0] || '{}')
-  check('тело signal_read по контракту §2 (key/type/park/signal_date)',
-    body.key === 'test-phrase' && body.type === 'signal_read' && body.park === 'ohta' && body.signal_date === '2025-05-16')
-  check('после успеха: «Прочитано ✓», кнопка неактивна',
-    el.textContent.includes('Прочитано') && el.querySelector('[data-test="signal-read"]').disabled === true)
+  check('тело signal_read по контракту §2 + score из ползунка',
+    body.key === 'test-phrase' && body.type === 'signal_read' && body.park === 'ohta' &&
+    body.signal_date === '2025-05-16' && body.score === 8)
+  check('после успеха: модалка закрыта, «Прочитано ✓», кнопка неактивна',
+    !rateSheet() && el.textContent.includes('Прочитано') &&
+    el.querySelector('[data-test="signal-read"]').disabled === true)
   app.unmount()
   const re = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('прочитано и при следующих заходах', re.el.textContent.includes('Прочитано'))
   re.app.unmount()
+}
+{
+  // закрытие модалки без отправки = отмена: POST нет, кнопка активна
+  localStorage.clear()
+  postMode = 'ok'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  check('модалка открыта', !!rateSheet())
+  await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
+  await new Promise((r) => setTimeout(r, 20)); await nextTick()
+  check('закрытие крестом: POST не ушёл, прочтение не зафиксировано',
+    !rateSheet() && postedBodies.length === 0 &&
+    el.querySelector('[data-test="signal-read"]').disabled === false &&
+    el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
+  app.unmount()
 }
 {
   // ошибка бэка → красная плашка, кнопка остаётся активной
@@ -406,10 +450,11 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
   await new Promise((r) => setTimeout(r, 20)); await nextTick()
   check('красная плашка дословно', el.textContent.includes('Не удалось отметить. Проверьте связь и попробуйте ещё раз.'))
-  check('кнопка осталась активной (повтор разрешён)',
-    el.querySelector('[data-test="signal-read"]').disabled === false &&
+  check('кнопка осталась активной (повтор разрешён), модалка закрыта',
+    !rateSheet() && el.querySelector('[data-test="signal-read"]').disabled === false &&
     el.textContent.includes('Прочитала') && !el.textContent.includes('Прочитано'))
   app.unmount()
   postMode = 'ok'
@@ -1198,8 +1243,9 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   await flush()
   const tiles = [...el.querySelectorAll('.grid button')]
   check('плиток на Главной 4', tiles.length === 4, tiles.length)
-  check('«Сводки» — первая плитка', tiles[0]?.getAttribute('data-test') === 'tile-summary' && tiles[0].textContent.includes('Сводки'))
-  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Аналитика,Проекты,Материалы',
+  // Переименования владельца 28.07: плитка «Тренды» (бывш. «Сводки»), «Прогресс» (бывш. «Аналитика»).
+  check('«Тренды» — первая плитка', tiles[0]?.getAttribute('data-test') === 'tile-summary' && tiles[0].textContent.includes('Тренды'))
+  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Проекты,Материалы',
     tiles.slice(1).map((t) => t.textContent.trim()).join(','))
   await fire(tiles[0], 'click')
   check('тап по плитке → под-страница «summary»', nav.subView.value === 'summary', nav.subView.value)
