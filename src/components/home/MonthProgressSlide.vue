@@ -58,9 +58,13 @@ const props = defineProps({
 // нового hex в палитру не заводим.
 const TINT = 'color-mix(in srgb, var(--accent) 40%, var(--surface))'
 const HATCH = 'repeating-linear-gradient(-45deg, transparent 0 2px, var(--text-muted) 2px 3px)'
-// НЕДОБОР ДО ПЛАНА — точки. Та же краска, что у штрихов (4,54:1 на треке), но
-// другой паттерн: линии и точки не спутать. Пролёт перестаёт быть «пустотой».
-const DOTS = 'radial-gradient(circle at 50% 50%, var(--text-muted) 0.6px, transparent 0.7px)'
+// НЕДОБОР ДО ПЛАНА — точки на своей подложке. Одних точек мало: редкая сыпь не
+// очерчивает зону, у неё не читаются верхняя и нижняя границы, и пролёт всё
+// равно выглядит пустым. Поэтому зона получает чуть более тёмный фон, чем трек
+// (--line, приглушённый до подложки), а точки ложатся поверх плотной сеткой.
+// Фон отделяет зону, точки говорят «это не заработано».
+const DOT_BG = 'color-mix(in srgb, var(--line) 75%, var(--surface-2))'
+const DOTS = 'radial-gradient(circle at 50% 50%, var(--text-muted) 0.7px, transparent 0.8px)'
 
 const L = computed(() => monthLayout(props))
 const active = ref(null) // ключ подсвеченного элемента; null — подсветки нет
@@ -75,17 +79,14 @@ const gapStyle = computed(() => ({
 const shortStyle = computed(() => ({
   left: `${L.value.shortStart}%`,
   width: `${L.value.shortWidth}%`,
+  backgroundColor: DOT_BG,
   backgroundImage: DOTS,
-  backgroundSize: '3px 3px',
+  backgroundSize: '2.5px 2.5px',
 }))
 const planMark = computed(() => markStyle(L.value.planPct))
 // Метка цели — только если цель НЕ верх шкалы (её кто-то перерос) ЛИБО цель
 // выбрана тапом: пока она молчаливый верх шкалы, подсвечивать было бы нечего,
 // и тап по «Цели» выглядел как сломанный (гасло всё, не загоралось ничто).
-const goalMark = computed(() =>
-  L.value.goalIsEnd && active.value !== 'goal' ? null : markStyle(L.value.goalPct),
-)
-
 // ── ПОДСВЕТКА ───────────────────────────────────────────────────────────────
 // Подсвечиваем НАКОПЛЕННУЮ ДЛИНУ от нуля, а не отдельный сегмент. Причина: чип
 // «Прогноз» показывает ₽4,5 млн — это ВСЯ выручка месяца по прогнозу, а не
@@ -118,28 +119,58 @@ const dimAt = (pct) => {
   return pct > a + 1e-9 ? 'opacity-10' : ''
 }
 const isOn = (key) => active.value === key
-const trackClass = computed(() => ['h-3', isOn('goal') ? 'ring-2 ring-[var(--text)]' : ''])
+// Обводим трек, когда выбранная величина равна ВСЕЙ шкале. Привязка к ключу
+// 'goal' была багом: у парка без планировщика колонка называется «План и цель»
+// и живёт под ключом 'plan' — обводка не включалась, хотя выбрана вся шкала.
+// Правильный признак — позиция, а не имя.
+const wholeScale = computed(() => activePct.value != null && activePct.value >= 99.999)
+const trackClass = computed(() => ['h-3', wholeScale.value ? 'ring-2 ring-[var(--text)]' : ''])
+const goalMark = computed(() =>
+  L.value.goalIsEnd && !wholeScale.value ? null : markStyle(L.value.goalPct),
+)
 function toggle(key) {
   active.value = active.value === key ? null : key
 }
 
 // Колонки — в порядке следования по шкале, чтобы глаз связывал подпись с элементом.
 // Значения нет (цель не задана) → колонки просто нет.
+//
+// СОВПАВШИЕ ВЕЛИЧИНЫ СХЛОПЫВАЮТСЯ В ОДНУ КОЛОНКУ. Две подписи с одинаковым
+// числом читаются как ошибка данных: в ТЦ Июнь рядом стояли «Прогноз ₽3,0 млн»
+// и «План и цель ₽3,0 млн». Схлопываем ТОЛЬКО при точном равенстве — сближать
+// разные числа значило бы врать. Раньше это было частным случаем «план = цель»;
+// теперь правило общее и покрывает любое совпадение.
+const ROLE = { forecast: 1, fact: 2, plan: 3, goal: 4 } // чей глиф побеждает в группе
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1)
+
 const columns = computed(() => {
   const l = L.value
-  const raw = l.planIsGoal
-    ? [
-        { key: 'fact', label: 'Факт', value: props.fact, glyph: 'fill' },
-        { key: 'forecast', label: 'Прогноз', value: props.forecast, glyph: 'hatch' },
-        { key: 'plan', label: 'План и цель', value: props.goal, glyph: 'end', done: l.reachedGoal },
-      ]
-    : [
-        { key: 'fact', label: 'Факт', value: props.fact, glyph: 'fill' },
-        { key: 'forecast', label: 'Прогноз', value: props.forecast, glyph: 'hatch' },
-        { key: 'plan', label: 'План', value: props.plan, glyph: 'cross', done: l.reachedPlan },
-        { key: 'goal', label: 'Цель', value: props.goal, glyph: 'end', done: l.reachedGoal },
-      ]
-  return raw.filter((c) => c.value != null).sort((a, b) => a.value - b.value)
+  const base = [
+    { key: 'fact', name: 'факт', value: props.fact, glyph: 'fill' },
+    { key: 'forecast', name: 'прогноз', value: props.forecast, glyph: 'hatch' },
+    { key: 'plan', name: 'план', value: props.plan, glyph: 'cross', done: l.reachedPlan },
+    { key: 'goal', name: 'цель', value: props.goal, glyph: 'end', done: l.reachedGoal },
+  ].filter((c) => c.value != null)
+
+  const groups = new Map()
+  for (const c of base) {
+    if (!groups.has(c.value)) groups.set(c.value, [])
+    groups.get(c.value).push(c)
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([value, items]) => {
+      const names = items.map((x) => x.name)
+      // «План и цель» · «Прогноз, план и цель» — перечисление с «и» перед последним
+      const label = names.length === 1
+        ? cap(names[0])
+        : cap(`${names.slice(0, -1).join(', ')} и ${names[names.length - 1]}`)
+      const lead = items.reduce((a, b) => (ROLE[b.key] > ROLE[a.key] ? b : a))
+      return {
+        key: lead.key, label, value, glyph: lead.glyph,
+        done: items.some((x) => x.done),
+      }
+    })
 })
 
 // Полоса с метками сама по себе недоступна — дублируем смысл строкой, включая
@@ -155,7 +186,7 @@ const aria = computed(() =>
   <div>
     <!-- Внешний контейнер с воздухом сверху и снизу: штрих плана ВЫШЕ полосы,
          поэтому он не может жить внутри трека с overflow-hidden. -->
-    <div class="relative pb-1 pt-[7px]" role="img" :aria-label="aria">
+    <div class="relative pb-1 pt-[10px]" role="img" :aria-label="aria">
       <div
         data-test="track"
         class="relative overflow-hidden rounded-full bg-[var(--surface-2)] transition-all duration-300"
@@ -200,8 +231,8 @@ const aria = computed(() =>
       <div
         v-if="planMark"
         data-test="mark-plan"
-        class="absolute inset-y-0 rounded-[1px] bg-[var(--text)] transition-all duration-300"
-        :class="[dimAt(L.planPct), isOn('plan') ? 'w-[4px]' : 'w-[2.5px]']"
+        class="absolute bottom-[1px] top-[7px] w-[2.5px] rounded-[1px] bg-[var(--text)] transition-opacity"
+        :class="dimAt(L.planPct)"
         :style="planMark"
       ></div>
       <!-- КАРЕТКА ПОРОГА. Без неё роль плана угадывалась по позиции: когда план
@@ -250,12 +281,13 @@ const aria = computed(() =>
               class="h-full w-full"
               :style="{ backgroundColor: TINT, backgroundImage: HATCH }"
             ></i>
-            <!-- ПОРОГ: стрелка вниз — та же каретка, что стоит над штрихом на
-                 полосе. Стрелка нагляднее полоски: полоска в квадрате читалась
-                 как «ещё один сегмент», стрелка сразу говорит «метка, указатель». -->
+            <!-- ПОРОГ: точки — та же фактура, что у зоны недобора на полосе.
+                 Чип обозначает не саму риску, а путь до плана: именно эта зона
+                 «сколько ещё нужно» и есть содержание колонки. -->
             <i
               v-else-if="c.glyph === 'cross'"
-              class="mx-auto h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent border-t-[var(--text)]"
+              class="h-full w-full"
+              :style="{ backgroundColor: DOT_BG, backgroundImage: DOTS, backgroundSize: '2.5px 2.5px' }"
             ></i>
             <!-- ЭТАЛОН: обводка по ПЕРИМЕТРУ изнутри, без штриха. Цель — это не
                  точка на шкале, а вся её протяжённость, и рамка говорит ровно

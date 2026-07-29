@@ -2092,6 +2092,9 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   // прижимается к концу шкалы и без каретки читается как торец полосы.
   const pc = document.querySelector('[data-test="caret-plan"]')
   check('у порога есть каретка сверху — опознаётся как метка, а не торец полосы', !!pc)
+  check('каретка ОТДЕЛЕНА от штриха зазором (не слиплись)',
+    !!pc && pc.className.includes('top-0') && pm.className.includes('top-[7px]'),
+    pm.className.match(/top-\S+/)?.[0])
   check('каретка стоит РОВНО над штрихом (позиция и transform совпадают)',
     !!pc && pc.style.left === pm.style.left && pc.style.transform === pm.style.transform,
     pc && `${pc.style.left}/${pc.style.transform}`)
@@ -2106,6 +2109,9 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   const sseg = document.querySelector('[data-test="seg-short"]')
   check('пролёт «прогноз → план» закрашен точками, а не пуст',
     !!sseg && sseg.style.backgroundImage.includes('radial-gradient'), sseg && sseg.style.backgroundImage)
+  check('у зоны недобора есть подложка — иначе не читаются её границы',
+    !!sseg && sseg.style.backgroundColor.includes('color-mix') && sseg.style.backgroundColor.includes('--line'),
+    sseg && sseg.style.backgroundColor)
   check('точки начинаются на прогнозе и упираются в план',
     !!sseg && sseg.style.left === fseg.style.left.replace(/[\d.]+/, String(parseFloat(fseg.style.left) + parseFloat(fseg.style.width)))
       || (!!sseg && Math.abs(parseFloat(sseg.style.left) - (parseFloat(fseg.style.left) + parseFloat(fseg.style.width))) < 1e-9),
@@ -2163,13 +2169,39 @@ console.log('\n=== jsdom: D-34 — состояния порогов (совпа
   const a = mount(bundle.MonthProgressSlide, { ...B, plan: 1_550_000, goal: 1_550_000 })
   check('цель = плану → одна колонка «План и цель», а не две с одним числом',
     cols().includes('План и цель') && !cols().includes('План') && !cols().includes('Цель'))
+  a.app.unmount(); document.body.innerHTML = ''
+
+  // ТРИ СОВПАВШИЕ ВЕЛИЧИНЫ — реальный случай ТЦ Июнь: прогноз 3,0 = план 3,0 =
+  // цель 3,0. Раньше рядом стояли два чипа с одинаковым «₽3,0 млн».
+  const trio = mount(bundle.MonthProgressSlide,
+    { fact: 2_700_000, forecast: 3_000_000, plan: 3_000_000, goal: 3_000_000 })
+  check('три совпавшие величины → одна колонка «Прогноз, план и цель»',
+    cols().includes('Прогноз, план и цель'), cols().filter((x) => x.length > 3).join(' | '))
+  check('три совпавшие → колонок ДВЕ, дублей чисел нет',
+    document.querySelectorAll('[data-test="legend-chip"]').length === 2,
+    document.querySelectorAll('[data-test="legend-chip"]').length)
+  const trioChips = [...document.querySelectorAll('[data-test="legend-chip"]')]
+  await fire(trioChips[1], 'click')
+  check('БАГ ИСПРАВЛЕН: тап по «Прогноз, план и цель» обводит ВЕСЬ трек',
+    document.querySelector('[data-test="track"]').className.includes('ring-2'))
+  trio.app.unmount(); document.body.innerHTML = ''
+
+  const a2 = mount(bundle.MonthProgressSlide, { ...B, plan: 1_550_000, goal: 1_550_000 })
+  const mergedChip = [...document.querySelectorAll('[data-test="legend-chip"]')].at(-1)
+  await fire(mergedChip, 'click')
+  check('БАГ ИСПРАВЛЕН: «План и цель» = вся шкала → обводка трека включается',
+    document.querySelector('[data-test="track"]').className.includes('ring-2'))
+  a2.app.unmount(); document.body.innerHTML = ''
+
+  const a3 = mount(bundle.MonthProgressSlide, { ...B, plan: 1_550_000, goal: 1_550_000 })
   check('цель = плану → колонок три, а не четыре',
-    document.querySelectorAll('.gap-\\[3px\\]').length === 3, document.querySelectorAll('.gap-\\[3px\\]').length)
+    document.querySelectorAll('[data-test="legend-chip"]').length === 3,
+    document.querySelectorAll('[data-test="legend-chip"]').length)
   // Считаем именно МЕТКИ (mark-*), каретка — их спутник, а не отдельная метка.
   check('цель = плану → в этой точке одна метка, дубля не рисуем',
     [...document.querySelectorAll('[data-test^="mark-"]')].filter((n) => n.style.left === '100%').length === 1,
     [...document.querySelectorAll('[data-test^="mark-"]')].map((n) => n.dataset.test + '@' + n.style.left).join(' '))
-  a.app.unmount(); document.body.innerHTML = ''
+  a3.app.unmount(); document.body.innerHTML = ''
 
   // ПЛАН ВЗЯТ ФАКТОМ, цель ещё нет.
   const b = mount(bundle.MonthProgressSlide, { ...B, fact: 1_600_000, forecast: 1_700_000 })
@@ -2237,9 +2269,11 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
     glyphBg(3))
   // Порог = стрелка (та же каретка, что на полосе); эталон = рамка по периметру
   // (цель — не точка на шкале, а вся её протяжённость).
-  check('глиф порога — стрелка, а не полоска',
-    chips[2].querySelector('i i').className.includes('border-t-[var(--text)]'),
-    chips[2].querySelector('i i').className)
+  // Глиф порога — ТОЧКИ, та же фактура, что у зоны недобора на полосе: чип
+  // обозначает путь до плана («сколько ещё нужно»), а не саму риску.
+  check('глиф порога — точки, как зона недобора на полосе',
+    chips[2].querySelector('i i').style.backgroundImage.includes('radial-gradient'),
+    chips[2].querySelector('i i').style.backgroundImage)
   check('глиф эталона — обводка по периметру изнутри, без штриха',
     chips[3].querySelector('i i').style.boxShadow.includes('inset'),
     chips[3].querySelector('i i').style.boxShadow)
@@ -2290,13 +2324,11 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   check('снятие выбора цели убирает и обводку, и проявленную метку',
     !track().className.includes('ring-2') && !document.querySelector('[data-test="mark-goal"]'))
 
-  // ПОРОГ подсвечивается утолщением: он линия, гасить вокруг него мало.
   await fire(chips[2], 'click') // план
   const pmk = document.querySelector('[data-test="mark-plan"]')
-  check('тап по ПЛАНУ → штрих порога утолщается (2,5→4px)', pmk.className.includes('w-[4px]'), pmk.className)
+  check('подсветка НЕ утолщает штрих порога — размеры элементов постоянны',
+    pmk.className.includes('w-[2.5px]') && !pmk.className.includes('w-[4px]'), pmk.className)
   await fire(chips[2], 'click')
-  check('снятие выбора возвращает штрих к 2,5px',
-    document.querySelector('[data-test="mark-plan"]').className.includes('w-[2.5px]'))
   app.app.unmount(); document.body.innerHTML = ''
 }
 
