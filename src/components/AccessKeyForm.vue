@@ -46,6 +46,13 @@ const emit = defineEmits(['submit'])
 const phrase = ref('')
 const show = ref(false)
 
+// Крупный кегль включается ТОЛЬКО когда в поле есть что маскировать.
+// Раньше он зависел от одного `show`, и на пустом поле переключение глаза меняло
+// font-size с 24px на 16px — вместе с ним съезжал placeholder, хотя пользователь
+// ничего не вводил. Теперь пустое поле выглядит одинаково в обоих состояниях
+// глаза, а размер меняется только с появлением первого символа.
+const masked = computed(() => !show.value && phrase.value.length > 0)
+
 function onSubmit() {
   const v = phrase.value.trim()
   if (!v || props.loading) return
@@ -165,7 +172,10 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
                менеджеры паролей). Поэтому маска сделана КРУПНОЙ: кегль 24px вместо
                16px. Разрядка урезана 0.28em → 0.06em: шрифт моноширинный, у него
                и так широкий шаг, а лишний интервал растаскивал точки в пунктир.
-               Placeholder остаётся 16px без разрядки — иначе «код доступа» разъезжается. -->
+               Оба состояния дают line-box ровно 24px (24×1 и 16×1.5), поэтому
+               высота строки не скачет ни при вводе, ни при переключении глаза.
+               Placeholder своих размеров НЕ переопределяет: он наследует метрики
+               поля, а на пустом поле они всегда одни и те же (см. `masked`). -->
           <div class="relative flex min-h-[52px] items-center pl-4 pr-1">
             <input
               v-model="phrase"
@@ -177,8 +187,8 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
               :aria-invalid="error ? 'true' : 'false'"
               :disabled="loading"
               data-test="access-phrase"
-              class="w-full border-none bg-transparent pr-2 font-mono text-[var(--text)] placeholder:text-[1rem] placeholder:tracking-normal placeholder:text-[var(--placeholder)] outline-none disabled:opacity-60"
-              :class="show ? 'text-[1rem]' : 'text-[1.5rem] leading-[1] tracking-[0.06em]'"
+              class="w-full border-none bg-transparent pr-2 font-mono text-[var(--text)] placeholder:text-[var(--placeholder)] outline-none disabled:opacity-60"
+              :class="masked ? 'text-[1.5rem] leading-[1] tracking-[0.06em]' : 'text-[1rem] leading-[1.5] tracking-normal'"
             />
             <!-- Системное кольцо фокуса тут синее — это цвет ОС, а не наш токен, и
                  на монохромном экране оно выглядит как чужеродная подсветка. Гасим

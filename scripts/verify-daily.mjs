@@ -1548,13 +1548,38 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     login.className.includes('font-mono') &&
     phrase.className.includes('font-mono') &&
     (phrase.className.includes('text-[1.5rem]') || phrase.className.includes('text-[1rem]')))
-  // разрядка урезана 0.28 → 0.06em: шрифт моноширинный, лишний интервал растаскивал
-  // точки в пунктир. Размер оставлен 24px — символ «*» браузер рисовать не даёт.
-  check('маска пароля крупная (24px), но без лишней разрядки',
-    phrase.className.includes('text-[1.5rem]') && phrase.className.includes('tracking-[0.06em]'))
-  check('placeholder пароля остался 16px без разрядки — иначе разъезжается',
-    phrase.className.includes('placeholder:text-[1rem]') &&
-    phrase.className.includes('placeholder:tracking-normal'))
+  // На ПУСТОМ поле кегль всегда 16px — независимо от состояния глаза. Раньше он
+  // зависел только от `show`, и переключение глаза сдвигало placeholder, хотя
+  // пользователь ничего не вводил (боевой баг, замечен владельцем).
+  check('пустое поле: кегль 16px, крупная маска не включена',
+    phrase.className.includes('text-[1rem]') && !phrase.className.includes('text-[1.5rem]'))
+  // цвет placeholder'у задаём (это токен), а вот РАЗМЕР и разрядку — нет:
+  // из-за них он и расходился с полем при переключении глаза
+  check('placeholder задаёт только цвет, метрики наследует у поля',
+    phrase.className.includes('placeholder:text-[var(--placeholder)]') &&
+    !/placeholder:text-\[\d/.test(phrase.className) &&
+    !phrase.className.includes('placeholder:tracking-'))
+  {
+    // ввели символ → включилась крупная маска; щёлкнули глазом → снова 16px
+    const t = mount(bundle.AccessKeyForm, {})
+    await nextTick()
+    const inp = t.el.querySelector('[data-test="access-phrase"]')
+    inp.value = 'abc'
+    await fire(inp, 'input')
+    check('после ввода маска крупная (24px)', inp.className.includes('text-[1.5rem]'))
+    await fire(t.el.querySelector('[data-test="access-eye"]'), 'click')
+    check('глаз показал код → снова 16px', inp.className.includes('text-[1rem]'))
+    // стёрли всё при открытом глазе и закрыли его — placeholder не должен прыгать
+    inp.value = ''
+    await fire(inp, 'input')
+    const a = inp.className
+    await fire(t.el.querySelector('[data-test="access-eye"]'), 'click')
+    check('на пустом поле переключение глаза НЕ меняет метрики (placeholder не прыгает)',
+      inp.className === a, a === inp.className ? 'классы совпали' : inp.className)
+    check('высота строки одна в обоих состояниях: 24×1 = 16×1.5 = 24px',
+      /leading-\[1\]|leading-\[1\.5\]/.test(inp.className))
+    t.app.unmount()
+  }
   const submit = el.querySelector('[data-test="access-submit"]')
   check('кнопка «СТАРТ» голосом бренда, капс, разрядка 12% (v2)',
     submit.textContent.trim() === 'СТАРТ' && submit.className.includes('font-brand') &&
