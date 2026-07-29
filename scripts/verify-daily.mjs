@@ -1553,6 +1553,18 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
   // пользователь ничего не вводил (боевой баг, замечен владельцем).
   check('пустое поле: кегль 16px, крупная маска не включена',
     phrase.className.includes('text-[1rem]') && !phrase.className.includes('text-[1.5rem]'))
+  // 29.07: кегль маски вернули к 16px — 24px давал жирные кружки тяжелее букв.
+  // Отличается только разрядка, поэтому размер не скачет при переключении глаза.
+  check('маска и текст одного кегля: 24px больше нигде нет',
+    !readFileSync(resolve(root, 'src/components/AccessKeyForm.vue'), 'utf8')
+      .includes("masked ? 'text-[1.5rem]"))
+  // композиция: лого и карточка — одна группа, подвал не эластичный
+  const group = el.querySelector('[data-test="access-group"]')
+  check('лого и карточка — один центрированный блок с фиксированным зазором',
+    !!group && !!group.querySelector('[data-test="access-logo"]') && !!group.querySelector('form') &&
+    group.className.includes('justify-center') && group.className.includes('gap-10'))
+  check('подвал не растягивается (иначе на высоком экране блок расползается)',
+    (el.querySelector('[data-test="access-footer-link"]').parentElement.className || '').includes('shrink-0'))
   // цвет placeholder'у задаём (это токен), а вот РАЗМЕР и разрядку — нет:
   // из-за них он и расходился с полем при переключении глаза
   check('placeholder задаёт только цвет, метрики наследует у поля',
@@ -1566,9 +1578,11 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     const inp = t.el.querySelector('[data-test="access-phrase"]')
     inp.value = 'abc'
     await fire(inp, 'input')
-    check('после ввода маска крупная (24px)', inp.className.includes('text-[1.5rem]'))
+    check('после ввода включилась разрядка маски, кегль тот же 16px',
+      inp.className.includes('tracking-[0.14em]') && inp.className.includes('text-[1rem]'))
     await fire(t.el.querySelector('[data-test="access-eye"]'), 'click')
-    check('глаз показал код → снова 16px', inp.className.includes('text-[1rem]'))
+    check('глаз показал код → разрядка снята, кегль не менялся',
+      inp.className.includes('tracking-normal') && inp.className.includes('text-[1rem]'))
     // стёрли всё при открытом глазе и закрыли его — placeholder не должен прыгать
     inp.value = ''
     await fire(inp, 'input')
