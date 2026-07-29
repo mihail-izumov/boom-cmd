@@ -1964,9 +1964,16 @@ console.log('\n=== D-34: геометрия полосы (РЕГЛАМЕНТ-с�
   check('И-2 прогноз: 1,30/1,86 = 69,8924…%', near(L1.forecastPct, 1_300_000 / 1_860_000 * 100), L1.forecastPct)
   check('И-5 цель = scaleMax → ровно 100', L1.goalPct === 100, L1.goalPct)
   check('цель = верх шкалы → goalIsEnd (отдельной метки не нужно)', L1.goalIsEnd === true)
-  check('И-3 штриховка стыкуется: gapStart = factPct', near(L1.gapStart, L1.factPct))
-  check('И-3 штриховка стыкуется: gapStart + gapWidth = forecastPct',
+  check('И-3 прогноз стыкуется: gapStart = factPct', near(L1.gapStart, L1.factPct))
+  check('И-3 прогноз стыкуется: gapStart + gapWidth = forecastPct',
     near(L1.gapStart + L1.gapWidth, L1.forecastPct), L1.gapStart + L1.gapWidth)
+  // Недобор до плана — тоже сегмент, и он обязан стыковаться без зазора и нахлёста.
+  check('И-3 недобор стыкуется: shortStart = forecastPct', near(L1.shortStart, L1.forecastPct))
+  check('И-3 недобор упирается в план: shortStart + shortWidth = planPct',
+    near(L1.shortStart + L1.shortWidth, L1.planPct), L1.shortStart + L1.shortWidth)
+  check('И-7 цепочка без разрывов: 0 → факт → прогноз → план',
+    near(L1.factPct + L1.gapWidth + L1.shortWidth, L1.planPct),
+    L1.factPct + L1.gapWidth + L1.shortWidth)
 
   // И-4/И-6 + вырожденные и инверсные случаи — свойство на случайных наборах.
   // Точечные кейсы ловят то, о чём подумали; свойство — то, о чём не подумали.
@@ -2009,6 +2016,11 @@ console.log('\n=== D-34: геометрия полосы (РЕГЛАМЕНТ-с�
       fail('И-3 конец штриховки ≠ позиции прогноза')
     }
     if (L.gapWidth < -EPS) fail('И-3 отрицательная ширина сегмента')
+    if (L.shortWidth < -EPS) fail('И-3 отрицательная ширина недобора')
+    if (L.planPct != null && L.forecastPct != null && L.planPct > L.forecastPct
+        && !near(L.shortStart + L.shortWidth, L.planPct)) fail('И-3 недобор не упирается в план')
+    if (L.planPct != null && L.forecastPct != null && L.planPct <= L.forecastPct
+        && L.shortWidth > EPS) fail('прогноз перерос план, а недобор всё равно нарисован')
   }
   check(`И-1…И-7 держатся на ${n} случайных наборах (равенства, нули, null, инверсии)`, !bad, bad || 'чисто')
 
@@ -2053,32 +2065,54 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
     !fills[0].className.includes('rounded'), fills[0].className)
   // Трек — вложенный элемент: внешний контейнер держит воздух для штриха плана,
   // который обязан выходить за полосу, поэтому overflow-hidden только у трека.
-  const track = document.querySelector('[role="img"] .rounded-full')
+  const track = document.querySelector('[data-test="track"]')
   check('скругление и обрезка — у трека, не у внешнего контейнера',
-    !!track && track.className.includes('overflow-hidden')
+    !!track && track.className.includes('overflow-hidden') && track.className.includes('rounded-full')
     && !document.querySelector('[role="img"]').className.includes('overflow-hidden'))
   check('хардкод hex в слайде отсутствует (только токены)',
     !readFileSync(resolve(root, 'src/components/home/MonthProgressSlide.vue'), 'utf8').match(/#[0-9a-fA-F]{6}\b/))
   const darkMarks = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--text)]'))
-  check('конец факта помечен тёмной риской (жёлтый сам по себе 1,36:1)',
-    darkMarks.some((n) => n.style.left && parseFloat(n.style.left) > 53 && parseFloat(n.style.left) < 54),
+  // Тёмного торца у факта больше нет: он спорил с порогом за роль «метка».
+  // Границу несёт штриховка прогноза — 3,34:1 на жёлтом (посчитано по WCAG).
+  const fseg = document.querySelector('[data-test="seg-forecast"]')
+  check('тёмной риски между фактом и прогнозом нет — границу несёт штриховка',
+    !darkMarks.some((n) => n.style.left && parseFloat(n.style.left) > 53 && parseFloat(n.style.left) < 54),
     darkMarks.map((n) => n.style.left).join(' '))
+  check('прогноз — светло-жёлтая заливка ИЗ ТОКЕНОВ + штриховка поверх',
+    !!fseg && fseg.style.backgroundColor.includes('color-mix') && fseg.style.backgroundColor.includes('--accent')
+    && fseg.style.backgroundImage.includes('repeating-linear-gradient'),
+    fseg && fseg.style.backgroundColor)
   // bullet chart: цель = верх шкалы, отдельной метки у неё НЕТ.
   check('цель = верх шкалы → метки цели на полосе нет (длина полосы и есть цель)',
     !document.querySelector('[data-test="mark-goal"]'))
   const pm = document.querySelector('[data-test="mark-plan"]')
   check('план — порог bullet chart: штрих есть и стоит в своей точке (83,33%)',
     !!pm && pm.style.left === (1_550_000 / 1_860_000 * 100) + '%', pm && pm.style.left)
+  // Роль кодируется ФОРМОЙ, а не позицией: когда план близок к цели, штрих
+  // прижимается к концу шкалы и без каретки читается как торец полосы.
+  const pc = document.querySelector('[data-test="caret-plan"]')
+  check('у порога есть каретка сверху — опознаётся как метка, а не торец полосы', !!pc)
+  check('каретка стоит РОВНО над штрихом (позиция и transform совпадают)',
+    !!pc && pc.style.left === pm.style.left && pc.style.transform === pm.style.transform,
+    pc && `${pc.style.left}/${pc.style.transform}`)
   check('штрих плана ВНЕ трека — пересекает полосу, а не спрятан под overflow',
-    !!pm && pm.parentElement.className.includes('py-1') && !pm.parentElement.className.includes('overflow-hidden'))
-  const hatch = [...document.querySelectorAll('div')]
-    .filter((n) => (n.style.backgroundImage || '').includes('repeating-linear-gradient'))
-  check('прогноз — штрихованный отрезок, начинается на конце факта',
-    hatch.length === 1 && hatch[0].style.left.startsWith('53.7'), hatch[0] && hatch[0].style.left)
-  check('ширина штриховки = прогноз − факт (≈16,1 п.п.)',
-    hatch.length === 1 && hatch[0].style.width.startsWith('16.1'), hatch[0] && hatch[0].style.width)
-  check('штриховка серая (--text-muted), не цветная',
-    hatch.length === 1 && hatch[0].style.backgroundImage.includes('--text-muted'))
+    !!pm && !pm.parentElement.className.includes('overflow-hidden')
+    && pm.parentElement.querySelector('[data-test="track"]'))
+  check('прогноз начинается ровно на конце факта', fseg.style.left.startsWith('53.7'), fseg.style.left)
+  check('ширина прогноза = прогноз − факт (≈16,1 п.п.)', fseg.style.width.startsWith('16.1'), fseg.style.width)
+  check('штрихи серые (--text-muted) — они и держат контраст',
+    fseg.style.backgroundImage.includes('--text-muted'))
+  // НЕДОБОР ДО ПЛАНА — точки от прогноза до порога: пролёт не должен быть «пустотой».
+  const sseg = document.querySelector('[data-test="seg-short"]')
+  check('пролёт «прогноз → план» закрашен точками, а не пуст',
+    !!sseg && sseg.style.backgroundImage.includes('radial-gradient'), sseg && sseg.style.backgroundImage)
+  check('точки начинаются на прогнозе и упираются в план',
+    !!sseg && sseg.style.left === fseg.style.left.replace(/[\d.]+/, String(parseFloat(fseg.style.left) + parseFloat(fseg.style.width)))
+      || (!!sseg && Math.abs(parseFloat(sseg.style.left) - (parseFloat(fseg.style.left) + parseFloat(fseg.style.width))) < 1e-9),
+    sseg && `${sseg.style.left} + ${sseg.style.width}`)
+  check('точки той же краски, что штрихи, но другим паттерном',
+    !!sseg && sseg.style.backgroundImage.includes('--text-muted')
+    && !sseg.style.backgroundImage.includes('repeating-linear-gradient'))
   app.app.unmount(); document.body.innerHTML = ''
 
   const app2 = mount(bundle.MonthProgressSlide, { ...P, goal: null })
@@ -2089,6 +2123,24 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   check('нет цели → шкала до плана (1,0 из 1,55 млн ≈ 64,5%)',
     fills2.length > 0 && fills2[0].style.width.startsWith('64.5'), fills2[0] && fills2[0].style.width)
   app2.app.unmount(); document.body.innerHTML = ''
+
+  // План вплотную к цели (случай Питерленда: 7,5 при 7,7) и план = цели (ТЦ Июнь):
+  // именно здесь штрих раньше сливался с концом полосы и владелец спросил,
+  // что это за чёрная полоска.
+  const tight = mount(bundle.MonthProgressSlide, { ...P, plan: 1_840_000, goal: 1_860_000 })
+  const tm = document.querySelector('[data-test="mark-plan"]')
+  const tc = document.querySelector('[data-test="caret-plan"]')
+  check('план вплотную к цели → каретка на месте, метка не сливается с торцом',
+    !!tc && tc.style.left === tm.style.left, tm && tm.style.left)
+  tight.app.unmount(); document.body.innerHTML = ''
+
+  const flush = mount(bundle.MonthProgressSlide, { ...P, plan: 1_860_000, goal: 1_860_000 })
+  const fm = document.querySelector('[data-test="mark-plan"]')
+  const fc = document.querySelector('[data-test="caret-plan"]')
+  check('план = цели = верх шкалы → штрих и каретка прижаты ВНУТРЬ, не торчат',
+    !!fc && fm.style.transform === 'translateX(-100%)' && fc.style.transform === 'translateX(-100%)',
+    fc && fc.style.transform)
+  flush.app.unmount(); document.body.innerHTML = ''
 
   const app3 = mount(bundle.MonthProgressSlide, { ...P, forecast: 2_000_000 })
   const marks = [...document.querySelectorAll('div')].filter((n) => n.style.left)
@@ -2113,9 +2165,10 @@ console.log('\n=== jsdom: D-34 — состояния порогов (совпа
     cols().includes('План и цель') && !cols().includes('План') && !cols().includes('Цель'))
   check('цель = плану → колонок три, а не четыре',
     document.querySelectorAll('.gap-\\[3px\\]').length === 3, document.querySelectorAll('.gap-\\[3px\\]').length)
-  check('цель = плану → одна метка в этой точке, риска плана не рисуется',
-    marks().filter((n) => n.style.left === '100%').length === 1,
-    marks().map((n) => n.style.left).join(' '))
+  // Считаем именно МЕТКИ (mark-*), каретка — их спутник, а не отдельная метка.
+  check('цель = плану → в этой точке одна метка, дубля не рисуем',
+    [...document.querySelectorAll('[data-test^="mark-"]')].filter((n) => n.style.left === '100%').length === 1,
+    [...document.querySelectorAll('[data-test^="mark-"]')].map((n) => n.dataset.test + '@' + n.style.left).join(' '))
   a.app.unmount(); document.body.innerHTML = ''
 
   // ПЛАН ВЗЯТ ФАКТОМ, цель ещё нет.
@@ -2176,17 +2229,74 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   check('чипы — кнопки, по умолчанию не нажаты',
     chips.every((c) => c.tagName === 'BUTTON' && c.getAttribute('aria-pressed') === 'false'))
   check('без выбора ничего не приглушено',
-    document.querySelectorAll('.opacity-25').length === 0)
+    document.querySelectorAll('.opacity-10').length === 0)
+
+  const glyphBg = (i) => chips[i].querySelector('i').className
+  check('глифы порога и эталона — кусок трека, а не пустой чекбокс',
+    glyphBg(2).includes('bg-[var(--surface-2)]') && glyphBg(3).includes('bg-[var(--surface-2)]'),
+    glyphBg(3))
+  // Порог = стрелка (та же каретка, что на полосе); эталон = рамка по периметру
+  // (цель — не точка на шкале, а вся её протяжённость).
+  check('глиф порога — стрелка, а не полоска',
+    chips[2].querySelector('i i').className.includes('border-t-[var(--text)]'),
+    chips[2].querySelector('i i').className)
+  check('глиф эталона — обводка по периметру изнутри, без штриха',
+    chips[3].querySelector('i i').style.boxShadow.includes('inset'),
+    chips[3].querySelector('i i').style.boxShadow)
+  check('чипы гасят системное кольцо фокуса и ставят своё',
+    chips.every((c) => c.className.includes('outline-none') && c.className.includes('focus-visible:ring-2')))
+
+  const track = () => document.querySelector('[data-test="track"]')
+  const seg = (n) => document.querySelector(`[data-test="seg-${n}"]`)
+  const dimmed = (el) => !!el && el.className.includes('opacity-10')
+  check('без выбора трек обычной высоты', track().className.includes('h-3'))
 
   await fire(chips[1], 'click') // второй по шкале — прогноз
   check('тап по чипу → он помечен нажатым', chips[1].getAttribute('aria-pressed') === 'true')
   check('тап по чипу → обводка чипа стала контрастной',
     chips[1].querySelector('i').className.includes('border-[var(--text)]'))
-  check('тап → остальные элементы полосы приглушены, выбранный нет',
-    document.querySelectorAll('.opacity-25').length > 0)
+  // РАЗМЕРЫ НЕ МЕНЯЮТСЯ: рост полосы перестраивал масштаб, глаз терял опору.
+  check('подсветка НЕ меняет высоту полосы (размеры постоянны)',
+    track().className.includes('h-3') && !track().className.includes('h-[18px]'),
+    track().className.match(/h-\S+/)?.[0])
+  // НАКОПЛЕННАЯ ДЛИНА: чип «Прогноз» = ₽4,5 млн, это вся выручка месяца по
+  // прогнозу, а не прирост над фактом. Значит гореть должен и факт тоже.
+  check('подсветка прогноза светит ОТ НУЛЯ: факт горит вместе с ним',
+    !dimmed(document.querySelector('[data-test="track"] div')))
+  check('подсветка прогноза гасит то, что ЗА ним (недобор до плана)', dimmed(seg('short')))
+  check('сам прогноз не приглушён', !dimmed(seg('forecast')))
   await fire(chips[1], 'click')
   check('повторный тап снимает подсветку',
-    chips[1].getAttribute('aria-pressed') === 'false' && document.querySelectorAll('.opacity-25').length === 0)
+    chips[1].getAttribute('aria-pressed') === 'false' && document.querySelectorAll('.opacity-10').length === 0)
+
+  await fire(chips[2], 'click') // план
+  check('подсветка плана светит от нуля: факт, прогноз и недобор — все горят',
+    !dimmed(seg('forecast')) && !dimmed(seg('short')))
+  await fire(chips[2], 'click')
+
+  await fire(chips[0], 'click') // факт
+  check('подсветка факта гасит и прогноз, и недобор (они ЗА фактом)',
+    dimmed(seg('forecast')) && dimmed(seg('short')))
+  await fire(chips[0], 'click')
+
+  // ГЛАВНЫЙ ДЕФЕКТ ПЕРВОЙ ВЕРСИИ: у цели нет метки (она = длина шкалы), поэтому
+  // тап по ней гасил всё и не зажигал ничего — выглядел как сломанный.
+  await fire(chips[3], 'click') // цель
+  check('тап по ЦЕЛИ → трек обведён: подсвечена шкала, а она и есть цель',
+    track().className.includes('ring-2') && track().className.includes('ring-[var(--text)]'))
+  check('тап по ЦЕЛИ → на конце шкалы ПРОЯВЛЯЕТСЯ метка (было нечего подсвечивать)',
+    !!document.querySelector('[data-test="mark-goal"]'))
+  await fire(chips[3], 'click')
+  check('снятие выбора цели убирает и обводку, и проявленную метку',
+    !track().className.includes('ring-2') && !document.querySelector('[data-test="mark-goal"]'))
+
+  // ПОРОГ подсвечивается утолщением: он линия, гасить вокруг него мало.
+  await fire(chips[2], 'click') // план
+  const pmk = document.querySelector('[data-test="mark-plan"]')
+  check('тап по ПЛАНУ → штрих порога утолщается (2,5→4px)', pmk.className.includes('w-[4px]'), pmk.className)
+  await fire(chips[2], 'click')
+  check('снятие выбора возвращает штрих к 2,5px',
+    document.querySelector('[data-test="mark-plan"]').className.includes('w-[2.5px]'))
   app.app.unmount(); document.body.innerHTML = ''
 }
 

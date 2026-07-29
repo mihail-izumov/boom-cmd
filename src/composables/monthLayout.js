@@ -59,15 +59,24 @@ export function monthLayout(v) {
   // Прогноз по построению ≥ факта (landing = факт + остаток), но отрицательную
   // ширину не пускаем: один битый набор не должен рисовать сегмент задом наперёд.
   const gapWidth = forecastPct == null ? 0 : Math.max(0, forecastPct - factPct)
+  // НЕДОБОР ДО ПЛАНА: от прогноза до порога. Не самостоятельная величина, а
+  // остаток плана, который при текущем темпе не закрывается. Рисуется точками,
+  // чтобы пролёт не читался как «тут ничего нет» — он заканчивается ровно на
+  // штрихе плана и тем сам себя объясняет. Прогноз перерос план → ширина 0.
+  const planPctV = pct(plan)
+  const shortStart = forecastPct == null ? 0 : forecastPct
+  const shortWidth = forecastPct == null || planPctV == null ? 0 : Math.max(0, planPctV - forecastPct)
 
   return {
     scaleMax,
     factPct,
-    planPct: pct(plan),
+    planPct: planPctV,
     forecastPct,
     goalPct: pct(goal),
     gapStart: factPct,
     gapWidth,
+    shortStart,
+    shortWidth,
     // Цель совпала с планом — штатный случай (парк без планировщика, цель
     // приравнена к плану решением владельца). Сравниваем ТОЧНО: сближать
     // разные числа значило бы врать.

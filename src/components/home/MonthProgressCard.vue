@@ -120,7 +120,7 @@ function goTo(i) {
         v-for="(s, i) in slides"
         :key="s.key"
         type="button"
-        class="flex h-6 w-6 items-center justify-center"
+        class="flex h-6 w-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)]"
         :aria-label="`Показать: ${s.title}`"
         :aria-current="i === idx ? 'true' : undefined"
         @click="goTo(i)"
