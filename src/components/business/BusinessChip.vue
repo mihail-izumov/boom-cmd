@@ -64,7 +64,10 @@ watch(open, async (v) => {
     document.addEventListener('keydown', onKey)
     document.addEventListener('click', onDocClick, true)
     await nextTick()
-    menuRef.value?.querySelector('[role="menuitem"]')?.focus?.()
+    // Первый пункт НЕ фокусируем программно: после тапа пальцем браузер рисовал
+    // на нём системное кольцо фокуса (синее — цвет ОС, не наш токен), и активный
+    // бизнес выглядел как выделенный по ошибке. Клавиатура доходит до пунктов
+    // обычным Tab — они идут в DOM сразу за чипом.
   } else {
     document.removeEventListener('keydown', onKey)
     document.removeEventListener('click', onDocClick, true)
@@ -84,7 +87,7 @@ onBeforeUnmount(() => {
     <button
       type="button"
       data-test="business-chip"
-      class="inline-flex min-h-[44px] items-center"
+      class="inline-flex min-h-[44px] items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)] focus-visible:ring-offset-0"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="menu"
       @click="toggle"
@@ -104,34 +107,34 @@ onBeforeUnmount(() => {
       ref="menuRef"
       data-test="business-menu"
       role="menu"
-      class="absolute left-0 top-full z-40 mt-1.5 w-[17rem] overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1 text-left shadow-2xl"
+      class="absolute left-0 top-full z-40 mt-1.5 flex w-[17rem] flex-col gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 text-left shadow-2xl"
     >
+      <!-- Разделителя нет: каждый пункт — самостоятельная плашка на фоне, границу
+           между ними держит зазор, а не линия. Высота у всех одинаковая (56px),
+           хотя у «Подключить бизнес» две строки текста, а у бизнеса одна:
+           разновысокие плашки в коротком списке читаются как разные по важности. -->
       <button
         v-for="b in BUSINESSES"
         :key="b.id"
         type="button"
         role="menuitem"
-        class="bc-menu-item flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left active:bg-[var(--surface-2)]"
-        style="min-height: 44px"
+        class="bc-menu-item flex min-h-[56px] w-full items-center gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)] active:bg-[var(--surface-hover)]"
         @click="close"
       >
         <span class="text-[1rem] text-[var(--text)]">{{ b.name }}</span>
         <Check
           v-if="b.active"
-          class="ml-auto h-5 w-5 text-[var(--text)]"
+          class="ml-auto h-5 w-5 shrink-0 text-[var(--text)]"
           :stroke-width="2.25"
           aria-label="Активный бизнес"
         />
       </button>
 
-      <div class="my-1 h-px bg-[var(--line)]" aria-hidden="true"></div>
-
       <button
         type="button"
         role="menuitem"
         data-test="business-connect"
-        class="bc-menu-item flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left active:bg-[var(--surface-2)]"
-        style="min-height: 44px"
+        class="bc-menu-item flex min-h-[56px] w-full items-center gap-2.5 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)] active:bg-[var(--surface-hover)]"
         @click="openConnect"
       >
         <Plus class="h-5 w-5 shrink-0 text-[var(--text-secondary)]" :stroke-width="2.25" aria-hidden="true" />
@@ -151,8 +154,11 @@ onBeforeUnmount(() => {
    настоящим ховером: на тач-экране :hover остаётся на последнем тапнутом пункте
    и выглядит как ошибочно выбранный бизнес. Отсюда media-запрос, а не hover:. */
 @media (hover: hover) and (pointer: fine) {
+  .bc-menu-item {
+    transition: background-color 120ms ease;
+  }
   .bc-menu-item:hover {
-    background: var(--surface-2);
+    background: var(--surface-hover);
   }
 }
 </style>

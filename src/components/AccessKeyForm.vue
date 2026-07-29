@@ -66,6 +66,10 @@ const maskOf = (file) => {
 const logoMask = maskOf('runscale_logo.svg') // «Модуль роста», подвал
 // Шеврон Ранскейл. viewBox обрезан по знаку (см. комментарий в самом svg),
 // поэтому height бокса = реальная высота знака.
+// ЗАЛИВКА В ФАЙЛЕ — БЕЛАЯ, и это не вкусовщина: WebKit для webkit-mask-image
+// считает СВЕТЛОТУ, а не альфу. Чёрный знак = светлота 0 = замаскирован целиком,
+// то есть невидим. Именно на этом шеврон пропадал на проде, пока «Модуль Роста»
+// (он белый) рисовался нормально. Цвет на экране даёт фон элемента, не файл.
 // ШИРИНА ЗАДАНА ЯВНО (62 / 94px), и это не украшательство: пустой div без контента
 // внутри flex-колонки с align-items:center получает ширину по содержимому, то есть
 // НОЛЬ — знак просто не рисовался (ровно этот баг был виден на проде: слово есть,
@@ -158,9 +162,10 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
           <!-- Символ маски пароля рисует БРАУЗЕР (U+2022), поменять его на «*»
                средствами CSS нельзя — только полностью самодельной маской, а это
                ломает нативный ввод (каретка при правке в середине, вставка,
-               менеджеры паролей). Поэтому маска сделана КРУПНОЙ: кегль 24px и
-               разрядка 0.28em вместо 16px. Placeholder остаётся 16px без разрядки —
-               иначе «код доступа» разъезжается. -->
+               менеджеры паролей). Поэтому маска сделана КРУПНОЙ: кегль 24px вместо
+               16px. Разрядка урезана 0.28em → 0.06em: шрифт моноширинный, у него
+               и так широкий шаг, а лишний интервал растаскивал точки в пунктир.
+               Placeholder остаётся 16px без разрядки — иначе «код доступа» разъезжается. -->
           <div class="relative flex min-h-[52px] items-center pl-4 pr-1">
             <input
               v-model="phrase"
@@ -173,11 +178,16 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
               :disabled="loading"
               data-test="access-phrase"
               class="w-full border-none bg-transparent pr-2 font-mono text-[var(--text)] placeholder:text-[1rem] placeholder:tracking-normal placeholder:text-[var(--placeholder)] outline-none disabled:opacity-60"
-              :class="show ? 'text-[1rem]' : 'text-[1.5rem] leading-[1] tracking-[0.28em]'"
+              :class="show ? 'text-[1rem]' : 'text-[1.5rem] leading-[1] tracking-[0.06em]'"
             />
+            <!-- Системное кольцо фокуса тут синее — это цвет ОС, а не наш токен, и
+                 на монохромном экране оно выглядит как чужеродная подсветка. Гасим
+                 outline и рисуем своё кольцо только для клавиатуры (focus-visible):
+                 после тапа пальцем focus-visible не срабатывает, кольца не будет. -->
             <button
               type="button"
-              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-[var(--surface)]"
+              data-test="access-eye"
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-secondary)] active:bg-[var(--surface)]"
               :aria-label="show ? ACCESS_RU.hide : ACCESS_RU.show"
               :aria-pressed="show ? 'true' : 'false'"
               tabindex="-1"

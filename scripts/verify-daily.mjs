@@ -1447,6 +1447,19 @@ console.log('\n=== D-20: имя продукта ушло из шапки Гла
   check('Главная: крупного заголовка нет', !el.querySelector('h1'))
   check('Главная: компактного заголовка нет', !el.querySelector('[data-test="nav-compact-title"]'))
   check('Главная: чип бизнеса в шапке есть', !!el.querySelector('[data-test="business-chip"]'))
+  // чип должен жить В ЛИПКОЙ ПОЛОСЕ (header), а не в потоке под ней —
+  // иначе контекст экрана уезжает при прокрутке
+  check('чип внутри липкой полосы, в левом слоте',
+    !!el.querySelector('header [data-test="business-chip"]'))
+  check('кнопка перезагрузки уехала в правый слот, к концу строки',
+    !!el.querySelector('header [data-test="nav-hard-reload"]') &&
+    (() => {
+      const bar = el.querySelector('header > div')
+      const kids = [...bar.children]
+      const iChip = kids.findIndex((k) => k.querySelector('[data-test="business-chip"]'))
+      const iRel = kids.findIndex((k) => k.querySelector('[data-test="nav-hard-reload"]'))
+      return iChip === 0 && iRel === kids.length - 1
+    })())
   check('Главная: слова «Мастерплан» в шапке нет', !el.textContent.includes('Мастерплан'))
   app.unmount()
 
@@ -1535,8 +1548,10 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     login.className.includes('font-mono') &&
     phrase.className.includes('font-mono') &&
     (phrase.className.includes('text-[1.5rem]') || phrase.className.includes('text-[1rem]')))
-  check('маска пароля крупная: 24px с разрядкой (символ «*» браузер рисовать не даёт)',
-    phrase.className.includes('text-[1.5rem]') && phrase.className.includes('tracking-[0.28em]'))
+  // разрядка урезана 0.28 → 0.06em: шрифт моноширинный, лишний интервал растаскивал
+  // точки в пунктир. Размер оставлен 24px — символ «*» браузер рисовать не даёт.
+  check('маска пароля крупная (24px), но без лишней разрядки',
+    phrase.className.includes('text-[1.5rem]') && phrase.className.includes('tracking-[0.06em]'))
   check('placeholder пароля остался 16px без разрядки — иначе разъезжается',
     phrase.className.includes('placeholder:text-[1rem]') &&
     phrase.className.includes('placeholder:tracking-normal'))
@@ -1625,7 +1640,7 @@ console.log('\n=== D-21 v2: тёмная витрина входа ===')
   const scope = (css.match(/\[data-theme="auth-dark"\]\s*{[^}]*}/) || [])[0] || ''
   check('скоуп auth-dark объявлен в токенах (единственное место с hex)', !!scope)
   const tok = (name) => (scope.match(new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1]
-  const want = { bg: '#0A0A0A', surface: '#161616', 'surface-2': '#0F0F0F', line: '#2A2A2A', text: '#F2F2F2', rim: '#2E2E2E' }
+  const want = { bg: '#0A0A0A', surface: '#161616', 'surface-2': '#0F0F0F', line: '#2A2A2A', text: '#F2F2F2', rim: '#383838' }
   for (const [k, v] of Object.entries(want))
     check(`--${k} = ${v} (по палитре v2)`, tok(k) === v, tok(k))
   check('жёлтого на витрине входа нет: --accent переопределён в белый',
@@ -1755,9 +1770,17 @@ console.log('\n=== D-20: чип-переключатель бизнесов ==='
     bcSrc.includes('ChevronsUpDown') && !/\bChevronDown\b/.test(bcSrc))
   check('ховер-подсветка строк только для мыши (на тач-экране :hover залипает)',
     /@media \(hover: hover\) and \(pointer: fine\)/.test(bcSrc) && /\.bc-menu-item:hover/.test(bcSrc))
-  const navSrc2 = readFileSync(resolve(root, 'src/components/NavigationBar.vue'), 'utf8')
-  check('чип выровнен по левому краю, а не по центру',
-    /BusinessChip/.test(navSrc2) && /flex justify-start"[\s\S]{0,120}BusinessChip/.test(navSrc2))
+  check('первый пункт НЕ фокусируется программно (иначе системное кольцо после тапа)',
+    !/querySelector\('\[role="menuitem"\]'\)\?\.focus/.test(bcSrc))
+  check('разделителя между пунктами больше нет — каждый пункт плашкой на фоне',
+    !/h-px bg-\[var\(--line\)\]/.test(bcSrc) &&
+    (bcSrc.match(/bg-\[var\(--surface-2\)\]/g) || []).length === 2)
+  check('высота плашек одинаковая (56px), хотя строк текста разное число',
+    (bcSrc.match(/min-h-\[56px\]/g) || []).length === 2)
+  check('ховер меняет фон на отдельный токен, а не на цвет самой плашки',
+    /background: var\(--surface-hover\)/.test(bcSrc))
+  check('своё кольцо фокуса вместо системного (оно синее — цвет ОС, не наш токен)',
+    (bcSrc.match(/outline-none focus-visible:ring-2/g) || []).length >= 3)
 
   await fire(chip, 'click')
   const menu = el.querySelector('[data-test="business-menu"]')

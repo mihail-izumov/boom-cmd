@@ -15,10 +15,11 @@ import { useNavTrailing } from '../composables/useNavTrailing.js'
 //   - в потоке скролла: eyebrow-бейдж (опц.) + крупный центрированный заголовок;
 //   - в потоке скролла: большая пилюля по центру под заголовком (если parkFilter).
 //
-// `eyebrow` — короткий бейдж НАД крупным заголовком (на Главной — «БУМБАСТИК»,
-// графитовая заливка --graphite). Рендерится только когда задан. С D-20 это не
+// `eyebrow` — подпись чипа бизнеса (на Главной «БУМБАСТИК»). С D-20 это не
 // статичный бейдж, а BusinessChip: кнопка-переключатель бизнесов с пунктом
-// «Подключить бизнес». Внешний вид капсулы не менялся.
+// «Подключить бизнес». С 28.07 он живёт В ЛИПКОЙ ПОЛОСЕ, в левом слоте, а не
+// в потоке под ней: контекст экрана не должен уезжать при прокрутке. Служебная
+// кнопка перезагрузки за это уехала в правый слот — на Главной он свободен.
 //
 // `title` С D-20 НЕОБЯЗАТЕЛЕН. На Главной заголовка нет вовсе (правка владельца
 // 28.07: имя продукта внутри приложения не пишется нигде, а «Мастерплан» ушёл
@@ -87,7 +88,12 @@ async function hardReload() {
          Узко (375px) — сжимается и обрезается по многоточию подпись «Назад»,
          а не заголовок; 2.75rem = 44pt тач-таргета боковым слотам гарантированы. -->
     <div class="grid h-11 w-full grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)] items-center">
-      <!-- Левый угол: back или leadingAction (взаимоисключающие) -->
+      <!-- Левый угол: back, иначе чип бизнеса (Главная).
+           Правка 28.07: чип переехал СЮДА, в липкую полосу, — он не должен уезжать
+           при скролле, это постоянный контекст экрана. Кнопка перезагрузки ушла
+           в правый угол: на Главной правый слот свободен (нет ни парк-фильтра,
+           ни селектора месяца), а слева теперь живёт контекст, а не служебное
+           действие. -->
       <div class="flex min-w-0 items-center justify-self-start pl-1">
         <button
           v-if="showBack"
@@ -98,16 +104,9 @@ async function hardReload() {
           <ChevronLeft class="h-6 w-6 shrink-0" :stroke-width="2.25" />
           <span v-if="backLabel" class="truncate text-[1.0625rem] leading-none">{{ backLabel }}</span>
         </button>
-        <button
-          v-else-if="leadingAction === 'hardReload'"
-          type="button"
-          class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--text)] active:bg-[var(--surface-2)]"
-          aria-label="Жёсткая перезагрузка (сбросить кэш)"
-          title="Жёсткая перезагрузка"
-          @click="hardReload"
-        >
-          <SyncIcon class="h-5 w-5" />
-        </button>
+        <div v-else-if="eyebrow" class="pl-2">
+          <BusinessChip :label="eyebrow" />
+        </div>
         <div v-else class="min-h-[44px] min-w-[44px]" aria-hidden="true"></div>
       </div>
 
@@ -127,19 +126,29 @@ async function hardReload() {
       <!-- Правый угол: либо управляемый слот раздела (селектор месяца в «Сводках»),
            либо компактная пилюля парк-фильтра (виден при collapsed && parkFilter).
            Слот виден всегда: у раздела с ним нет второй копии контрола в потоке. -->
-      <div
-        v-if="trailing"
-        data-test="nav-trailing"
-        class="flex min-w-0 items-center justify-self-end pr-1"
-      >
-        <component :is="trailing.component" v-bind="trailing.props" />
-      </div>
-      <div
-        v-else
-        class="flex min-w-0 items-center justify-self-end pr-1 transition-opacity duration-200"
-        :class="collapsed && parkFilter ? 'opacity-100' : 'pointer-events-none opacity-0'"
-      >
-        <ParkFilterPill v-if="parkFilter" :compact="true" @open="openPicker" />
+      <div class="flex min-w-0 items-center justify-self-end gap-1 pr-1">
+        <div v-if="trailing" data-test="nav-trailing" class="flex min-w-0 items-center">
+          <component :is="trailing.component" v-bind="trailing.props" />
+        </div>
+        <div
+          v-else
+          class="flex min-w-0 items-center transition-opacity duration-200"
+          :class="collapsed && parkFilter ? 'opacity-100' : 'pointer-events-none opacity-0'"
+        >
+          <ParkFilterPill v-if="parkFilter" :compact="true" @open="openPicker" />
+        </div>
+        <!-- служебное действие — в правом углу (см. комментарий у левого слота) -->
+        <button
+          v-if="!showBack && leadingAction === 'hardReload'"
+          type="button"
+          data-test="nav-hard-reload"
+          class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--text)] active:bg-[var(--surface-2)]"
+          aria-label="Жёсткая перезагрузка (сбросить кэш)"
+          title="Жёсткая перезагрузка"
+          @click="hardReload"
+        >
+          <SyncIcon class="h-5 w-5" />
+        </button>
       </div>
     </div>
   </header>
@@ -147,18 +156,12 @@ async function hardReload() {
   <!-- Крупный центрированный заголовок — в потоке скролла.
        eyebrow (опц., напр. «БУМБАСТИК») — графитовый бейдж НАД заголовком.
        caption ('данные от …') — absolute НАД заголовком, не сдвигает h1. -->
-  <div v-if="title || eyebrow || caption" class="relative px-4 pb-3 pt-2 text-center">
+  <!-- eyebrow (чип бизнеса) с 28.07 живёт в липкой полосе выше, не здесь -->
+  <div v-if="title || caption" class="relative px-4 pb-3 pt-2 text-center">
     <p
       v-if="caption"
       class="pointer-events-none absolute inset-x-0 -top-2 text-[0.75rem] leading-none text-[var(--text-muted)]"
     >{{ caption }}</p>
-    <!-- Чип бизнеса выровнен ПО ЛЕВОМУ КРАЮ (правка 28.07). По центру он читался
-         как логотип-вывеска, хотя это контрол выбора контекста: у контролов место
-         у края, как в переключателе аккаунтов X. Центр экрана освобождён под
-         содержательную строку периода «<Месяц Год>: парки». -->
-    <div v-if="eyebrow" class="flex justify-start" :class="title ? 'mb-1.5' : ''">
-      <BusinessChip :label="eyebrow" />
-    </div>
     <h1 v-if="title" class="text-[2.125rem] font-bold leading-tight tracking-tight text-[var(--text)]">
       {{ title }}
     </h1>
