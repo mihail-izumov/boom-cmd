@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { computeDaily, computeNetwork, sigClass } from '../src/composables/dailyModel.js'
+import { monthLayout, markStyle } from '../src/composables/monthLayout.js'
 import { actCode } from '../src/i18n/daily.js'
 import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
@@ -1950,9 +1951,94 @@ console.log('\n=== D-34: цель месяца в модели (month_goal) ==='
     Math.abs(n.totals.landDev - (n.totals.landing / n.totals.target - 1)) < 1e-9)
 }
 
+console.log('\n=== D-34: геометрия полосы (РЕГЛАМЕНТ-соответствие-полос-числам, И-1…И-7) ===')
+{
+  const EPS = 1e-9
+  const near = (a, b) => Math.abs(a - b) < EPS
+
+  // И-2 на ручном кейсе: проценты считаны отдельно, не «как получилось».
+  const L1 = monthLayout({ fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000 })
+  check('И-1 scaleMax = максимум заданных значений', L1.scaleMax === 1_860_000, L1.scaleMax)
+  check('И-2 факт: 1,00/1,86 = 53,7634…%', near(L1.factPct, 100_0000 / 1_860_000 * 100), L1.factPct)
+  check('И-2 план: 1,55/1,86 = 83,3333…%', near(L1.planPct, 1_550_000 / 1_860_000 * 100), L1.planPct)
+  check('И-2 прогноз: 1,30/1,86 = 69,8924…%', near(L1.forecastPct, 1_300_000 / 1_860_000 * 100), L1.forecastPct)
+  check('И-5 цель = scaleMax → ровно 100', L1.goalPct === 100, L1.goalPct)
+  check('И-3 штриховка стыкуется: gapStart = factPct', near(L1.gapStart, L1.factPct))
+  check('И-3 штриховка стыкуется: gapStart + gapWidth = forecastPct',
+    near(L1.gapStart + L1.gapWidth, L1.forecastPct), L1.gapStart + L1.gapWidth)
+
+  // И-4/И-6 + вырожденные и инверсные случаи — свойство на случайных наборах.
+  // Точечные кейсы ловят то, о чём подумали; свойство — то, о чём не подумали.
+  let bad = null, n = 0
+  const pick = (r) => (r < 0.12 ? null : r < 0.2 ? 0 : Math.round(r * 4_000_000))
+  for (let i = 0; i < 400 && !bad; i++) {
+    const v = {
+      fact: pick(Math.random()), plan: pick(Math.random()),
+      forecast: pick(Math.random()), goal: pick(Math.random()),
+    }
+    // равенства и «инверсии» подмешиваем намеренно, случайно они почти не выпадут
+    if (i % 5 === 0 && v.plan) v.goal = v.plan
+    if (i % 7 === 0 && v.fact) v.forecast = v.fact
+    if (i % 11 === 0 && v.goal) v.forecast = v.goal * 1.4
+    const L = monthLayout(v)
+    n++
+    const present = [['fact', v.fact], ['plan', v.plan], ['forecast', v.forecast], ['goal', v.goal]]
+      .filter(([, x]) => x != null && x > 0)
+    const key = { fact: 'factPct', plan: 'planPct', forecast: 'forecastPct', goal: 'goalPct' }
+    const fail = (m) => { bad = `${m} · ${JSON.stringify(v)} → ${JSON.stringify(L)}` }
+
+    if (!present.length) { if (!L.empty) fail('пустой набор не помечен empty'); continue }
+    if (L.scaleMax !== Math.max(...present.map(([, x]) => x))) fail('И-1 scaleMax ≠ max')
+    for (const [k, x] of present) {
+      const p = L[key[k]]
+      if (!near(p, (x / L.scaleMax) * 100)) fail(`И-2 ${k}: позиция ≠ v/scaleMax`)
+      if (p < -EPS || p > 100 + EPS) fail(`И-6 ${k}: позиция вне [0,100]`)
+      if (x === L.scaleMax && !near(p, 100)) fail(`И-5 ${k}: v = scaleMax, но позиция ≠ 100`)
+    }
+    // И-5: не задано → позиция null, а не 0
+    for (const [k, x] of [['plan', v.plan], ['forecast', v.forecast], ['goal', v.goal]]) {
+      if ((x == null || x <= 0) && L[key[k]] !== null) fail(`И-5 ${k}: нет значения, но позиция не null`)
+    }
+    // И-4 монотонность: сортировка по значению = сортировка по позиции
+    const byVal = [...present].sort((a, b) => a[1] - b[1]).map(([k]) => k)
+    const byPos = [...present].sort((a, b) => L[key[a[0]]] - L[key[b[0]]]).map(([k]) => k)
+    if (byVal.join() !== byPos.join()) fail('И-4 порядок позиций ≠ порядку значений')
+    // И-3/И-7 непрерывность штриховки
+    if (L.forecastPct != null && !near(L.gapStart + L.gapWidth, Math.max(L.factPct, L.forecastPct))) {
+      fail('И-3 конец штриховки ≠ позиции прогноза')
+    }
+    if (L.gapWidth < -EPS) fail('И-3 отрицательная ширина сегмента')
+  }
+  check(`И-1…И-7 держатся на ${n} случайных наборах (равенства, нули, null, инверсии)`, !bad, bad || 'чисто')
+
+  // И-6 в рендере: метка на 100% прижимается ВНУТРЬ, иначе половина её ширины
+  // уезжает за overflow и читается как хвост, торчащий из полосы.
+  check('метка на 100% прижата внутрь (translateX(-100%))',
+    markStyle(100).left === '100%' && markStyle(100).transform === 'translateX(-100%)')
+  check('метка в середине центрируется', markStyle(50).transform === 'translateX(-50%)')
+  check('метка на 0% не уезжает влево', markStyle(0).transform === 'translateX(0)')
+  check('нет позиции → нет стиля', markStyle(null) === null)
+
+  // §2 регламента: арифметики процентов в шаблоне быть не должно.
+  const sfc = readFileSync(resolve(root, 'src/components/home/MonthProgressSlide.vue'), 'utf8')
+  check('§2 геометрии в шаблоне нет (расчёт только в monthLayout.js)',
+    !/\/\s*scaleMax|\*\s*100\b|Math\.min\(100|Math\.max\(0,/.test(sfc))
+
+  // §4.4: числа полосы = агрегату модели, а не «переданы на глаз».
+  const nw = computeNetwork(sets, ['ohta', 'piterland', 'iyun'])
+  const sumF = nw.cards.reduce((a, c) => a + c.earned, 0)
+  const sumL = nw.cards.reduce((a, c) => a + c.landing, 0)
+  const sumT = nw.cards.reduce((a, c) => a + c.target, 0)
+  const sumG = nw.cards.reduce((a, c) => a + c.goal, 0)
+  check('§4.4 сетевая полоса строится на суммах парков (факт/прогноз/план/цель)',
+    nw.totals.earned === sumF && nw.totals.landing === sumL &&
+    nw.totals.target === sumT && nw.totals.goal === sumG,
+    `${sumF}/${sumL}/${sumT}/${sumG}`)
+}
+
 console.log('\n=== jsdom: D-34 — слайд месяца (полосы и метки) ===')
 {
-  const P = { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000, daysDone: 20, daysTotal: 31 }
+  const P = { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000 }
   const app = mount(bundle.MonthProgressSlide, P)
   const card = document.querySelector('[role="img"]')
   check('дорожка денег отрисована с aria-label', !!card && card.getAttribute('aria-label').includes('Цель'))
@@ -1962,6 +2048,10 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   const fills = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--accent)]'))
   check('заливка факта — жёлтая, ширина = факт/максимум (1,0 из 1,86 млн ≈ 53,8%)',
     fills.length > 0 && fills[0].style.width.startsWith('53.7'), fills[0] && fills[0].style.width)
+  check('внутренние края прямые: у заливки нет rounded (иначе серп на стыке)',
+    !fills[0].className.includes('rounded'), fills[0].className)
+  check('скругление только у трека (снаружи)',
+    document.querySelector('[role="img"]').className.includes('rounded-full'))
   check('хардкод hex в слайде отсутствует (только токены)',
     !readFileSync(resolve(root, 'src/components/home/MonthProgressSlide.vue'), 'utf8').match(/#[0-9a-fA-F]{6}\b/))
   const darkMarks = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--text)]'))
@@ -2000,7 +2090,7 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
 
 console.log('\n=== jsdom: D-34 — состояния порогов (совпадение и достижение) ===')
 {
-  const B = { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000, daysDone: 20, daysTotal: 31 }
+  const B = { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000 }
   const cols = () => [...document.querySelectorAll('span')].map((n) => n.textContent.trim())
   const marks = () => [...document.querySelectorAll('div')].filter((n) => n.style.left)
 
@@ -2055,7 +2145,6 @@ console.log('\n=== jsdom: D-34 — состояния порогов (совпа
   check('мок: у Июня план = цели (штатный случай, а не дефект данных)', iy.T === iy.goal, `${iy.T}/${iy.goal}`)
   const e = mount(bundle.MonthProgressSlide, {
     fact: iy.realizedRev, plan: iy.T, forecast: iy.landing, goal: iy.goal,
-    daysDone: iy.realizedCount, daysTotal: iy.DIM,
   })
   check('мок Июня → «План и цель» одной колонкой', cols().includes('План и цель'))
   e.app.unmount(); document.body.innerHTML = ''
@@ -2078,11 +2167,15 @@ console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся с
   check('лента прокрутки со снапом существует',
     !!track && track.className.includes('snap-x') && track.className.includes('snap-mandatory'))
   check('в ленте ровно 4 слайда', track && track.children.length === 4, track && track.children.length)
-  check('первый экран — «Вся сеть»', document.querySelector('h3').textContent.trim() === 'Вся сеть',
-    document.querySelector('h3').textContent.trim())
-  check('месяц и дни в шапке деки (пилюли больше не нужны)',
-    document.body.textContent.includes('Май') && /\d+ из \d+ дня/.test(document.body.textContent),
-    (document.body.textContent.match(/Май[^]{0,24}/) || [''])[0])
+  check('главное в шапке — МЕСЯЦ (карта про месяц, парк лишь уточняет срез)',
+    document.querySelector('h3').textContent.trim() === 'Май\u00A02025', document.querySelector('h3').textContent.trim())
+  check('парк — второй строкой, не заголовком',
+    document.querySelector('[data-test="month-deck-scope"]').textContent.trim() === 'Вся сеть')
+  const badge = document.querySelector('[data-test="month-deck-days"]')
+  check('дни — бейджем и про ОСТАТОК, а не про пройденное',
+    !!badge && /^Осталось \d+ (день|дня|дней)$/.test(badge.textContent.trim()), badge && badge.textContent.trim())
+  check('верхней дорожки времени больше нет (мешала основной полосе)',
+    document.querySelectorAll('.h-1').length === 0)
   const dots = document.querySelector('[data-test="month-deck-dots"]')
   check('точек столько же, сколько экранов', !!dots && dots.children.length === 4, dots && dots.children.length)
   check('активна первая точка', !!dots && dots.children[0].getAttribute('aria-current') === 'true')
@@ -2097,9 +2190,9 @@ console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся с
   track.scrollLeft = 800
   track.dispatchEvent(new dom.window.Event('scroll', { bubbles: true }))
   await nextTick()
-  check('прокрутка на 3-й экран → заголовок сменился на имя парка',
-    document.querySelector('h3').textContent.trim() === slides[2].title,
-    document.querySelector('h3').textContent.trim())
+  check('прокрутка на 3-й экран → срез сменился на имя парка',
+    document.querySelector('[data-test="month-deck-scope"]').textContent.trim() === slides[2].title,
+    document.querySelector('[data-test="month-deck-scope"]').textContent.trim())
   check('прокрутка → активная точка переехала',
     document.querySelector('[data-test="month-deck-dots"]').children[2].getAttribute('aria-current') === 'true')
   app.app.unmount(); document.body.innerHTML = ''
@@ -2107,7 +2200,9 @@ console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся с
   // Один парк — карусель из одного экрана обман: сетевой слайд и точки не нужны.
   const one = mount(bundle.MonthProgressCard, { slides: [parkSlides[0]], month: '2025-05', loading: false })
   check('один парк → точек нет', !document.querySelector('[data-test="month-deck-dots"]'))
-  check('один парк → заголовок = имя парка', document.querySelector('h3').textContent.trim() === parkSlides[0].title)
+  check('один парк → в срезе имя парка, в заголовке месяц',
+    document.querySelector('[data-test="month-deck-scope"]').textContent.trim() === parkSlides[0].title
+    && document.querySelector('h3').textContent.trim() === 'Май\u00A02025')
   one.app.unmount(); document.body.innerHTML = ''
 
   const load = mount(bundle.MonthProgressCard, { slides: [], month: '', loading: true })

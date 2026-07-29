@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import MonthProgressSlide from './MonthProgressSlide.vue'
-import { monthCap } from '../../i18n/home.js'
+import { monthCap, plural } from '../../i18n/home.js'
 
 // Дека месяца (D-34) — свайп-карусель «где месяц» В РУБЛЯХ И ДНЯХ.
 // Экран 1 — вся сеть, дальше по экрану на парк. Заголовок слайда называет,
@@ -33,16 +33,15 @@ const many = computed(() => props.slides.length > 1)
 const current = computed(() => props.slides[Math.min(idx.value, props.slides.length - 1)] || null)
 const monthLabel = computed(() => (props.month ? monthCap(props.month) : ''))
 
-const daysLabel = computed(() => {
+// Бейдж считает ОСТАВШИЕСЯ дни, а не пройденные: «прошло 27 из 31» — констатация,
+// «осталось 4 дня» — то, чем можно распорядиться. Месяц закрыт → так и пишем:
+// «осталось 0» читалось бы как ошибка, а не как завершённый месяц.
+const daysBadge = computed(() => {
   const c = current.value
   if (!c || c.daysDone == null || !c.daysTotal) return ''
-  return `${c.daysDone} из ${c.daysTotal}`
-})
-// «Июль 2026 · 27 из 31 дня» — месяц и прогресс по дням одной строкой справа
-// от заголовка. Слово «дня» ставим один раз в конце, а не после каждого числа.
-const metaLabel = computed(() => {
-  const parts = [monthLabel.value, daysLabel.value && `${daysLabel.value} дня`].filter(Boolean)
-  return parts.join(' · ')
+  const left = Math.max(0, c.daysTotal - c.daysDone)
+  if (left === 0) return 'Месяц закрыт'
+  return `Осталось ${left} ${plural(left, ['день', 'дня', 'дней'])}`
 })
 
 // Индекс активного экрана — из позиции прокрутки. Слушаем сам scroll, а не
@@ -62,22 +61,32 @@ function goTo(i) {
 
 <template>
   <section class="rounded-[22px] bg-[var(--surface)] px-4 pb-3 pt-3 shadow-sm">
-    <!-- Шапка: чьи числа + месяц и прогресс по дням -->
-    <div class="mb-2.5 flex items-baseline justify-between gap-2">
+    <!-- Шапка. Главное — МЕСЯЦ: карта про месяц, а парк лишь уточняет, чей срез.
+         Парк второй строкой. Остаток дней — бейджем справа. -->
+    <div class="mb-2.5 flex items-start justify-between gap-2">
       <template v-if="loading">
-        <span class="bc-skeleton h-[16px] w-[92px] rounded"></span>
-        <span class="bc-skeleton h-[13px] w-[124px] rounded"></span>
+        <span class="flex flex-col gap-1.5">
+          <span class="bc-skeleton block h-[16px] w-[96px] rounded"></span>
+          <span class="bc-skeleton block h-[12px] w-[68px] rounded"></span>
+        </span>
+        <span class="bc-skeleton h-[20px] w-[92px] rounded-full"></span>
       </template>
       <template v-else>
-        <h3 class="truncate text-[0.9375rem] font-bold text-[var(--text)]">{{ current?.title || '—' }}</h3>
-        <span class="shrink-0 text-[0.6875rem] text-[var(--text-muted)]">{{ metaLabel }}</span>
+        <span class="flex min-w-0 flex-col">
+          <h3 class="truncate text-[0.9375rem] font-bold leading-tight text-[var(--text)]">{{ monthLabel || '—' }}</h3>
+          <span data-test="month-deck-scope" class="truncate text-[0.6875rem] text-[var(--text-muted)]">{{ current?.title || '' }}</span>
+        </span>
+        <span
+          v-if="daysBadge"
+          data-test="month-deck-days"
+          class="shrink-0 whitespace-nowrap rounded-full bg-[var(--surface-2)] px-2 py-[3px] text-[0.6875rem] font-semibold text-[var(--text-secondary)]"
+        >{{ daysBadge }}</span>
       </template>
     </div>
 
-    <!-- Пока грузится — один статичный скелетон вместо карусели: пустая лента
-         со снапом ловит жесты и ведёт себя как сломанная. -->
+    <!-- Пока грузится — статичный скелетон вместо карусели: пустая лента со
+         снапом ловит жесты и ведёт себя как сломанная. -->
     <div v-if="loading" class="flex flex-col gap-2">
-      <span class="bc-skeleton h-1 w-full rounded-full"></span>
       <span class="bc-skeleton h-3.5 w-full rounded-full"></span>
       <span class="bc-skeleton mt-1 h-[30px] w-full rounded"></span>
     </div>
@@ -100,14 +109,7 @@ function goTo(i) {
         aria-roledescription="слайд"
         :aria-label="`${s.title}, ${i + 1} из ${slides.length}`"
       >
-        <MonthProgressSlide
-          :fact="s.fact"
-          :plan="s.plan"
-          :forecast="s.forecast"
-          :goal="s.goal"
-          :days-done="s.daysDone"
-          :days-total="s.daysTotal"
-        />
+        <MonthProgressSlide :fact="s.fact" :plan="s.plan" :forecast="s.forecast" :goal="s.goal" />
       </div>
     </div>
 
