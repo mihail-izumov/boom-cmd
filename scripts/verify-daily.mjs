@@ -275,6 +275,8 @@ export { default as BusinessChip } from '${root}/src/components/business/Busines
 export { default as AccessKeyForm } from '${root}/src/components/AccessKeyForm.vue'
 export { default as ConnectBusinessModal } from '${root}/src/components/business/ConnectBusinessModal.vue'
 export { default as HomeScreen } from '${root}/src/screens/HomeScreen.vue'
+export { default as MonthProgressCard } from '${root}/src/components/home/MonthProgressCard.vue'
+export { default as MonthProgressSlide } from '${root}/src/components/home/MonthProgressSlide.vue'
 export { default as ReviewsScreen } from '${root}/src/screens/ReviewsScreen.vue'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
@@ -1903,6 +1905,223 @@ console.log('\n=== D-20: модалка «Подключить бизнес» ==
     !document.querySelector('[data-test="connect-input"]'))
   app.unmount()
   document.querySelectorAll('[data-test="connect-modal"]').forEach((n) => n.remove())
+}
+
+console.log('\n=== D-34: цель месяца в модели (month_goal) ===')
+{
+  const withGoal = computeDaily(sets['ohta:2025-05'])
+  check('computeDaily отдаёт goal из month_goal', withGoal.goal === 1860000, withGoal.goal)
+  check('goal ≠ T (цель и план — разные числа)', withGoal.goal !== withGoal.T, `${withGoal.goal} vs ${withGoal.T}`)
+  check('planRealized = realizedRev + tailCum (план на сегодня)',
+    Math.abs(withGoal.planRealized - (withGoal.realizedRev + withGoal.tailCum)) < 1e-6,
+    Math.round(withGoal.planRealized))
+
+  // Цели нет → null, а не 0 и не NaN: виджет должен отличить «нет цели» от «цель ноль».
+  const noGoal = computeDaily({ ...sets['ohta:2025-05'], month_goal: undefined })
+  check('нет month_goal → goal = null', noGoal.goal === null, String(noGoal.goal))
+  const zeroGoal = computeDaily({ ...sets['ohta:2025-05'], month_goal: 0 })
+  check('month_goal = 0 → goal = null (0 не цель)', zeroGoal.goal === null, String(zeroGoal.goal))
+  const junkGoal = computeDaily({ ...sets['ohta:2025-05'], month_goal: 'нет' })
+  check('битый month_goal → goal = null', junkGoal.goal === null, String(junkGoal.goal))
+
+  const n = computeNetwork(sets, ['ohta', 'piterland', 'iyun'])
+  const sumGoal = 1860000 + 3190000 + 1400000
+  check('сеть: goal = Σ по паркам', n.totals.goal === sumGoal, n.totals.goal)
+  check('сеть: goalParks = 3, goalPartial = false',
+    n.totals.goalParks === 3 && n.totals.goalPartial === false, `${n.totals.goalParks}/${n.totals.goalPartial}`)
+
+  // Ключевая защита: цель есть НЕ у всех парков → сумма врала бы (цель двух против факта трёх).
+  const partial = { ...sets, 'iyun:2025-05': { ...sets['iyun:2025-05'], month_goal: undefined } }
+  const np = computeNetwork(partial, ['ohta', 'piterland', 'iyun'])
+  check('сеть: цель не у всех парков → goal = null (частичную сумму не показываем)',
+    np.totals.goal === null, String(np.totals.goal))
+  check('сеть: goalPartial = true подсказывает причину', np.totals.goalPartial === true)
+
+  check('сеть: daysDone/daysTotal заполнены',
+    Number.isFinite(n.totals.daysDone) && Number.isFinite(n.totals.daysTotal) && n.totals.daysTotal >= n.totals.daysDone,
+    `${n.totals.daysDone}/${n.totals.daysTotal}`)
+  check('сеть: planRealized = Σ по паркам',
+    Math.abs(n.totals.planRealized - n.cards.reduce((a, c) => a + c.planRealized, 0)) < 1e-6,
+    Math.round(n.totals.planRealized))
+  // Регрессия: расширение totals не должно было тронуть существующие метрики.
+  check('регрессия: target/earned/landing/landDev не изменились',
+    n.totals.target === n.cards.reduce((a, c) => a + c.target, 0) &&
+    n.totals.earned === n.cards.reduce((a, c) => a + c.earned, 0) &&
+    Math.abs(n.totals.landDev - (n.totals.landing / n.totals.target - 1)) < 1e-9)
+}
+
+console.log('\n=== jsdom: D-34 — слайд месяца (полосы и метки) ===')
+{
+  const P = { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000, daysDone: 20, daysTotal: 31 }
+  const app = mount(bundle.MonthProgressSlide, P)
+  const card = document.querySelector('[role="img"]')
+  check('дорожка денег отрисована с aria-label', !!card && card.getAttribute('aria-label').includes('Цель'))
+  const labels = [...document.querySelectorAll('span')].map((n) => n.textContent.trim())
+  check('есть все четыре подписи', ['Факт', 'Прогноз', 'План', 'Цель'].every((l) => labels.includes(l)))
+  check('процентов на слайде нет (не дублируем виджеты)', !document.body.textContent.includes('%'))
+  const fills = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--accent)]'))
+  check('заливка факта — жёлтая, ширина = факт/максимум (1,0 из 1,86 млн ≈ 53,8%)',
+    fills.length > 0 && fills[0].style.width.startsWith('53.7'), fills[0] && fills[0].style.width)
+  check('хардкод hex в слайде отсутствует (только токены)',
+    !readFileSync(resolve(root, 'src/components/home/MonthProgressSlide.vue'), 'utf8').match(/#[0-9a-fA-F]{6}\b/))
+  const darkMarks = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--text)]'))
+  check('конец факта помечен тёмной риской (жёлтый сам по себе 1,36:1)',
+    darkMarks.some((n) => n.style.left && parseFloat(n.style.left) > 53 && parseFloat(n.style.left) < 54),
+    darkMarks.map((n) => n.style.left).join(' '))
+  check('цель — отдельная риска у верха шкалы (100%, прижата внутрь)',
+    darkMarks.some((n) => n.style.left === '100%' && n.style.transform === 'translateX(-100%)'))
+  const hatch = [...document.querySelectorAll('div')]
+    .filter((n) => (n.style.backgroundImage || '').includes('repeating-linear-gradient'))
+  check('прогноз — штрихованный отрезок, начинается на конце факта',
+    hatch.length === 1 && hatch[0].style.left.startsWith('53.7'), hatch[0] && hatch[0].style.left)
+  check('ширина штриховки = прогноз − факт (≈16,1 п.п.)',
+    hatch.length === 1 && hatch[0].style.width.startsWith('16.1'), hatch[0] && hatch[0].style.width)
+  check('штриховка серая (--text-muted), не цветная',
+    hatch.length === 1 && hatch[0].style.backgroundImage.includes('--text-muted'))
+  app.app.unmount(); document.body.innerHTML = ''
+
+  const app2 = mount(bundle.MonthProgressSlide, { ...P, goal: null })
+  const labels2 = [...document.querySelectorAll('span')].map((n) => n.textContent.trim())
+  check('нет цели → колонки «Цель» нет', !labels2.includes('Цель'))
+  check('нет цели → остальные три на месте', ['Факт', 'Прогноз', 'План'].every((l) => labels2.includes(l)))
+  const fills2 = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--accent)]'))
+  check('нет цели → шкала до плана (1,0 из 1,55 млн ≈ 64,5%)',
+    fills2.length > 0 && fills2[0].style.width.startsWith('64.5'), fills2[0] && fills2[0].style.width)
+  app2.app.unmount(); document.body.innerHTML = ''
+
+  const app3 = mount(bundle.MonthProgressSlide, { ...P, forecast: 2_000_000 })
+  const marks = [...document.querySelectorAll('div')].filter((n) => n.style.left)
+  check('прогноз > цели → все метки в пределах 0–100%',
+    marks.length >= 3 && marks.every((n) => parseFloat(n.style.left) <= 100), marks.map((n) => n.style.left).join(' '))
+  check('прогноз > цели → цель ушла ВНУТРЬ шкалы (1,86 из 2,0 = 93%)',
+    marks.some((n) => n.style.left === '93%' && n.style.transform === 'translateX(-50%)'))
+  app3.app.unmount(); document.body.innerHTML = ''
+}
+
+console.log('\n=== jsdom: D-34 — состояния порогов (совпадение и достижение) ===')
+{
+  const B = { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000, daysDone: 20, daysTotal: 31 }
+  const cols = () => [...document.querySelectorAll('span')].map((n) => n.textContent.trim())
+  const marks = () => [...document.querySelectorAll('div')].filter((n) => n.style.left)
+
+  // ЦЕЛЬ = ПЛАН (штатно у парка без планировщика, так сейчас у ТЦ Июнь).
+  const a = mount(bundle.MonthProgressSlide, { ...B, plan: 1_550_000, goal: 1_550_000 })
+  check('цель = плану → одна колонка «План и цель», а не две с одним числом',
+    cols().includes('План и цель') && !cols().includes('План') && !cols().includes('Цель'))
+  check('цель = плану → колонок три, а не четыре',
+    document.querySelectorAll('.gap-\\[3px\\]').length === 3, document.querySelectorAll('.gap-\\[3px\\]').length)
+  check('цель = плану → одна метка в этой точке, риска плана не рисуется',
+    marks().filter((n) => n.style.left === '100%').length === 1,
+    marks().map((n) => n.style.left).join(' '))
+  a.app.unmount(); document.body.innerHTML = ''
+
+  // ПЛАН ВЗЯТ ФАКТОМ, цель ещё нет.
+  const b = mount(bundle.MonthProgressSlide, { ...B, fact: 1_600_000, forecast: 1_700_000 })
+  // ВНИМАНИЕ: числа форматируются с русской десятичной запятой («₽1,6 млн»),
+  // поэтому регулярки вида /План[^,]*взято/ ломаются на ней. Режем по «, »
+  // (запятая+пробел): десятичная запятая всегда идёт перед цифрой, разделитель — перед пробелом.
+  const doneOf = (arr, label) => arr.some((x) => x.startsWith(label + ' ') && x.endsWith('взято'))
+  const parts2 = document.querySelector('[role="img"]').getAttribute('aria-label').split(', ')
+  check('факт ≥ плана → у плана «взято», у цели нет',
+    doneOf(parts2, 'План') && !doneOf(parts2, 'Цель'), parts2.join(' | '))
+  check('взятый порог помечен галочкой (одна, не две)',
+    document.querySelectorAll('svg.lucide-check').length === 1,
+    document.querySelectorAll('svg.lucide-check').length)
+  b.app.unmount(); document.body.innerHTML = ''
+
+  // ЦЕЛЬ ВЗЯТА ФАКТОМ — шкала обязана растянуться до факта, иначе метка цели у края.
+  const c = mount(bundle.MonthProgressSlide, { ...B, fact: 2_000_000, forecast: 2_000_000 })
+  const fill = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--accent)]'))[0]
+  check('факт перерос цель → шкала до факта, заливка 100%', fill.style.width === '100%', fill.style.width)
+  check('факт перерос цель → метка цели ушла ВНУТРЬ (1,86 из 2,0 = 93%)',
+    marks().some((n) => n.style.left === '93%'), marks().map((n) => n.style.left).join(' '))
+  check('и план, и цель помечены «взято» — две галочки',
+    document.querySelectorAll('svg.lucide-check').length === 2,
+    document.querySelectorAll('svg.lucide-check').length)
+  const parts3 = document.querySelector('[role="img"]').getAttribute('aria-label').split(', ')
+  check('состояние «взято» ушло в aria-label (скринридер получает результат, не только числа)',
+    doneOf(parts3, 'Цель') && doneOf(parts3, 'План'), parts3.join(' | '))
+  check('факт = прогнозу → штриховки нет (добирать нечего)',
+    [...document.querySelectorAll('div')].filter((n) => (n.style.backgroundImage || '').includes('repeating')).length === 0)
+  c.app.unmount(); document.body.innerHTML = ''
+
+  // Ничего не взято — галочек нет вовсе.
+  const d = mount(bundle.MonthProgressSlide, B)
+  check('ничего не взято → галочек нет', document.querySelectorAll('svg.lucide-check').length === 0)
+  d.app.unmount(); document.body.innerHTML = ''
+
+  // Реальный набор мока: у Июня план и цель совпадают.
+  const iy = computeDaily(sets['iyun:2025-05'])
+  check('мок: у Июня план = цели (штатный случай, а не дефект данных)', iy.T === iy.goal, `${iy.T}/${iy.goal}`)
+  const e = mount(bundle.MonthProgressSlide, {
+    fact: iy.realizedRev, plan: iy.T, forecast: iy.landing, goal: iy.goal,
+    daysDone: iy.realizedCount, daysTotal: iy.DIM,
+  })
+  check('мок Июня → «План и цель» одной колонкой', cols().includes('План и цель'))
+  e.app.unmount(); document.body.innerHTML = ''
+}
+
+console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся сеть → парки») ===')
+{
+  const netSlides = computeNetwork(sets, ['ohta', 'piterland', 'iyun'])
+  const parkSlides = netSlides.cards.map((c) => ({
+    key: c.park, title: c.parkName, fact: c.earned, plan: c.target, forecast: c.landing,
+    goal: c.goal, daysDone: c.daysDone, daysTotal: c.daysTotal,
+  }))
+  const t0 = netSlides.totals
+  const slides = [{ key: 'network', title: 'Вся сеть', fact: t0.earned, plan: t0.target,
+    forecast: t0.landing, goal: t0.goal, daysDone: t0.daysDone, daysTotal: t0.daysTotal }, ...parkSlides]
+
+  const app = mount(bundle.MonthProgressCard, { slides, month: '2025-05', loading: false })
+  check('деку собрали: 1 сеть + 3 парка = 4 экрана', slides.length === 4, slides.length)
+  const track = document.querySelector('[data-test="month-deck-track"]')
+  check('лента прокрутки со снапом существует',
+    !!track && track.className.includes('snap-x') && track.className.includes('snap-mandatory'))
+  check('в ленте ровно 4 слайда', track && track.children.length === 4, track && track.children.length)
+  check('первый экран — «Вся сеть»', document.querySelector('h3').textContent.trim() === 'Вся сеть',
+    document.querySelector('h3').textContent.trim())
+  check('месяц и дни в шапке деки (пилюли больше не нужны)',
+    document.body.textContent.includes('Май') && /\d+ из \d+ дня/.test(document.body.textContent),
+    (document.body.textContent.match(/Май[^]{0,24}/) || [''])[0])
+  const dots = document.querySelector('[data-test="month-deck-dots"]')
+  check('точек столько же, сколько экранов', !!dots && dots.children.length === 4, dots && dots.children.length)
+  check('активна первая точка', !!dots && dots.children[0].getAttribute('aria-current') === 'true')
+  check('каждый слайд подписан для скринридера («N из M»)',
+    [...track.children].every((n, i) => (n.getAttribute('aria-label') || '').endsWith(`${i + 1} из 4`)),
+    track.children[1].getAttribute('aria-label'))
+  check('область тапа точки ≥24px (HIG: точка мелкая, кнопка растянута)',
+    dots.children[0].className.includes('h-6') && dots.children[0].className.includes('w-6'))
+
+  // Заголовок обязан следовать за прокруткой — иначе подпись врёт про числа.
+  Object.defineProperty(track, 'clientWidth', { value: 400, configurable: true })
+  track.scrollLeft = 800
+  track.dispatchEvent(new dom.window.Event('scroll', { bubbles: true }))
+  await nextTick()
+  check('прокрутка на 3-й экран → заголовок сменился на имя парка',
+    document.querySelector('h3').textContent.trim() === slides[2].title,
+    document.querySelector('h3').textContent.trim())
+  check('прокрутка → активная точка переехала',
+    document.querySelector('[data-test="month-deck-dots"]').children[2].getAttribute('aria-current') === 'true')
+  app.app.unmount(); document.body.innerHTML = ''
+
+  // Один парк — карусель из одного экрана обман: сетевой слайд и точки не нужны.
+  const one = mount(bundle.MonthProgressCard, { slides: [parkSlides[0]], month: '2025-05', loading: false })
+  check('один парк → точек нет', !document.querySelector('[data-test="month-deck-dots"]'))
+  check('один парк → заголовок = имя парка', document.querySelector('h3').textContent.trim() === parkSlides[0].title)
+  one.app.unmount(); document.body.innerHTML = ''
+
+  const load = mount(bundle.MonthProgressCard, { slides: [], month: '', loading: true })
+  check('loading → скелетоны, ленты со снапом нет (пустая ловила бы жесты)',
+    document.querySelectorAll('.bc-skeleton').length > 0 && !document.querySelector('[data-test="month-deck-track"]'))
+  load.app.unmount(); document.body.innerHTML = ''
+}
+
+console.log('\n=== jsdom: D-34 — пилюли парков сняты с Главной ===')
+{
+  const src = readFileSync(resolve(root, 'src/screens/HomeScreen.vue'), 'utf8')
+  check('в HomeScreen не осталось строки пилюль (parkNames)', !src.includes('parkNames'))
+  check('месяц в шапке деки, monthCap из HomeScreen убран', !src.includes('monthCap'))
+  check('дека получает слайды и месяц', src.includes(':slides="monthSlides"') && src.includes(':month="t.month'))
 }
 
 console.log('\n=== Vue warnings ===')

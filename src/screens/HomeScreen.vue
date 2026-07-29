@@ -2,21 +2,23 @@
 import { computed, ref } from 'vue'
 import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Layers, Newspaper, Target } from 'lucide-vue-next'
 import HomeWidget from '../components/home/HomeWidget.vue'
+import MonthProgressCard from '../components/home/MonthProgressCard.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
 import { setActive, setSubView } from '../composables/useAppNav.js'
-import { mlnRub, mlnSigned, pctDelta, pct1, monthCap, readCounters, checkupsWord, signalsWord, reviewsWord, L } from '../i18n/home.js'
+import { mlnRub, mlnSigned, pctDelta, pct1, readCounters, checkupsWord, signalsWord, reviewsWord, L } from '../i18n/home.js'
 import { L as LS } from '../i18n/summary.js'
 import { reviewCount } from '../composables/reviews.js'
 
-// Home — командная дека. Два ВИДЖЕТА (два столбца): «Контроль Дня» (План/Факт %,
-// серая стрелка тренда, Накопленный хвост млн со знаком) и «Цели и планы» (Прогноз
-// выручки млн, Текущий темп %). Над ними — «<Месяц Год>: <парки>» (какие парки в
-// данных). Ниже — карта-сетка из трёх серых плиток. Внизу — графитовая ссылка b00m.fun.
-// Данные — сетевой агрегат computeNetwork из daily-пейлоада. Пока грузится — переливы
-// (bc-skeleton) вместо значений; имена парков — с фолбэком на справочник parks.js.
+// Home — командная дека. Сверху полоса счётчиков, под ней ДЕКА МЕСЯЦА (D-34:
+// свайп «Вся сеть → парки», рубли и дни), затем два ВИДЖЕТА (два столбца):
+// «Контроль Дня» (План/Факт %, стрелка тренда, Разрыв млн со знаком) и «Цели и
+// планы» (Прогноз/План %, Прогноз выручки млн). Ниже — карта-сетка плиток, внизу
+// графитовая ссылка b00m.fun. Данные — сетевой агрегат computeNetwork из
+// daily-пейлоада; пока грузится — переливы (bc-skeleton) вместо значений.
+// Строка пилюль «<Месяц>: <парки>» снята — см. комментарий у деки в шаблоне.
 
 const NM_DAILY = 'Контроль\nДня'
 const NM_GOALS = 'Цели и\nпланы'
@@ -31,10 +33,8 @@ const net = computed(() => computeNetwork(sets.value, parkIdsWithDaily.value))
 const t = computed(() => net.value.totals)
 const ready = computed(() => net.value.cards.length > 0)
 
-const parkNames = computed(() =>
-  net.value.cards.map((c) => c.parkName || PARKS_BY_ID[c.park]?.name).filter(Boolean),
-)
-const monthLabel = computed(() => (t.value.month ? monthCap(t.value.month) : ''))
+// Список имён парков и подпись месяца сняты вместе со строкой пилюль (D-34):
+// месяц теперь в шапке деки, имена парков — в заголовках её слайдов.
 const counters = computed(() => readCounters(data.value)) // v3.1: чекапы/сигналы (система)
 // D-19: счётчик разборов — из журнала payload.reviews (длина массива), а не из
 // stats: журнал грузится во фронт целиком, отдельного счётчика на бэке не нужно.
@@ -46,6 +46,29 @@ const tail = computed(() => (ready.value ? mlnSigned(-t.value.tailCumSum) : '—
 const pace = computed(() => (ready.value ? pctDelta(t.value.landDev) : '—'))
 const forecastTrend = computed(() => (ready.value ? t.value.trendForecast || null : null))
 const forecastSub = computed(() => (ready.value ? mlnRub(t.value.landing) : '—'))
+
+// D-34: дека месяца в рублях и днях (факт → прогноз → план → цель). Экран 1 —
+// вся сеть, дальше по экрану на парк. Числа — из того же сетевого агрегата,
+// отдельного запроса нет. Цель по сети = null, если она задана не у всех парков
+// (см. computeNetwork): половинчатую сумму на шкалу не пускаем.
+//
+// Один парк в данных → сетевой слайд не заводим: «Вся сеть» и этот парк были бы
+// двумя одинаковыми экранами.
+const monthSlides = computed(() => {
+  if (!ready.value) return []
+  const parks = net.value.cards.map((c) => ({
+    key: c.park,
+    title: c.parkName || PARKS_BY_ID[c.park]?.name || c.park,
+    fact: c.earned, plan: c.target, forecast: c.landing, goal: c.goal,
+    daysDone: c.daysDone, daysTotal: c.daysTotal,
+  }))
+  if (parks.length < 2) return parks
+  return [{
+    key: 'network', title: 'Вся сеть',
+    fact: t.value.earned, plan: t.value.target, forecast: t.value.landing, goal: t.value.goal,
+    daysDone: t.value.daysDone, daysTotal: t.value.daysTotal,
+  }, ...parks]
+})
 
 const infoOpen = ref(false)
 
@@ -118,22 +141,17 @@ function goMaterials() { setSubView('materials') }
       </button>
     </div>
 
-    <!-- <Месяц Год>: парки в данных. Пока грузится — переливы. -->
-    <div v-if="loading || (ready && parkNames.length)" class="mb-3 flex flex-nowrap items-center justify-center gap-[7px]">
-      <template v-if="loading">
-        <span class="bc-skeleton h-[15px] w-[78px] shrink-0 rounded"></span>
-        <span class="bc-skeleton h-[22px] w-[74px] shrink-0 rounded-full"></span>
-        <span class="bc-skeleton h-[22px] w-[74px] shrink-0 rounded-full"></span>
-      </template>
-      <template v-else>
-        <span class="shrink-0 text-[0.75rem] font-bold text-[var(--text-secondary)]">{{ monthLabel }}:</span>
-        <span
-          v-for="p in parkNames"
-          :key="p"
-          class="shrink-0 whitespace-nowrap rounded-full border border-[var(--line)] px-[9px] py-[3px] text-[0.6875rem] font-semibold text-[var(--text-muted)]"
-        >{{ p }}</span>
-      </template>
-    </div>
+    <!-- D-34: дека месяца — рубли, дни и разрез по паркам. Над процентными
+         виджетами: сначала абсолютная картина, потом детализация в процентах.
+         Пилюли «<Месяц>: <парки>» СНЯТЫ — их работу делает заголовок слайда,
+         причём честнее (пилюли перечисляли парки, а числа показывали сетевые). -->
+    <MonthProgressCard
+      class="mb-3"
+      data-test="home-month-progress"
+      :slides="monthSlides"
+      :month="t.month || ''"
+      :loading="loading"
+    />
 
     <!-- два виджета -->
     <div class="flex gap-3">
@@ -188,6 +206,7 @@ function goMaterials() { setSubView('materials') }
         <p><b class="text-[var(--text)]">План/Факт</b> — сколько заработали к сегодняшнему дню от плана на прошедшие дни. 100% — идём ровно по плану, ниже — отстаём. Стрелка — тренд за последний день. {{ planFactInfo }}</p>
         <p class="mt-2"><b class="text-[var(--text)]">Прогноз/План</b> — если темп сохранится, насколько выручка месяца отклонится от цели. {{ paceInfo }}</p>
         <p class="mt-2"><b class="text-[var(--text)]">Вместе:</b> слева — где мы сейчас, справа — куда придём к концу месяца.</p>
+        <p class="mt-2"><b class="text-[var(--text)]">Полоса месяца</b> — те же деньги, но в рублях. Верхняя тонкая линия — сколько дней месяца прошло, нижняя — сколько заработано. Деньги отстают от времени — не успеваем. <b class="text-[var(--text)]">План</b> — обязательство на месяц, <b class="text-[var(--text)]">цель</b> — амбиция сверху; они разные числа.</p>
       </div>
     </Transition>
 

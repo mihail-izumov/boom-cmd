@@ -134,6 +134,7 @@
       "park_name": "Охта Молл",
       "month": "2025-05",
       "month_target": 1550000,
+      "month_goal": 1860000,
       "signals": [
         {
           "date": "2025-05-09",
@@ -632,6 +633,7 @@
       "park_name": "Питерленд",
       "month": "2025-05",
       "month_target": 2900000,
+      "month_goal": 3190000,
       "signals": [
         {
           "date": "2025-05-12",
@@ -1007,6 +1009,7 @@
       "park_name": "ТЦ Июнь",
       "month": "2025-05",
       "month_target": 1400000,
+      "month_goal": 1400000,
       "days": [
         {
           "date": "2025-05-01",

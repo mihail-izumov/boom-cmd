@@ -107,6 +107,14 @@ export function computeDaily(set) {
   const onPlan = planRealized > 0 ? realizedRev / planRealized : null
   const tailCum = planRealized - realizedRev
 
+  // ЦЕЛЬ-амбиция месяца (D-34). Приходит из payload как month_goal; источник —
+  // targets/targets-2026.md контура B. НЕ путать с T (month_target) — это ПЛАН,
+  // обязательство, по которому живёт весь дневной контроль (Σ план дней = T РОВНО).
+  // Цель ≥ плана по канону. Нет цели (парк без планировщика, месяц не перекатан) →
+  // null: виджет месяца строит шкалу до плана и маркер цели не рисует.
+  const goalRaw = Number(set.month_goal)
+  const goal = Number.isFinite(goalRaw) && goalRaw > 0 ? goalRaw : null
+
   const lastFactISO = realized.length ? realized[realized.length - 1].iso : null
   const futureDays = days.filter((x) => !x.full && (!lastFactISO || x.iso > lastFactISO))
   const currentPace = realized.length ? realizedRev / realized.length : 0
@@ -208,7 +216,7 @@ export function computeDaily(set) {
 
   return {
     park: set.park, parkName: set.park_name, month: set.month, Y, M, DIM,
-    T, realizedRev, realizedCount: realized.length,
+    T, goal, planRealized, realizedRev, realizedCount: realized.length,
     impliedBase, adjBase,
     signals: Array.isArray(set.signals) ? set.signals : [],
     landing, landDev, fcSig: sigClass(T ? landing / T : null),
@@ -241,9 +249,10 @@ export function computeNetwork(setsByKey, parkIds) {
     const assume = (s.dow_src || []).some((x) => x !== 'данные')
     cards.push({
       park: pid, parkName: s.park_name, month: s.month,
-      target: m.T, earned: m.realizedRev, landing: m.landing,
+      target: m.T, goal: m.goal, earned: m.realizedRev, landing: m.landing,
       landDev: m.landDev, fcSig: m.fcSig, achievable: m.achievable, goalState: m.goalState,
       onPlan: m.onPlan, tailCum: m.tailCum, assume,
+      planRealized: m.planRealized, daysDone: m.realizedCount, daysTotal: m.DIM,
       signal: latestSignal(sortSignals(s.signals)),
     })
     // моментум «как в журнале»: последний шаг journal по каждому парку (сетевой ряд A)
@@ -257,6 +266,20 @@ export function computeNetwork(setsByKey, parkIds) {
   const totTarget = sum(cards, (c) => c.target)
   const totEarned = sum(cards, (c) => c.earned)
   const totLanding = sum(cards, (c) => c.landing)
+  // ЦЕЛЬ по сети (D-34). Складываем ТОЛЬКО если она есть у ВСЕХ парков в агрегате:
+  // частичная сумма сравнивала бы цель одних парков с фактом всех — шкала бы врала.
+  // Хоть у одного null → goal=null, виджет строит шкалу до плана. goalParks/goalPartial —
+  // чтобы UI мог честно сказать, почему цели нет.
+  const goalCards = cards.filter((c) => c.goal != null)
+  const totGoal = goalCards.length === cards.length && cards.length ? sum(goalCards, (c) => c.goal) : null
+  // План-на-сегодня по сети = Σ план закрытых дней. Держим суммой (не средним):
+  // он сравнивается с суммой факта на одной денежной шкале.
+  const totPlanRealized = sum(cards, (c) => c.planRealized || 0)
+  // Прогресс месяца по времени. Парки могут отличаться на день (разная дата
+  // последнего закрытого дня) — берём максимум закрытых дней и максимум длины месяца:
+  // шкала времени общая для сети, отставание одного парка её не должно укорачивать.
+  const daysDone = cards.length ? Math.max(...cards.map((c) => c.daysDone || 0)) : null
+  const daysTotal = cards.length ? Math.max(...cards.map((c) => c.daysTotal || 0)) : null
   const opv = cards.map((c) => c.onPlan).filter((v) => v != null && Number.isFinite(v))
   const onPlanAvg = opv.length ? opv.reduce((a, b) => a + b, 0) / opv.length : null
   const tailCumSum = sum(cards, (c) => c.tailCum || 0)
@@ -269,7 +292,9 @@ export function computeNetwork(setsByKey, parkIds) {
   return {
     cards,
     totals: {
-      target: totTarget, earned: totEarned, landing: totLanding,
+      target: totTarget, goal: totGoal, earned: totEarned, landing: totLanding,
+      planRealized: totPlanRealized, daysDone, daysTotal,
+      goalParks: goalCards.length, goalPartial: goalCards.length > 0 && goalCards.length < cards.length,
       landDev: totTarget ? totLanding / totTarget - 1 : 0,
       fcSig: sigClass(totTarget ? totLanding / totTarget : null),
       onPlanAvg, tailCumSum,
