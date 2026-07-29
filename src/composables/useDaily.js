@@ -10,7 +10,7 @@ import { useAccessKey } from './useAccessKey.js'
 //     читает ОТДЕЛЬНУЮ дневную таблицу по openById; URL — VITE_DAILY_API, фолбэк VITE_ANALYTICS_API
 //     (тот же деплой). На VITE_PROJECTS_API НЕ фолбэкаем — другой деплой.
 
-const EMPTY = { updated: null, sets: {} }
+const EMPTY = { updated: null, sets: {}, signal_reads: [] }
 
 function normalizeSet(raw) {
   if (!raw || typeof raw !== 'object') return null
@@ -45,6 +45,11 @@ function normalize(raw) {
   // Журнал разборов (D-19) — тоже верхнеуровневый массив; валидация и сортировка —
   // в reviews.js. Нет ключа → счётчик Главной «—», журнал покажет пустой стейт.
   if (Array.isArray(safe.reviews)) out.reviews = safe.reviews
+  // Отметки «Прочитал» (D-36, бэк v3.9) — компактная проекция, одна строка на парк.
+  // В ОТЛИЧИЕ от net_summary/reviews ключ гарантируем ВСЕГДА, пустоту как []: карточка
+  // сигнала не должна отличать «поле не доехало» от «никто не отметил» — в обоих
+  // случаях она честно живёт на локальном состоянии устройства.
+  out.signal_reads = Array.isArray(safe.signal_reads) ? safe.signal_reads : []
   const sets = safe.sets && typeof safe.sets === 'object' ? safe.sets : {}
   for (const [key, v] of Object.entries(sets)) {
     const n = normalizeSet(v)

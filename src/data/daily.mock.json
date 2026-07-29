@@ -4,6 +4,20 @@
     "checkups": 137,
     "signals": 42
   },
+  "signal_reads": [
+    {
+      "park": "ohta",
+      "signal_date": "2025-05-14",
+      "read_at": "2025-05-14 11:36",
+      "score": null
+    },
+    {
+      "park": "piterland",
+      "signal_date": "2025-05-12",
+      "read_at": "2025-05-12 09:41",
+      "score": 7
+    }
+  ],
   "reviews": [
     {
       "date": "2025-05-09",

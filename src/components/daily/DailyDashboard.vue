@@ -11,14 +11,19 @@ import DailyMetrics from './DailyMetrics.vue'
 import DailyCoef from './DailyCoef.vue'
 import DailyActivities from './DailyActivities.vue'
 
-defineProps({ m: { type: Object, required: true } })
+// reads (D-36) — проекция payload.signal_reads: «показанный сигнал уже отмечен?».
+// Прокидываем сквозь дашборд, чтобы карточка не лезла за данными сама.
+defineProps({
+  m: { type: Object, required: true },
+  reads: { type: Array, default: () => [] },
+})
 </script>
 
 <template>
   <div class="flex flex-col gap-3">
     <DailyLead v-if="m.lead" :m="m" />
     <DailyHero :m="m" />
-    <DailySignalCard :m="m" />
+    <DailySignalCard :m="m" :reads="reads" />
     <DailyKpis :m="m" />
     <DailyWeeks :m="m" />
     <DailySummary :m="m" />

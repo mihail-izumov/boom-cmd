@@ -107,7 +107,7 @@ watch(updatedLabel, () => syncCaption())
     <!-- конкретный парк -->
     <template v-else-if="model">
       <p class="bc-fade-in px-1 text-[0.8125rem] capitalize text-[var(--text-muted)]">{{ monthLabel }}</p>
-      <DailyDashboard :m="model" class="bc-fade-in" />
+      <DailyDashboard :m="model" :reads="data?.signal_reads || []" class="bc-fade-in" />
     </template>
 
     <!-- «Отчёт дня» (D-12): вход в единственную пишущую страницу.

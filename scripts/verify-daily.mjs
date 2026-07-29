@@ -17,7 +17,7 @@ import { monthLayout, markStyle } from '../src/composables/monthLayout.js'
 import { actCode } from '../src/i18n/daily.js'
 import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
-  buildSignalReadBody, postSignalRead,
+  buildSignalReadBody, postSignalRead, normalizeReads, readFor, readDay,
 } from '../src/composables/dailySignals.js'
 import { readCounters, plural, checkupsWord, signalsWord, reviewsWord } from '../src/i18n/home.js'
 // ВНИМАНИЕ: useConnectRequest.js импортирует vue — статически его сюда тянуть НЕЛЬЗЯ.
@@ -260,6 +260,37 @@ check('модель прокидывает signals + impliedBase/adjBase',
     !!o.signal && o.signal.date === '2025-05-16' && iy.signal === null)
 }
 
+console.log('\n=== D-36: проекция отметок payload.signal_reads (чистые функции) ===')
+{
+  const proj = [
+    { park: 'ohta', signal_date: '2025-05-14', read_at: '2025-05-14 11:36', score: null },
+    { park: 'piterland', signal_date: '2025-05-12', read_at: '2025-05-12 09:41', score: 7 },
+    { park: 'iyun', signal_date: 'не-дата', read_at: '', score: null }, // битая — отбросить
+    null, 'мусор',
+  ]
+  check('normalizeReads: битые записи и не-объекты отброшены', normalizeReads(proj).length === 2,
+    normalizeReads(proj).length)
+  check('normalizeReads: не массив → []',
+    normalizeReads(undefined).length === 0 && normalizeReads(null).length === 0)
+  check('readFor: пара парк+дата найдена', readFor(proj, 'piterland', '2025-05-12')?.score === 7)
+  check('readFor: ДРУГАЯ дата того же парка → null (вчерашняя отметка не гасит сегодняшнюю кнопку)',
+    readFor(proj, 'piterland', '2025-05-16') === null)
+  check('readFor: чужой парк → null', readFor(proj, 'ohta', '2025-05-12') === null)
+  check('readFor: пустая проекция → null (поле не доехало = живём на локальном состоянии)',
+    readFor([], 'ohta', '2025-05-14') === null && readFor(undefined, 'ohta', '2025-05-14') === null)
+  check('readDay: штамп → дата', readDay({ read_at: '2025-05-14 11:36' }) === '2025-05-14')
+  check('readDay: битый/пустой штамп → пусто',
+    readDay({ read_at: 'нет' }) === '' && readDay({}) === '' && readDay(null) === '')
+}
+{
+  const mock = JSON.parse(readFileSync(resolve(here, '../src/data/daily.mock.json'), 'utf8'))
+  check('мок несёт signal_reads массивом (контракт бэка v3.9)', Array.isArray(mock.signal_reads))
+  check('в моке не больше одной строки на парк',
+    new Set(mock.signal_reads.map((r) => r.park)).size === mock.signal_reads.length)
+  check('в моке нет реальных данных: даты — из выдуманного мая 2025',
+    mock.signal_reads.every((r) => r.signal_date.startsWith('2025-05')))
+}
+
 // ═══════════════ jsdom: живой рендер полос A/B и сети ═══════════════
 console.log('\n=== jsdom: сборка тестового бандла ===')
 const tmp = resolve(root, '.tmp-verify-daily')
@@ -487,6 +518,92 @@ const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]'
   check('без сигнала: заметка-пустышка дословно', el.textContent.includes('Разбор аналитика появится позже.'))
   check('без сигнала: «Как идёт день» всё равно есть', el.textContent.includes('Как идёт день'))
   app.unmount()
+}
+
+console.log('\n=== jsdom: D-36 — отметка из payload переживает перезагрузку и смену устройства ===')
+{
+  // Чистое устройство (localStorage пуст) + отметка в проекции бэка → кнопка сразу
+  // в состоянии «Прочитано», POST не нужен. Это и есть §2.4 задания.
+  localStorage.clear()
+  postMode = 'ok'; postedBodies.length = 0
+  const reads = [{ park: 'ohta', signal_date: '2025-05-16', read_at: '2025-05-16 11:36', score: 8 }]
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
+  await nextTick()
+  check('пустой localStorage + отметка в payload → «Прочитано ✓» сразу',
+    el.textContent.includes('Прочитано ✓'))
+  check('дата отметки видна рядом со статусом (16.05)',
+    el.querySelector('[data-test="signal-read-date"]')?.textContent.includes('16.05'))
+  check('кнопка неактивна, повторный POST не уходит',
+    el.querySelector('[data-test="signal-read"]').disabled === true && postedBodies.length === 0)
+  check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
+  app.unmount()
+}
+{
+  // Отметка ВЧЕРАШНЕГО сигнала не должна гасить кнопку у сегодняшнего.
+  localStorage.clear()
+  const reads = [{ park: 'ohta', signal_date: '2025-05-14', read_at: '2025-05-14 11:36', score: null }]
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
+  await nextTick()
+  check('отметка другого сигнала → кнопка активна, «✓» нет',
+    el.querySelector('[data-test="signal-read"]').disabled === false &&
+    !el.textContent.includes('Прочитано ✓') && !el.querySelector('[data-test="signal-read-date"]'))
+  app.unmount()
+}
+{
+  // Чужой парк в проекции — не наш случай.
+  localStorage.clear()
+  const reads = [{ park: 'piterland', signal_date: '2025-05-16', read_at: '2025-05-16 09:41', score: 7 }]
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
+  await nextTick()
+  check('отметка чужого парка кнопку не гасит',
+    el.querySelector('[data-test="signal-read"]').disabled === false)
+  app.unmount()
+}
+{
+  // Старый деплой бэка: поля нет вовсе → поведение ровно как до D-36.
+  localStorage.clear()
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  check('нет проекции (старый деплой) → кнопка активна, карточка живёт как раньше',
+    el.querySelector('[data-test="signal-read"]').disabled === false &&
+    el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
+  app.unmount()
+}
+{
+  // Успешная отправка: дата появляется сразу, не дожидаясь следующего payload.
+  localStorage.clear()
+  postMode = 'ok'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads: [] })
+  await nextTick()
+  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(document.querySelector('[data-test="signal-rate-submit"]'), 'click')
+  await new Promise((r) => setTimeout(r, 20)); await nextTick()
+  check('после успеха дата отметки видна сразу (16.05, до обновления payload)',
+    el.textContent.includes('Прочитано ✓') &&
+    el.querySelector('[data-test="signal-read-date"]')?.textContent.includes('16.05'))
+  app.unmount()
+}
+{
+  // Сбой отправки: кнопка НЕ гаснет и даты нет — «не нажали» отличимо от «не долетело».
+  localStorage.clear()
+  postMode = 'neterror'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads: [] })
+  await nextTick()
+  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(document.querySelector('[data-test="signal-rate-submit"]'), 'click')
+  await new Promise((r) => setTimeout(r, 20)); await nextTick()
+  check('сетевой сбой: плашка есть, кнопка активна, даты НЕТ (молча не гасим)',
+    el.textContent.includes('Не удалось отметить') &&
+    el.querySelector('[data-test="signal-read"]').disabled === false &&
+    !el.querySelector('[data-test="signal-read-date"]'))
+  app.unmount()
+  postMode = 'ok'
+}
+{
+  const src = readFileSync(resolve(root, 'src/screens/DailyScreen.vue'), 'utf8')
+  const dash = readFileSync(resolve(root, 'src/components/daily/DailyDashboard.vue'), 'utf8')
+  check('DailyScreen отдаёт проекцию в дашборд', src.includes(':reads="data?.signal_reads || []"'))
+  check('дашборд прокидывает её в карточку сигнала', dash.includes(':reads="reads"'))
 }
 
 console.log('\n=== jsdom: полоса A — «Как идёт день» (bare-блок) ===')

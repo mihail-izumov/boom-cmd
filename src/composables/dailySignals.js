@@ -79,6 +79,33 @@ export function markState(store, park, date, state) {
   return store
 }
 
+// ── Проекция уже записанных отметок (payload.signal_reads, бэк v3.9 / D-36) ──
+// Локальное состояние (localStorage выше) — пер-девайсное и врёт при смене телефона
+// или чистке кэша: канон прочтения живёт в листе signal_reads. Бэк отдаёт не лист,
+// а КОМПАКТНУЮ проекцию — одну строку на парк, максимум три: {park, signal_date,
+// read_at, score}. Фронт сверяет signal_date проекции с датой сигнала, который рисует.
+// Пустота приходит как [] (а НЕ отсутствием ключа) — иначе «никто не отметил» не
+// отличить от «поле не доехало со старого деплоя», а это и был корень D-36.
+export function normalizeReads(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw.filter(
+    (r) => r && typeof r === 'object' && String(r.park || '') && DATE_RE.test(String(r.signal_date || '')),
+  )
+}
+// Запись проекции для пары (парк, дата сигнала) либо null. Сравнение строгое по дате:
+// отметка вчерашнего сигнала НЕ должна гасить кнопку у сегодняшнего.
+export function readFor(reads, park, date) {
+  if (!park || !DATE_RE.test(String(date || ''))) return null
+  return normalizeReads(reads).find(
+    (r) => String(r.park) === String(park) && String(r.signal_date) === String(date),
+  ) || null
+}
+// Дата отметки для подписи кнопки: 'yyyy-MM-dd HH:mm' → 'yyyy-MM-dd'. Битый штамп → ''.
+export function readDay(entry) {
+  const s = String((entry && entry.read_at) || '')
+  return DATE_RE.test(s.slice(0, 10)) ? s.slice(0, 10) : ''
+}
+
 // ── Запись прочтения (signal_read) ──
 // Тело POST по контракту ТЗ §2 + v3.2: опциональная оценка пользы `score` (0–10,
 // целое) из модалки «Оцените пользу Сигнала?». score валидируем здесь и кладём в

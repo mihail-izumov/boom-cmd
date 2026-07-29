@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-vue-next'
 import {
   sortSignals, latestSignal, feedSignals, signalDot,
   statusOf, markState, loadReadStore, saveReadStore,
+  readFor, readDay,
 } from '../../composables/dailySignals.js'
 import { useSignalRead } from '../../composables/useSignalRead.js'
 import { L, ddmm } from '../../i18n/daily.js'
@@ -17,6 +18,11 @@ import SignalRateSheet from './SignalRateSheet.vue'
 const props = defineProps({
   m: { type: Object, required: true },
   now: { type: Date, default: null },
+  // D-36: проекция payload.signal_reads — уже записанные бэком отметки (одна строка
+  // на парк). Канон прочтения, в отличие от localStorage, переживает перезагрузку,
+  // чистку кэша и смену устройства. Нет поля / старый деплой → [], карточка живёт
+  // на локальном состоянии как раньше.
+  reads: { type: Array, default: () => [] },
 })
 
 const signals = computed(() => (props.m && props.m.signals) || [])
@@ -35,8 +41,29 @@ const { posting, postError, markRead } = useSignalRead()
 
 const headDate = computed(() => (latest.value ? ddmm(latest.value.date) : ''))
 const statusFor = (date) => statusOf(store.value, park.value, date)
-const latestRead = computed(() => !!latest.value && statusFor(latest.value.date) === 'read')
+
+// D-36: отметка, уже записанная бэком, ровно для того сигнала, который сейчас на
+// экране (сверяем signal_date — вчерашняя отметка не должна гасить сегодняшнюю кнопку).
+const serverRead = computed(() =>
+  latest.value ? readFor(props.reads, park.value, latest.value.date) : null,
+)
+// Прочитано = так считает бэк ИЛИ так считает устройство. ИЛИ, а не только localStorage:
+// иначе после перезагрузки на другом телефоне кнопка снова предлагает отметить уже
+// отмеченный сигнал, а повторное нажатие с 29.07 не пишет новую строку — управляющий
+// видел бы «не отмечено» вечно и не понимал, дошло ли вообще.
+const latestRead = computed(
+  () => !!latest.value && (statusFor(latest.value.date) === 'read' || !!serverRead.value),
+)
 const latestNew = computed(() => !!latest.value && statusOf(snapshot, park.value, latest.value.date) === 'none')
+
+// Дата отметки в подписи кнопки: из проекции бэка, а сразу после нажатия — из ответа
+// текущей сессии (payload обновится только на следующей загрузке). Даты нет — кнопка
+// всё равно показывает «Прочитано ✓», просто без числа.
+const justReadOn = ref('')
+const readDate = computed(() => {
+  const d = serverRead.value ? readDay(serverRead.value) : ''
+  return ddmm(d || justReadOn.value)
+})
 
 function persist(date, state) {
   markState(store.value, park.value, date, state)
@@ -54,11 +81,24 @@ function onRead() {
   if (!latest.value || latestRead.value || posting.value) return
   rateOpen.value = true
 }
+// Локальная дата «сегодня» для подписи кнопки сразу после успешной отправки
+// (read_at ставит бэк, но в этой сессии его ещё не видно). now — для тестов.
+function todayIso() {
+  const d = props.now || new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
 async function onRateSubmit(score) {
   if (!latest.value || latestRead.value || posting.value) return
   const okres = await markRead({ park: park.value, signal_date: latest.value.date, score })
   rateOpen.value = false
-  if (okres) persist(latest.value.date, 'read')
+  // Ошибка/сеть отпала — состояние НЕ фиксируем: кнопка остаётся активной, ниже
+  // висит плашка «не удалось отметить». Молча гасить кнопку нельзя (§2.4 задания):
+  // тогда «не нажали» не отличить от «нажали, но не долетело».
+  if (okres) {
+    justReadOn.value = todayIso()
+    persist(latest.value.date, 'read')
+  }
 }
 function toggleFeed() { feedOpen.value = !feedOpen.value }
 function toggleRow(date) {
@@ -102,6 +142,9 @@ function rowMarker(date) {
       >
         <span v-if="latestRead">{{ L.signal_read_done }} ✓</span>
         <span v-else>{{ L.signal_read }}</span>
+        <!-- D-36: дата отметки рядом со статусом — подтверждение, что запись
+             дошла до бэка, а не осталась в памяти телефона. -->
+        <span v-if="latestRead && readDate" data-test="signal-read-date" class="text-[0.8125rem] text-[var(--text-muted)]">· {{ readDate }}</span>
       </button>
 
       <p v-if="postError" class="mt-2 rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]" style="background: color-mix(in srgb, var(--negative) 12%, var(--surface))">{{ L.signal_error }}</p>
