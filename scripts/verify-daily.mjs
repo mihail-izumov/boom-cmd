@@ -1558,13 +1558,13 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
   check('маска и текст одного кегля: 24px больше нигде нет',
     !readFileSync(resolve(root, 'src/components/AccessKeyForm.vue'), 'utf8')
       .includes("masked ? 'text-[1.5rem]"))
-  // композиция: лого и карточка — одна группа, подвал не эластичный
-  const group = el.querySelector('[data-test="access-group"]')
-  check('лого и карточка — один центрированный блок с фиксированным зазором',
-    !!group && !!group.querySelector('[data-test="access-logo"]') && !!group.querySelector('form') &&
-    group.className.includes('justify-center') && group.className.includes('gap-10'))
-  check('подвал не растягивается (иначе на высоком экране блок расползается)',
-    (el.querySelector('[data-test="access-footer-link"]').parentElement.className || '').includes('shrink-0'))
+  // Композиция — прежняя, из трёх зон: лого (отступ 13% высоты) / карточка / подвал.
+  // Пробовали 29.07 собрать лого с карточкой в одну центрированную группу —
+  // владелец вернул как было. Чек стоит, чтобы раскладку не «улучшили» молча.
+  check('раскладка из трёх зон: лого с отступом 13svh, карточка и подвал отдельно',
+    !el.querySelector('[data-test="access-group"]') &&
+    /flex flex-1 items-start justify-center pt-\[13svh\]/
+      .test(readFileSync(resolve(root, 'src/components/AccessKeyForm.vue'), 'utf8')))
   // цвет placeholder'у задаём (это токен), а вот РАЗМЕР и разрядку — нет:
   // из-за них он и расходился с полем при переключении глаза
   check('placeholder задаёт только цвет, метрики наследует у поля',
