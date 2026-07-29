@@ -2078,9 +2078,9 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   check('тёмной риски между фактом и прогнозом нет — границу несёт штриховка',
     !darkMarks.some((n) => n.style.left && parseFloat(n.style.left) > 53 && parseFloat(n.style.left) < 54),
     darkMarks.map((n) => n.style.left).join(' '))
-  check('прогноз — светло-жёлтая заливка ИЗ ТОКЕНОВ + штриховка поверх',
+  check('прогноз — светло-жёлтая заливка ИЗ ТОКЕНОВ + точечная сыпь',
     !!fseg && fseg.style.backgroundColor.includes('color-mix') && fseg.style.backgroundColor.includes('--accent')
-    && fseg.style.backgroundImage.includes('repeating-linear-gradient'),
+    && fseg.style.backgroundImage.includes('radial-gradient'),
     fseg && fseg.style.backgroundColor)
   // bullet chart: цель = верх шкалы, отдельной метки у неё НЕТ.
   check('цель = верх шкалы → метки цели на полосе нет (длина полосы и есть цель)',
@@ -2092,8 +2092,11 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   // прижимается к концу шкалы и без каретки читается как торец полосы.
   const pc = document.querySelector('[data-test="caret-plan"]')
   check('у порога есть каретка сверху — опознаётся как метка, а не торец полосы', !!pc)
+  check('каретка — SVG со скруглёнными углами (у CSS-бордера углы не скруглить)',
+    !!pc && pc.tagName.toLowerCase() === 'svg'
+    && pc.querySelector('path').getAttribute('stroke-linejoin') === 'round')
   check('каретка ОТДЕЛЕНА от штриха зазором (не слиплись)',
-    !!pc && pc.className.includes('top-0') && pm.className.includes('top-[7px]'),
+    !!pc && pc.getAttribute('class').includes('top-0') && pm.className.includes('top-[7px]'),
     pm.className.match(/top-\S+/)?.[0])
   check('каретка стоит РОВНО над штрихом (позиция и transform совпадают)',
     !!pc && pc.style.left === pm.style.left && pc.style.transform === pm.style.transform,
@@ -2103,22 +2106,22 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
     && pm.parentElement.querySelector('[data-test="track"]'))
   check('прогноз начинается ровно на конце факта', fseg.style.left.startsWith('53.7'), fseg.style.left)
   check('ширина прогноза = прогноз − факт (≈16,1 п.п.)', fseg.style.width.startsWith('16.1'), fseg.style.width)
-  check('штрихи серые (--text-muted) — они и держат контраст',
+  check('фактура прогноза серая (--text-muted) — она и держит контраст',
     fseg.style.backgroundImage.includes('--text-muted'))
   // НЕДОБОР ДО ПЛАНА — точки от прогноза до порога: пролёт не должен быть «пустотой».
   const sseg = document.querySelector('[data-test="seg-short"]')
-  check('пролёт «прогноз → план» закрашен точками, а не пуст',
-    !!sseg && sseg.style.backgroundImage.includes('radial-gradient'), sseg && sseg.style.backgroundImage)
+  check('пролёт «прогноз → план» закрашен полосками, а не пуст',
+    !!sseg && sseg.style.backgroundImage.includes('repeating-linear-gradient'), sseg && sseg.style.backgroundImage)
   check('у зоны недобора есть подложка — иначе не читаются её границы',
     !!sseg && sseg.style.backgroundColor.includes('color-mix') && sseg.style.backgroundColor.includes('--line'),
     sseg && sseg.style.backgroundColor)
-  check('точки начинаются на прогнозе и упираются в план',
+  check('недобор начинается на прогнозе и упирается в план',
     !!sseg && sseg.style.left === fseg.style.left.replace(/[\d.]+/, String(parseFloat(fseg.style.left) + parseFloat(fseg.style.width)))
       || (!!sseg && Math.abs(parseFloat(sseg.style.left) - (parseFloat(fseg.style.left) + parseFloat(fseg.style.width))) < 1e-9),
     sseg && `${sseg.style.left} + ${sseg.style.width}`)
-  check('точки той же краски, что штрихи, но другим паттерном',
+  check('фактуры разные: у прогноза точки, у недобора полоски',
     !!sseg && sseg.style.backgroundImage.includes('--text-muted')
-    && !sseg.style.backgroundImage.includes('repeating-linear-gradient'))
+    && !sseg.style.backgroundImage.includes('radial-gradient'))
   app.app.unmount(); document.body.innerHTML = ''
 
   const app2 = mount(bundle.MonthProgressSlide, { ...P, goal: null })
@@ -2271,14 +2274,16 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   // (цель — не точка на шкале, а вся её протяжённость).
   // Глиф порога — ТОЧКИ, та же фактура, что у зоны недобора на полосе: чип
   // обозначает путь до плана («сколько ещё нужно»), а не саму риску.
-  check('глиф порога — точки, как зона недобора на полосе',
-    chips[2].querySelector('i i').style.backgroundImage.includes('radial-gradient'),
+  check('глиф порога — та же фактура, что у зоны недобора (полоски)',
+    chips[2].querySelector('i i').style.backgroundImage.includes('repeating-linear-gradient'),
     chips[2].querySelector('i i').style.backgroundImage)
   // Квадрат эталона МЕНЬШЕ чипа: во всю ширину его углы срезала обводка чипа.
   check('глиф эталона — рамка, и она не обрезается обводкой чипа',
     chips[3].querySelector('i i').className.includes('border-[1.5px]')
     && chips[3].querySelector('i i').className.includes('h-2'),
     chips[3].querySelector('i i').className)
+  check('выбранный чип получает серую плашку — видно, что тап сработал',
+    chips.every((c) => !c.className.includes('bg-[var(--surface-2)]')))
   check('чипы гасят системное кольцо фокуса и ставят своё',
     chips.every((c) => c.className.includes('outline-none') && c.className.includes('focus-visible:ring-2')))
 
@@ -2291,6 +2296,8 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   check('тап по чипу → он помечен нажатым', chips[1].getAttribute('aria-pressed') === 'true')
   check('тап по чипу → обводка чипа стала контрастной',
     chips[1].querySelector('i').className.includes('border-[var(--text)]'))
+  check('тап по чипу → под ним появилась серая плашка (тап явно сработал)',
+    chips[1].className.includes('bg-[var(--surface-2)]'), chips[1].className)
   // РАЗМЕРЫ НЕ МЕНЯЮТСЯ: рост полосы перестраивал масштаб, глаз терял опору.
   check('подсветка НЕ меняет высоту полосы (размеры постоянны)',
     track().className.includes('h-3') && !track().className.includes('h-[18px]'),
@@ -2325,16 +2332,15 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   check('обводка рисуется ВНУТРЬ и не вылезает за карту',
     !!ring() && ring().className.includes('ring-inset') && ring().parentElement.className.includes('overflow-hidden'),
     ring() && ring().className)
-  check('тап по ЦЕЛИ → на конце шкалы ПРОЯВЛЯЕТСЯ метка (было нечего подсвечивать)',
-    !!document.querySelector('[data-test="mark-goal"]'))
+  check('тап по ЦЕЛИ → метки на конце НЕТ: обводки достаточно, метка читалась артефактом',
+    !document.querySelector('[data-test="mark-goal"]'))
   await fire(chips[3], 'click')
-  check('снятие выбора цели убирает и обводку, и проявленную метку',
-    !ring() && !document.querySelector('[data-test="mark-goal"]'))
+  check('снятие выбора убирает обводку', !ring())
 
   await fire(chips[2], 'click') // план
   const pmk = document.querySelector('[data-test="mark-plan"]')
   check('подсветка НЕ утолщает штрих порога — размеры элементов постоянны',
-    pmk.className.includes('w-[2.5px]') && !pmk.className.includes('w-[4px]'), pmk.className)
+    pmk.className.includes('w-[2px]') && !pmk.className.includes('w-[4px]'), pmk.className)
   await fire(chips[2], 'click')
   app.app.unmount(); document.body.innerHTML = ''
 }
@@ -2401,6 +2407,24 @@ console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся с
     document.querySelector('[data-test="month-deck-scope"]').textContent.trim())
   check('прокрутка → активная точка переехала',
     document.querySelector('[data-test="month-deck-dots"]').children[2].getAttribute('aria-current') === 'true')
+
+  // Выделение относится к КОНКРЕТНОЙ полосе: таскать его на соседний парк —
+  // врать про то, что выбрано. Дека сбрасывает подсветку при смене экрана.
+  const firstChip = track.children[2].querySelector('[data-test="legend-chip"]')
+  await fire(firstChip, 'click')
+  check('на экране можно выбрать величину', firstChip.getAttribute('aria-pressed') === 'true')
+  track.scrollLeft = 400
+  track.dispatchEvent(new dom.window.Event('scroll', { bubbles: true }))
+  await nextTick()
+  check('смена экрана свайпом СБРАСЫВАЕТ подсветку',
+    firstChip.getAttribute('aria-pressed') === 'false')
+  await fire(firstChip, 'click')
+  // jsdom не реализует Element.scrollTo — в браузере он есть, здесь глушим,
+  // иначе тап в точку падает на плавной прокрутке, а не на проверяемой логике.
+  track.scrollTo = () => {}
+  document.querySelector('[data-test="month-deck-dots"]').children[0].click()
+  await nextTick()
+  check('тап в точку тоже сбрасывает подсветку', firstChip.getAttribute('aria-pressed') === 'false')
   app.app.unmount(); document.body.innerHTML = ''
 
   // Один парк — карусель из одного экрана обман: сетевой слайд и точки не нужны.

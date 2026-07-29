@@ -28,6 +28,10 @@ const props = defineProps({
 
 const idx = ref(0)
 const track = ref(null)
+// Сигнал слайдам «снять подсветку». Дека дёргает его при любой смене экрана:
+// выделение относится к конкретной полосе, и переносить его на соседний парк —
+// врать про то, что выбрано.
+const resetToken = ref(0)
 
 const many = computed(() => props.slides.length > 1)
 const current = computed(() => props.slides[Math.min(idx.value, props.slides.length - 1)] || null)
@@ -50,9 +54,12 @@ const daysBadge = computed(() => {
 function onScroll(e) {
   const el = e.target
   const w = el.clientWidth || 1
-  idx.value = Math.max(0, Math.min(props.slides.length - 1, Math.round(el.scrollLeft / w)))
+  const next = Math.max(0, Math.min(props.slides.length - 1, Math.round(el.scrollLeft / w)))
+  if (next !== idx.value) resetToken.value += 1
+  idx.value = next
 }
 function goTo(i) {
+  if (i !== idx.value) resetToken.value += 1
   idx.value = i
   const el = track.value
   if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
@@ -109,7 +116,13 @@ function goTo(i) {
         aria-roledescription="слайд"
         :aria-label="`${s.title}, ${i + 1} из ${slides.length}`"
       >
-        <MonthProgressSlide :fact="s.fact" :plan="s.plan" :forecast="s.forecast" :goal="s.goal" />
+        <MonthProgressSlide
+          :fact="s.fact"
+          :plan="s.plan"
+          :forecast="s.forecast"
+          :goal="s.goal"
+          :reset-token="resetToken"
+        />
       </div>
     </div>
 

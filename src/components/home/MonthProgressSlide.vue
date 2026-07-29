@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Check } from 'lucide-vue-next'
 import { mlnRub } from '../../i18n/home.js'
 import { monthLayout, markStyle } from '../../composables/monthLayout.js'
@@ -46,6 +46,10 @@ const props = defineProps({
   plan: { type: Number, default: null },
   forecast: { type: Number, default: null },
   goal: { type: Number, default: null },
+  // Счётчик-сигнал от деки: сменился — снять подсветку. Дека дёргает его при
+  // свайпе и тапе в точку: выделение относится к КОНКРЕТНОЙ полосе, и таскать
+  // его за собой на соседний парк — врать про то, что выбрано.
+  resetToken: { type: Number, default: 0 },
 })
 
 // ПРОГНОЗ — светло-жёлтая заливка ПОД штриховкой. Заливка говорит «та же мера,
@@ -57,14 +61,14 @@ const props = defineProps({
 // Тон берём color-mix из токенов (приём уже узаконен DESIGN-STANDARD §6.2),
 // нового hex в палитру не заводим.
 const TINT = 'color-mix(in srgb, var(--accent) 40%, var(--surface))'
-const HATCH = 'repeating-linear-gradient(-45deg, transparent 0 2px, var(--text-muted) 2px 3px)'
-// НЕДОБОР ДО ПЛАНА — точки на своей подложке. Одних точек мало: редкая сыпь не
-// очерчивает зону, у неё не читаются верхняя и нижняя границы, и пролёт всё
-// равно выглядит пустым. Поэтому зона получает чуть более тёмный фон, чем трек
-// (--line, приглушённый до подложки), а точки ложатся поверх плотной сеткой.
-// Фон отделяет зону, точки говорят «это не заработано».
-const DOT_BG = 'color-mix(in srgb, var(--line) 75%, var(--surface-2))'
+// ПРОГНОЗ — светло-жёлтая заливка + мелкая ТОЧЕЧНАЯ сыпь: «почти как факт,
+// но ещё не осязаемо». НЕДОБОР — подложка темнее трека + ПОЛОСКИ: штриховка
+// жёстче точек, и зона «сколько ещё нужно» должна читаться жёстче ожидаемого.
 const DOTS = 'radial-gradient(circle at 50% 50%, var(--text-muted) 0.45px, transparent 0.55px)'
+const HATCH = 'repeating-linear-gradient(-45deg, transparent 0 2px, var(--text-muted) 2px 3px)'
+// Подложка недобора: чуть темнее трека, иначе у зоны не читаются верхняя и
+// нижняя границы и пролёт выглядит пустым.
+const SHORT_BG = 'color-mix(in srgb, var(--line) 75%, var(--surface-2))'
 
 const L = computed(() => monthLayout(props))
 const active = ref(null) // ключ подсвеченного элемента; null — подсветки нет
@@ -74,14 +78,14 @@ const gapStyle = computed(() => ({
   left: `${L.value.gapStart}%`,
   width: `${L.value.gapWidth}%`,
   backgroundColor: TINT,
-  backgroundImage: HATCH,
+  backgroundImage: DOTS,
+  backgroundSize: '2.5px 2.5px',
 }))
 const shortStyle = computed(() => ({
   left: `${L.value.shortStart}%`,
   width: `${L.value.shortWidth}%`,
-  backgroundColor: DOT_BG,
-  backgroundImage: DOTS,
-  backgroundSize: '2.5px 2.5px',
+  backgroundColor: SHORT_BG,
+  backgroundImage: HATCH,
 }))
 const planMark = computed(() => markStyle(L.value.planPct))
 
@@ -122,15 +126,14 @@ const isOn = (key) => active.value === key
 // и живёт под ключом 'plan' — обводка не включалась, хотя выбрана вся шкала.
 // Правильный признак — позиция, а не имя.
 const wholeScale = computed(() => activePct.value != null && activePct.value >= 99.999)
-// Метка цели — только если цель НЕ верх шкалы (её кто-то перерос) ЛИБО выбрана
-// вся шкала: пока цель молчаливый верх шкалы, подсвечивать было бы нечего, и
-// тап по «Цели» выглядел как сломанный (гасло всё, не загоралось ничто).
-const goalMark = computed(() =>
-  L.value.goalIsEnd && !wholeScale.value ? null : markStyle(L.value.goalPct),
-)
+// Метка цели — ТОЛЬКО если цель не верх шкалы (её кто-то перерос). Когда цель
+// и есть верх, метки нет даже при выборе: подсветку берёт на себя обводка всей
+// шкалы, а метка поверх неё читалась как артефакт у правого края.
+const goalMark = computed(() => (L.value.goalIsEnd ? null : markStyle(L.value.goalPct)))
 function toggle(key) {
   active.value = active.value === key ? null : key
 }
+watch(() => props.resetToken, () => { active.value = null })
 
 // Колонки — в порядке следования по шкале, чтобы глаз связывал подпись с элементом.
 // Значения нет (цель не задана) → колонки просто нет.
@@ -220,7 +223,7 @@ const aria = computed(() =>
         <div
           v-if="wholeScale"
           data-test="scale-ring"
-          class="pointer-events-none absolute inset-0 rounded-full ring-2 ring-inset ring-[var(--text)]"
+          class="pointer-events-none absolute inset-0 rounded-full ring-1 ring-inset ring-[var(--text)]"
         ></div>
         <!-- ЦЕЛЬ внутри шкалы — только когда её перерос прогноз или факт -->
         <div
@@ -236,7 +239,7 @@ const aria = computed(() =>
       <div
         v-if="planMark"
         data-test="mark-plan"
-        class="absolute bottom-[1px] top-[7px] w-[2.5px] rounded-[1px] bg-[var(--text)] transition-opacity"
+        class="absolute bottom-[1px] top-[7px] w-[2px] rounded-[1px] bg-[var(--text)] transition-opacity"
         :class="dimAt(L.planPct)"
         :style="planMark"
       ></div>
@@ -246,13 +249,26 @@ const aria = computed(() =>
            а не как метка. Позиция — переменная, форма — постоянная, поэтому роль
            обязана кодироваться формой (DESIGN-STANDARD §7.1). Треугольник сверху
            не двигает метку ни на пиксель, он делает её опознаваемой всегда. -->
-      <div
+      <svg
         v-if="planMark"
         data-test="caret-plan"
-        class="absolute top-0 h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent border-t-[var(--text)] transition-opacity"
+        class="absolute top-0 h-[5px] w-[9px] transition-opacity"
         :class="dimAt(L.planPct)"
         :style="planMark"
-      ></div>
+        viewBox="0 0 9 5"
+        aria-hidden="true"
+      >
+        <!-- Треугольник рисуем SVG'шкой, а не CSS-бордерами: у бордерного
+             треугольника углы скруглить нечем, и он выбивался из стиля
+             остальных элементов (у штриха и чипов углы мягкие). -->
+        <path
+          d="M1.6 1.2 H7.4 L4.5 3.8 Z"
+          fill="var(--text)"
+          stroke="var(--text)"
+          stroke-width="1.6"
+          stroke-linejoin="round"
+        />
+      </svg>
     </div>
 
     <div class="mt-2 flex items-start justify-between gap-1">
@@ -261,7 +277,8 @@ const aria = computed(() =>
         :key="c.key"
         type="button"
         data-test="legend-chip"
-        class="flex min-w-0 flex-1 flex-col items-start gap-[3px] rounded-lg py-0.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--text-muted)]"
+        class="flex min-w-0 flex-1 flex-col items-start gap-[3px] rounded-lg px-1 py-1 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--text-muted)]"
+        :class="active === c.key ? 'bg-[var(--surface-2)]' : ''"
         :aria-pressed="active === c.key ? 'true' : 'false'"
         :aria-label="`Подсветить: ${c.label}`"
         @click="toggle(c.key)"
@@ -284,15 +301,15 @@ const aria = computed(() =>
             <i
               v-else-if="c.glyph === 'hatch'"
               class="h-full w-full"
-              :style="{ backgroundColor: TINT, backgroundImage: HATCH }"
+              :style="{ backgroundColor: TINT, backgroundImage: DOTS, backgroundSize: '2.5px 2.5px' }"
             ></i>
-            <!-- ПОРОГ: точки — та же фактура, что у зоны недобора на полосе.
+            <!-- ПОРОГ: полоски — та же фактура, что у зоны недобора на полосе.
                  Чип обозначает не саму риску, а путь до плана: именно эта зона
                  «сколько ещё нужно» и есть содержание колонки. -->
             <i
               v-else-if="c.glyph === 'cross'"
               class="h-full w-full"
-              :style="{ backgroundColor: DOT_BG, backgroundImage: DOTS, backgroundSize: '2.5px 2.5px' }"
+              :style="{ backgroundColor: SHORT_BG, backgroundImage: HATCH }"
             ></i>
             <!-- ЭТАЛОН: рамка внутри чипа. Цель — не точка на шкале, а вся её
                  протяжённость, рамка говорит ровно это. Квадрат МЕНЬШЕ чипа и
