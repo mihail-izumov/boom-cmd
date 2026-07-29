@@ -2183,14 +2183,14 @@ console.log('\n=== jsdom: D-34 — состояния порогов (совпа
   const trioChips = [...document.querySelectorAll('[data-test="legend-chip"]')]
   await fire(trioChips[1], 'click')
   check('БАГ ИСПРАВЛЕН: тап по «Прогноз, план и цель» обводит ВЕСЬ трек',
-    document.querySelector('[data-test="track"]').className.includes('ring-2'))
+    !!document.querySelector('[data-test="scale-ring"]'))
   trio.app.unmount(); document.body.innerHTML = ''
 
   const a2 = mount(bundle.MonthProgressSlide, { ...B, plan: 1_550_000, goal: 1_550_000 })
   const mergedChip = [...document.querySelectorAll('[data-test="legend-chip"]')].at(-1)
   await fire(mergedChip, 'click')
   check('БАГ ИСПРАВЛЕН: «План и цель» = вся шкала → обводка трека включается',
-    document.querySelector('[data-test="track"]').className.includes('ring-2'))
+    !!document.querySelector('[data-test="scale-ring"]'))
   a2.app.unmount(); document.body.innerHTML = ''
 
   const a3 = mount(bundle.MonthProgressSlide, { ...B, plan: 1_550_000, goal: 1_550_000 })
@@ -2274,9 +2274,11 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   check('глиф порога — точки, как зона недобора на полосе',
     chips[2].querySelector('i i').style.backgroundImage.includes('radial-gradient'),
     chips[2].querySelector('i i').style.backgroundImage)
-  check('глиф эталона — обводка по периметру изнутри, без штриха',
-    chips[3].querySelector('i i').style.boxShadow.includes('inset'),
-    chips[3].querySelector('i i').style.boxShadow)
+  // Квадрат эталона МЕНЬШЕ чипа: во всю ширину его углы срезала обводка чипа.
+  check('глиф эталона — рамка, и она не обрезается обводкой чипа',
+    chips[3].querySelector('i i').className.includes('border-[1.5px]')
+    && chips[3].querySelector('i i').className.includes('h-2'),
+    chips[3].querySelector('i i').className)
   check('чипы гасят системное кольцо фокуса и ставят своё',
     chips.every((c) => c.className.includes('outline-none') && c.className.includes('focus-visible:ring-2')))
 
@@ -2316,13 +2318,18 @@ console.log('\n=== jsdom: D-34 — чипы легенды и подсветка
   // ГЛАВНЫЙ ДЕФЕКТ ПЕРВОЙ ВЕРСИИ: у цели нет метки (она = длина шкалы), поэтому
   // тап по ней гасил всё и не зажигал ничего — выглядел как сломанный.
   await fire(chips[3], 'click') // цель
-  check('тап по ЦЕЛИ → трек обведён: подсвечена шкала, а она и есть цель',
-    track().className.includes('ring-2') && track().className.includes('ring-[var(--text)]'))
+  // Обводка — отдельный слой ВНУТРИ трека: ring на самом треке — это box-shadow
+  // снаружи, и у полосы, прижатой к краю карты, он вылезал за её границы.
+  const ring = () => document.querySelector('[data-test="scale-ring"]')
+  check('тап по ЦЕЛИ → шкала обведена (она и есть цель)', !!ring())
+  check('обводка рисуется ВНУТРЬ и не вылезает за карту',
+    !!ring() && ring().className.includes('ring-inset') && ring().parentElement.className.includes('overflow-hidden'),
+    ring() && ring().className)
   check('тап по ЦЕЛИ → на конце шкалы ПРОЯВЛЯЕТСЯ метка (было нечего подсвечивать)',
     !!document.querySelector('[data-test="mark-goal"]'))
   await fire(chips[3], 'click')
   check('снятие выбора цели убирает и обводку, и проявленную метку',
-    !track().className.includes('ring-2') && !document.querySelector('[data-test="mark-goal"]'))
+    !ring() && !document.querySelector('[data-test="mark-goal"]'))
 
   await fire(chips[2], 'click') // план
   const pmk = document.querySelector('[data-test="mark-plan"]')

@@ -64,7 +64,7 @@ const HATCH = 'repeating-linear-gradient(-45deg, transparent 0 2px, var(--text-m
 // (--line, приглушённый до подложки), а точки ложатся поверх плотной сеткой.
 // Фон отделяет зону, точки говорят «это не заработано».
 const DOT_BG = 'color-mix(in srgb, var(--line) 75%, var(--surface-2))'
-const DOTS = 'radial-gradient(circle at 50% 50%, var(--text-muted) 0.7px, transparent 0.8px)'
+const DOTS = 'radial-gradient(circle at 50% 50%, var(--text-muted) 0.45px, transparent 0.55px)'
 
 const L = computed(() => monthLayout(props))
 const active = ref(null) // ключ подсвеченного элемента; null — подсветки нет
@@ -84,9 +84,7 @@ const shortStyle = computed(() => ({
   backgroundSize: '2.5px 2.5px',
 }))
 const planMark = computed(() => markStyle(L.value.planPct))
-// Метка цели — только если цель НЕ верх шкалы (её кто-то перерос) ЛИБО цель
-// выбрана тапом: пока она молчаливый верх шкалы, подсвечивать было бы нечего,
-// и тап по «Цели» выглядел как сломанный (гасло всё, не загоралось ничто).
+
 // ── ПОДСВЕТКА ───────────────────────────────────────────────────────────────
 // Подсвечиваем НАКОПЛЕННУЮ ДЛИНУ от нуля, а не отдельный сегмент. Причина: чип
 // «Прогноз» показывает ₽4,5 млн — это ВСЯ выручка месяца по прогнозу, а не
@@ -124,7 +122,9 @@ const isOn = (key) => active.value === key
 // и живёт под ключом 'plan' — обводка не включалась, хотя выбрана вся шкала.
 // Правильный признак — позиция, а не имя.
 const wholeScale = computed(() => activePct.value != null && activePct.value >= 99.999)
-const trackClass = computed(() => ['h-3', wholeScale.value ? 'ring-2 ring-[var(--text)]' : ''])
+// Метка цели — только если цель НЕ верх шкалы (её кто-то перерос) ЛИБО выбрана
+// вся шкала: пока цель молчаливый верх шкалы, подсвечивать было бы нечего, и
+// тап по «Цели» выглядел как сломанный (гасло всё, не загоралось ничто).
 const goalMark = computed(() =>
   L.value.goalIsEnd && !wholeScale.value ? null : markStyle(L.value.goalPct),
 )
@@ -189,8 +189,7 @@ const aria = computed(() =>
     <div class="relative pb-1 pt-[10px]" role="img" :aria-label="aria">
       <div
         data-test="track"
-        class="relative overflow-hidden rounded-full bg-[var(--surface-2)] transition-all duration-300"
-        :class="trackClass"
+        class="relative h-3 overflow-hidden rounded-full bg-[var(--surface-2)]"
       >
         <!-- ФАКТ — мера. Тёмного торца на конце БОЛЬШЕ НЕТ: границу несёт
              штриховка прогноза (3,34:1 на жёлтом), а лишняя чёрная риска
@@ -216,6 +215,12 @@ const aria = computed(() =>
           class="absolute inset-y-0 transition-all duration-500"
           :class="dimFrom(L.gapStart)"
           :style="gapStyle"
+        ></div>
+        <!-- ВЫБРАНА ВСЯ ШКАЛА — обводим её изнутри, последним слоем поверх сегментов -->
+        <div
+          v-if="wholeScale"
+          data-test="scale-ring"
+          class="pointer-events-none absolute inset-0 rounded-full ring-2 ring-inset ring-[var(--text)]"
         ></div>
         <!-- ЦЕЛЬ внутри шкалы — только когда её перерос прогноз или факт -->
         <div
@@ -268,7 +273,7 @@ const aria = computed(() =>
                Без фона они читались пустыми чекбоксами: обводка + тонкая линия
                внутри белого квадрата = «галочку забыли поставить». -->
           <i
-            class="flex h-[14px] w-[14px] shrink-0 items-center overflow-hidden rounded-[4px] border transition-colors"
+            class="flex h-[14px] w-[14px] shrink-0 items-center justify-center overflow-hidden rounded-[4px] border transition-colors"
             :class="[
               active === c.key ? 'border-[var(--text)]' : 'border-[var(--line)]',
               c.glyph === 'cross' || c.glyph === 'end' ? 'bg-[var(--surface-2)]' : '',
@@ -289,10 +294,11 @@ const aria = computed(() =>
               class="h-full w-full"
               :style="{ backgroundColor: DOT_BG, backgroundImage: DOTS, backgroundSize: '2.5px 2.5px' }"
             ></i>
-            <!-- ЭТАЛОН: обводка по ПЕРИМЕТРУ изнутри, без штриха. Цель — это не
-                 точка на шкале, а вся её протяжённость, и рамка говорит ровно
-                 это: «весь объём целиком». -->
-            <i v-else class="h-full w-full" :style="{ boxShadow: 'inset 0 0 0 1.5px var(--text)' }"></i>
+            <!-- ЭТАЛОН: рамка внутри чипа. Цель — не точка на шкале, а вся её
+                 протяжённость, рамка говорит ровно это. Квадрат МЕНЬШЕ чипа и
+                 со своим скруглением: во всю ширину его углы срезала обводка
+                 чипа и он выглядел обкусанным. -->
+            <i v-else class="h-2 w-2 rounded-[2px] border-[1.5px] border-[var(--text)]"></i>
           </i>
           <span class="truncate text-[0.625rem] text-[var(--text-muted)]">{{ c.label }}</span>
           <!-- Порог взят фактом. Галочка монохромная: цвет здесь несёт только
