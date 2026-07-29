@@ -74,6 +74,11 @@ export function monthLayout(v) {
     planIsGoal: plan != null && goal != null && plan === goal,
     reachedPlan: plan != null && fact != null && fact >= plan,
     reachedGoal: goal != null && fact != null && fact >= goal,
+    // ЦЕЛЬ = ВЕРХ ШКАЛЫ (обычный случай). Тогда отдельной метки у неё нет: конец
+    // полосы и есть цель — так устроен bullet chart, эталон задаёт длину шкалы,
+    // а не рисуется штрихом внутри. Метка нужна ТОЛЬКО когда цель кто-то перерос
+    // (прогноз или факт выше цели) и она оказалась внутри шкалы.
+    goalIsEnd: goal != null && goal === scaleMax,
     empty: present.length === 0,
   }
 }

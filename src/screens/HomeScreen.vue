@@ -56,12 +56,20 @@ const forecastSub = computed(() => (ready.value ? mlnRub(t.value.landing) : '—
 // двумя одинаковыми экранами.
 const monthSlides = computed(() => {
   if (!ready.value) return []
-  const parks = net.value.cards.map((c) => ({
-    key: c.park,
-    title: c.parkName || PARKS_BY_ID[c.park]?.name || c.park,
-    fact: c.earned, plan: c.target, forecast: c.landing, goal: c.goal,
-    daysDone: c.daysDone, daysTotal: c.daysTotal,
-  }))
+  // Порядок парков — от ближнего к выполнению плана к дальнему: свайп идёт от
+  // благополучного к проблемному, последний экран = кому нужно внимание.
+  // Мера близости — ПРОГНОЗ/ПЛАН (придём ли), а не факт/план (сколько уже есть):
+  // вопрос «выполнит ли парк план» решается проекцией на конец месяца.
+  // Плана нет → парк в конец (сравнивать не с чем, но и прятать нельзя).
+  const rank = (c) => (c.target ? c.landing / c.target : -Infinity)
+  const parks = [...net.value.cards]
+    .sort((a, b) => rank(b) - rank(a))
+    .map((c) => ({
+      key: c.park,
+      title: c.parkName || PARKS_BY_ID[c.park]?.name || c.park,
+      fact: c.earned, plan: c.target, forecast: c.landing, goal: c.goal,
+      daysDone: c.daysDone, daysTotal: c.daysTotal,
+    }))
   if (parks.length < 2) return parks
   return [{
     key: 'network', title: 'Вся сеть',

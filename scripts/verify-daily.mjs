@@ -1963,6 +1963,7 @@ console.log('\n=== D-34: геометрия полосы (РЕГЛАМЕНТ-с�
   check('И-2 план: 1,55/1,86 = 83,3333…%', near(L1.planPct, 1_550_000 / 1_860_000 * 100), L1.planPct)
   check('И-2 прогноз: 1,30/1,86 = 69,8924…%', near(L1.forecastPct, 1_300_000 / 1_860_000 * 100), L1.forecastPct)
   check('И-5 цель = scaleMax → ровно 100', L1.goalPct === 100, L1.goalPct)
+  check('цель = верх шкалы → goalIsEnd (отдельной метки не нужно)', L1.goalIsEnd === true)
   check('И-3 штриховка стыкуется: gapStart = factPct', near(L1.gapStart, L1.factPct))
   check('И-3 штриховка стыкуется: gapStart + gapWidth = forecastPct',
     near(L1.gapStart + L1.gapWidth, L1.forecastPct), L1.gapStart + L1.gapWidth)
@@ -2050,16 +2051,26 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
     fills.length > 0 && fills[0].style.width.startsWith('53.7'), fills[0] && fills[0].style.width)
   check('внутренние края прямые: у заливки нет rounded (иначе серп на стыке)',
     !fills[0].className.includes('rounded'), fills[0].className)
-  check('скругление только у трека (снаружи)',
-    document.querySelector('[role="img"]').className.includes('rounded-full'))
+  // Трек — вложенный элемент: внешний контейнер держит воздух для штриха плана,
+  // который обязан выходить за полосу, поэтому overflow-hidden только у трека.
+  const track = document.querySelector('[role="img"] .rounded-full')
+  check('скругление и обрезка — у трека, не у внешнего контейнера',
+    !!track && track.className.includes('overflow-hidden')
+    && !document.querySelector('[role="img"]').className.includes('overflow-hidden'))
   check('хардкод hex в слайде отсутствует (только токены)',
     !readFileSync(resolve(root, 'src/components/home/MonthProgressSlide.vue'), 'utf8').match(/#[0-9a-fA-F]{6}\b/))
   const darkMarks = [...document.querySelectorAll('div')].filter((n) => n.className.includes('bg-[var(--text)]'))
   check('конец факта помечен тёмной риской (жёлтый сам по себе 1,36:1)',
     darkMarks.some((n) => n.style.left && parseFloat(n.style.left) > 53 && parseFloat(n.style.left) < 54),
     darkMarks.map((n) => n.style.left).join(' '))
-  check('цель — отдельная риска у верха шкалы (100%, прижата внутрь)',
-    darkMarks.some((n) => n.style.left === '100%' && n.style.transform === 'translateX(-100%)'))
+  // bullet chart: цель = верх шкалы, отдельной метки у неё НЕТ.
+  check('цель = верх шкалы → метки цели на полосе нет (длина полосы и есть цель)',
+    !document.querySelector('[data-test="mark-goal"]'))
+  const pm = document.querySelector('[data-test="mark-plan"]')
+  check('план — порог bullet chart: штрих есть и стоит в своей точке (83,33%)',
+    !!pm && pm.style.left === (1_550_000 / 1_860_000 * 100) + '%', pm && pm.style.left)
+  check('штрих плана ВНЕ трека — пересекает полосу, а не спрятан под overflow',
+    !!pm && pm.parentElement.className.includes('py-1') && !pm.parentElement.className.includes('overflow-hidden'))
   const hatch = [...document.querySelectorAll('div')]
     .filter((n) => (n.style.backgroundImage || '').includes('repeating-linear-gradient'))
   check('прогноз — штрихованный отрезок, начинается на конце факта',
@@ -2083,6 +2094,8 @@ console.log('\n=== jsdom: D-34 — слайд месяца (полосы и ме
   const marks = [...document.querySelectorAll('div')].filter((n) => n.style.left)
   check('прогноз > цели → все метки в пределах 0–100%',
     marks.length >= 3 && marks.every((n) => parseFloat(n.style.left) <= 100), marks.map((n) => n.style.left).join(' '))
+  check('прогноз > цели → метка цели ВОЗВРАЩАЕТСЯ (она больше не верх шкалы)',
+    !!document.querySelector('[data-test="mark-goal"]'))
   check('прогноз > цели → цель ушла ВНУТРЬ шкалы (1,86 из 2,0 = 93%)',
     marks.some((n) => n.style.left === '93%' && n.style.transform === 'translateX(-50%)'))
   app3.app.unmount(); document.body.innerHTML = ''
@@ -2148,6 +2161,50 @@ console.log('\n=== jsdom: D-34 — состояния порогов (совпа
   })
   check('мок Июня → «План и цель» одной колонкой', cols().includes('План и цель'))
   e.app.unmount(); document.body.innerHTML = ''
+}
+
+console.log('\n=== jsdom: D-34 — чипы легенды и подсветка по тапу ===')
+{
+  const app = mount(bundle.MonthProgressSlide,
+    { fact: 1_000_000, plan: 1_550_000, forecast: 1_300_000, goal: 1_860_000 })
+  const chips = [...document.querySelectorAll('[data-test="legend-chip"]')]
+  check('чипов столько же, сколько значений', chips.length === 4, chips.length)
+  const boxes = chips.map((c) => c.querySelector('i'))
+  check('все глифы — квадраты одного размера с обводкой',
+    boxes.every((b) => b.className.includes('h-[14px]') && b.className.includes('w-[14px]') && b.className.includes('border')),
+    boxes.map((b) => b.className.match(/h-\[\d+px\]/)?.[0]).join(' '))
+  check('чипы — кнопки, по умолчанию не нажаты',
+    chips.every((c) => c.tagName === 'BUTTON' && c.getAttribute('aria-pressed') === 'false'))
+  check('без выбора ничего не приглушено',
+    document.querySelectorAll('.opacity-25').length === 0)
+
+  await fire(chips[1], 'click') // второй по шкале — прогноз
+  check('тап по чипу → он помечен нажатым', chips[1].getAttribute('aria-pressed') === 'true')
+  check('тап по чипу → обводка чипа стала контрастной',
+    chips[1].querySelector('i').className.includes('border-[var(--text)]'))
+  check('тап → остальные элементы полосы приглушены, выбранный нет',
+    document.querySelectorAll('.opacity-25').length > 0)
+  await fire(chips[1], 'click')
+  check('повторный тап снимает подсветку',
+    chips[1].getAttribute('aria-pressed') === 'false' && document.querySelectorAll('.opacity-25').length === 0)
+  app.app.unmount(); document.body.innerHTML = ''
+}
+
+console.log('\n=== D-34: порядок парков в деке (ближе к плану — раньше) ===')
+{
+  const nw = computeNetwork(sets, ['ohta', 'piterland', 'iyun'])
+  const rank = (c) => (c.target ? c.landing / c.target : -Infinity)
+  const sorted = [...nw.cards].sort((a, b) => rank(b) - rank(a))
+  const ranks = sorted.map((c) => rank(c))
+  check('порядок убывающий по прогноз/план (последний — самый отстающий)',
+    ranks.every((v, i) => i === 0 || ranks[i - 1] >= v), ranks.map((v) => (v * 100).toFixed(1) + '%').join(' → '))
+  check('сортировка не теряет и не дублирует парки',
+    sorted.length === nw.cards.length && new Set(sorted.map((c) => c.park)).size === nw.cards.length)
+  // Парк без плана сравнивать не с чем — уходит в конец, но не пропадает.
+  const noPlan = [...nw.cards, { park: 'x', target: 0, landing: 5 }]
+  const s2 = [...noPlan].sort((a, b) => rank(b) - rank(a))
+  check('парк без плана уходит в конец, а не выпадает',
+    s2[s2.length - 1].park === 'x' && s2.length === noPlan.length)
 }
 
 console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся сеть → парки») ===')
