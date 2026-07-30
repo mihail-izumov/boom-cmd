@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Layers, Newspaper, Target } from 'lucide-vue-next'
+// Map импортируем под псевдонимом: голое имя Map затенило бы глобальный
+// конструктор Map в области модуля.
+import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Map as MapIcon, Newspaper, Target } from 'lucide-vue-next'
 import HomeWidget from '../components/home/HomeWidget.vue'
 import MonthProgressCard from '../components/home/MonthProgressCard.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
@@ -67,12 +69,15 @@ const monthSlides = computed(() => {
     .map((c) => ({
       key: c.park,
       title: c.parkName || PARKS_BY_ID[c.park]?.name || c.park,
+      // month — свой у каждого слайда: остаток дней считается по календарю
+      // ИМЕННО его месяца (у отстающего парка последний месяц может отличаться).
+      month: c.month,
       fact: c.earned, plan: c.target, forecast: c.landing, goal: c.goal,
       daysDone: c.daysDone, daysTotal: c.daysTotal,
     }))
   if (parks.length < 2) return parks
   return [{
-    key: 'network', title: 'Вся сеть',
+    key: 'network', title: 'Вся сеть', month: t.value.month,
     fact: t.value.earned, plan: t.value.target, forecast: t.value.landing, goal: t.value.goal,
     daysDone: t.value.daysDone, daysTotal: t.value.daysTotal,
   }, ...parks]
@@ -103,8 +108,8 @@ function goReviews() { setSubView('reviews') } // D-19: журнал разбо�
 function goSummary() { setActive('summary') }
 function goGoals() { setSubView('goals') }
 function goAnalytics() { setActive('analytics') }
-function goProjects() { setActive('projects') }
 function goMaterials() { setSubView('materials') }
+// goProjects снят вместе с плиткой «Задачи» (30.07): вход в раздел — вкладка таб-бара.
 </script>
 
 <template>
@@ -231,9 +236,13 @@ function goMaterials() { setSubView('materials') }
           <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><ChartColumnBig class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
           <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Прогресс</span>
         </button>
-        <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goProjects">
-          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Layers class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Задачи</span>
+        <!-- 30.07: плитка «Задачи» заменена на «Мастерплан» → под-страница «Цели
+             и планы». Доступ к «Задачам» не потерян: это вкладка таб-бара, и
+             плитка её лишь дублировала. Иконка — карта: мастерплан читается как
+             маршрут месяца, а мишень Target уже занята виджетом «Цели и планы». -->
+        <button type="button" data-test="tile-masterplan" class="flex min-w-0 flex-col items-center gap-2.5" @click="goGoals">
+          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><MapIcon class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Мастерплан</span>
         </button>
         <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goMaterials">
           <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Folder class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>

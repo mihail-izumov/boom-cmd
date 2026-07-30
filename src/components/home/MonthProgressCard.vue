@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import MonthProgressSlide from './MonthProgressSlide.vue'
 import { monthCap, plural } from '../../i18n/home.js'
+import { daysLeftInMonth } from '../../composables/monthDays.js'
 
 // Дека месяца (D-34) — свайп-карусель «где месяц» В РУБЛЯХ И ДНЯХ.
 // Экран 1 — вся сеть, дальше по экрану на парк. Заголовок слайда называет,
@@ -21,7 +22,10 @@ import { monthCap, plural } from '../../i18n/home.js'
 // прячем: карусель из одного экрана — обман интерфейса.
 
 const props = defineProps({
-  slides: { type: Array, default: () => [] }, // [{ key, title, fact, plan, forecast, goal, daysDone, daysTotal }]
+  // [{ key, title, month, fact, plan, forecast, goal, daysDone, daysTotal }]
+  // `month` — 'YYYY-MM' слайда (остаток дней считается по нему); daysDone/daysTotal
+  // остались фолбэком на случай слайда без месяца.
+  slides: { type: Array, default: () => [] },
   month: { type: String, default: '' },
   loading: { type: Boolean, default: false },
 })
@@ -40,12 +44,45 @@ const monthLabel = computed(() => (props.month ? monthCap(props.month) : ''))
 // Бейдж считает ОСТАВШИЕСЯ дни, а не пройденные: «прошло 27 из 31» — констатация,
 // «осталось 4 дня» — то, чем можно распорядиться. Месяц закрыт → так и пишем:
 // «осталось 0» читалось бы как ошибка, а не как завершённый месяц.
+//
+// ИСТОЧНИК ОСТАТКА — КАЛЕНДАРЬ МОСКВЫ, А НЕ ДАННЫЕ (фикс 30.07.2026). Было
+// `daysTotal - daysDone`, где daysDone — число ЗАКРЫТЫХ дней в выгрузке: пока
+// вчерашний день не приехал в payload, бейдж прибавлял себе лишние сутки
+// («Осталось 3 дня» 30 июля). Остаток месяца — факт календаря и не может
+// зависеть от того, успел ли кто-то закрыть день в таблице. Расчёт —
+// composables/monthDays.js; сегодняшний день входит в остаток.
+//
+// Месяц берём У СЛАЙДА, а не у деки: у отстающего парка последний месяц может
+// отличаться от сетевого, и остаток обязан относиться к его месяцу.
+const now = ref(Date.now())
+let tick = null
+// PWA живёт открытой сутками — без пересчёта бейдж застрянет на вчерашнем числе.
+// Минутный таймер + пробуждение из фона: полночь ловится обоими путями.
+function refreshNow() { now.value = Date.now() }
+function onVisible() { if (!document.hidden) refreshNow() }
+onMounted(() => {
+  tick = setInterval(refreshNow, 60_000)
+  document.addEventListener('visibilitychange', onVisible)
+})
+onUnmounted(() => {
+  if (tick) clearInterval(tick)
+  document.removeEventListener('visibilitychange', onVisible)
+})
+
+const daysWord = (n) => `Осталось ${n} ${plural(n, ['день', 'дня', 'дней'])}`
+
 const daysBadge = computed(() => {
   const c = current.value
-  if (!c || c.daysDone == null || !c.daysTotal) return ''
-  const left = Math.max(0, c.daysTotal - c.daysDone)
+  const left = daysLeftInMonth((c && c.month) || props.month, new Date(now.value))
+  // Месяца нет или он нечитаем — падаем на дни из данных: лучше приблизительный
+  // остаток, чем пустое место.
+  if (left == null) {
+    if (!c || c.daysDone == null || !c.daysTotal) return ''
+    const fb = Math.max(0, c.daysTotal - c.daysDone)
+    return fb === 0 ? 'Месяц закрыт' : daysWord(fb)
+  }
   if (left === 0) return 'Месяц закрыт'
-  return `Осталось ${left} ${plural(left, ['день', 'дня', 'дней'])}`
+  return daysWord(left)
 })
 
 // Индекс активного экрана — из позиции прокрутки. Слушаем сам scroll, а не

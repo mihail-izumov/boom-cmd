@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { computeDaily, computeNetwork, sigClass } from '../src/composables/dailyModel.js'
 import { monthLayout, markStyle } from '../src/composables/monthLayout.js'
+import { daysInMonth, daysLeftInMonth, mskToday } from '../src/composables/monthDays.js'
 import { actCode } from '../src/i18n/daily.js'
 import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
@@ -1380,8 +1381,15 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   check('плиток на Главной 4', tiles.length === 4, tiles.length)
   // Переименования владельца 28.07: плитка «Тренды» (бывш. «Сводки»), «Прогресс» (бывш. «Аналитика»).
   check('«Тренды» — первая плитка', tiles[0]?.getAttribute('data-test') === 'tile-summary' && tiles[0].textContent.includes('Тренды'))
-  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Задачи,Материалы',
+  // 30.07: плитка «Задачи» заменена на «Мастерплан» (раздел «Задачи» остался
+  // вкладкой таб-бара — плитка его дублировала).
+  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Мастерплан,Материалы',
     tiles.slice(1).map((t) => t.textContent.trim()).join(','))
+  const mp = tiles.find((t) => t.getAttribute('data-test') === 'tile-masterplan')
+  await fire(mp, 'click')
+  check('тап по «Мастерплану» → под-страница «Цели и планы» (goals)',
+    nav.subView.value === 'goals', nav.subView.value)
+  bundle.clearSubView()
   await fire(tiles[0], 'click')
   // 28.07: «Тренды» — вкладка таб-бара, тап по плитке активирует её (не под-страницу)
   check('тап по плитке «Тренды» → вкладка «summary», под-страницы нет',
@@ -2501,8 +2509,11 @@ console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся с
   check('парк — второй строкой, не заголовком',
     document.querySelector('[data-test="month-deck-scope"]').textContent.trim() === 'Вся сеть')
   const badge = document.querySelector('[data-test="month-deck-days"]')
-  check('дни — бейджем и про ОСТАТОК, а не про пройденное',
-    !!badge && /^Осталось \d+ (день|дня|дней)$/.test(badge.textContent.trim()), badge && badge.textContent.trim())
+  // Мок — май 2025, месяц давно прошёл: бейдж обязан говорить «закрыт», а не
+  // выдавать остаток из daysDone/daysTotal (фикс 30.07.2026 — остаток считается
+  // по календарю МСК, а не по числу закрытых дней в выгрузке).
+  check('прошедший месяц → «Месяц закрыт», а не остаток из данных',
+    !!badge && badge.textContent.trim() === 'Месяц закрыт', badge && badge.textContent.trim())
   check('верхней дорожки времени больше нет (мешала основной полосе)',
     document.querySelectorAll('.h-1').length === 0)
   const dots = document.querySelector('[data-test="month-deck-dots"]')
@@ -2556,6 +2567,51 @@ console.log('\n=== jsdom: D-34 — дека месяца (свайп «Вся с
   check('loading → скелетоны, ленты со снапом нет (пустая ловила бы жесты)',
     document.querySelectorAll('.bc-skeleton').length > 0 && !document.querySelector('[data-test="month-deck-track"]'))
   load.app.unmount(); document.body.innerHTML = ''
+}
+
+console.log('\n=== Остаток дней месяца — календарь Москвы (фикс 30.07.2026) ===')
+{
+  // Фиксированные моменты UTC: проверяем, что считается ИМЕННО московский день.
+  const at = (iso) => new Date(iso)
+  check('30 июля 12:00 МСК → осталось 2 дня (сегодня входит)',
+    daysLeftInMonth('2026-07', at('2026-07-30T09:00:00Z')) === 2,
+    daysLeftInMonth('2026-07', at('2026-07-30T09:00:00Z')))
+  check('последний день месяца → остаток 1, а не 0',
+    daysLeftInMonth('2026-07', at('2026-07-31T09:00:00Z')) === 1)
+  check('первый день месяца → весь месяц целиком',
+    daysLeftInMonth('2026-07', at('2026-07-01T09:00:00Z')) === 31)
+  check('февраль високосного года → 29 дней', daysInMonth(2028, 2) === 29, daysInMonth(2028, 2))
+  check('прошедший месяц → 0 («Месяц закрыт»)', daysLeftInMonth('2026-06', at('2026-07-30T09:00:00Z')) === 0)
+  check('будущий месяц → длина месяца', daysLeftInMonth('2026-08', at('2026-07-30T09:00:00Z')) === 31)
+  check('мусор на входе → null (вызывающий падает на фолбэк)',
+    daysLeftInMonth('', at('2026-07-30T09:00:00Z')) === null && daysLeftInMonth('2026-7', new Date()) === null)
+  // ГРАНИЦА ЧАСОВОГО ПОЯСА: 31 июля 21:30 UTC = 1 августа 00:30 МСК. Для июля
+  // месяц уже закрыт, для августа остаток полный. Локальная зона устройства
+  // (у CI это часто UTC) не должна на это влиять.
+  check('21:30 UTC 31.07 = 00:30 МСК 01.08 → июль закрыт',
+    daysLeftInMonth('2026-07', at('2026-07-31T21:30:00Z')) === 0,
+    daysLeftInMonth('2026-07', at('2026-07-31T21:30:00Z')))
+  check('та же секунда → у августа остаток 31',
+    daysLeftInMonth('2026-08', at('2026-07-31T21:30:00Z')) === 31)
+  // Бейдж НЕ зависит от того, сколько дней закрыто в выгрузке: та же дата,
+  // разные daysDone — один и тот же остаток.
+  const today = mskToday(at('2026-07-30T09:00:00Z'))
+  check('mskToday даёт ym текущего месяца', today.ym === '2026-07', today && today.ym)
+
+  // Живой месяц в деке: бейдж считает от сегодняшней даты, а не от daysDone.
+  const nowYm = mskToday(new Date()).ym
+  const live = mount(bundle.MonthProgressCard, {
+    slides: [{ key: 'p', title: 'Парк', month: nowYm, fact: 1, plan: 2, forecast: 1.5, goal: 3,
+      daysDone: 1, daysTotal: 31 }], // данные врут про 30 оставшихся — календарь их перебивает
+    month: nowYm,
+    loading: false,
+  })
+  const b = document.querySelector('[data-test="month-deck-days"]')
+  const expLeft = daysLeftInMonth(nowYm, new Date())
+  check('текущий месяц → остаток из календаря, а не из daysDone/daysTotal',
+    !!b && b.textContent.trim() === `Осталось ${expLeft} ${plural(expLeft, ['день', 'дня', 'дней'])}`,
+    b && b.textContent.trim())
+  live.app.unmount(); document.body.innerHTML = ''
 }
 
 console.log('\n=== jsdom: D-34 — пилюли парков сняты с Главной ===')
