@@ -41,6 +41,20 @@ eq('сортировка', m.visibleDrivers(joined, 'all', 'all').map(d => d.cod
 const leaked = ['metric','measure_status','ready_pct','gaps','conflicts_open','decided_by','source','docs_count','first_start']
 eq('в drivers мока нет «внутренней кухни»', mock.drivers.every(d => leaked.every(k => !(k in d))), true)
 
+// ── робастность к словарю статусов контура B (баг «не все статусы») ──
+// «черновик» (реальный статус прода) и любой неизвестный статус не должны теряться:
+// попадают в statusOptions (известные по порядку, неизвестные в хвост) и в счётчики.
+const synth = m.joinDrivers(
+  [{ code: 'X1', status: 'черновик' }, { code: 'X2', status: 'внезапный_статус' }, { code: 'X3', status: 'идёт' }],
+  [{ code: 'X3', park: 'ohta', start: '2026-07-01', end: '', accuracy: 'день' }],
+)
+eq('statusOptions: известные по порядку, неизвестный в хвосте', m.statusOptions(synth), ['идёт', 'черновик', 'внезапный_статус'])
+const scS = m.statusCounts(synth)
+eq('счётчики: черновик 1, неизвестный 1', [scS['черновик'], scS['внезапный_статус']], [1, 1])
+eq('statusLabel неизвестного — с большой буквы', i.statusLabel('внезапный_статус'), 'Внезапный_статус')
+eq('незапущенный (нет периодов) виден при любом парке', m.matches(synth.find(d => d.code === 'X1'), 'ohta', 'all'), true)
+eq('запущенный по периодам фильтруется по парку', m.matches(synth.find(d => d.code === 'X3'), 'piterland', 'all'), false)
+
 // WCAG-контраст текста (--text #1C1B18) на color-mix заливках бейджей.
 const TOK = { '--positive':'#2F9E54','--warning':'#FFC833','--info':'#2563EB','--st-backlog':'#8A8880','--st-todo':'#6F6D66','--text-muted':'#6F6D66' }
 const rgb = h => [1,3,5].map(k => parseInt(h.slice(k,k+2),16))

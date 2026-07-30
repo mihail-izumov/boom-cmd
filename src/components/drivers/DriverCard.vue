@@ -8,7 +8,6 @@ import {
   parkLabel,
   fmtDate,
   launchLabel,
-  isActive,
   L,
 } from '../../i18n/drivers.js'
 
@@ -19,12 +18,13 @@ import {
 
 const props = defineProps({
   driver: { type: Object, required: true },
-  // Канонический набор парков из данных (section → parkOptions). Для активных
-  // драйверов показываем плашку на каждый парк, пунктиром — где не подключён.
+  // Канонический набор парков из данных (section → parkOptions). У запущенного
+  // драйвера показываем строку на каждый парк, «— не подключён» — где периода нет.
   parkIds: { type: Array, default: () => [] },
 })
 
-const active = computed(() => isActive(props.driver.status))
+// «Запущен» = есть периоды (не завязано на имя статуса — устойчиво к словарю B).
+const launched = computed(() => (props.driver.periods || []).length > 0)
 const periodOf = (pid) => (props.driver.periods || []).find((p) => p.park === pid) || null
 const approx = (per) => (per && per.accuracy && per.accuracy !== 'день' ? '~' : '')
 </script>
@@ -54,42 +54,37 @@ const approx = (per) => (per && per.accuracy && per.accuracy !== 'день' ? '~
 
     <!-- строки: показываем только непустые -->
     <dl class="flex flex-col gap-1.5 border-t border-[var(--line)] pt-2.5">
-      <!-- Парки — всегда -->
-      <div class="flex gap-2 text-[0.78125rem] leading-snug">
-        <dt class="shrink-0 basis-[4.5rem] text-[var(--text-muted)]">{{ L.row_parks }}</dt>
+      <!-- Парки — всегда. Запущенный: строка на каждый парк сети (дата или
+           «— не подключён»). Незапущенный: одна строка «не запущен…». -->
+      <div class="flex gap-2 text-[0.8125rem] leading-snug">
+        <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_parks }}</dt>
         <dd class="min-w-0 flex-1">
-          <div v-if="active" class="flex flex-wrap gap-1.5">
-            <span
-              v-for="pid in parkIds"
-              :key="pid"
-              class="rounded-md border px-2 py-0.5 text-[0.75rem]"
-              :class="periodOf(pid) ? 'border-[var(--line)] text-[var(--text)]' : 'border-dashed border-[var(--line)] text-[var(--text-muted)]'"
-            >
-              <b class="font-semibold">{{ parkLabel(pid) }}</b>
-              <span v-if="periodOf(pid)" class="ml-1 text-[var(--text-muted)]">
-                {{ approx(periodOf(pid)) }}с {{ fmtDate(periodOf(pid).start) }}<template v-if="periodOf(pid).end"> по {{ fmtDate(periodOf(pid).end) }}</template>
-              </span>
-            </span>
+          <div v-if="launched" class="flex flex-col gap-0.5">
+            <div v-for="pid in parkIds" :key="pid" class="flex flex-wrap items-baseline gap-x-1.5">
+              <span class="font-medium text-[var(--text)]">{{ parkLabel(pid) }}</span>
+              <span v-if="periodOf(pid)" class="text-[var(--text-muted)]">{{ approx(periodOf(pid)) }}с {{ fmtDate(periodOf(pid).start) }}<template v-if="periodOf(pid).end"> по {{ fmtDate(periodOf(pid).end) }}</template></span>
+              <span v-else class="text-[var(--text-muted)]">— не подключён</span>
+            </div>
           </div>
-          <span v-else class="inline-block rounded-md border border-dashed border-[var(--line)] px-2 py-0.5 text-[0.75rem] text-[var(--text-muted)]">{{ L.not_launched }}</span>
+          <span v-else class="text-[var(--text-muted)]">{{ L.not_launched }}</span>
         </dd>
       </div>
 
       <!-- Запуск -->
-      <div v-if="driver.launch" class="flex gap-2 text-[0.78125rem] leading-snug">
-        <dt class="shrink-0 basis-[4.5rem] text-[var(--text-muted)]">{{ L.row_launch }}</dt>
+      <div v-if="driver.launch" class="flex gap-2 text-[0.8125rem] leading-snug">
+        <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_launch }}</dt>
         <dd class="min-w-0 flex-1 text-[var(--text)]">{{ launchLabel(driver.launch) }}</dd>
       </div>
 
       <!-- Цель -->
-      <div v-if="driver.goal" class="flex gap-2 text-[0.78125rem] leading-snug">
-        <dt class="shrink-0 basis-[4.5rem] text-[var(--text-muted)]">{{ L.row_goal }}</dt>
+      <div v-if="driver.goal" class="flex gap-2 text-[0.8125rem] leading-snug">
+        <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_goal }}</dt>
         <dd class="min-w-0 flex-1 text-[var(--text)]">{{ driver.goal }}</dd>
       </div>
 
       <!-- Программа -->
-      <div v-if="driver.program" class="flex gap-2 text-[0.78125rem] leading-snug">
-        <dt class="shrink-0 basis-[4.5rem] text-[var(--text-muted)]">{{ L.row_program }}</dt>
+      <div v-if="driver.program" class="flex gap-2 text-[0.8125rem] leading-snug">
+        <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_program }}</dt>
         <dd class="min-w-0 flex-1">
           <span class="inline-flex items-center rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-2 py-0.5 text-[0.75rem] text-[var(--text-secondary)]">{{ driver.program }}</span>
         </dd>
