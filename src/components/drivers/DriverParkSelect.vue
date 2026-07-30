@@ -30,7 +30,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div ref="rootRef" class="relative flex justify-center">
+  <!-- При открытии поднимаем ВЕСЬ селект в отдельный слой (z-30): position:relative
+       без z-index не создаёт stacking context, и меню провалилось бы под слайдер
+       статусов и карточки, идущие ниже в DOM. -->
+  <div ref="rootRef" class="relative flex justify-center" :class="open ? 'z-30' : ''">
     <button
       type="button"
       class="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-4 text-[0.9375rem] font-medium text-[var(--text)] active:opacity-90"
@@ -47,7 +50,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
     <div
       v-if="open"
       role="listbox"
-      class="absolute top-[calc(100%+6px)] z-20 w-64 max-w-[90vw] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--card-shadow)]"
+      class="absolute left-1/2 top-[calc(100%+6px)] z-30 w-64 max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--card-shadow)]"
     >
       <button
         v-for="o in options"
