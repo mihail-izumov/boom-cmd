@@ -1378,22 +1378,33 @@ console.log('\n=== jsdom: раздел «Сводки сети» и вход с 
   const { el, app } = mount(bundle.HomeScreen, {})
   await flush()
   const tiles = [...el.querySelectorAll('.grid button')]
-  check('плиток на Главной 4', tiles.length === 4, tiles.length)
-  // Переименования владельца 28.07: плитка «Тренды» (бывш. «Сводки»), «Прогресс» (бывш. «Аналитика»).
-  check('«Тренды» — первая плитка', tiles[0]?.getAttribute('data-test') === 'tile-summary' && tiles[0].textContent.includes('Тренды'))
-  // 30.07: плитка «Задачи» заменена на «Мастерплан» (раздел «Задачи» остался
-  // вкладкой таб-бара — плитка его дублировала).
-  check('порядок остальных не тронут', tiles.slice(1).map((t) => t.textContent.trim()).join(',') === 'Прогресс,Мастерплан,Материалы',
-    tiles.slice(1).map((t) => t.textContent.trim()).join(','))
+  // Ревизия владельца 30.07: плитки «Тренды» и «Прогресс» убраны — они дублировали
+  // вкладки таб-бара. Осталось ТРИ входа, которых в таб-баре нет, «Драйверы» первой.
+  check('плиток на Главной 3', tiles.length === 3, tiles.length)
+  check('«Драйверы» — первая плитка',
+    tiles[0]?.getAttribute('data-test') === 'tile-drivers' && tiles[0].textContent.includes('Драйверы'),
+    tiles[0]?.getAttribute('data-test'))
+  check('порядок плиток: Драйверы,Мастерплан,Материалы',
+    tiles.map((t) => t.textContent.trim()).join(',') === 'Драйверы,Мастерплан,Материалы',
+    tiles.map((t) => t.textContent.trim()).join(','))
+  // Плиток-дублей вкладок больше нет: доступ к «Трендам»/«Прогрессу» — только таб-бар.
+  check('плиток-дублей вкладок нет (tile-summary / Прогресс)',
+    !tiles.some((t) => t.getAttribute('data-test') === 'tile-summary' || t.textContent.includes('Прогресс')))
   const mp = tiles.find((t) => t.getAttribute('data-test') === 'tile-masterplan')
   await fire(mp, 'click')
   check('тап по «Мастерплану» → под-страница «Цели и планы» (goals)',
     nav.subView.value === 'goals', nav.subView.value)
   bundle.clearSubView()
   await fire(tiles[0], 'click')
-  // 28.07: «Тренды» — вкладка таб-бара, тап по плитке активирует её (не под-страницу)
-  check('тап по плитке «Тренды» → вкладка «summary», под-страницы нет',
-    nav.active.value === 'summary' && nav.subView.value === null, nav.active.value)
+  // 30.07: «Драйверы» — под-страница (в таб-баре раздела нет).
+  check('тап по «Драйверам» → под-страница «drivers», вкладка не меняется',
+    nav.subView.value === 'drivers' && nav.active.value === 'home',
+    `${nav.active.value}/${nav.subView.value}`)
+  const mt = tiles.find((t) => t.getAttribute('data-test') === 'tile-materials')
+  bundle.clearSubView()
+  await fire(mt, 'click')
+  check('тап по «Материалам» → под-страница «materials»',
+    nav.subView.value === 'materials', nav.subView.value)
   nav.setActive('home')
   bundle.clearSubView()
   app.unmount()

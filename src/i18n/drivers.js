@@ -1,0 +1,107 @@
+// i18n и палитра раздела «Драйверы роста» (под-страница дашборда).
+// Принцип DESIGN-STANDARD §3.4–3.6: цвет — ТОЛЬКО в заливке статус-бейджа,
+// текст всегда монохромный (var(--text)); все цвета — из токенов main.css,
+// хардкод hex запрещён. Раздел отвечает на «что подключено и что готовится»,
+// НЕ на «что сработало» — метрику/результат не показываем.
+//
+// Данные приходят из дневного пейлоада (?action=daily): payload.drivers +
+// payload.driver_periods (см. useDaily.normalize). Статус — русский enum из
+// контура B (backlog — единственный латинский), type — латинский код с переводом.
+
+import { PARKS_BY_ID } from '../data/parks.js'
+
+// ── Порядок сортировки карточек (актуальное сверху). Совпадает со спекой ТЗ §3 ──
+export const STATUS_ORDER = ['идёт', 'пауза', 'готов', 'разработка', 'backlog', 'закрыт']
+
+// Порядок чипов фильтра статуса (ТЗ §3): активные → готовящиеся → завершённые.
+export const STATUS_FILTER_ORDER = ['идёт', 'готов', 'разработка', 'backlog', 'пауза', 'закрыт']
+
+// «Активные» = уже где-то запущены → фильтруются по подключённым паркам.
+// «Незапущенные» (готов/разработка/backlog) видны при ЛЮБОМ выборе парка.
+export const ACTIVE_STATUSES = ['идёт', 'пауза', 'закрыт']
+export const isActive = (status) => ACTIVE_STATUSES.includes(status)
+
+// Подписи статусов на чипах (данные — уже по-русски, здесь только регистр/показ).
+export const STATUS_LABEL = {
+  'идёт': 'Идёт',
+  'готов': 'Готов',
+  'разработка': 'Разработка',
+  'backlog': 'Backlog',
+  'пауза': 'Пауза',
+  'закрыт': 'Закрыт',
+}
+
+// ── Статус-бейдж: цвет = сигнал, ЗАЛИВКА мягким тоном через color-mix, текст
+//    монохромный. Идиома color-mix — как signalTint в dailySignals.js.
+//    Токены сверены по src/styles/main.css §3.6:
+//      --positive #2F9E54 · --warning #FFC833 · --info #2563EB · --st-backlog #8A8880 ·
+//      --st-todo #6F6D66 · --text-muted #6F6D66.
+//    Пауза/закрыт — НЕЙТРАЛИ (оранжевый/фиолетовый убраны по решению владельца):
+//      пауза — нейтраль + пунктирная рамка (сигнал «временно выключено»);
+//      закрыт — нейтраль темнее backlog (базовый токен темнее → тон читается глубже).
+//    Красный (--negative) НЕ используем — он зарезервирован под Urgent.
+export const STATUS_STYLE = {
+  'идёт': { token: 'var(--positive)', mix: 18 },
+  'готов': { token: 'var(--warning)', mix: 22 },
+  'разработка': { token: 'var(--info)', mix: 16 },
+  'backlog': { token: 'var(--st-backlog)', mix: 60 },
+  'пауза': { token: 'var(--st-todo)', mix: 45, dashed: true },
+  'закрыт': { token: 'var(--text-muted)', mix: 55 },
+}
+
+// Заливка бейджа по статусу (мягкий тон на холсте карточки).
+export function statusFill(status) {
+  const s = STATUS_STYLE[status] || STATUS_STYLE.backlog
+  return `color-mix(in srgb, ${s.token} ${s.mix}%, var(--surface))`
+}
+export const statusDashed = (status) => !!(STATUS_STYLE[status] && STATUS_STYLE[status].dashed)
+
+// ── Тип драйвера: нейтральный контурный бейдж, визуально СЛАБЕЕ статуса.
+export const TYPE_RU = {
+  promo: 'акция',
+  sales: 'продажи',
+  product: 'продукт',
+  traffic: 'трафик',
+  loyalty: 'возвраты',
+  ops: 'операционка',
+}
+
+// ── Парки. Порядок фильтра — Охта · Питерленд · Июнь · MARI (MARI в хвосте,
+//    подхватится автоматически, когда появится в данных). Имена — из parks.js.
+export const DRIVER_PARK_ORDER = ['ohta', 'piterland', 'iyun', 'mari']
+export const parkLabel = (id) => (PARKS_BY_ID[id] && PARKS_BY_ID[id].name) || id
+
+// ── Форматтер даты старта в парке: 'YYYY-MM-DD' → «13.07.26» (как в песочнице).
+export function fmtDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = String(iso).split('-')
+  if (!y || !m || !d) return String(iso)
+  return `${d}.${m}.${y.slice(2)}`
+}
+
+// Поле «Запуск» — либо дата, либо триггер словами («по триггеру — 3-я неделя месяца»).
+// Apps Script отдаёт дату канонично (ISO), текст — как есть; здесь ISO приводим к
+// русскому виду, текст не трогаем.
+export function launchLabel(v) {
+  const s = String(v || '')
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? fmtDate(s) : s
+}
+
+// Безопасный перевод с фолбэком (по образцу i18n/projects.js t()).
+export const tr = (dict, key) => (key != null && dict[key] != null ? dict[key] : String(key))
+
+// ── Подписи UI (данные — EN/RU-коды, интерфейс по-русски).
+export const L = {
+  title: 'Драйверы роста',
+  subtitle: 'Что подключено, что готовится и что в очереди. Результаты — позже.',
+  filter_park: 'Парк',
+  filter_status: 'Статус',
+  all: 'Все',
+  count: (shown, total) => `Показано ${shown} из ${total}`,
+  empty_filters: 'Ничего не подходит под фильтры',
+  not_launched: 'не запущен ни в одном парке',
+  row_parks: 'Парки',
+  row_launch: 'Запуск',
+  row_goal: 'Цель',
+  row_program: 'Программа',
+}

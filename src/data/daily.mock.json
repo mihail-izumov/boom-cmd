@@ -1,5 +1,24 @@
 {
   "updated": "2025-05-20",
+  "drivers": [
+    {"code": "DRV-01", "name": "Пример акции на кассе", "type": "promo", "status": "идёт", "launch": "", "goal": "средний чек", "program": "", "desc": "выдуманное описание: гость добирает сумму до порога и чаще пополняет — форма совпадает с контрактом"},
+    {"code": "DRV-02", "name": "Пример готового драйвера", "type": "loyalty", "status": "готов", "launch": "по триггеру: условие-заглушка", "goal": "возвраты", "program": "", "desc": "выдуманная гипотеза — ждёт запуска по названному триггеру"},
+    {"code": "DRV-03", "name": "Пример активных продаж", "type": "sales", "status": "идёт", "launch": "", "goal": "средний чек", "program": "Программа-заглушка", "desc": "выдуманное описание: кассир называет сумму сам, первое пополнение растёт"},
+    {"code": "DRV-04", "name": "Пример в разработке", "type": "product", "status": "разработка", "launch": "ориентир-заглушка: следующий квартал", "goal": "средний чек", "program": "Программа-заглушка", "desc": "выдуманное описание — прорабатывается"},
+    {"code": "DRV-05", "name": "Пример из бэклога", "type": "traffic", "status": "backlog", "launch": "", "goal": "трафик", "program": "", "desc": "выдуманная идея в очереди"},
+    {"code": "DRV-06", "name": "Пример на паузе", "type": "ops", "status": "пауза", "launch": "", "goal": "возвраты", "program": "", "desc": "выдуманное описание — временно выключен"},
+    {"code": "DRV-07", "name": "Пример завершённого", "type": "promo", "status": "закрыт", "launch": "", "goal": "трафик", "program": "", "desc": "выдуманное описание — акция завершена"}
+  ],
+  "driver_periods": [
+    {"code": "DRV-01", "park": "ohta", "start": "2026-04-01", "end": "", "accuracy": "день"},
+    {"code": "DRV-01", "park": "piterland", "start": "2026-04-01", "end": "", "accuracy": "месяц"},
+    {"code": "DRV-03", "park": "ohta", "start": "2026-07-13", "end": "", "accuracy": "день"},
+    {"code": "DRV-03", "park": "piterland", "start": "2026-07-13", "end": "", "accuracy": "день"},
+    {"code": "DRV-03", "park": "iyun", "start": "2026-07-13", "end": "", "accuracy": "день"},
+    {"code": "DRV-03", "park": "mari", "start": "2026-07-20", "end": "", "accuracy": "день"},
+    {"code": "DRV-06", "park": "ohta", "start": "2026-05-01", "end": "2026-06-15", "accuracy": "день"},
+    {"code": "DRV-07", "park": "piterland", "start": "2026-03-01", "end": "2026-04-30", "accuracy": "unknown"}
+  ],
   "stats": {
     "checkups": 137,
     "signals": 42

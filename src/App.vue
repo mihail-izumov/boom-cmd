@@ -12,6 +12,7 @@ import GoalsScreen from './screens/GoalsScreen.vue'
 import SummaryScreen from './screens/SummaryScreen.vue'
 import DailyReportScreen from './screens/DailyReportScreen.vue'
 import ReviewsScreen from './screens/ReviewsScreen.vue'
+import DriversSection from './components/drivers/DriversSection.vue'
 import SharkEyesIcon from './components/icons/SharkEyesIcon.vue'
 import AccessKeyForm from './components/AccessKeyForm.vue'
 import ReporterShell from './components/report/ReporterShell.vue'
@@ -92,6 +93,18 @@ const subViews = {
     showBack: true,
     backLabel: 'Главная',
     parkFilter: true,
+  },
+  // «Драйверы роста» (30.07) — что подключено в каждом парке, что готовится,
+  // что в очереди. Вход — плиткой с Главной; в таб-баре раздела нет.
+  // `parkFilter: false` осознанно: у раздела СВОИ локальные чипы парка со
+  // спец-логикой (незапущенные драйверы видны при любом выборе парка) —
+  // глобальную пилюлю не дублируем, иначе два разных фильтра парка в одной шапке.
+  drivers: {
+    title: 'Драйверы роста',
+    screen: DriversSection,
+    showBack: true,
+    backLabel: 'Главная',
+    parkFilter: false,
   },
   // «Отчёт Дня» (D-12) — единственная пишущая страница; открывается кнопкой
   // «Добавить отчёт» из «Контроля Дня». `backTo` — статический возврат на

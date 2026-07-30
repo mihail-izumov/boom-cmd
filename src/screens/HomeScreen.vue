@@ -2,16 +2,15 @@
 import { computed, ref } from 'vue'
 // Map импортируем под псевдонимом: голое имя Map затенило бы глобальный
 // конструктор Map в области модуля.
-import { ChartColumnBig, ExternalLink, Folder, Gauge, Info, Map as MapIcon, Newspaper, Target } from 'lucide-vue-next'
+import { ExternalLink, Folder, Gauge, Info, Map as MapIcon, Rocket, Target } from 'lucide-vue-next'
 import HomeWidget from '../components/home/HomeWidget.vue'
 import MonthProgressCard from '../components/home/MonthProgressCard.vue'
 import InstallPwaBanner from '../components/home/InstallPwaBanner.vue'
 import { useDaily } from '../composables/useDaily.js'
 import { computeNetwork } from '../composables/dailyModel.js'
 import { PARKS, PARKS_BY_ID } from '../data/parks.js'
-import { setActive, setSubView } from '../composables/useAppNav.js'
+import { setSubView } from '../composables/useAppNav.js'
 import { mlnRub, mlnSigned, pctDelta, pct1, readCounters, checkupsWord, signalsWord, reviewsWord, L } from '../i18n/home.js'
-import { L as LS } from '../i18n/summary.js'
 import { reviewCount } from '../composables/reviews.js'
 
 // Home — командная дека. Сверху полоса счётчиков, под ней ДЕКА МЕСЯЦА (D-34:
@@ -24,7 +23,6 @@ import { reviewCount } from '../composables/reviews.js'
 
 const NM_DAILY = 'Контроль\nДня'
 const NM_GOALS = 'Цели и\nпланы'
-const SUMMARY_TILE = LS.home_tile
 
 const { data, loading } = useDaily()
 const sets = computed(() => data.value?.sets || {})
@@ -101,14 +99,15 @@ const paceInfo = computed(() => {
   return `Сейчас ${pace.value} — по прогнозу выйдем ровно к цели.`
 })
 
-// 28.07: «Тренды» — теперь вкладка таб-бара (setActive), «Материалы» — наоборот,
-// под-страница (setSubView); остальные входы не менялись.
+// Входы с Главной — теперь ТОЛЬКО под-страницы (setSubView). Ревизия 30.07
+// (владелец): плитки «Тренды» и «Прогресс» убраны, вместе с ними ушли goSummary /
+// goAnalytics и импорт setActive — эти разделы живут вкладками таб-бара, плитки их
+// лишь дублировали. Доступ к ним не потерян.
 function goDaily() { setSubView('daily') }
 function goReviews() { setSubView('reviews') } // D-19: журнал разборов, вход только отсюда
-function goSummary() { setActive('summary') }
 function goGoals() { setSubView('goals') }
-function goAnalytics() { setActive('analytics') }
 function goMaterials() { setSubView('materials') }
+function goDrivers() { setSubView('drivers') } // 30.07: драйверы роста, вход только отсюда
 // goProjects снят вместе с плиткой «Задачи» (30.07): вход в раздел — вкладка таб-бара.
 </script>
 
@@ -223,28 +222,27 @@ function goMaterials() { setSubView('materials') }
       </div>
     </Transition>
 
-    <!-- карта-сетка: плитки-приложения. «Тренды» — первая (вход в сетевые сводки
-         дня/недели/месяца). Сетка на 4 колонки: на узких экранах (SE, 375px)
-         колонка ~80px, иконка 60px + подпись в одну строку помещаются. -->
+    <!-- карта-сетка: плитки-приложения. Ревизия 30.07 (владелец): плитки «Тренды» и
+         «Прогресс» убраны — они лишь дублировали вкладки таб-бара, доступ к разделам
+         не потерян. Остались ТРИ входа, которых в таб-баре нет: «Драйверы» (первая),
+         «Мастерплан», «Материалы». Сетка на 3 колонки: колонка стала шире (~130px
+         на SE), подписи больше не обрезаются. -->
     <div class="mt-3.5 rounded-[22px] bg-[var(--surface)] px-2.5 pb-3.5 pt-[18px] shadow-sm">
-      <div class="grid grid-cols-4 gap-1">
-        <button type="button" data-test="tile-summary" class="flex min-w-0 flex-col items-center gap-2.5" @click="goSummary">
-          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Newspaper class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">{{ SUMMARY_TILE }}</span>
-        </button>
-        <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goAnalytics">
-          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><ChartColumnBig class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
-          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Прогресс</span>
+      <div class="grid grid-cols-3 gap-1">
+        <!-- «Драйверы» — первая: что подключено в парках, что готовится, что в очереди.
+             Иконка — ракета (ускорители роста); Target/Gauge заняты виджетами. -->
+        <button type="button" data-test="tile-drivers" class="flex min-w-0 flex-col items-center gap-2.5" @click="goDrivers">
+          <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Rocket class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
+          <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Драйверы</span>
         </button>
         <!-- 30.07: плитка «Задачи» заменена на «Мастерплан» → под-страница «Цели
-             и планы». Доступ к «Задачам» не потерян: это вкладка таб-бара, и
-             плитка её лишь дублировала. Иконка — карта: мастерплан читается как
-             маршрут месяца, а мишень Target уже занята виджетом «Цели и планы». -->
+             и планы». Иконка — карта: мастерплан читается как маршрут месяца,
+             а мишень Target уже занята виджетом «Цели и планы». -->
         <button type="button" data-test="tile-masterplan" class="flex min-w-0 flex-col items-center gap-2.5" @click="goGoals">
           <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><MapIcon class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
           <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Мастерплан</span>
         </button>
-        <button type="button" class="flex min-w-0 flex-col items-center gap-2.5" @click="goMaterials">
+        <button type="button" data-test="tile-materials" class="flex min-w-0 flex-col items-center gap-2.5" @click="goMaterials">
           <span class="flex h-[60px] w-[60px] items-center justify-center rounded-[17px] bg-[var(--surface-2)] text-[var(--text-secondary)]"><Folder class="h-[28px] w-[28px]" :stroke-width="2" aria-hidden="true" /></span>
           <span class="max-w-full truncate text-[0.75rem] font-medium text-[var(--text)]">Материалы</span>
         </button>

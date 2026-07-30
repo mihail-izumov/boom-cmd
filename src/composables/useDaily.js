@@ -45,6 +45,11 @@ function normalize(raw) {
   // Журнал разборов (D-19) — тоже верхнеуровневый массив; валидация и сортировка —
   // в reviews.js. Нет ключа → счётчик Главной «—», журнал покажет пустой стейт.
   if (Array.isArray(safe.reviews)) out.reviews = safe.reviews
+  // Драйверы роста — два верхнеуровневых массива (по образцу net_summary/reviews,
+  // НЕ внутри sets[k]: раздел сетевой, не привязан к паре парк:месяц). Join, фильтр
+  // и сортировка — в driversModel.js. Нет ключей → раздел «Драйверы» скрыт.
+  if (Array.isArray(safe.drivers)) out.drivers = safe.drivers
+  if (Array.isArray(safe.driver_periods)) out.driver_periods = safe.driver_periods
   // Отметки «Прочитал» (D-36, бэк v3.9) — компактная проекция, одна строка на парк.
   // В ОТЛИЧИЕ от net_summary/reviews ключ гарантируем ВСЕГДА, пустоту как []: карточка
   // сигнала не должна отличать «поле не доехало» от «никто не отметил» — в обоих
