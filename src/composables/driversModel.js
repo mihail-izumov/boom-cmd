@@ -3,15 +3,12 @@
 // (по образцу dailyModel.js / netSummary.js). Источник данных — верхнеуровневые
 // payload.drivers + payload.driver_periods из дневного пейлоада.
 
-import { PARKS_BY_ID } from '../data/parks.js'
 import { STATUS_ORDER, STATUS_FILTER_ORDER, DRIVER_PARK_ORDER } from '../i18n/drivers.js'
 
 const RANK = Object.fromEntries(STATUS_ORDER.map((s, i) => [s, i]))
 
-// «Запущен» = есть хотя бы один период по парку. НЕ завязано на имя статуса:
-// контур B может переименовать словарь статусов (в проде вместо backlog/разработка
-// пришёл «черновик»), а признак «где-то работает» остаётся верным. Запущенные
-// фильтруются по подключённым паркам; незапущенные видны при любом выборе парка.
+// «Запущен» = есть хотя бы один период по парку (карточка так решает «не запущен ни
+// в одном парке»). НЕ завязано на имя статуса — устойчиво к словарю контура B.
 export const isLaunched = (d) => !!(d && Array.isArray(d.periods) && d.periods.length > 0)
 
 // Периоды по паркам присоединяем к драйверу по code (контракт — плоский массив,
@@ -27,25 +24,19 @@ export function joinDrivers(drivers, periods) {
     .map((d) => ({ ...d, periods: byCode[d.code] || [] }))
 }
 
-// Опции чипа «Парк» — из данных: только парки, реально встречающиеся в периодах.
-// Порядок — DRIVER_PARK_ORDER (MARI в хвосте), затем любые неизвестные id из данных.
-// Так MARI и будущие парки подхватятся без правки кода.
-export function parkOptions(joined) {
-  const present = new Set()
-  for (const d of joined) for (const p of d.periods) if (p.park) present.add(p.park)
-  const ordered = DRIVER_PARK_ORDER.filter((id) => present.has(id))
-  const extra = [...present].filter((id) => !DRIVER_PARK_ORDER.includes(id)).sort()
-  return [...ordered, ...extra].filter((id) => PARKS_BY_ID[id] || true)
+// Опции чипа «Парк» — ФИКСИРОВАННЫЕ три действующих СПб (§0.1 п.2). НЕ из данных и
+// НЕ из глобального parks.js: MARI исключён совсем, а не «подхватится». Показываем
+// все три всегда (как песочница), даже если у парка сейчас 0 драйверов.
+export function parkOptions() {
+  return DRIVER_PARK_ORDER.slice()
 }
 
-// Проходит ли драйвер текущие фильтры. fPark/fStatus === 'all' → без ограничения.
-// Активные — по подключённым паркам; незапущенные — видны при любом выборе парка.
+// Проходит ли драйвер текущие фильтры. fStatus/fPark === 'all' → без ограничения.
+// §0.1 п.1/п.4: выбран ПАРК → только драйверы с периодом в этом парке. Незапущенные
+// (нет периодов) видны ТОЛЬКО во «Всей сети» (fPark==='all'), не под конкретным парком.
 export function matches(d, fPark, fStatus) {
   if (fStatus !== 'all' && d.status !== fStatus) return false
-  if (fPark !== 'all') {
-    if (isLaunched(d)) return d.periods.some((p) => p.park === fPark)
-    return true // незапущенные — во всех парках
-  }
+  if (fPark !== 'all') return (d.periods || []).some((p) => p.park === fPark)
   return true
 }
 
@@ -63,12 +54,12 @@ export function visibleDrivers(joined, fPark, fStatus) {
   return sortDrivers(joined.filter((d) => matches(d, fPark, fStatus)))
 }
 
-// Счётчики чипа «Парк». Активные — считаются по подключённому парку; незапущенные
-// попадают в счётчик КАЖДОГО парка (они потенциально сетевые). 'all' — всего.
+// Счётчики чипа «Парк» — драйверы с периодом в этом парке (§0.1 п.1: без «утечки»
+// незапущенных под каждый парк). 'all' — все драйверы (в т.ч. незапущенные).
 export function parkCounts(joined, parkIds) {
   const c = { all: joined.length }
   for (const id of parkIds) {
-    c[id] = joined.filter((d) => (isLaunched(d) ? d.periods.some((p) => p.park === id) : true)).length
+    c[id] = joined.filter((d) => (d.periods || []).some((p) => p.park === id)).length
   }
   return c
 }

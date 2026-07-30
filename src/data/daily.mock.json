@@ -15,7 +15,6 @@
     {"code": "DRV-03", "park": "ohta", "start": "2026-07-13", "end": "", "accuracy": "день"},
     {"code": "DRV-03", "park": "piterland", "start": "2026-07-13", "end": "", "accuracy": "день"},
     {"code": "DRV-03", "park": "iyun", "start": "2026-07-13", "end": "", "accuracy": "день"},
-    {"code": "DRV-03", "park": "mari", "start": "2026-07-20", "end": "", "accuracy": "день"},
     {"code": "DRV-06", "park": "ohta", "start": "2026-05-01", "end": "2026-06-15", "accuracy": "день"},
     {"code": "DRV-07", "park": "piterland", "start": "2026-03-01", "end": "2026-04-30", "accuracy": "unknown"}
   ],

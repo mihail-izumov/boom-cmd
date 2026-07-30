@@ -1,75 +1,61 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useDaily } from '../../composables/useDaily.js'
-import { useParkContext } from '../../composables/useParkContext.js'
 import {
   joinDrivers,
   parkOptions,
   matches,
-  statusOptions,
+  visibleDrivers,
+  parkCounts,
   statusCounts,
+  statusOptions,
 } from '../../composables/driversModel.js'
-import { statusLabel, L } from '../../i18n/drivers.js'
-import DriverStatusTabs from './DriverStatusTabs.vue'
-import DriverGroup from './DriverGroup.vue'
+import { statusLabel, parkLabel, L } from '../../i18n/drivers.js'
+import DriverCard from './DriverCard.vue'
 
-// Раздел «Драйверы роста» — приведён к паттернам приложения:
-//   • ПАРК — глобальная выпадающая пилюля в шапке (useParkContext, как «Задачи»);
-//     секция не рендерит свой парк-контрол (parkFilter:true у под-страницы в App.vue).
-//   • СТАТУС — горизонтальный слайдер-лента (DriverStatusTabs, как домены «Прогресса»).
-//   • СПИСОК — сворачиваемые группы по статусу с кружком-счётчиком (DriverGroup, как
-//     статус-группы «Задач»), по дефолту свёрнуты.
+// Раздел «Драйверы роста» — по §3 задания и песочнице: ДВА ряда чипов-фильтров
+// (Парк · Статус) + плоский список карточек в одну колонку, сортировка по статусу.
+// Чипы и тач-таргеты ≥44pt — по образцу «Задач», не из sizing песочницы.
+//
+// Парк — ЛОКАЛЬНЫЙ фильтр по трём действующим СПб (Охта/Питерленд/Июнь), БЕЗ MARI и
+// БЕЗ глобальной пилюли (§0.1 п.2/п.4: «Вся сеть» = 3 СПб, не все парки приложения).
+// Выбран парк → только драйверы с периодом в нём; незапущенные видны лишь во «Всей
+// сети» (§0.1 п.1 — логика в driversModel.matches/parkCounts).
 //
 // ЧЕТЫРЕ СОСТОЯНИЯ (loading/error/empty/data): раздел — под-страница со своей плиткой,
-// useDaily не синглтон (fetch на каждом открытии), поэтому «скрыть всё» давало бы
-// пустой экран. error и empty разведены (не путаем «пусто» с «не загрузилось»).
+// useDaily не синглтон (fetch на каждом открытии), «скрыть всё» дало бы пустой экран.
 
 const { data, loading, error, reload } = useDaily()
-const { current: parkCtx, isNetwork, currentName } = useParkContext()
 
-const joined = computed(() =>
-  joinDrivers(data.value && data.value.drivers, data.value && data.value.driver_periods),
-)
-// Набор парков для строк карточки — из всех данных (не зависит от выбранного парка).
-const parkIds = computed(() => parkOptions(joined.value))
+const joined = computed(() => joinDrivers(data.value && data.value.drivers, data.value && data.value.driver_periods))
+const parkIds = computed(() => parkOptions()) // три фиксированных СПб
 
-// Парк-скоуп из глобального контекста: «Вся сеть» → все драйверы; парк → запущенные
-// в этом парке + незапущенные (они потенциально сетевые). Логика — в matches().
-const parkScope = computed(() => (isNetwork.value ? 'all' : parkCtx.value))
-const scoped = computed(() => joined.value.filter((d) => matches(d, parkScope.value, 'all')))
+const fPark = ref('all')
+const fStatus = ref('all')
 
+// Набор под текущим парком (все статусы) — для «Всего N» и счётчиков статуса.
+const scoped = computed(() => joined.value.filter((d) => matches(d, fPark.value, 'all')))
 const total = computed(() => scoped.value.length)
-const present = computed(() => statusOptions(scoped.value))
-const sCounts = computed(() => statusCounts(scoped.value))
 
-const statusTabs = computed(() => [
-  { id: 'all', label: L.all, count: scoped.value.length },
-  ...present.value.map((s) => ({ id: s, label: statusLabel(s), count: sCounts.value[s] })),
+// Чипы «Парк»: Все + три СПб. Счётчик парка — драйверы с периодом в нём; «Все» — всего.
+const pCounts = computed(() => parkCounts(joined.value, parkIds.value))
+const parkChips = computed(() => [
+  { val: 'all', label: L.all, count: joined.value.length },
+  ...parkIds.value.map((id) => ({ val: id, label: parkLabel(id), count: pCounts.value[id] })),
 ])
 
-const fStatus = ref('all')
-// Если выбранный статус пропал из скоупа (сменили парк) — вернуться на «Все».
-watch([present, fStatus], () => {
-  if (fStatus.value !== 'all' && !present.value.includes(fStatus.value)) fStatus.value = 'all'
+// Чипы «Статус»: из статусов, присутствующих под текущим парком; чип с 0 скрыт.
+const sCounts = computed(() => statusCounts(scoped.value))
+const statusChips = computed(() => [
+  { val: 'all', label: L.all, count: scoped.value.length },
+  ...statusOptions(scoped.value).map((s) => ({ val: s, label: statusLabel(s), count: sCounts.value[s] })),
+])
+// Выбранный статус пропал из скоупа (сменили парк) → вернуться на «Все».
+watch([scoped, fStatus], () => {
+  if (fStatus.value !== 'all' && !statusOptions(scoped.value).includes(fStatus.value)) fStatus.value = 'all'
 })
 
-// Группировка по статусу (внутри — по коду).
-const grouped = computed(() => {
-  const m = {}
-  for (const s of present.value) m[s] = []
-  for (const d of scoped.value) (m[d.status] || (m[d.status] = [])).push(d)
-  for (const s in m) m[s].sort((a, b) => String(a.code).localeCompare(String(b.code)))
-  return m
-})
-const visibleStatuses = computed(() =>
-  fStatus.value === 'all' ? present.value : present.value.filter((s) => s === fStatus.value),
-)
-
-// Сворачивание: по дефолту всё свёрнуто (как «Задачи»). При выборе конкретного
-// статуса слайдером его группа раскрыта — искать нечего, показываем сразу.
-const openMap = reactive({})
-const toggle = (s) => (openMap[s] = !openMap[s])
-const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
+const list = computed(() => visibleDrivers(joined.value, fPark.value, fStatus.value))
 </script>
 
 <template>
@@ -104,7 +90,7 @@ const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
       >{{ L.retry }}</button>
     </div>
 
-    <!-- empty: источника нет вовсе (ни одного драйвера в пейлоаде) -->
+    <!-- empty: ни одного драйвера в пейлоаде -->
     <div
       v-else-if="!joined.length"
       class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
@@ -113,38 +99,63 @@ const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ L.empty_hint }}</p>
     </div>
 
-    <!-- empty по scope: драйверы есть, но не под выбранный парк -->
-    <div
-      v-else-if="!scoped.length"
-      class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
-    >
-      <p class="text-[1.0625rem] text-[var(--text)]">
-        {{ isNetwork ? L.empty_scope_network : L.empty_scope_park(currentName) }}
-      </p>
-      <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ L.empty_scope_hint }}</p>
-    </div>
-
     <!-- data -->
     <template v-else>
       <!-- лид по центру, как на «Трендах» (крупный заголовок рисует оболочка) -->
       <p class="bc-fade-in px-4 text-center text-[1rem] leading-snug text-[var(--text-muted)]">{{ L.subtitle }}</p>
 
-      <!-- слайдер статусов -->
-      <DriverStatusTabs v-model="fStatus" :tabs="statusTabs" class="bc-fade-in" />
+      <!-- фильтры: два ряда чипов со счётчиками (тач ≥44pt, как «Задачи») -->
+      <div class="bc-fade-in flex flex-col gap-2">
+        <div class="flex flex-col gap-1.5">
+          <span class="text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--text-muted)]">{{ L.filter_park }}</span>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="c in parkChips"
+              :key="'park-' + c.val"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full border px-4 text-[0.8125rem] font-medium transition-colors"
+              style="min-height: 44px"
+              :class="fPark === c.val
+                ? 'border-[var(--text)] bg-[var(--text)] text-[var(--surface)]'
+                : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-secondary)] active:bg-[var(--surface-2)]'"
+              :aria-pressed="fPark === c.val"
+              @click="fPark = c.val"
+            >
+              {{ c.label }}
+              <span class="text-[0.6875rem]" :class="fPark === c.val ? 'opacity-70' : 'text-[var(--text-muted)]'">{{ c.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <span class="text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--text-muted)]">{{ L.filter_status }}</span>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="c in statusChips"
+              :key="'st-' + c.val"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full border px-4 text-[0.8125rem] font-medium transition-colors"
+              style="min-height: 44px"
+              :class="fStatus === c.val
+                ? 'border-[var(--text)] bg-[var(--text)] text-[var(--surface)]'
+                : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-secondary)] active:bg-[var(--surface-2)]'"
+              :aria-pressed="fStatus === c.val"
+              @click="fStatus = c.val"
+            >
+              {{ c.label }}
+              <span class="text-[0.6875rem]" :class="fStatus === c.val ? 'opacity-70' : 'text-[var(--text-muted)]'">{{ c.count }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <p class="bc-fade-in px-1 text-[0.8125rem] text-[var(--text-muted)]">{{ L.total(total) }}</p>
 
-      <!-- сворачиваемые группы по статусу -->
-      <DriverGroup
-        v-for="s in visibleStatuses"
-        :key="s"
-        class="bc-fade-in"
-        :status="s"
-        :drivers="grouped[s]"
-        :park-ids="parkIds"
-        :open="isOpen(s)"
-        @toggle="toggle"
-      />
+      <!-- плоский список карточек в одну колонку, сортировка по статусу -->
+      <div v-if="list.length" class="bc-fade-in flex flex-col gap-3">
+        <DriverCard v-for="d in list" :key="d.code" :driver="d" :park-ids="parkIds" />
+      </div>
+      <p v-else class="py-11 text-center text-[0.875rem] text-[var(--text-muted)]">{{ L.empty_filters }}</p>
     </template>
   </section>
 </template>
