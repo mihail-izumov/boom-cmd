@@ -78,10 +78,17 @@ onUnmounted(() => {
         @click="$emit('update:modelValue', t.id)"
       >
         {{ t.label }}
+        <!-- Счётчик — круглый бейдж, единый язык с шапками групп (DriverGroup).
+             На неактивном чипе подложка --line (как в группах); на активном жёлтом
+             --line выглядел бы грязно, поэтому лёгкий тон ink на самом акценте.
+             Текст в обоих случаях монохромный (§3.5). -->
         <span
           v-if="t.count != null"
-          class="text-[0.75rem]"
-          :class="modelValue === t.id ? 'opacity-60' : 'text-[var(--text-muted)]'"
+          class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[0.6875rem] font-medium leading-none"
+          :class="modelValue === t.id ? 'text-[var(--accent-ink)]' : 'bg-[var(--line)] text-[var(--text-secondary)]'"
+          :style="modelValue === t.id
+            ? { background: 'color-mix(in srgb, var(--accent-ink) 14%, transparent)' }
+            : null"
         >{{ t.count }}</span>
       </button>
     </div>
