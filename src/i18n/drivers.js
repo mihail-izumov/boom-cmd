@@ -115,6 +115,7 @@ export const L = {
   filter_park: 'Парк',
   filter_status: 'Статус',
   all: 'Все',
+  network: 'Вся сеть',
   total: (n) => `Всего ${n} ${pluralRu(n, DRIVERS_PLURAL)}`,
   empty_filters: 'Ничего не подходит под фильтры',
   empty_scope_network: 'В разделе «Вся сеть» драйверов нет',

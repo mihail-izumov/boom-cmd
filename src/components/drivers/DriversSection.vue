@@ -12,6 +12,8 @@ import {
 } from '../../composables/driversModel.js'
 import { statusLabel, parkLabel, L } from '../../i18n/drivers.js'
 import DriverCard from './DriverCard.vue'
+import DriverParkSelect from './DriverParkSelect.vue'
+import DriverStatusTabs from './DriverStatusTabs.vue'
 
 // Раздел «Драйверы роста» — по §3 задания и песочнице: ДВА ряда чипов-фильтров
 // (Парк · Статус) + плоский список карточек в одну колонку, сортировка по статусу.
@@ -37,18 +39,19 @@ const fStatus = ref('all')
 const scoped = computed(() => joined.value.filter((d) => matches(d, fPark.value, 'all')))
 const total = computed(() => scoped.value.length)
 
-// Чипы «Парк»: Все + три СПб. Счётчик парка — драйверы с периодом в нём; «Все» — всего.
+// Выпадающий список «Парк»: Вся сеть + три СПб. Счётчик парка — драйверы с периодом
+// в нём; «Вся сеть» — все.
 const pCounts = computed(() => parkCounts(joined.value, parkIds.value))
-const parkChips = computed(() => [
-  { val: 'all', label: L.all, count: joined.value.length },
+const parkOpts = computed(() => [
+  { val: 'all', label: L.network, count: joined.value.length },
   ...parkIds.value.map((id) => ({ val: id, label: parkLabel(id), count: pCounts.value[id] })),
 ])
 
-// Чипы «Статус»: из статусов, присутствующих под текущим парком; чип с 0 скрыт.
+// Слайдер «Статус»: из статусов, присутствующих под текущим парком; таб с 0 скрыт.
 const sCounts = computed(() => statusCounts(scoped.value))
-const statusChips = computed(() => [
-  { val: 'all', label: L.all, count: scoped.value.length },
-  ...statusOptions(scoped.value).map((s) => ({ val: s, label: statusLabel(s), count: sCounts.value[s] })),
+const statusTabs = computed(() => [
+  { id: 'all', label: L.all, count: scoped.value.length },
+  ...statusOptions(scoped.value).map((s) => ({ id: s, label: statusLabel(s), count: sCounts.value[s] })),
 ])
 // Выбранный статус пропал из скоупа (сменили парк) → вернуться на «Все».
 watch([scoped, fStatus], () => {
@@ -104,50 +107,9 @@ const list = computed(() => visibleDrivers(joined.value, fPark.value, fStatus.va
       <!-- лид по центру, как на «Трендах» (крупный заголовок рисует оболочка) -->
       <p class="bc-fade-in px-4 text-center text-[1rem] leading-snug text-[var(--text-muted)]">{{ L.subtitle }}</p>
 
-      <!-- фильтры: два ряда чипов со счётчиками (тач ≥44pt, как «Задачи») -->
-      <div class="bc-fade-in flex flex-col gap-2">
-        <div class="flex flex-col gap-1.5">
-          <span class="text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--text-muted)]">{{ L.filter_park }}</span>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="c in parkChips"
-              :key="'park-' + c.val"
-              type="button"
-              class="inline-flex items-center gap-1.5 rounded-full border px-4 text-[0.8125rem] font-medium transition-colors"
-              style="min-height: 44px"
-              :class="fPark === c.val
-                ? 'border-[var(--text)] bg-[var(--text)] text-[var(--surface)]'
-                : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-secondary)] active:bg-[var(--surface-2)]'"
-              :aria-pressed="fPark === c.val"
-              @click="fPark = c.val"
-            >
-              {{ c.label }}
-              <span class="text-[0.6875rem]" :class="fPark === c.val ? 'opacity-70' : 'text-[var(--text-muted)]'">{{ c.count }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <span class="text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--text-muted)]">{{ L.filter_status }}</span>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="c in statusChips"
-              :key="'st-' + c.val"
-              type="button"
-              class="inline-flex items-center gap-1.5 rounded-full border px-4 text-[0.8125rem] font-medium transition-colors"
-              style="min-height: 44px"
-              :class="fStatus === c.val
-                ? 'border-[var(--text)] bg-[var(--text)] text-[var(--surface)]'
-                : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-secondary)] active:bg-[var(--surface-2)]'"
-              :aria-pressed="fStatus === c.val"
-              @click="fStatus = c.val"
-            >
-              {{ c.label }}
-              <span class="text-[0.6875rem]" :class="fStatus === c.val ? 'opacity-70' : 'text-[var(--text-muted)]'">{{ c.count }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- фильтры без подписей: парк — выпадающий список (по центру), статус — слайдер -->
+      <DriverParkSelect v-model="fPark" :options="parkOpts" class="bc-fade-in" />
+      <DriverStatusTabs v-model="fStatus" :tabs="statusTabs" class="bc-fade-in" />
 
       <p class="bc-fade-in px-1 text-[0.8125rem] text-[var(--text-muted)]">{{ L.total(total) }}</p>
 
