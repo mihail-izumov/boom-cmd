@@ -90,10 +90,18 @@ eq('только драйверы этого парка', items.length, 2)
 eq('сортировка по вкладу вниз', items.map((x) => x.code), ['DRV-03', 'DRV-01'])
 eq('короткий код для бейджа', items[0].short, '03')
 eq('метка «фоновый» по bg', items.map((x) => x.bg), [false, true])
-eq('мини-полоса от максимума', items.map((x) => Math.round(x.barPct)), [100, 67])
+// Полоса обязана означать ТО ЖЕ, что напечатано справа. Раньше она считалась от
+// максимального вклада, и верхняя строка была залита на 100 % при подписи «45 %».
+eq('ширина мини-полосы = pct_in, а не доля от максимума',
+  items.map((x) => Math.round(x.barPct)), items.map((x) => Math.round(x.pct_in)))
+ok('верхняя строка НЕ залита на 100 % при доле меньше 100', items[0].barPct < 100)
+eq('нет pct_in → фолбэк на долю от максимума, полоса не пустая',
+  Math.round(m.itemsFor({ driver_contrib_items: [
+    { park: 'x', code: 'A', rub: 100 }, { park: 'x', code: 'B', rub: 50 },
+  ] }, 'x')[1].barPct), 50)
 eq('детализации по сети нет', m.itemsFor(mock, null).length, 0)
 
-console.log('\n=== «Парки — закрытие ёмкости» ===')
+console.log('\n=== «Сила драйверов» — разбивка по паркам ===')
 const rows = m.parkRows(mock)
 eq('три действующих парка всегда в списке', rows.map((r) => r.park), ['ohta', 'piterland', 'iyun'])
 eq('парк без строки — прочерк, а не исчезновение', rows[2], { park: 'iyun', has: false, covered_pct: null, barPct: 0 })
@@ -234,6 +242,8 @@ const hPl = await screen('piterland')
 const hMari = await screen('mari')
 
 ok('сеть: карточка парков есть', hNet.includes('data-test="parks"'))
+ok('заголовок карточки парков — «Сила драйверов»', hNet.includes('Сила драйверов'))
+ok('старого заголовка «закрытие ёмкости» не осталось', !hNet.includes('закрытие ёмкости'))
 ok('сеть: детализации по драйверам НЕТ (решение 31.07)', !hNet.includes('data-test="inside"'))
 ok('парк: детализация есть', hOhta.includes('data-test="inside"'))
 ok('парк: карточки парков нет', !hOhta.includes('data-test="parks"'))

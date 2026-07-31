@@ -295,7 +295,12 @@ console.log('\n=== D-36: проекция отметок payload.signal_reads (�
 // ═══════════════ jsdom: живой рендер полос A/B и сети ═══════════════
 console.log('\n=== jsdom: сборка тестового бандла ===')
 const tmp = resolve(root, '.tmp-verify-daily')
-rmSync(tmp, { recursive: true, force: true })
+// Уборка «мягкая»: macOS заводит в папке сборки .DS_Store, и если его удаление
+// запрещено средой (песочница, сетевой диск), весь прогон падал ЗДЕСЬ — до единой
+// проверки, и выглядело это как сломанная приёмка. Папка в .gitignore; не убралась —
+// не беда, содержимое перезапишется следующей сборкой.
+const rmTmp = () => { try { rmSync(tmp, { recursive: true, force: true }) } catch { /* остаётся */ } }
+rmTmp()
 mkdirSync(tmp, { recursive: true })
 writeFileSync(resolve(tmp, 'entry.js'), `
 export { default as DailySignalCard } from '${root}/src/components/daily/DailySignalCard.vue'
@@ -2619,10 +2624,21 @@ console.log('\n=== Остаток дней месяца — календарь �
   })
   const b = document.querySelector('[data-test="month-deck-days"]')
   const expLeft = daysLeftInMonth(nowYm, new Date())
+  // Склоняется и ГЛАГОЛ: «остался 1 день», но «осталось 2 дня» / «осталось 5 дней».
+  const daysWord = (n) =>
+    `${plural(n, ['Остался', 'Осталось', 'Осталось'])} ${n} ${plural(n, ['день', 'дня', 'дней'])}`
   check('текущий месяц → остаток из календаря, а не из daysDone/daysTotal',
-    !!b && b.textContent.trim() === `Осталось ${expLeft} ${plural(expLeft, ['день', 'дня', 'дней'])}`,
-    b && b.textContent.trim())
+    !!b && b.textContent.trim() === daysWord(expLeft), b && b.textContent.trim())
   live.app.unmount(); document.body.innerHTML = ''
+
+  // Склонение на всех формах: единица, 2–4, 5+, а также 11 и 21 (ловушки правила).
+  for (const [n, exp] of [
+    [1, 'Остался 1 день'], [2, 'Осталось 2 дня'], [4, 'Осталось 4 дня'],
+    [5, 'Осталось 5 дней'], [11, 'Осталось 11 дней'], [21, 'Остался 21 день'],
+    [22, 'Осталось 22 дня'], [31, 'Остался 31 день'],
+  ]) {
+    check(`склонение остатка: ${n} → «${exp}»`, daysWord(n) === exp, daysWord(n))
+  }
 }
 
 console.log('\n=== jsdom: D-34 — пилюли парков сняты с Главной ===')
@@ -2636,7 +2652,7 @@ console.log('\n=== jsdom: D-34 — пилюли парков сняты с Гл�
 console.log('\n=== Vue warnings ===')
 check('нет [Vue warn]', vueWarns.length === 0, vueWarns[0] || 'чисто')
 console.warn = origWarn
-rmSync(tmp, { recursive: true, force: true })
+rmTmp()
 
 console.log('\n=== Итог ===')
 console.log(ok ? 'ВСЁ ОК' : 'ЕСТЬ ОШИБКИ')
