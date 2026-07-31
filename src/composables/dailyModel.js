@@ -15,6 +15,10 @@
 // в i18n/daily.js, здесь только числа/классы.
 
 import { sortSignals, latestSignal } from './dailySignals.js'
+// Календарь МСК — тем же модулем, что считает остаток дней. Месяц «сейчас» у экрана
+// и у бейджа обязан быть один: разъедутся — виджет скажет «Месяц закрыт» над живыми
+// цифрами. monthDays.js ничего не импортирует, цикла нет.
+import { mskToday } from './monthDays.js'
 
 export const DOW_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 export const GOOD = 1.0
@@ -233,11 +237,21 @@ export function computeDaily(set) {
 // Сетевой агрегат «Вся сеть»: мини-карты по паркам + сетевые суммы.
 // setsByKey — объект payload.sets; parkIds — какие парки включать (в порядке).
 // Для каждого парка берём его ПОСЛЕДНИЙ месяц (max month).
-export function computeNetwork(setsByKey, parkIds) {
+export function computeNetwork(setsByKey, parkIds, now = new Date()) {
+  // Месяц каждого парка — по общему правилу pickMonth, а НЕ «максимум в данных».
+  // Максимум перекидывал виджет Главной на пустой будущий месяц в тот же миг, когда
+  // контур B заводил маску следующего месяца: план есть, факта нет, и на Главной
+  // вместо живого месяца появлялись нули. Месяц у парка свой — у отстающего парка
+  // последний закрытый может отличаться.
+  const monthsOf = {}
+  Object.entries(setsByKey || {}).forEach(([key, s]) => {
+    const p = s.park || key.split(':')[0]
+    ;(monthsOf[p] || (monthsOf[p] = [])).push(String(s.month))
+  })
   const byPark = {}
   Object.entries(setsByKey || {}).forEach(([key, s]) => {
     const p = s.park || key.split(':')[0]
-    if (!byPark[p] || String(s.month) > String(byPark[p].month)) byPark[p] = s
+    if (String(s.month) === pickMonth(monthsOf[p], now)) byPark[p] = s
   })
   const cards = []
   let dLanding = 0, nLanding = 0, dOnPlan = 0, nOnPlan = 0
@@ -306,6 +320,34 @@ export function computeNetwork(setsByKey, parkIds) {
 }
 
 // Список месяцев набора для парка + выбор последнего (max month).
+// ── ВЫБОР МЕСЯЦА ПО УМОЛЧАНИЮ (ТЗ-6 §2.1) ───────────────────────────────────
+// Правило одно на весь дневной слой: и «Контроль дня», и виджет месяца на Главной
+// обязаны показывать ОДИН и тот же месяц, иначе Главная и экран контроля разойдутся.
+//
+// 1. текущий календарный месяц по МСК есть в данных → берём его;
+// 2. иначе — последний месяц НЕ ПОЗЖЕ текущего;
+// 3. иначе (в данных только будущее) — последний доступный.
+//
+// Пункт 2 — суть правки. Раньше брался просто максимум, и как только контур B
+// заводил маску следующего месяца заранее (план есть, дни пустые), экран
+// перепрыгивал на пустой месяц, а живой текущий пропадал. Теперь будущий месяц
+// сам не выбирается — он доступен только вручную через пикер.
+//
+// `now` инъектируется в тестах: правило завязано на календарь, и проверять его
+// «когда наступит август» — не приёмка, а ожидание.
+export function pickMonth(months, now = new Date()) {
+  const list = (Array.isArray(months) ? months : []).filter(Boolean).slice().sort()
+  if (!list.length) return null
+  const t = mskToday(now)
+  const cur = t && t.ym
+  if (cur && list.includes(cur)) return cur
+  if (cur) {
+    const past = list.filter((m) => m <= cur)
+    if (past.length) return past[past.length - 1]
+  }
+  return list[list.length - 1]
+}
+
 export function monthsForPark(setsByKey, parkId) {
   const months = Object.values(setsByKey || {})
     .filter((s) => (s.park || '') === parkId)

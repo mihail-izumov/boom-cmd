@@ -635,7 +635,8 @@
           "landing": 1344000,
           "landing_pct": 0.8671,
           "on_plan": 0.8671,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-02",
@@ -644,7 +645,8 @@
           "landing": 1359628,
           "landing_pct": 0.8772,
           "on_plan": 0.8772,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-03",
@@ -653,7 +655,8 @@
           "landing": 1372000,
           "landing_pct": 0.8852,
           "on_plan": 0.8852,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-04",
@@ -662,7 +665,8 @@
           "landing": 1405714,
           "landing_pct": 0.9069,
           "on_plan": 0.9069,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-05",
@@ -671,7 +675,8 @@
           "landing": 1458000,
           "landing_pct": 0.9406,
           "on_plan": 0.9406,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "out"
         },
         {
           "date": "2025-05-06",
@@ -680,7 +685,8 @@
           "landing": 1512000,
           "landing_pct": 0.9755,
           "on_plan": 0.9755,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-07",
@@ -689,7 +695,8 @@
           "landing": 1567500,
           "landing_pct": 1.0113,
           "on_plan": 1.1359,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-08",
@@ -698,7 +705,8 @@
           "landing": 1549333,
           "landing_pct": 0.9996,
           "on_plan": 1.1054,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-09",
@@ -707,7 +715,8 @@
           "landing": 1538537,
           "landing_pct": 0.9926,
           "on_plan": 1.0827,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-10",
@@ -716,7 +725,8 @@
           "landing": 1532235,
           "landing_pct": 0.9885,
           "on_plan": 1.0624,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-11",
@@ -725,7 +735,8 @@
           "landing": 1531957,
           "landing_pct": 0.9884,
           "on_plan": 1.0507,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-12",
@@ -734,7 +745,8 @@
           "landing": 1554098,
           "landing_pct": 1.0026,
           "on_plan": 1.059,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "out"
         },
         {
           "date": "2025-05-13",
@@ -743,7 +755,8 @@
           "landing": 1579886,
           "landing_pct": 1.0193,
           "on_plan": 1.0685,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-14",
@@ -752,7 +765,8 @@
           "landing": 1580255,
           "landing_pct": 1.0195,
           "on_plan": 1.0636,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-15",
@@ -761,7 +775,8 @@
           "landing": 1572356,
           "landing_pct": 1.0144,
           "on_plan": 1.0535,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         }
       ]
     },
@@ -1038,7 +1053,8 @@
           "landing": 2128000,
           "landing_pct": 0.7338,
           "on_plan": 0.7338,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-02",
@@ -1047,7 +1063,8 @@
           "landing": 2695467,
           "landing_pct": 0.9295,
           "on_plan": 0.9295,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-03",
@@ -1056,7 +1073,8 @@
           "landing": 2787680,
           "landing_pct": 0.9613,
           "on_plan": 0.9613,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-04",
@@ -1065,7 +1083,8 @@
           "landing": 2802545,
           "landing_pct": 0.9664,
           "on_plan": 0.9664,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-05",
@@ -1074,7 +1093,8 @@
           "landing": 2694222,
           "landing_pct": 0.929,
           "on_plan": 0.929,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "out"
         },
         {
           "date": "2025-05-06",
@@ -1083,7 +1103,8 @@
           "landing": 2616639,
           "landing_pct": 0.9023,
           "on_plan": 0.9023,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-07",
@@ -1092,7 +1113,8 @@
           "landing": 2644548,
           "landing_pct": 0.9119,
           "on_plan": 0.9119,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-08",
@@ -1101,7 +1123,8 @@
           "landing": 2586754,
           "landing_pct": 0.892,
           "on_plan": 0.892,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-09",
@@ -1110,7 +1133,8 @@
           "landing": 2668837,
           "landing_pct": 0.9203,
           "on_plan": 0.9203,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-10",
@@ -1119,7 +1143,8 @@
           "landing": 2705243,
           "landing_pct": 0.9328,
           "on_plan": 0.9328,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-11",
@@ -1128,7 +1153,8 @@
           "landing": 2716417,
           "landing_pct": 0.9367,
           "on_plan": 0.9367,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-12",
@@ -1137,7 +1163,8 @@
           "landing": 2683243,
           "landing_pct": 0.9253,
           "on_plan": 0.9253,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "out"
         }
       ]
     },
@@ -1369,7 +1396,8 @@
           "landing": 891964,
           "landing_pct": 0.6371,
           "on_plan": 0.6371,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-02",
@@ -1378,7 +1406,8 @@
           "landing": 1110000,
           "landing_pct": 0.7929,
           "on_plan": 0.7929,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-03",
@@ -1387,7 +1416,8 @@
           "landing": 1090526,
           "landing_pct": 0.7789,
           "on_plan": 0.7789,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-04",
@@ -1396,7 +1426,8 @@
           "landing": 1138831,
           "landing_pct": 0.8135,
           "on_plan": 0.8135,
-          "achievable": false
+          "achievable": false,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-05",
@@ -1405,7 +1436,8 @@
           "landing": 1186552,
           "landing_pct": 0.8475,
           "on_plan": 0.8475,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "out"
         },
         {
           "date": "2025-05-06",
@@ -1414,7 +1446,8 @@
           "landing": 1154264,
           "landing_pct": 0.8245,
           "on_plan": 0.8245,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-07",
@@ -1423,7 +1456,8 @@
           "landing": 1154578,
           "landing_pct": 0.8247,
           "on_plan": 0.8247,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         },
         {
           "date": "2025-05-08",
@@ -1432,7 +1466,8 @@
           "landing": 1124214,
           "landing_pct": 0.803,
           "on_plan": 0.803,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-09",
@@ -1441,7 +1476,8 @@
           "landing": 1152556,
           "landing_pct": 0.8233,
           "on_plan": 0.8233,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-10",
@@ -1450,7 +1486,8 @@
           "landing": 1146694,
           "landing_pct": 0.8191,
           "on_plan": 0.8191,
-          "achievable": true
+          "achievable": true,
+          "goal_state": "record"
         }
       ],
       "lead": {

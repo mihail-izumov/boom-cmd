@@ -316,6 +316,10 @@ export { default as HomeScreen } from '${root}/src/screens/HomeScreen.vue'
 export { default as MonthProgressCard } from '${root}/src/components/home/MonthProgressCard.vue'
 export { default as MonthProgressSlide } from '${root}/src/components/home/MonthProgressSlide.vue'
 export { default as ReviewsScreen } from '${root}/src/screens/ReviewsScreen.vue'
+export { default as DailyScreen } from '${root}/src/screens/DailyScreen.vue'
+export { useNavTrailing } from '${root}/src/composables/useNavTrailing.js'
+export { setPark } from '${root}/src/composables/useParkContext.js'
+export { pickMonth, computeNetwork as computeNetworkB } from '${root}/src/composables/dailyModel.js'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
@@ -2647,6 +2651,125 @@ console.log('\n=== jsdom: D-34 — пилюли парков сняты с Гл�
   check('в HomeScreen не осталось строки пилюль (parkNames)', !src.includes('parkNames'))
   check('месяц в шапке деки, monthCap из HomeScreen убран', !src.includes('monthCap'))
   check('дека получает слайды и месяц', src.includes(':slides="monthSlides"') && src.includes(':month="t.month'))
+}
+
+// ═══════════ ТЗ-6: месяц по умолчанию + пикер месяцев «Контроля дня» ═══════════
+// Фикстура — июль (живой) + август (план/цель есть, days пустые), как в §5 ТЗ.
+console.log('\n=== ТЗ-6: правило выбора месяца (pickMonth) ===')
+{
+  const at = (iso) => new Date(iso)
+  const M = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08']
+
+  // §5 п.1 — главный кейс: в данных ЕСТЬ пустой август, но 30 июля берём ИЮЛЬ.
+  check('30 июля при наличии августа → июль (пустой будущий сам не выбирается)',
+    bundle.pickMonth(M, at('2026-07-30T09:00:00Z')) === '2026-07',
+    bundle.pickMonth(M, at('2026-07-30T09:00:00Z')))
+  // §5 п.5 — 1 августа переключается сам.
+  check('1 августа → август (перекат без правки кода)',
+    bundle.pickMonth(M, at('2026-08-01T00:30:00+03:00')) === '2026-08')
+  check('31 июля 23:30 МСК — ещё июль (граница суток по Москве)',
+    bundle.pickMonth(M, at('2026-07-31T20:30:00Z')) === '2026-07')
+  // Правило 2: текущего месяца в данных нет → последний НЕ ПОЗЖЕ текущего.
+  check('сентябрь, данных нет → последний закрытый (август), а не «пусто»',
+    bundle.pickMonth(M, at('2026-09-10T09:00:00Z')) === '2026-08')
+  check('данных за текущий нет, есть дырка → ближайший прошлый',
+    bundle.pickMonth(['2026-04', '2026-06'], at('2026-07-05T09:00:00Z')) === '2026-06')
+  // Правило 3: только будущее — показываем хоть что-то, а не пустой экран.
+  check('в данных только будущее → последний доступный',
+    bundle.pickMonth(['2026-09'], at('2026-07-05T09:00:00Z')) === '2026-09')
+  check('пустой список → null', bundle.pickMonth([], at('2026-07-05T09:00:00Z')) === null)
+  check('порядок на входе не важен',
+    bundle.pickMonth(['2026-08', '2026-04', '2026-07'], at('2026-07-30T09:00:00Z')) === '2026-07')
+}
+
+console.log('\n=== ТЗ-6: виджет месяца на Главной переживает перекат ===')
+{
+  // Тот же набор, что у экрана: июль полный + август пустой (план есть, дней нет).
+  const july = JSON.parse(JSON.stringify(sets))
+  const setsTZ6 = {}
+  for (const [k, s] of Object.entries(july)) {
+    const m = s.month
+    setsTZ6[`${s.park}:${m}`] = s
+    // клон-«август»: план и цель есть, дни пустые — ровно маска будущего месяца
+    const next = { ...JSON.parse(JSON.stringify(s)), month: '2099-12', days: [], journal: [] }
+    setsTZ6[`${s.park}:2099-12`] = next
+  }
+  const ids = ['ohta', 'piterland', 'iyun']
+  const nowInsideJuly = new Date(`${Object.values(july)[0].month}-15T09:00:00Z`)
+  const nNow = bundle.computeNetworkB(setsTZ6, ids, nowInsideJuly)
+  check('виджет НЕ прыгает на пустой будущий месяц',
+    nNow.cards.length > 0 && nNow.cards.every((c) => c.month !== '2099-12'),
+    JSON.stringify(nNow.cards.map((c) => c.month)))
+  check('виджет показывает живой месяц с фактом',
+    nNow.cards.every((c) => c.daysDone > 0))
+  // а когда будущий месяц наступит — переключается сам
+  const nFuture = bundle.computeNetworkB(setsTZ6, ids, new Date('2099-12-05T09:00:00Z'))
+  check('наступил новый месяц → виджет перешёл на него сам',
+    nFuture.cards.length > 0 && nFuture.cards.every((c) => c.month === '2099-12'),
+    JSON.stringify(nFuture.cards.map((c) => c.month)))
+  check('пустой месяц: факт 0 и НЕТ NaN/Infinity',
+    nFuture.cards.every((c) => !c.earned && !BAD.test(JSON.stringify(c))),
+    JSON.stringify(nFuture.cards[0]))
+  check('месяц у Главной и у экрана считается ОДНИМ правилом',
+    nNow.cards[0].month === bundle.pickMonth(
+      Object.values(setsTZ6).filter((s) => s.park === nNow.cards[0].park).map((s) => s.month),
+      nowInsideJuly))
+}
+
+console.log('\n=== ТЗ-6: пикер месяцев на «Контроле дня» ===')
+{
+  const src = readFileSync(resolve(root, 'src/screens/DailyScreen.vue'), 'utf8')
+  check('DailyScreen больше НЕ берёт months[months.length - 1]',
+    !src.includes('months[months.length - 1]'))
+  check('DailyScreen использует общее правило pickMonth', src.includes('pickMonth(parkMonths.value)'))
+  check('выбор пользователя приоритетнее дефолта', src.includes('parkMonths.value.includes(picked.value)'))
+  check('пикер — переиспользованный SummaryMonthPicker', src.includes('SummaryMonthPicker'))
+  check('слот освобождается при уходе экрана', src.includes('clearTrailing'))
+
+  const { trailing } = bundle.useNavTrailing()
+  const july = Object.values(sets)[0].month
+  const sets2 = {}
+  for (const s of Object.values(sets)) {
+    sets2[`${s.park}:${s.month}`] = s
+    sets2[`${s.park}:2099-12`] = { ...JSON.parse(JSON.stringify(s)), month: '2099-12', days: [], journal: [] }
+  }
+  getPayload = { updated: '2025-05-20', sets: sets2 }
+  bundle.setPark('ohta')
+  const scr = mount(bundle.DailyScreen, {})
+  await nextTick(); await new Promise((r) => setTimeout(r, 30)); await nextTick(); await nextTick()
+
+  check('пикер встал в правый верхний угол шапки', !!trailing.value, 'слот пуст')
+  check('в списке оба месяца, новые сверху',
+    !!trailing.value && JSON.stringify(trailing.value.props.months) === JSON.stringify(['2099-12', july]),
+    trailing.value && JSON.stringify(trailing.value.props.months))
+  check('выбран НЕ пустой будущий, а живой месяц',
+    !!trailing.value && trailing.value.props.modelValue === july,
+    trailing.value && trailing.value.props.modelValue)
+  const txt = () => scr.el.textContent
+
+  // §5 п.3: переключение на пустой будущий месяц не роняет экран и не даёт NaN
+  trailing.value.props['onUpdate:modelValue']('2099-12')
+  await nextTick(); await nextTick()
+  check('переключение на пустой месяц: экран жив', txt().length > 0)
+  check('переключение на пустой месяц: нет NaN/undefined/Infinity', !BAD.test(txt()), txt().slice(0, 200))
+  check('пикер показывает выбранный месяц', trailing.value.props.modelValue === '2099-12')
+
+  // §5 п.4: возврат на живой месяц — полный контроль как раньше
+  trailing.value.props['onUpdate:modelValue'](july)
+  await nextTick(); await nextTick()
+  check('возврат на живой месяц: данные на месте', !BAD.test(txt()) && txt().length > 0)
+
+  // §5 п.6: смена парка пересчитывает список; «Вся сеть» — без пикера
+  bundle.setPark('piterland')
+  await nextTick(); await nextTick()
+  check('смена парка: список месяцев пересчитан', !!trailing.value && trailing.value.props.months.length === 2)
+  bundle.setPark('network')
+  await nextTick(); await nextTick()
+  check('«Вся сеть» → пикера нет (у парков свои месяцы)', !trailing.value)
+
+  scr.app.unmount(); document.body.innerHTML = ''
+  bundle.setPark('network')
+  getPayload = {}
 }
 
 console.log('\n=== Vue warnings ===')

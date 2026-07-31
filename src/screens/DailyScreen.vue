@@ -1,17 +1,19 @@
 <script setup>
-import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch, watchEffect } from 'vue'
 import { Plus } from 'lucide-vue-next'
 import { useDaily } from '../composables/useDaily.js'
 import { setSubView } from '../composables/useAppNav.js'
 import { useParkContext } from '../composables/useParkContext.js'
 import { useNavCaption } from '../composables/useNavCaption.js'
-import { computeDaily, computeNetwork, monthsForPark, setForParkMonth } from '../composables/dailyModel.js'
+import { clearTrailing, setTrailing } from '../composables/useNavTrailing.js'
+import { computeDaily, computeNetwork, monthsForPark, pickMonth, setForParkMonth } from '../composables/dailyModel.js'
 import { updatedDateLabel } from '../i18n/analytics.js'
 import { monthTitle, L } from '../i18n/daily.js'
 import { PARKS } from '../data/parks.js'
 
 import DailyDashboard from '../components/daily/DailyDashboard.vue'
 import DailyNetwork from '../components/daily/DailyNetwork.vue'
+import SummaryMonthPicker from '../components/daily/SummaryMonthPicker.vue'
 
 // Экран под-страницы «Контроль дня». 4 состояния (loading/error/empty/data).
 // Парк-контекст — глобальная пилюля (useParkContext): конкретный парк → дашборд,
@@ -30,12 +32,29 @@ const parkIdsWithDaily = computed(() =>
   PARKS.map((p) => p.id).filter((id) => Object.values(sets.value).some((s) => s.park === id)),
 )
 
-// набор текущего парка (последний месяц)
+// ── МЕСЯЦ (ТЗ-6) ────────────────────────────────────────────────────────────
+// Месяцы конкретного парка, по возрастанию (как отдаёт monthsForPark).
+const parkMonths = computed(() =>
+  isNetwork.value ? [] : monthsForPark(sets.value, parkCtx.value),
+)
+// Пикеру — новые сверху (как на Сводках).
+const monthOptions = computed(() => [...parkMonths.value].reverse())
+
+// Выбор пользователя. Живёт до смены парка: если в новом парке такого месяца нет,
+// `month` сам падает на дефолт (проверка `includes` ниже), сбрасывать вручную нечего.
+const picked = ref(null)
+
+// Действующий месяц: выбор пользователя приоритетнее, иначе общее правило pickMonth
+// (текущий календарный → последний не позже него → последний доступный).
+// Управляющие вносят день ежедневно, поэтому «сейчас» обязано открываться само,
+// а не оказываться на месяц назад или на пустом будущем.
+const month = computed(() =>
+  parkMonths.value.includes(picked.value) ? picked.value : pickMonth(parkMonths.value),
+)
+
 const currentSet = computed(() => {
-  if (isNetwork.value) return null
-  const months = monthsForPark(sets.value, parkCtx.value)
-  if (!months.length) return null
-  return setForParkMonth(sets.value, parkCtx.value, months[months.length - 1])
+  if (isNetwork.value || !month.value) return null
+  return setForParkMonth(sets.value, parkCtx.value, month.value)
 })
 
 const model = computed(() => (currentSet.value ? computeDaily(currentSet.value) : null))
@@ -60,12 +79,33 @@ const updatedLabel = computed(() => {
   return mx ? `данные от ${mx}` : ''
 })
 
+const active = ref(true)
 let isActive = false
 function syncCaption() { if (isActive) setCaption(updatedLabel.value) }
 onMounted(() => { isActive = true; syncCaption() })
-onActivated(() => { isActive = true; syncCaption() })
-onDeactivated(() => { isActive = false; clearCaption() })
+onActivated(() => { isActive = true; active.value = true; syncCaption() })
+onDeactivated(() => { isActive = false; active.value = false; clearCaption(); clearTrailing() })
 watch(updatedLabel, () => syncCaption())
+
+// ── Пикер месяцев в правом верхнем углу шапки (ТЗ-6 §2.2) ───────────────────
+// Слот общий на всю оболочку — освобождаем, когда экран уходит, иначе пикер
+// «Контроля дня» останется висеть над чужим разделом.
+// На «Всей сети» пикера НЕТ: сетевой обзор собирает по парку его собственный
+// месяц (у отстающего парка последний закрытый может отличаться), и один общий
+// селектор над ним означал бы месяц, которого у части парков нет.
+// Один месяц у парка → пикер не показываем: кнопка без выбора.
+onBeforeUnmount(clearTrailing)
+watchEffect(() => {
+  if (!active.value || isNetwork.value || monthOptions.value.length < 2) {
+    clearTrailing()
+    return
+  }
+  setTrailing(SummaryMonthPicker, {
+    months: monthOptions.value,
+    modelValue: month.value,
+    'onUpdate:modelValue': (m) => { picked.value = m },
+  })
+})
 </script>
 
 <template>
