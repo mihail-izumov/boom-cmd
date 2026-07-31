@@ -348,6 +348,32 @@ export function pickMonth(months, now = new Date()) {
   return list[list.length - 1]
 }
 
+// ── КАКИЕ МЕСЯЦЫ ПРЕДЛАГАТЬ В ПИКЕРЕ (решение владельца 31.07) ──────────────
+// «Июль и далее каждый следующий, для которого есть план».
+//
+// Апрель–июнь 2026 лежат в данных ПОЛНОСТЬЮ (30/30 закрытых дней, журнал), но
+// залиты они как база для калибровки коэффициентов дней недели, а не как месяцы
+// контроля: сам «Контроль дня» ведётся с июля. По форме они неотличимы от июля,
+// поэтому отличить их можно только этой границей — вычислить её из данных нечем.
+export const DAILY_FIRST_MONTH = '2026-07'
+
+/**
+ * Месяцы парка для пикера: есть ПЛАН и месяц не раньше DAILY_FIRST_MONTH.
+ * По возрастанию (разворачивает вызывающий).
+ *
+ * Фолбэк намеренный: если под границу не попал НИ ОДИН месяц (дев-фикстура живёт
+ * в 2025 году, да и границу когда-нибудь сдвинут), возвращаем всё, что есть с
+ * планом. Пустой пикер и экран без данных — цена выше, чем лишний месяц в списке.
+ */
+export function monthsForPicker(setsByKey, parkId, first = DAILY_FIRST_MONTH) {
+  const withPlan = Object.values(setsByKey || {})
+    .filter((s) => s && s.park === parkId && Number(s.month_target) > 0)
+    .map((s) => String(s.month))
+    .sort()
+  const scoped = withPlan.filter((m) => m >= first)
+  return scoped.length ? scoped : withPlan
+}
+
 export function monthsForPark(setsByKey, parkId) {
   const months = Object.values(setsByKey || {})
     .filter((s) => (s.park || '') === parkId)

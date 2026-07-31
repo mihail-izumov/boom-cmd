@@ -6,7 +6,7 @@ import { setSubView } from '../composables/useAppNav.js'
 import { useParkContext } from '../composables/useParkContext.js'
 import { useNavCaption } from '../composables/useNavCaption.js'
 import { clearTrailing, setTrailing } from '../composables/useNavTrailing.js'
-import { computeDaily, computeNetwork, monthsForPark, pickMonth, setForParkMonth } from '../composables/dailyModel.js'
+import { computeDaily, computeNetwork, monthsForPicker, pickMonth, setForParkMonth } from '../composables/dailyModel.js'
 import { updatedDateLabel } from '../i18n/analytics.js'
 import { monthTitle, L } from '../i18n/daily.js'
 import { PARKS } from '../data/parks.js'
@@ -33,9 +33,12 @@ const parkIdsWithDaily = computed(() =>
 )
 
 // ── МЕСЯЦ (ТЗ-6) ────────────────────────────────────────────────────────────
-// Месяцы конкретного парка, по возрастанию (как отдаёт monthsForPark).
+// Месяцы конкретного парка, по возрастанию. НЕ все, что есть в данных: только с
+// планом и не раньше DAILY_FIRST_MONTH (решение владельца 31.07 — «июль и далее
+// каждый следующий, для которого есть план»). Апрель–июнь лежат в данных
+// полными, но это база для калибровки коэффициентов, а не месяцы контроля.
 const parkMonths = computed(() =>
-  isNetwork.value ? [] : monthsForPark(sets.value, parkCtx.value),
+  isNetwork.value ? [] : monthsForPicker(sets.value, parkCtx.value),
 )
 // Пикеру — новые сверху (как на Сводках).
 const monthOptions = computed(() => [...parkMonths.value].reverse())

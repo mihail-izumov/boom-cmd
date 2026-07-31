@@ -319,7 +319,7 @@ export { default as ReviewsScreen } from '${root}/src/screens/ReviewsScreen.vue'
 export { default as DailyScreen } from '${root}/src/screens/DailyScreen.vue'
 export { useNavTrailing } from '${root}/src/composables/useNavTrailing.js'
 export { setPark } from '${root}/src/composables/useParkContext.js'
-export { pickMonth, computeNetwork as computeNetworkB } from '${root}/src/composables/dailyModel.js'
+export { pickMonth, monthsForPicker, DAILY_FIRST_MONTH, computeNetwork as computeNetworkB } from '${root}/src/composables/dailyModel.js'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
@@ -2716,6 +2716,39 @@ console.log('\n=== ТЗ-6: виджет месяца на Главной пер�
       nowInsideJuly))
 }
 
+console.log('\n=== Глубина пикера: «июль и далее, для чего есть план» (31.07) ===')
+{
+  // Апрель–июнь 2026 лежат в данных ПОЛНЫМИ месяцами (30/30 закрытых дней) — это
+  // база для калибровки коэффициентов, а не месяцы контроля. Отличить их от июля
+  // по форме нельзя, только по границе DAILY_FIRST_MONTH.
+  const real = {}
+  for (const m of ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08']) {
+    real[`ohta:${m}`] = { park: 'ohta', month: m, month_target: 5000000 }
+  }
+  real['ohta:2026-09'] = { park: 'ohta', month: '2026-09', month_target: null } // плана нет
+  real['piterland:2026-06'] = { park: 'piterland', month: '2026-06', month_target: 5749013 }
+
+  check('граница — июль 2026', bundle.DAILY_FIRST_MONTH === '2026-07')
+  check('апрель–июнь отброшены, июль и август остались',
+    JSON.stringify(bundle.monthsForPicker(real, 'ohta')) === JSON.stringify(['2026-07', '2026-08']),
+    JSON.stringify(bundle.monthsForPicker(real, 'ohta')))
+  check('месяц без плана в список не идёт',
+    !bundle.monthsForPicker(real, 'ohta').includes('2026-09'))
+  check('чужой парк не подмешивается',
+    !bundle.monthsForPicker(real, 'ohta').includes('2026-06'))
+  // Фолбэк: под границу не попал никто → отдаём всё с планом, а не пустоту.
+  check('парк только с дореформенными месяцами → фолбэк, а не пустой пикер',
+    JSON.stringify(bundle.monthsForPicker(real, 'piterland')) === JSON.stringify(['2026-06']),
+    JSON.stringify(bundle.monthsForPicker(real, 'piterland')))
+  check('дев-фикстура 2025 года не остаётся без месяцев (тот же фолбэк)',
+    bundle.monthsForPicker(sets, 'ohta').length > 0)
+  // Дефолт считается по ОТФИЛЬТРОВАННОМУ списку — иначе открылся бы апрель.
+  check('дефолт 31 июля = июль, а не апрель',
+    bundle.pickMonth(bundle.monthsForPicker(real, 'ohta'), new Date('2026-07-31T09:00:00Z')) === '2026-07')
+  check('дефолт 1 августа = август',
+    bundle.pickMonth(bundle.monthsForPicker(real, 'ohta'), new Date('2026-08-01T00:30:00+03:00')) === '2026-08')
+}
+
 console.log('\n=== ТЗ-6: пикер месяцев на «Контроле дня» ===')
 {
   const src = readFileSync(resolve(root, 'src/screens/DailyScreen.vue'), 'utf8')
@@ -2727,11 +2760,18 @@ console.log('\n=== ТЗ-6: пикер месяцев на «Контроле д�
   check('слот освобождается при уходе экрана', src.includes('clearTrailing'))
 
   const { trailing } = bundle.useNavTrailing()
-  const july = Object.values(sets)[0].month
+  // Фикстура под ЖИВОЕ правило глубины: месяцы обязаны быть не раньше
+  // DAILY_FIRST_MONTH, иначе пикер их отфильтрует и проверять будет нечего.
+  // Даты мока (2025-05) переписываем на июль 2026 целиком — вместе с днями,
+  // журналом и сигналами, чтобы набор остался самосогласованным.
+  const july = '2026-07'
+  const next = '2026-08'
   const sets2 = {}
   for (const s of Object.values(sets)) {
-    sets2[`${s.park}:${s.month}`] = s
-    sets2[`${s.park}:2099-12`] = { ...JSON.parse(JSON.stringify(s)), month: '2099-12', days: [], journal: [] }
+    const live = JSON.parse(JSON.stringify(s).split(s.month).join(july))
+    sets2[`${s.park}:${july}`] = live
+    // маска следующего месяца: план и цель есть, дней нет
+    sets2[`${s.park}:${next}`] = { ...JSON.parse(JSON.stringify(live)), month: next, days: [], journal: [] }
   }
   getPayload = { updated: '2025-05-20', sets: sets2 }
   bundle.setPark('ohta')
@@ -2740,7 +2780,7 @@ console.log('\n=== ТЗ-6: пикер месяцев на «Контроле д�
 
   check('пикер встал в правый верхний угол шапки', !!trailing.value, 'слот пуст')
   check('в списке оба месяца, новые сверху',
-    !!trailing.value && JSON.stringify(trailing.value.props.months) === JSON.stringify(['2099-12', july]),
+    !!trailing.value && JSON.stringify(trailing.value.props.months) === JSON.stringify([next, july]),
     trailing.value && JSON.stringify(trailing.value.props.months))
   check('выбран НЕ пустой будущий, а живой месяц',
     !!trailing.value && trailing.value.props.modelValue === july,
@@ -2748,11 +2788,11 @@ console.log('\n=== ТЗ-6: пикер месяцев на «Контроле д�
   const txt = () => scr.el.textContent
 
   // §5 п.3: переключение на пустой будущий месяц не роняет экран и не даёт NaN
-  trailing.value.props['onUpdate:modelValue']('2099-12')
+  trailing.value.props['onUpdate:modelValue'](next)
   await nextTick(); await nextTick()
   check('переключение на пустой месяц: экран жив', txt().length > 0)
   check('переключение на пустой месяц: нет NaN/undefined/Infinity', !BAD.test(txt()), txt().slice(0, 200))
-  check('пикер показывает выбранный месяц', trailing.value.props.modelValue === '2099-12')
+  check('пикер показывает выбранный месяц', trailing.value.props.modelValue === next)
 
   // §5 п.4: возврат на живой месяц — полный контроль как раньше
   trailing.value.props['onUpdate:modelValue'](july)
