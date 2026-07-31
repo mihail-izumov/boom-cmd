@@ -9,9 +9,11 @@ import {
   statusOptions,
   statusCounts,
 } from '../../composables/driversModel.js'
+import { hasContrib } from '../../composables/contribModel.js'
 import { statusLabel, L } from '../../i18n/drivers.js'
 import DriverStatusTabs from './DriverStatusTabs.vue'
 import DriverGroup from './DriverGroup.vue'
+import ContribScreen from './ContribScreen.vue'
 
 // Раздел «Драйверы роста» — контролы ОДИН В ОДИН как в «Задачах»:
 //   • ПАРК — пилюля в шапке + bottom-sheet «Выбрать парк». Свои контролы раздел НЕ
@@ -70,6 +72,24 @@ const visibleStatuses = computed(() =>
 const openMap = reactive({})
 const toggle = (s) => (openMap[s] = !openMap[s])
 const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
+
+// ── Два состояния раздела (задание «Вклад в план», 31.07) ───────────────────
+// «Вклад в план» — ДЕФОЛТНОЕ состояние. Список драйверов — второе, и он остаётся
+// один в один прежним: ниже не добавлено ни одной новой секции и ни одной новой
+// группировки, изменился только его обвес сверху.
+// Вкладок driver_contrib нет или они пусты → переключателя нет вовсе и раздел
+// открывается списком, как до этой правки (обратная совместимость §4 задания).
+// Переключатель без второго рабочего состояния был бы кнопкой в пустоту.
+const canContrib = computed(() => hasContrib(data.value))
+const tab = ref('contrib')
+// Отдельный computed, а не watch по canContrib: в момент первого рендера данные ещё
+// грузятся, canContrib === false, и watch навсегда увёл бы дефолт на список —
+// «Вклад в план» переставал бы быть дефолтным ровно там, где он есть.
+const view = computed(() => (canContrib.value ? tab.value : 'list'))
+const VIEW_TABS = [
+  { id: 'contrib', label: L.tab_contrib },
+  { id: 'list', label: L.tab_list },
+]
 </script>
 
 <template>
@@ -97,9 +117,39 @@ const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
       >{{ L.retry }}</button>
     </div>
 
+    <template v-else>
+    <!-- Сегмент-переключатель двух состояний. Идиома сегмент-контрола iOS: единая
+         подложка --surface-2, выбранное — белая «таблетка» с тенью. Не путать со
+         слайдером статусов ниже (там чипы на акценте): это НАВИГАЦИЯ между экранами,
+         а не фильтр, и роль обязана кодироваться формой (DESIGN-STANDARD §7.1). -->
+    <div
+      v-if="canContrib"
+      data-test="view-switch"
+      class="bc-fade-in flex gap-1 rounded-xl bg-[var(--surface-2)] p-1"
+      role="tablist"
+      aria-label="Вид раздела"
+    >
+      <button
+        v-for="t in VIEW_TABS"
+        :key="t.id"
+        type="button"
+        role="tab"
+        :aria-selected="view === t.id"
+        class="flex flex-1 items-center justify-center rounded-[0.625rem] px-3 text-[0.875rem] transition-colors"
+        :class="view === t.id
+          ? 'bg-[var(--surface)] font-semibold text-[var(--text)] shadow-[var(--card-shadow)]'
+          : 'text-[var(--text-secondary)]'"
+        style="min-height: 44px"
+        @click="tab = t.id"
+      >{{ t.label }}</button>
+    </div>
+
+    <ContribScreen v-if="view === 'contrib'" :data="data" />
+
+    <template v-else>
     <!-- empty: ни одного драйвера в пейлоаде -->
     <div
-      v-else-if="!joined.length"
+      v-if="!joined.length"
       class="flex min-h-[40svh] flex-col items-center justify-center gap-2 px-6 text-center"
     >
       <p class="text-[1.0625rem] text-[var(--text)]">{{ L.empty_title }}</p>
@@ -138,6 +188,8 @@ const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
         :open="isOpen(s)"
         @toggle="toggle"
       />
+    </template>
+    </template>
     </template>
   </section>
 </template>

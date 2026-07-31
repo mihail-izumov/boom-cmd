@@ -50,6 +50,11 @@ function normalize(raw) {
   // и сортировка — в driversModel.js. Нет ключей → раздел «Драйверы» скрыт.
   if (Array.isArray(safe.drivers)) out.drivers = safe.drivers
   if (Array.isArray(safe.driver_periods)) out.driver_periods = safe.driver_periods
+  // Экран «Вклад в план» (второе состояние раздела «Драйверы») — ещё два верхнеуровневых
+  // массива, тот же образец. Прокидываем как есть: раскладка и суммы — в contribModel.js.
+  // Нет ключей → переключатель не показывается, раздел работает как список драйверов.
+  if (Array.isArray(safe.driver_contrib)) out.driver_contrib = safe.driver_contrib
+  if (Array.isArray(safe.driver_contrib_items)) out.driver_contrib_items = safe.driver_contrib_items
   // Отметки «Прочитал» (D-36, бэк v3.9) — компактная проекция, одна строка на парк.
   // В ОТЛИЧИЕ от net_summary/reviews ключ гарантируем ВСЕГДА, пустоту как []: карточка
   // сигнала не должна отличать «поле не доехало» от «никто не отметил» — в обоих

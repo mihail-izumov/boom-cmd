@@ -16,6 +16,7 @@ dist-ssr
 # Временная папка verify-daily (чистится сама при успешном прогоне;
 # прерванный прогон оставляет её — в коммит не берём)
 .tmp-verify-daily/
+.tmp-verify-contrib/
 
 # Локальные env: URL источников (VITE_PROJECTS_API, VITE_ANALYTICS_API).
 # Фраза доступа здесь НЕ хранится (она только в localStorage).
