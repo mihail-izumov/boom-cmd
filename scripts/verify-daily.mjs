@@ -448,10 +448,11 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
   check('headline актуального виден', el.textContent.includes('Темп восстановлен к выходным'))
   check('бейдж «новое» на первом заходе', el.textContent.includes('новое'))
   const btn = el.querySelector('[data-test="signal-read"]')
-  // 28.07: текст кнопки — «Прочитано» в обоих состояниях; активную от нажатой
-  // отличаем по disabled и галке «✓».
-  check('кнопка «Прочитано» активна (без «✓»)',
-    !!btn && btn.disabled === false && el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
+  // 04.08: кнопка и статус — РАЗНЫЕ строки. До этого обе были «Прочитано», и кнопка
+  // обещала результат вместо действия; состояния отличались только галочкой.
+  check('кнопка зовёт к действию, а не сообщает результат',
+    !!btn && btn.disabled === false &&
+    btn.textContent.includes('Отметить прочитанным') && !el.textContent.includes('Прочитано ✓'))
   check('«Как идёт день» влит в блок', el.textContent.includes('Как идёт день'))
   check('день-строки влиты (4 на моке)', el.querySelectorAll('[data-test="day-line"]').length === 4,
     el.querySelectorAll('[data-test="day-line"]').length)
@@ -490,9 +491,16 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('до клика модалки нет', !rateSheet())
+  // Две кнопки видны СРАЗУ, а не дорисовываются после закрытия окна: прежний поток
+  // «нажал → всплыло → закрыл → появилась вторая кнопка» читался как сбой.
+  check('обе кнопки видны до всякого нажатия',
+    el.querySelector('[data-test="signal-read"]').textContent.includes('Отметить прочитанным') &&
+    !!el.querySelector('[data-test="signal-rate-cta"]'))
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
-  check('клик по кнопке → модалка открыта, POST ещё не ушёл (ждём оценку)',
-    !!rateSheet() && postedBodies.length === 0)
+  check('отметка НЕ открывает модалку сама (владелец 04.08)', !rateSheet())
+  check('POST ещё не ушёл — ждём, не догонит ли оценка', postedBodies.length === 0)
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
+  check('модалку открывает отдельная кнопка «Оценить»', !!rateSheet())
   // ТРЕТЬЕ СОСТОЯНИЕ: нажатие принято, но бэк ещё не подтвердил. Без него нельзя
   // одновременно зафиксировать нажатие сразу и не врать «✓» до ответа.
   check('кнопка сразу в состоянии «отправляем», а не «✓»',
@@ -530,6 +538,10 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   check('после ПОДТВЕРЖДЕНИЯ бэка: «Прочитано ✓», кнопка неактивна',
     el.textContent.includes('Прочитано ✓') &&
     el.querySelector('[data-test="signal-read"]').disabled === true)
+  // Дата и оценка — бейджи, а не «· 04.08» посреди строки: точка-разделитель
+  // читалась как случайный символ (правка владельца 04.08).
+  check('дата отметки — бейдж без точки-разделителя',
+    !el.querySelector('[data-test="signal-read"]').textContent.includes('·'))
   check('очередь пуста — долгов не осталось', sr.queue.value.length === 0, String(sr.queue.value.length))
   app.unmount()
   const re = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
@@ -546,6 +558,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
   check('модалка открыта', !!rateSheet())
   await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
   await nextTick()
@@ -557,8 +570,11 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
     !rateSheet() && el.textContent.includes('Прочитано ✓'))
   // Долг по оценке виден, а не спрятан: «не оценил» обязано отличаться от «оценил,
   // но не долетело», и вернуться к оценке должно быть можно.
-  check('долг по оценке виден, кнопка «Оценить» жива',
-    el.textContent.includes('оценка не поставлена') && !!el.querySelector('[data-test="signal-rate-cta"]'))
+  // Долг виден по отсутствию бейджа с цифрой на кнопке «Оценить» — отдельной
+  // подписи не нужно, кнопка и так на экране.
+  check('кнопка «Оценить» жива, бейджа с оценкой нет — долг виден',
+    !!el.querySelector('[data-test="signal-rate-cta"]') &&
+    !el.querySelector('[data-test="signal-score-badge"]'))
   app.unmount()
 }
 {
@@ -571,7 +587,9 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   await nextTick()
   const cta = el.querySelector('[data-test="signal-rate-cta"]')
   check('у прочитанного сигнала есть «Изменить оценку» с текущим значением',
-    !!cta && cta.textContent.includes('Изменить оценку') && cta.textContent.includes('4'))
+    !!cta && cta.textContent.includes('Изменить оценку') &&
+    el.querySelector('[data-test="signal-score-badge"]')?.textContent.trim() === '4')
+  check('оценка — бейдж, точки-разделителя нет', !cta.textContent.includes('·'))
   await fire(cta, 'click')
   await nextTick()
   check('модалка открывается на текущей оценке и сразу готова к отправке',
@@ -593,7 +611,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   postMode = 'score-fail'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
-  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
   const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
   sl.value = '6'; await fire(sl, 'input')
   await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
@@ -624,11 +642,14 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   check('в раскрытой строке ленты ЕСТЬ кнопка отметки', !!rowBtn && rowBtn.disabled === false)
   await fire(rowBtn, 'click')
   await nextTick()
-  await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
   await drainOutbox()
   check('отметка из ленты ушла на СВОЮ дату, не на дату свежего сигнала',
     postedBodies.length === 1 && JSON.parse(postedBodies[0]).signal_date === '2025-05-14',
     postedBodies[0])
+  // Раньше в ленте дата отметки пряталась (show-date=false) — оставалась только
+  // дата сигнала слева, и подтверждения записи в ленте не было вовсе.
+  check('в ленте видны и галочка, и дата отметки бейджем',
+    row.textContent.includes('Прочитано ✓') && !!row.querySelector('[data-test="signal-read-date"]'))
   app.unmount()
 }
 {
@@ -649,7 +670,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   postMode = 'reject'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
-  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
   const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
   sl.value = '5'; await fire(sl, 'input')
   await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
@@ -657,7 +678,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   check('красная плашка дословно', el.textContent.includes('Не удалось отметить. Проверьте связь и попробуйте ещё раз.'))
   check('кнопка осталась активной (повтор разрешён), «✓» нет',
     !rateSheet() && el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
+    el.textContent.includes('Отметить прочитанным') && !el.textContent.includes('Прочитано ✓'))
   // 'bad key' не станет валиднее сам собой: ретраить вечно — уйти в петлю.
   check('постоянная ошибка помечена как невосстановимая',
     sr.queue.value[0]?.dead === true, JSON.stringify(sr.queue.value[0]))
@@ -671,7 +692,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   postMode = 'neterror'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
-  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
   const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
   sl.value = '7'; await fire(sl, 'input')
   await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
@@ -748,7 +769,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
   await nextTick()
   check('нет проекции (старый деплой) → кнопка активна, карточка живёт как раньше',
     el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
+    el.textContent.includes('Отметить прочитанным') && !el.textContent.includes('Прочитано ✓'))
   app.unmount()
 }
 {
@@ -757,7 +778,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads: [] })
   await nextTick()
-  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
   const sl = document.querySelector('[data-test="signal-rate-slider"]')
   sl.value = '5'; await fire(sl, 'input')
   await fire(document.querySelector('[data-test="signal-rate-submit"]'), 'click')
@@ -773,7 +794,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
   postMode = 'neterror'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads: [] })
   await nextTick()
-  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  await fire(el.querySelector('[data-test="signal-rate-cta"]'), 'click')
   const sl = document.querySelector('[data-test="signal-rate-slider"]')
   sl.value = '5'; await fire(sl, 'input')
   await fire(document.querySelector('[data-test="signal-rate-submit"]'), 'click')

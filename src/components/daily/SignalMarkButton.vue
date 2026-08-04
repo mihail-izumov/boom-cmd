@@ -4,15 +4,22 @@ import { readFor, readDay, isMarkable } from '../../composables/dailySignals.js'
 import { useSignalRead } from '../../composables/useSignalRead.js'
 import { L, ddmm } from '../../i18n/daily.js'
 
-// Кнопка отметки одного сигнала. Вынесена в отдельный компонент, потому что кнопок
-// стало много: свежий сигнал И каждая строка ленты. Раньше кнопка была одна — только
-// у самого свежего сигнала, — и всё, что уезжало в ленту, становилось неотмечаемым
-// навсегда. Так за 22.07–04.08 потерялось 12 отметок из 42; сигнал за 02.08 не смог
-// отметить ни один парк.
+// Блок отметки одного сигнала: ДВЕ кнопки — «Отметить прочитанным» и «Оценить».
+// Вынесен в отдельный компонент, потому что блоков стало много: свежий сигнал И
+// каждая строка ленты. Раньше кнопка была одна и только у самого свежего сигнала —
+// всё, что уезжало в ленту, становилось неотмечаемым навсегда (12 потерь из 42).
 //
-// ТРИ СОСТОЯНИЯ вместо двух. Без «отправляем» два требования противоречат друг другу:
-// зафиксировать нажатие сразу (чтобы не потерялось) и не показывать «✓» до того, как
-// бэк подтвердил запись.
+// ДВЕ КНОПКИ СРАЗУ, а не одна с дорисовкой (правка владельца 04.08). Прежний поток
+// «нажал → всплыло окно оценки → закрыл → появилась вторая кнопка» читался как сбой:
+// интерфейс дорисовывал элементы после закрытия окна. Теперь оба действия видны
+// заранее и независимы. Модалка сама не всплывает — её открывает вторая кнопка.
+//
+// Оценить можно и не отмечая прочтение: бэк на любой signal_read пишет и прочтение
+// тоже (appendRead_ + appendScore_ в одной ветке), так что путь в один шаг честен.
+//
+// ТРИ СОСТОЯНИЯ отметки вместо двух. Без «отправляем» два требования противоречат
+// друг другу: зафиксировать нажатие сразу (чтобы не потерялось) и не показывать «✓»
+// до того, как бэк подтвердил запись.
 const props = defineProps({
   park: { type: String, required: true },
   date: { type: String, required: true },
@@ -21,18 +28,16 @@ const props = defineProps({
   // проекция бэка, но она приходит только со следующей загрузкой payload.
   localRead: { type: Boolean, default: false },
   now: { type: Date, default: null },
-  // Дату отметки показываем только у свежего сигнала: в ленте она уже слева в строке.
-  showDate: { type: Boolean, default: true },
 })
 const emit = defineEmits(['mark', 'rate'])
 
-const { statusOf, errorOf } = useSignalRead()
+const { statusOf } = useSignalRead()
 
 const state = computed(() => statusOf(props.park, props.date))
 const serverRead = computed(() => readFor(props.reads, props.park, props.date))
 // Отмечено = так считает бэк, ИЛИ так считает устройство, ИЛИ бэк подтвердил в этой
-// сессии. Раньше «✓» ставилось оптимистично, ещё до ответа, — и упавший запрос
-// оставлял человека в уверенности, что отметка ушла.
+// сессии. Оптимистичной галочки нет: упавший запрос не должен оставлять человека в
+// уверенности, что отметка ушла.
 const done = computed(
   () => !!serverRead.value || props.localRead || state.value === 'done' || state.value === 'score-debt',
 )
@@ -55,34 +60,52 @@ const readDate = computed(() => {
   return ddmm(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`)
 })
 
-const label = computed(() => {
-  if (state.value === 'sending') return L.signal_read_done
-  return done.value ? L.signal_read_done : L.signal_read
-})
+const label = computed(() => (done.value ? L.signal_read_done : L.signal_read))
 const disabled = computed(() => done.value || state.value === 'sending' || !markable.value)
 
-function onClick() {
-  if (disabled.value) return
-  emit('mark', props.date)
-}
+// Общие классы: кнопка на всю ширину, тач-таргет ≥44pt (HIG).
+const BTN = 'flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--surface-2)] px-4 ' +
+  'text-[0.9375rem] font-medium text-[var(--text)] transition-opacity active:opacity-90 disabled:opacity-100'
+// Бейдж числа: белая пилюля с кантом. Цифра — на --surface, контраст 17,22:1.
+// Отдельная плашка вместо «· 04.08» — точка-разделитель посреди строки читалась
+// как случайный символ, а не как структура.
+const BADGE = 'inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--surface)] ' +
+  'px-2 py-0.5 text-[0.8125rem] font-semibold tabular-nums text-[var(--text)]'
+// Подпись-статус словом (не число) — --text-secondary даёт 8,66:1 на --surface-2;
+// --text-muted там же даёт лишь 4,54:1, запас копеечный.
+const NOTE = 'text-[0.8125rem] font-normal text-[var(--text-secondary)]'
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-2">
+    <!-- 1. Отметка прочтения -->
     <button
       type="button"
       data-test="signal-read"
       :data-state="state"
       :disabled="disabled"
-      class="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-2)] px-4 text-[0.9375rem] font-medium text-[var(--text)] transition-opacity active:opacity-90 disabled:opacity-100"
+      :class="BTN"
       style="min-height: 44px"
-      @click="onClick"
+      @click="!disabled && emit('mark', date)"
     >
       <span>{{ label }}{{ done ? ' ✓' : '' }}</span>
-      <!-- третье состояние: нажатие принято, но бэк ещё не подтвердил -->
-      <span v-if="state === 'sending'" data-test="signal-read-sending" class="text-[0.8125rem] text-[var(--text-muted)]">· {{ L.signal_read_sending }}</span>
-      <span v-else-if="done && showDate && readDate" data-test="signal-read-date" class="text-[0.8125rem] text-[var(--text-muted)]">· {{ readDate }}</span>
-      <span v-else-if="!markable && !done" data-test="signal-archive" class="text-[0.8125rem] text-[var(--text-muted)]">· {{ L.signal_archive }}</span>
+      <span v-if="state === 'sending'" data-test="signal-read-sending" :class="NOTE">{{ L.signal_read_sending }}</span>
+      <span v-else-if="done && readDate" data-test="signal-read-date" :class="BADGE">{{ readDate }}</span>
+      <span v-else-if="!markable" data-test="signal-archive" :class="NOTE">{{ L.signal_archive }}</span>
+    </button>
+
+    <!-- 2. Оценка — видна СРАЗУ, наравне с отметкой, а не дорисовывается после неё.
+         Отсутствие бейджа с цифрой и есть видимый долг: оценки нет. -->
+    <button
+      v-if="markable"
+      type="button"
+      data-test="signal-rate-cta"
+      :class="BTN"
+      style="min-height: 44px"
+      @click="emit('rate', date)"
+    >
+      <span>{{ score === null ? L.signal_rate_cta : L.signal_rate_change }}</span>
+      <span v-if="score !== null" data-test="signal-score-badge" :class="BADGE">{{ score }}</span>
     </button>
 
     <!-- Отправить не удалось и повторять бессмысленно: молчать нельзя, иначе
@@ -90,7 +113,7 @@ function onClick() {
     <p
       v-if="state === 'failed'"
       data-test="signal-error"
-      class="mt-2 rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]"
+      class="rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]"
       style="background: color-mix(in srgb, var(--negative) 12%, var(--surface))"
     >{{ L.signal_error }}</p>
 
@@ -99,24 +122,8 @@ function onClick() {
     <p
       v-else-if="state === 'score-debt'"
       data-test="signal-score-debt"
-      class="mt-2 rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]"
+      class="rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]"
       style="background: color-mix(in srgb, var(--warning) 12%, var(--surface))"
     >{{ L.signal_rate_failed }}</p>
-
-    <!-- КОНТУР Б: закрыл модалку без оценки — прочтение всё равно записано, а долг
-         виден и кнопка «Оценить» жива. Переоценка (Ф-5) — та же кнопка: бэк умеет
-         «последняя оценка побеждает» с 28.07, но из UI это было недостижимо. -->
-    <button
-      v-if="done && markable && state !== 'sending'"
-      type="button"
-      data-test="signal-rate-cta"
-      class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-2)] px-4 text-[0.875rem] font-medium text-[var(--text)] active:opacity-90"
-      style="min-height: 44px"
-      @click="emit('rate', date)"
-    >
-      <span>{{ score === null ? L.signal_rate_cta : L.signal_rate_change }}</span>
-      <span v-if="score === null" class="text-[0.8125rem] text-[var(--text-muted)]">· {{ L.signal_rate_none }}</span>
-      <span v-else class="text-[0.8125rem] tabular-nums text-[var(--text-muted)]">· {{ score }}</span>
-    </button>
   </div>
 </template>
