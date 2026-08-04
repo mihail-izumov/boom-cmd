@@ -7,6 +7,7 @@ import { useParkContext } from '../composables/useParkContext.js'
 import { useNavCaption } from '../composables/useNavCaption.js'
 import { clearTrailing, setTrailing } from '../composables/useNavTrailing.js'
 import { computeDaily, computeNetwork, monthsForPicker, pickMonth, setForParkMonth } from '../composables/dailyModel.js'
+import { collectSignals } from '../composables/dailySignals.js'
 import { updatedDateLabel } from '../i18n/analytics.js'
 import { monthTitle, L } from '../i18n/daily.js'
 import { PARKS } from '../data/parks.js'
@@ -62,6 +63,14 @@ const currentSet = computed(() => {
 
 const model = computed(() => (currentSet.value ? computeDaily(currentSet.value) : null))
 const net = computed(() => (isNetwork.value ? computeNetwork(sets.value, parkIdsWithDaily.value) : null))
+
+// Пул сигналов для карточки (Ф-7). Собирается СКВОЗЬ границу месяца: окно отметки
+// (14 дней) + весь выбранный в пикере месяц. Раньше карточка жила внутри одного
+// набора парк:месяц — и 01.08 сигнал за 31.07 исчезал из ленты вместе с
+// возможностью его отметить. Это давало дыры на каждом переходе месяца.
+const signalPool = computed(() =>
+  isNetwork.value ? [] : collectSignals(sets.value, parkCtx.value, month.value),
+)
 
 const monthLabel = computed(() => (model.value ? monthTitle(model.value.month) : ''))
 
@@ -150,7 +159,7 @@ watchEffect(() => {
     <!-- конкретный парк -->
     <template v-else-if="model">
       <p class="bc-fade-in px-1 text-[0.8125rem] capitalize text-[var(--text-muted)]">{{ monthLabel }}</p>
-      <DailyDashboard :m="model" :reads="data?.signal_reads || []" class="bc-fade-in" />
+      <DailyDashboard :m="model" :reads="data?.signal_reads || []" :signals="signalPool" class="bc-fade-in" />
     </template>
 
     <!-- «Отчёт дня» (D-12): вход в единственную пишущую страницу.

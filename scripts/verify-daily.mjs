@@ -225,9 +225,12 @@ console.log('\n=== Сигналы дня (v3): выбор / лента / ста�
   let cap = null
   const okres = await postSignalRead({
     api: 'https://mock.invalid/report', key: 'phrase-x', park: 'ohta', signalDate: '2025-05-16', score: 7,
-    fetchImpl: async (url, opts) => { cap = { url, opts }; return { ok: true, status: 200, json: async () => ({ ok: true }) } },
+    fetchImpl: async (url, opts) => { cap = { url, opts }; return { ok: true, status: 200, json: async () => ({ ok: true, read: 'added', score: 'added' }) } },
   })
-  check('postSignalRead: {ok:true} → true', okres === true)
+  // Контракт ответа больше не выбрасывается: по полю score фронт отличает
+  // «оценка записана» от «оценка не сохранилась» и досылает недостающую половину.
+  check('postSignalRead отдаёт контракт {read, score}, а не true',
+    okres && okres.read === 'added' && okres.score === 'added', JSON.stringify(okres))
   check('postSignalRead: redirect follow + тело по контракту (со score)',
     cap.opts.redirect === 'follow' &&
     JSON.parse(cap.opts.body).type === 'signal_read' &&
@@ -286,8 +289,13 @@ console.log('\n=== D-36: проекция отметок payload.signal_reads (�
 {
   const mock = JSON.parse(readFileSync(resolve(here, '../src/data/daily.mock.json'), 'utf8'))
   check('мок несёт signal_reads массивом (контракт бэка v3.9)', Array.isArray(mock.signal_reads))
-  check('в моке не больше одной строки на парк',
-    new Set(mock.signal_reads.map((r) => r.park)).size === mock.signal_reads.length)
+  // Б-2 (04.08): проекция отдаёт строку на КАЖДУЮ пару (парк, день), а не одну на
+  // парк. Мок обязан это отражать — иначе dev-режим не покажет ленту с отметками, а
+  // проверка «одна строка на парк» закрепляла бы ровно тот дефект, который чиним.
+  check('в моке есть парк с несколькими днями (проекция по парам, не по паркам)',
+    mock.signal_reads.length > new Set(mock.signal_reads.map((r) => r.park)).size)
+  check('пары (парк, день) в моке уникальны',
+    new Set(mock.signal_reads.map((r) => r.park + '|' + r.signal_date)).size === mock.signal_reads.length)
   check('в моке нет реальных данных: даты — из выдуманного мая 2025',
     mock.signal_reads.every((r) => r.signal_date.startsWith('2025-05')))
 }
@@ -321,6 +329,8 @@ export { useNavTrailing } from '${root}/src/composables/useNavTrailing.js'
 export { setPark } from '${root}/src/composables/useParkContext.js'
 export { pickMonth, monthsForPicker, DAILY_FIRST_MONTH, computeNetwork as computeNetworkB } from '${root}/src/composables/dailyModel.js'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
+export { useSignalRead } from '${root}/src/composables/useSignalRead.js'
+export { collectSignals, isMarkable, signalAgeDays, SIGNAL_MARKABLE_DAYS, enqueueRead, resolveItem, isPermanentError } from '${root}/src/composables/dailySignals.js'
 export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
 export { useAppNav, clearSubView } from '${root}/src/composables/useAppNav.js'
@@ -365,17 +375,27 @@ await build({
 })
 console.log('✓  lib-сборка готова')
 
-// мок fetch: GET → гейт «ок», POST → сценарий из postMode
-let postMode = 'ok' // 'ok' | 'reject' | 'neterror'
+// мок fetch: GET → гейт «ок», POST → сценарий из postMode.
+// v3.13: бэк отвечает КОНТРАКТОМ {ok, read, score}, и фронт его читает. Мок обязан
+// отдавать те же поля — иначе проверки пройдут на ответе, которого в бою не бывает
+// (ровно этот класс ошибки — «тест создаёт состояние, недостижимое в бою» — уже
+// давал неверный вывод в отчёте владельцу, см. §2.2 задания D-36).
+let postMode = 'ok' // 'ok' | 'reject' | 'neterror' | 'score-fail'
 let getPayload = {} // что отдаёт GET (гейт + ?action=daily); меняется в кейсах сводок
 const postedBodies = []
 global.fetch = async (url, opts = {}) => {
   const json = (obj) => ({ ok: true, status: 200, json: async () => obj })
   if ((opts.method || 'GET') === 'POST') {
-    postedBodies.push(String(opts.body || ''))
+    const raw = String(opts.body || '')
+    postedBodies.push(raw)
     if (postMode === 'neterror') return { ok: false, status: 500, json: async () => ({}) }
     if (postMode === 'reject') return json({ ok: false, error: 'bad key' })
-    return json({ ok: true })
+    const sent = (() => { try { return JSON.parse(raw) } catch { return {} } })()
+    const hasScore = sent.score != null
+    // 'score-fail': прочтение записано, оценка нет — частичный результат, ради
+    // различимости которого и заводился контракт.
+    if (postMode === 'score-fail') return json({ ok: true, read: 'added', score: hasScore ? 'failed' : null })
+    return json({ ok: true, read: 'added', score: hasScore ? 'added' : null })
   }
   return json(getPayload) // гейт: 200 без error → фраза ок
 }
@@ -452,34 +472,65 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
 }
 // v3.2: модалка оценки телепортируется в body — ищем её по document, не по el.
 const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]')
+
+// v3.13: отправка стала фоновой очередью с задержкой ~2 с. Ждать её таймером в тестах
+// бессмысленно и флаки — дёргаем flush напрямую. Это публичный метод композабла,
+// тот же, которым ходят события online/visibilitychange.
+const sr = bundle.useSignalRead()
+const drainOutbox = async () => { await sr.flush({ force: true }); await nextTick() }
+// Очередь живёт на уровне модуля и localStorage.clear() её из памяти не выбьет —
+// сбрасываем явно, иначе сценарии протекают друг в друга.
+const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
 {
-  // «Прочитано» → модалка оценки; отправка → POST со score → «Прочитано ✓»
-  localStorage.clear()
+  // «Прочитано» → прочтение СРАЗУ в очередь + модалка; оценка догоняет и уезжает
+  // одним запросом. Раньше POST уходил только из сабмита модалки — всё, что человек
+  // не оценил, терялось целиком вместе с фактом прочтения.
+  resetSignals()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('до клика модалки нет', !rateSheet())
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
-  check('клик по кнопке → модалка открыта, POST ещё не ушёл',
+  check('клик по кнопке → модалка открыта, POST ещё не ушёл (ждём оценку)',
     !!rateSheet() && postedBodies.length === 0)
+  // ТРЕТЬЕ СОСТОЯНИЕ: нажатие принято, но бэк ещё не подтвердил. Без него нельзя
+  // одновременно зафиксировать нажатие сразу и не врать «✓» до ответа.
+  check('кнопка сразу в состоянии «отправляем», а не «✓»',
+    el.querySelector('[data-test="signal-read"]').dataset.state === 'sending' &&
+    !!el.querySelector('[data-test="signal-read-sending"]') &&
+    !el.textContent.includes('Прочитано ✓'))
   check('вопрос модалки дословно (28.07: без «?», сигнала со строчной)',
     rateSheet().textContent.includes('Оцените пользу сигнала') && !rateSheet().textContent.includes('Сигнала?'))
   const slider = rateSheet().querySelector('[data-test="signal-rate-slider"]')
-  check('ползунок 0–10 шаг 1, старт с середины (5)',
-    !!slider && slider.min === '0' && slider.max === '10' && slider.step === '1' && slider.value === '5')
+  check('ползунок 0–10 шаг 1', !!slider && slider.min === '0' && slider.max === '10' && slider.step === '1')
+  // КОНТУР А защиты от дурака: дефолта «5» больше нет. Раньше 7 оценок из 19
+  // оказывались ровно пятёрками — то есть стартовым положением ползунка.
+  check('до касания шкалы значения нет («—»)',
+    rateSheet().querySelector('[data-test="signal-rate-value"]').textContent.trim() === '—')
+  check('до касания шкалы «Отправить» неактивна',
+    rateSheet().querySelector('[data-test="signal-rate-submit"]').disabled === true)
+  check('подсказка объясняет, чего ждут', !!rateSheet().querySelector('[data-test="signal-rate-hint"]'))
   slider.value = '8'
   await fire(slider, 'input')
-  check('значение видно крупно', rateSheet().textContent.includes('8'))
+  await nextTick()
+  check('после касания значение видно крупно',
+    rateSheet().querySelector('[data-test="signal-rate-value"]').textContent.trim() === '8')
+  check('после касания «Отправить» активна',
+    rateSheet().querySelector('[data-test="signal-rate-submit"]').disabled === false)
   await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
-  await new Promise((r) => setTimeout(r, 20)); await nextTick()
-  check('POST ушёл ровно один', postedBodies.length === 1)
+  await nextTick()
+  check('модалка закрывается сразу — человек не ждёт сеть', !rateSheet())
+  await drainOutbox()
+  check('POST ушёл ровно один: прочтение и оценка одним телом',
+    postedBodies.length === 1, String(postedBodies.length))
   const body = JSON.parse(postedBodies[0] || '{}')
   check('тело signal_read по контракту §2 + score из ползунка',
     body.key === 'test-phrase' && body.type === 'signal_read' && body.park === 'ohta' &&
     body.signal_date === '2025-05-16' && body.score === 8)
-  check('после успеха: модалка закрыта, «Прочитано ✓», кнопка неактивна',
-    !rateSheet() && el.textContent.includes('Прочитано ✓') &&
+  check('после ПОДТВЕРЖДЕНИЯ бэка: «Прочитано ✓», кнопка неактивна',
+    el.textContent.includes('Прочитано ✓') &&
     el.querySelector('[data-test="signal-read"]').disabled === true)
+  check('очередь пуста — долгов не осталось', sr.queue.value.length === 0, String(sr.queue.value.length))
   app.unmount()
   const re = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
@@ -487,36 +538,157 @@ const rateSheet = () => document.querySelector('[data-test="signal-rate-sheet"]'
   re.app.unmount()
 }
 {
-  // закрытие модалки без отправки = отмена: POST нет, кнопка активна
-  localStorage.clear()
+  // КОНТУР Б защиты от дурака. Закрытие модалки БЕЗ оценки больше НЕ отменяет
+  // прочтение: оно уже в очереди. Раньше человек, не желавший оценивать, терял и
+  // факт прочтения — а с обязательной оценкой (Контур А) этот путь стал бы массовым.
+  resetSignals()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
   check('модалка открыта', !!rateSheet())
   await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
-  await new Promise((r) => setTimeout(r, 20)); await nextTick()
-  check('закрытие крестом: POST не ушёл, прочтение не зафиксировано',
-    !rateSheet() && postedBodies.length === 0 &&
-    el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
+  await nextTick()
+  await drainOutbox()
+  check('закрытие крестом: прочтение всё равно ушло', postedBodies.length === 1, String(postedBodies.length))
+  check('ушло БЕЗ поля score (оценки не было — врать нечем)',
+    JSON.parse(postedBodies[0] || '{}').score === undefined)
+  check('кнопка «Прочитано ✓» — факт контакта зафиксирован',
+    !rateSheet() && el.textContent.includes('Прочитано ✓'))
+  // Долг по оценке виден, а не спрятан: «не оценил» обязано отличаться от «оценил,
+  // но не долетело», и вернуться к оценке должно быть можно.
+  check('долг по оценке виден, кнопка «Оценить» жива',
+    el.textContent.includes('оценка не поставлена') && !!el.querySelector('[data-test="signal-rate-cta"]'))
   app.unmount()
 }
 {
-  // ошибка бэка → красная плашка, кнопка остаётся активной
-  localStorage.clear()
+  // Ф-5: переоценка. Бэк умеет «последняя оценка побеждает» с 28.07, но из UI это
+  // было недостижимо — onRead/onRateSubmit выходили при latestRead === true.
+  resetSignals()
+  postMode = 'ok'; postedBodies.length = 0
+  const reads = [{ park: 'ohta', signal_date: '2025-05-16', read_at: '2025-05-16 11:36', score: 4 }]
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
+  await nextTick()
+  const cta = el.querySelector('[data-test="signal-rate-cta"]')
+  check('у прочитанного сигнала есть «Изменить оценку» с текущим значением',
+    !!cta && cta.textContent.includes('Изменить оценку') && cta.textContent.includes('4'))
+  await fire(cta, 'click')
+  await nextTick()
+  check('модалка открывается на текущей оценке и сразу готова к отправке',
+    rateSheet().querySelector('[data-test="signal-rate-value"]').textContent.trim() === '4' &&
+    rateSheet().querySelector('[data-test="signal-rate-submit"]').disabled === false)
+  const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
+  sl.value = '9'; await fire(sl, 'input')
+  await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
+  await drainOutbox()
+  check('переоценка уходит на бэк с новым значением',
+    postedBodies.length === 1 && JSON.parse(postedBodies[0]).score === 9,
+    postedBodies[0])
+  app.unmount()
+}
+{
+  // Частичный результат: прочтение записано, оценка нет (score:'failed'). Раньше
+  // фронт выбрасывал поле score и рапортовал успех — долг был невидим и невосполним.
+  resetSignals()
+  postMode = 'score-fail'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
+  sl.value = '6'; await fire(sl, 'input')
+  await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
+  await drainOutbox()
+  check('прочтение подтверждено: «Прочитано ✓»', el.textContent.includes('Прочитано ✓'))
+  check('фронт ЗАМЕТИЛ, что оценка не сохранилась',
+    el.textContent.includes('Оценка не сохранилась') && !!el.querySelector('[data-test="signal-score-debt"]'))
+  check('долг остался в очереди для досылки',
+    sr.queue.value.length === 1 && sr.queue.value[0].score === 6 && sr.queue.value[0].read_ok === true,
+    JSON.stringify(sr.queue.value))
+  app.unmount()
+  postMode = 'ok'
+}
+{
+  // Ф-1: кнопка в КАЖДОЙ строке ленты. Её отсутствие и есть корень потерь — сигнал,
+  // уехавший в ленту, нельзя было отметить никогда (12 дыр из 42 за 22.07–04.08).
+  resetSignals()
+  postMode = 'ok'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  await fire(el.querySelector('[data-test="signal-feed-toggle"]'), 'click')
+  await nextTick()
+  const row = el.querySelectorAll('[data-test="signal-feed-row"]')[0]
+  check('лента раскрыта, строки есть', !!row)
+  await fire(row.querySelector('button'), 'click') // раскрыть строку
+  await nextTick()
+  const rowBtn = row.querySelector('[data-test="signal-read"]')
+  check('в раскрытой строке ленты ЕСТЬ кнопка отметки', !!rowBtn && rowBtn.disabled === false)
+  await fire(rowBtn, 'click')
+  await nextTick()
+  await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
+  await drainOutbox()
+  check('отметка из ленты ушла на СВОЮ дату, не на дату свежего сигнала',
+    postedBodies.length === 1 && JSON.parse(postedBodies[0]).signal_date === '2025-05-14',
+    postedBodies[0])
+  app.unmount()
+}
+{
+  // Окно ДЕЙСТВИЯ (14 дней) внутри горизонта ЗНАНИЯ (45 дней у бэка): статус старого
+  // сигнала виден, но отмечать поздно — read_at меряет скорость реакции.
+  resetSignals()
+  const old = { park: 'ohta', month: '2025-05', signals: [{ date: '2025-03-01', status: 'ok', headline: 'старый', action: '' }] }
+  const { el, app } = mount(bundle.DailySignalCard, { m: { ...mOhta, ...old }, now: NOW_MID, signals: old.signals })
+  await nextTick()
+  check('сигнал старше окна: кнопка неактивна и помечена «архив»',
+    el.querySelector('[data-test="signal-read"]').disabled === true &&
+    !!el.querySelector('[data-test="signal-archive"]'))
+  app.unmount()
+}
+{
+  // Постоянная ошибка бэка (bad key) → плашка, кнопка активна, вечной петли нет.
+  resetSignals()
   postMode = 'reject'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
+  sl.value = '5'; await fire(sl, 'input')
   await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
-  await new Promise((r) => setTimeout(r, 20)); await nextTick()
+  await drainOutbox()
   check('красная плашка дословно', el.textContent.includes('Не удалось отметить. Проверьте связь и попробуйте ещё раз.'))
-  check('кнопка осталась активной (повтор разрешён), модалка закрыта',
+  check('кнопка осталась активной (повтор разрешён), «✓» нет',
     !rateSheet() && el.querySelector('[data-test="signal-read"]').disabled === false &&
     el.textContent.includes('Прочитано') && !el.textContent.includes('Прочитано ✓'))
+  // 'bad key' не станет валиднее сам собой: ретраить вечно — уйти в петлю.
+  check('постоянная ошибка помечена как невосстановимая',
+    sr.queue.value[0]?.dead === true, JSON.stringify(sr.queue.value[0]))
   app.unmount()
   postMode = 'ok'
+}
+{
+  // Сеть отвалилась — намерение НЕ теряется: элемент ждёт в очереди и уходит сам,
+  // когда связь вернулась. Раньше упавший POST терял отметку безвозвратно.
+  resetSignals()
+  postMode = 'neterror'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
+  sl.value = '7'; await fire(sl, 'input')
+  await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
+  await drainOutbox()
+  check('сетевой сбой: намерение осталось в очереди, не выброшено',
+    sr.queue.value.length === 1 && sr.queue.value[0].dead === false &&
+    sr.queue.value[0].score === 7)
+  check('«✓» при этом НЕ показываем', !el.textContent.includes('Прочитано ✓'))
+  // Очередь переживает перезагрузку страницы: она на устройстве, а не в памяти.
+  sr.reloadOutbox()
+  check('очередь пережила перезагрузку (лежит в localStorage)',
+    sr.queue.value.length === 1 && sr.queue.value[0].signal_date === '2025-05-16')
+  postMode = 'ok'
+  await drainOutbox()
+  check('связь вернулась → отметка доехала сама, очередь пуста',
+    postedBodies.length === 2 && sr.queue.value.length === 0, String(sr.queue.value.length))
+  app.unmount()
 }
 {
   // нет сигнала (Июнь) → блок есть (Как идёт день живёт), но разбора нет
@@ -534,7 +706,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
 {
   // Чистое устройство (localStorage пуст) + отметка в проекции бэка → кнопка сразу
   // в состоянии «Прочитано», POST не нужен. Это и есть §2.4 задания.
-  localStorage.clear()
+  resetSignals()
   postMode = 'ok'; postedBodies.length = 0
   const reads = [{ park: 'ohta', signal_date: '2025-05-16', read_at: '2025-05-16 11:36', score: 8 }]
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
@@ -550,7 +722,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
 }
 {
   // Отметка ВЧЕРАШНЕГО сигнала не должна гасить кнопку у сегодняшнего.
-  localStorage.clear()
+  resetSignals()
   const reads = [{ park: 'ohta', signal_date: '2025-05-14', read_at: '2025-05-14 11:36', score: null }]
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
   await nextTick()
@@ -561,7 +733,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
 }
 {
   // Чужой парк в проекции — не наш случай.
-  localStorage.clear()
+  resetSignals()
   const reads = [{ park: 'piterland', signal_date: '2025-05-16', read_at: '2025-05-16 09:41', score: 7 }]
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads })
   await nextTick()
@@ -571,7 +743,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
 }
 {
   // Старый деплой бэка: поля нет вовсе → поведение ровно как до D-36.
-  localStorage.clear()
+  resetSignals()
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   check('нет проекции (старый деплой) → кнопка активна, карточка живёт как раньше',
@@ -581,30 +753,33 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
 }
 {
   // Успешная отправка: дата появляется сразу, не дожидаясь следующего payload.
-  localStorage.clear()
+  resetSignals()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads: [] })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  const sl = document.querySelector('[data-test="signal-rate-slider"]')
+  sl.value = '5'; await fire(sl, 'input')
   await fire(document.querySelector('[data-test="signal-rate-submit"]'), 'click')
-  await new Promise((r) => setTimeout(r, 20)); await nextTick()
-  check('после успеха дата отметки видна сразу (16.05, до обновления payload)',
+  await drainOutbox()
+  check('после подтверждения дата отметки видна сразу (16.05, до обновления payload)',
     el.textContent.includes('Прочитано ✓') &&
     el.querySelector('[data-test="signal-read-date"]')?.textContent.includes('16.05'))
   app.unmount()
 }
 {
-  // Сбой отправки: кнопка НЕ гаснет и даты нет — «не нажали» отличимо от «не долетело».
-  localStorage.clear()
+  // Сбой отправки: «✓» и даты нет — «не нажали» отличимо от «не долетело».
+  resetSignals()
   postMode = 'neterror'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID, reads: [] })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
+  const sl = document.querySelector('[data-test="signal-rate-slider"]')
+  sl.value = '5'; await fire(sl, 'input')
   await fire(document.querySelector('[data-test="signal-rate-submit"]'), 'click')
-  await new Promise((r) => setTimeout(r, 20)); await nextTick()
-  check('сетевой сбой: плашка есть, кнопка активна, даты НЕТ (молча не гасим)',
-    el.textContent.includes('Не удалось отметить') &&
-    el.querySelector('[data-test="signal-read"]').disabled === false &&
+  await drainOutbox()
+  check('сетевой сбой: «✓» нет, даты нет (молча не гасим)',
+    !el.textContent.includes('Прочитано ✓') &&
     !el.querySelector('[data-test="signal-read-date"]'))
   app.unmount()
   postMode = 'ok'
@@ -613,6 +788,8 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
   const src = readFileSync(resolve(root, 'src/screens/DailyScreen.vue'), 'utf8')
   const dash = readFileSync(resolve(root, 'src/components/daily/DailyDashboard.vue'), 'utf8')
   check('DailyScreen отдаёт проекцию в дашборд', src.includes(':reads="data?.signal_reads || []"'))
+  check('DailyScreen отдаёт межмесячный пул сигналов (Ф-7)',
+    src.includes(':signals="signalPool"') && src.includes('collectSignals'))
   check('дашборд прокидывает её в карточку сигнала', dash.includes(':reads="reads"'))
 }
 
@@ -2764,8 +2941,10 @@ console.log('\n=== ТЗ-6: пикер месяцев на «Контроле д�
   // DAILY_FIRST_MONTH, иначе пикер их отфильтрует и проверять будет нечего.
   // Даты мока (2025-05) переписываем на июль 2026 целиком — вместе с днями,
   // журналом и сигналами, чтобы набор остался самосогласованным.
-  const july = '2026-07'
-  const next = '2026-08'
+  const nowM = new Date()
+  const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const july = ym(nowM) // живой месяц = текущий
+  const next = ym(new Date(nowM.getFullYear(), nowM.getMonth() + 1, 1)) // пустая маска следующего
   const sets2 = {}
   for (const s of Object.values(sets)) {
     const live = JSON.parse(JSON.stringify(s).split(s.month).join(july))

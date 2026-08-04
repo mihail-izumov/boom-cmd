@@ -3,27 +3,34 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { L } from '../../i18n/daily.js'
 
-// v3.2: модалка оценки пользы «Сигнала Дня». Открывается кнопкой «Прочитала»
-// (DailySignalCard): вопрос «Оцените пользу Сигнала?» + ползунок 0–10 + «Отправить».
-// Controlled по образцу ParkPickerSheet: prop `open`, emit `close`/`submit(score)`.
-// Отправка и отметка прочтения — у родителя (одно тело signal_read + score);
-// закрытие фоном/крестом/Esc = отмена, прочтение НЕ фиксируется.
-// Ползунок монохромный (accent-color: var(--text)) — цветного не-статусного
-// управления не заводим (DESIGN-STANDARD §3.3); значение — крупной цифрой.
+// Модалка оценки пользы «Сигнала Дня». Открывается кнопкой «Прочитано» и кнопкой
+// «Оценить». Controlled по образцу ParkPickerSheet: prop `open`, emit `close`/`submit(score)`.
+// Ползунок монохромный (accent-color: var(--text)) — цветного не-статусного управления
+// не заводим (DESIGN-STANDARD §3.3); значение — крупной цифрой.
+//
+// КОНТУР А ЗАЩИТЫ ОТ ДУРАКА (2026-08-04). Раньше шкала стартовала с 5 и «Отправить»
+// была активна сразу: 7 оценок из 19 оказались ровно пятёрками — то есть дефолтом.
+// Отличить «подумал и поставил 5» от «просто нажал Отправить» было нельзя, а по этой
+// метрике владелец правит стандарт сигналов. Теперь значения нет, пока шкалу не
+// тронули, и отправлять нечего.
+//
+// КОНТУР Б живёт у родителя: закрытие модалки БЕЗ оценки больше НЕ отменяет прочтение —
+// оно уже лежит в очереди отправки. Здесь закрытие — это просто закрытие.
 const props = defineProps({
   open: { type: Boolean, default: false },
-  posting: { type: Boolean, default: false },
+  // Переоценка (Ф-5): текущая оценка из проекции бэка. Есть — шкала открывается на
+  // ней и сразу готова к отправке: человек уже высказался, требовать повторного
+  // касания незачем.
+  initial: { type: Number, default: null },
 })
 const emit = defineEmits(['close', 'submit'])
 
-const score = ref(5)
+const score = ref(5)      // позиция ползунка; смысл имеет только при touched
+const touched = ref(false)
 
-function hide() {
-  if (props.posting) return
-  emit('close')
-}
+function hide() { emit('close') }
 function send() {
-  if (props.posting) return
+  if (!touched.value) return
   emit('submit', Number(score.value))
 }
 function onKey(e) {
@@ -33,13 +40,15 @@ function onKey(e) {
   }
 }
 
-// Каждое открытие — с середины шкалы; плюс scroll-lock тела, как у шитов.
+// Каждое открытие — заново; плюс scroll-lock тела, как у шитов.
 let prevOverflow = ''
 watch(
   () => props.open,
   (v) => {
     if (v) {
-      score.value = 5
+      const has = Number.isInteger(props.initial)
+      score.value = has ? props.initial : 5
+      touched.value = has
       prevOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       document.addEventListener('keydown', onKey)
@@ -86,8 +95,12 @@ onBeforeUnmount(() => {
         </header>
 
         <div class="px-4 pb-4 pt-3">
-          <!-- крупное значение — единственный «ответ» модалки -->
-          <p class="text-center text-[2.25rem] font-bold leading-none tabular-nums text-[var(--text)]" aria-hidden="true">{{ score }}</p>
+          <!-- крупное значение — единственный «ответ» модалки; до касания шкалы его нет -->
+          <p
+            data-test="signal-rate-value"
+            class="text-center text-[2.25rem] font-bold leading-none tabular-nums text-[var(--text)]"
+            aria-hidden="true"
+          >{{ touched ? score : L.signal_rate_empty }}</p>
 
           <input
             v-model.number="score"
@@ -99,6 +112,7 @@ onBeforeUnmount(() => {
             :aria-label="L.signal_rate_aria"
             class="mt-3 w-full"
             style="accent-color: var(--text); min-height: 44px"
+            @input="touched = true"
           />
           <div class="mt-1 flex justify-between text-[0.75rem] text-[var(--text-muted)]">
             <span>{{ L.signal_rate_min }}</span>
@@ -108,13 +122,18 @@ onBeforeUnmount(() => {
           <button
             type="button"
             data-test="signal-rate-submit"
-            :disabled="posting"
+            :disabled="!touched"
             class="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-[0.9375rem] font-semibold text-[var(--accent-ink)] transition-opacity active:opacity-90 disabled:opacity-60"
             style="min-height: 48px"
             @click="send"
           >
             {{ L.signal_rate_send }}
           </button>
+          <p
+            v-if="!touched"
+            data-test="signal-rate-hint"
+            class="mt-2 text-center text-[0.8125rem] text-[var(--text-muted)]"
+          >{{ L.signal_rate_hint }}</p>
         </div>
       </div>
     </div>

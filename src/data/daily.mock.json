@@ -130,9 +130,21 @@
   "signal_reads": [
     {
       "park": "ohta",
+      "signal_date": "2025-05-05",
+      "read_at": "2025-05-06 10:12",
+      "score": 6
+    },
+    {
+      "park": "ohta",
+      "signal_date": "2025-05-09",
+      "read_at": "2025-05-09 12:04",
+      "score": null
+    },
+    {
+      "park": "ohta",
       "signal_date": "2025-05-14",
       "read_at": "2025-05-14 11:36",
-      "score": null
+      "score": 8
     },
     {
       "park": "piterland",

@@ -4,66 +4,65 @@ import { ChevronDown } from 'lucide-vue-next'
 import {
   sortSignals, latestSignal, feedSignals, signalDot,
   statusOf, markState, loadReadStore, saveReadStore,
-  readFor, readDay,
+  readFor, isMarkable,
 } from '../../composables/dailySignals.js'
 import { useSignalRead } from '../../composables/useSignalRead.js'
 import { L, ddmm } from '../../i18n/daily.js'
 import DailyDayProgress from './DailyDayProgress.vue'
 import SignalRateSheet from './SignalRateSheet.vue'
+import SignalMarkButton from './SignalMarkButton.vue'
 
-// v3.1: «Сигнал Дня» — единый блок. Сверху разбор аналитика из payload (m.signals,
-// если есть) + лента месяца + кнопка «Прочитала»; ниже — «Как идёт день» (авто-
-// интерпретация, живёт всегда). ТОЛЬКО рендерит payload (ТЗ §5); цвет — только в
-// точке статуса, текст монохромный (DESIGN-STANDARD §3.3/D-16).
+// «Сигнал Дня» — единый блок. Сверху разбор аналитика + лента + отметка; ниже —
+// «Как идёт день». ТОЛЬКО рендерит payload (ТЗ §5); цвет — только в точке статуса,
+// текст монохромный (DESIGN-STANDARD §3.3/D-16).
+//
+// ЧТО ИЗМЕНИЛОСЬ (2026-08-04):
+//   • отметить можно ЛЮБОЙ сигнал в окне 14 дней, а не только самый свежий. Раньше
+//     кнопка была одна, и всё, что уезжало в ленту, становилось неотмечаемым навсегда;
+//   • пул сигналов приходит СКВОЗЬ границу месяца (prop `signals`) — иначе 01.08
+//     сигнал за 31.07 исчезал вместе с возможностью его отметить;
+//   • прочтение и оценка развязаны: закрытие модалки больше не отменяет прочтение.
 const props = defineProps({
   m: { type: Object, required: true },
   now: { type: Date, default: null },
-  // D-36: проекция payload.signal_reads — уже записанные бэком отметки (одна строка
-  // на парк). Канон прочтения, в отличие от localStorage, переживает перезагрузку,
-  // чистку кэша и смену устройства. Нет поля / старый деплой → [], карточка живёт
-  // на локальном состоянии как раньше.
+  // Проекция payload.signal_reads — что бэк уже записал. Канон прочтения: переживает
+  // перезагрузку, чистку кэша и смену устройства. С 04.08 бэк отдаёт строку на КАЖДУЮ
+  // пару (парк, день) за 45 дней, а не одну на парк, — иначе лента врала бы на всех
+  // днях, кроме последнего.
   reads: { type: Array, default: () => [] },
+  // Пул сигналов окна + выбранного месяца (собирает DailyScreen через collectSignals).
+  // Не передан → живём внутри одного набора парк:месяц, как раньше.
+  signals: { type: Array, default: null },
 })
 
-const signals = computed(() => (props.m && props.m.signals) || [])
 const park = computed(() => (props.m && props.m.park) || '')
-const sorted = computed(() => sortSignals(signals.value))
-const latest = computed(() => latestSignal(sorted.value))
-const feed = computed(() => feedSignals(sorted.value))
+const pool = computed(() =>
+  sortSignals(props.signals && props.signals.length ? props.signals : (props.m && props.m.signals) || []),
+)
+const latest = computed(() => latestSignal(pool.value))
+const feed = computed(() => feedSignals(pool.value))
 
-// Статусы прочитанности на устройстве. Снимок «новизны» — на момент setup
-// (ДО записи viewed): бейдж «новое» живёт весь заход, снят в следующий (ТЗ §2).
+// Статусы на устройстве. Снимок «новизны» — на момент setup (ДО записи viewed):
+// бейдж «новое» живёт весь заход, снят в следующий (ТЗ §2).
 const store = ref(loadReadStore())
 const snapshot = { ...store.value }
 const feedOpen = ref(false)
 const openRows = ref({})
-const { posting, postError, markRead } = useSignalRead()
+const { statusOf: sendState, enqueue } = useSignalRead()
 
 const headDate = computed(() => (latest.value ? ddmm(latest.value.date) : ''))
-const statusFor = (date) => statusOf(store.value, park.value, date)
+const localStatus = (date) => statusOf(store.value, park.value, date)
+const localRead = (date) => localStatus(date) === 'read'
 
-// D-36: отметка, уже записанная бэком, ровно для того сигнала, который сейчас на
-// экране (сверяем signal_date — вчерашняя отметка не должна гасить сегодняшнюю кнопку).
-const serverRead = computed(() =>
-  latest.value ? readFor(props.reads, park.value, latest.value.date) : null,
+// Отмечено = бэк ИЛИ устройство ИЛИ подтверждение этой сессии.
+function isDone(date) {
+  const s = sendState(park.value, date)
+  return !!readFor(props.reads, park.value, date) || localRead(date) || s === 'done' || s === 'score-debt'
+}
+const latestDone = computed(() => !!latest.value && isDone(latest.value.date))
+const latestNew = computed(
+  () => !!latest.value && statusOf(snapshot, park.value, latest.value.date) === 'none',
 )
-// Прочитано = так считает бэк ИЛИ так считает устройство. ИЛИ, а не только localStorage:
-// иначе после перезагрузки на другом телефоне кнопка снова предлагает отметить уже
-// отмеченный сигнал, а повторное нажатие с 29.07 не пишет новую строку — управляющий
-// видел бы «не отмечено» вечно и не понимал, дошло ли вообще.
-const latestRead = computed(
-  () => !!latest.value && (statusFor(latest.value.date) === 'read' || !!serverRead.value),
-)
-const latestNew = computed(() => !!latest.value && statusOf(snapshot, park.value, latest.value.date) === 'none')
-
-// Дата отметки в подписи кнопки: из проекции бэка, а сразу после нажатия — из ответа
-// текущей сессии (payload обновится только на следующей загрузке). Даты нет — кнопка
-// всё равно показывает «Прочитано ✓», просто без числа.
-const justReadOn = ref('')
-const readDate = computed(() => {
-  const d = serverRead.value ? readDay(serverRead.value) : ''
-  return ddmm(d || justReadOn.value)
-})
 
 function persist(date, state) {
   markState(store.value, park.value, date, state)
@@ -71,43 +70,50 @@ function persist(date, state) {
   store.value = { ...store.value }
 }
 onMounted(() => {
-  if (latest.value && statusFor(latest.value.date) === 'none') persist(latest.value.date, 'viewed')
+  if (latest.value && localStatus(latest.value.date) === 'none') persist(latest.value.date, 'viewed')
 })
-// v3.2: «Прочитала» открывает модалку оценки пользы (0–10); POST уходит из
-// сабмита модалки одним телом signal_read + score. Закрытие без отправки =
-// отмена: прочтение не фиксируется, кнопка остаётся активной.
+
+// ── КОНТУР Б защиты от дурака ────────────────────────────────────────────────
+// Нажатие «Прочитано» СРАЗУ кладёт прочтение в очередь и только потом открывает
+// модалку. Раньше POST уходил из сабмита модалки, а закрытие крестом отменяло всё:
+// человек, не желавший оценивать, терял и прочтение. Теперь оценка обязательна в
+// потоке (Контур А), но никогда не ценой факта контакта.
 const rateOpen = ref(false)
-function onRead() {
-  if (!latest.value || latestRead.value || posting.value) return
+const rateDate = ref('')
+const rateInitial = computed(() => {
+  const entry = readFor(props.reads, park.value, rateDate.value)
+  const n = entry ? Number(entry.score) : NaN
+  return Number.isInteger(n) ? n : null
+})
+
+function onMark(date) {
+  if (!date || isDone(date) || !isMarkable(date, props.now || new Date())) return
+  // Локальный статус 'read' здесь НЕ пишем: он ставится только по подтверждению бэка
+  // (useSignalRead.confirm_). Иначе упавший запрос оставит человека с «Прочитано ✓»
+  // на экране и пустотой в контуре B — то есть ровно с исходной жалобой.
+  enqueue({ park: park.value, signal_date: date }) // score не трогаем — модалка впереди
+  rateDate.value = date
   rateOpen.value = true
 }
-// Локальная дата «сегодня» для подписи кнопки сразу после успешной отправки
-// (read_at ставит бэк, но в этой сессии его ещё не видно). now — для тестов.
-function todayIso() {
-  const d = props.now || new Date()
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+// «Оценить» / «Изменить оценку»: прочтение уже записано, правим только оценку.
+function onRate(date) {
+  rateDate.value = date
+  rateOpen.value = true
 }
-async function onRateSubmit(score) {
-  if (!latest.value || latestRead.value || posting.value) return
-  const okres = await markRead({ park: park.value, signal_date: latest.value.date, score })
+function onRateSubmit(score) {
+  if (!rateDate.value) return
+  enqueue({ park: park.value, signal_date: rateDate.value, score })
   rateOpen.value = false
-  // Ошибка/сеть отпала — состояние НЕ фиксируем: кнопка остаётся активной, ниже
-  // висит плашка «не удалось отметить». Молча гасить кнопку нельзя (§2.4 задания):
-  // тогда «не нажали» не отличить от «нажали, но не долетело».
-  if (okres) {
-    justReadOn.value = todayIso()
-    persist(latest.value.date, 'read')
-  }
 }
+
 function toggleFeed() { feedOpen.value = !feedOpen.value }
 function toggleRow(date) {
   openRows.value = { ...openRows.value, [date]: !openRows.value[date] }
-  if (statusFor(date) === 'none') persist(date, 'viewed') // tap снимает «новое»
+  if (localStatus(date) === 'none') persist(date, 'viewed') // tap снимает «новое»
 }
 function rowMarker(date) {
-  const s = statusFor(date)
-  return s === 'read' ? 'read' : s === 'none' ? 'new' : 'open'
+  if (isDone(date)) return 'read'
+  return localStatus(date) === 'none' ? 'new' : 'open'
 }
 </script>
 
@@ -117,12 +123,11 @@ function rowMarker(date) {
     <div class="flex items-start justify-between gap-3">
       <div class="flex items-center gap-2">
         <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ L.signal_title }}</h2>
-        <span v-if="latest && latestNew && !latestRead" class="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--accent-ink)]">{{ L.signal_new }}</span>
+        <span v-if="latest && latestNew && !latestDone" class="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--accent-ink)]">{{ L.signal_new }}</span>
       </div>
       <span v-if="latest" class="shrink-0 pt-0.5 text-[0.75rem] text-[var(--text-muted)]">{{ L.signal_by }} {{ headDate }}</span>
     </div>
 
-    <!-- разбор аналитика (если есть сигнал) -->
     <template v-if="latest">
       <div class="mt-2 flex items-start gap-2">
         <span class="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: signalDot(latest.status) }" />
@@ -132,25 +137,15 @@ function rowMarker(date) {
         </div>
       </div>
 
-      <button
-        type="button"
-        data-test="signal-read"
-        :disabled="latestRead || posting"
-        class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-2)] px-4 text-[0.9375rem] font-medium text-[var(--text)] transition-opacity active:opacity-90 disabled:opacity-100"
-        style="min-height: 44px"
-        @click="onRead"
-      >
-        <span v-if="latestRead">{{ L.signal_read_done }} ✓</span>
-        <span v-else>{{ L.signal_read }}</span>
-        <!-- D-36: дата отметки рядом со статусом — подтверждение, что запись
-             дошла до бэка, а не осталась в памяти телефона. -->
-        <span v-if="latestRead && readDate" data-test="signal-read-date" class="text-[0.8125rem] text-[var(--text-muted)]">· {{ readDate }}</span>
-      </button>
+      <div class="mt-3">
+        <SignalMarkButton
+          :park="park" :date="latest.date" :reads="reads"
+          :local-read="localRead(latest.date)" :now="now"
+          @mark="onMark" @rate="onRate"
+        />
+      </div>
 
-      <p v-if="postError" class="mt-2 rounded-xl px-3 py-2 text-[0.8125rem] leading-snug text-[var(--text)]" style="background: color-mix(in srgb, var(--negative) 12%, var(--surface))">{{ L.signal_error }}</p>
-
-      <!-- v3.2: модалка «Оцените пользу Сигнала?» (ползунок 0–10) -->
-      <SignalRateSheet :open="rateOpen" :posting="posting" @close="rateOpen = false" @submit="onRateSubmit" />
+      <SignalRateSheet :open="rateOpen" :initial="rateInitial" @close="rateOpen = false" @submit="onRateSubmit" />
 
       <div v-if="feed.length" class="mt-3 border-t border-[var(--line)] pt-1">
         <button
@@ -166,6 +161,8 @@ function rowMarker(date) {
         </button>
         <ul v-if="feedOpen" class="flex flex-col">
           <li v-for="s in feed" :key="s.date" data-test="signal-feed-row" class="border-t border-[var(--line)] first:border-t-0">
+            <!-- Раскрытие строки и отметка — РАЗНЫЕ элементы: вложенный <button>
+                 внутри <button> невалиден, а тач-таргеты обоих должны быть ≥44pt (HIG). -->
             <button type="button" class="flex w-full items-start gap-2 py-2 text-left" style="min-height: 44px" @click="toggleRow(s.date)">
               <span class="w-[2.6rem] shrink-0 pt-0.5 text-[0.75rem] tabular-nums text-[var(--text-muted)]">{{ ddmm(s.date) }}</span>
               <span class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full" :style="{ background: signalDot(s.status) }" />
@@ -175,7 +172,19 @@ function rowMarker(date) {
                 <span v-else-if="rowMarker(s.date) === 'read'" class="text-[0.75rem] text-[var(--text-muted)]" aria-label="прочитано">✓</span>
               </span>
             </button>
-            <p v-if="openRows[s.date] && s.action" class="pb-2 pl-[3.1rem] pr-1 text-[0.8125rem] leading-snug text-[var(--text-secondary)]">{{ s.action }}</p>
+            <div v-if="openRows[s.date]" class="pb-3 pl-[3.1rem] pr-1">
+              <p v-if="s.action" class="text-[0.8125rem] leading-snug text-[var(--text-secondary)]">{{ s.action }}</p>
+              <!-- Та же кнопка, что у свежего сигнала: именно её отсутствие здесь и
+                   делало пропущенные дни неотмечаемыми навсегда. Дата отмечаемого
+                   сигнала — слева в строке, поэтому в кнопке её не дублируем. -->
+              <div class="mt-2">
+                <SignalMarkButton
+                  :park="park" :date="s.date" :reads="reads"
+                  :local-read="localRead(s.date)" :now="now" :show-date="false"
+                  @mark="onMark" @rate="onRate"
+                />
+              </div>
+            </div>
           </li>
         </ul>
       </div>
@@ -184,7 +193,7 @@ function rowMarker(date) {
     <!-- нет сигнала: аналитик ещё не оставил разбор -->
     <p v-else class="mt-2 text-[0.875rem] leading-snug text-[var(--text-muted)]">{{ L.signal_empty }}</p>
 
-    <!-- «Как идёт день» — влит в блок «Сигнал Дня» (v3.1) -->
+    <!-- «Как идёт день» — влит в блок «Сигнал Дня» -->
     <div class="mt-3 border-t border-[var(--line)] pt-3">
       <DailyDayProgress :m="m" :now="now" />
     </div>

@@ -17,6 +17,9 @@ dist-ssr
 # прерванный прогон оставляет её — в коммит не берём)
 .tmp-verify-daily/
 .tmp-verify-contrib/
+# .tmp-verify-report/ здесь не было — прерванный прогон verify-report попадал в
+# коммит как untracked. Добавлено 04.08 после того, как это случилось.
+.tmp-verify-report/
 
 # Локальные env: URL источников (VITE_PROJECTS_API, VITE_ANALYTICS_API).
 # Фраза доступа здесь НЕ хранится (она только в localStorage).

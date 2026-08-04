@@ -27,9 +27,67 @@ export function latestSignal(sorted) {
   return sorted.length ? sorted[sorted.length - 1] : null
 }
 
-// Лента месяца = все прочие записи, новые сверху. Единственный сигнал → пусто.
+// Лента = все прочие записи, новые сверху. Единственный сигнал → пусто.
 export function feedSignals(sorted) {
   return sorted.length > 1 ? sorted.slice(0, -1).reverse() : []
+}
+
+// ── Два горизонта (решение владельца 04.08) ──
+// SIGNAL_MARKABLE_DAYS — горизонт ДЕЙСТВИЯ: что ещё можно отметить.
+// READS_PROJECTION_DAYS (45, Apps Script) — горизонт ЗНАНИЯ: на какую глубину бэк
+// отдаёт статус отметки.
+//
+// ⚠ ИНВАРИАНТ: окно действия обязано лежать СТРОГО ВНУТРИ горизонта знания. Нарушишь —
+// фронт предложит отметить день, статус которого не знает, и после смены устройства
+// предложит второй раз. Ровно этот дефект чинило D-36. Меняешь одну константу —
+// проверь вторую (комментарий продублирован у READS_PROJECTION_DAYS в скрипте).
+//
+// Почему 14, а не «всё подряд»: отметка меряет скорость реакции парка на сигнал
+// (read_at = первое нажатие). Разрешив догонять сигналы месячной давности, метрику
+// превращаем из «прочитал вовремя» в «зачёт по посещаемости». 14 дней покрывают
+// отпуск и болезнь, но не обнуляют смысл.
+export const SIGNAL_MARKABLE_DAYS = 14
+
+// Возраст сигнала в целых календарных днях. Битая дата → null (не отрицательное
+// число: «неизвестно» и «из будущего» — разные вещи, и путать их нельзя).
+export function signalAgeDays(date, now = new Date()) {
+  const s = String(date || '')
+  if (!DATE_RE.test(s)) return null
+  const [y, m, d] = s.split('-').map(Number)
+  const then = Date.UTC(y, m - 1, d)
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((today - then) / 86400000)
+}
+
+// Можно ли ещё отметить. Сигнал «из будущего» (age < 0) отмечаем — так бывает при
+// расхождении часовых поясов устройства и контура, и запрещать это незачем.
+export function isMarkable(date, now = new Date(), days = SIGNAL_MARKABLE_DAYS) {
+  const age = signalAgeDays(date, now)
+  return age !== null && age < days
+}
+
+// ── Пул сигналов карточки (Ф-7) ──
+// Раньше карточка жила внутри ОДНОГО набора `парк:месяц`, поэтому 01.08 сигнал за
+// 31.07 физически исчезал из ленты и становился неотмечаемым — граница месяца рвала
+// окно. Теперь пул собирается по всем месяцам парка сразу:
+//   • всё, что попадает в окно действия (сквозь границу месяца), — рабочая часть;
+//   • плюс весь выбранный в пикере месяц — чтобы архив листался как раньше.
+// Дубли по дате схлопываем: один день — одна запись.
+export function collectSignals(sets, park, month, now = new Date(), days = SIGNAL_MARKABLE_DAYS) {
+  if (!park) return []
+  const prefix = `${park}:`
+  const all = []
+  for (const [key, set] of Object.entries(sets || {})) {
+    if (!key.startsWith(prefix) || !set || !Array.isArray(set.signals)) continue
+    for (const s of set.signals) all.push(s)
+  }
+  const seen = new Set()
+  const ym = String(month || '')
+  return sortSignals(all).filter((s) => {
+    if (seen.has(s.date)) return false
+    seen.add(s.date)
+    return isMarkable(s.date, now, days) || String(s.date).slice(0, 7) === ym
+  })
 }
 
 // Точка статуса. Цвет — ТОЛЬКО в точке (текст монохромный, DESIGN-STANDARD).
@@ -114,6 +172,10 @@ export function readDay(entry) {
 // без кастомных заголовков — как форма. read-only не нарушаем: пишем только в
 // inbox-канал VITE_REPORT_API.
 export function normalizeScore(score) {
+  // ⚠ Пустое значение НЕ равно нулю. Number(null) и Number('') дают 0 — целое и в
+  // диапазоне 0..10, — поэтому без этой проверки «оценки нет» уезжало на бэк как
+  // score:0, то есть как суждение «сигнал бесполезен». Отсекаем до приведения типа.
+  if (score === null || score === undefined || score === '') return null
   const n = Number(score)
   return Number.isInteger(n) && n >= 0 && n <= 10 ? n : null
 }
@@ -124,6 +186,12 @@ export function buildSignalReadBody(key, park, signalDate, score) {
   return body
 }
 // Отправка. fetchImpl инъектируется в тестах (реального URL в тестах нет, §6).
+//
+// Возвращает КОНТРАКТ ОТВЕТА целиком: { read, score }.
+// Раньше здесь стояло `return true` — поля `read` и `score` выбрасывались молча.
+// Бэк с 30.07 честно сообщает, записалась ли оценка (score: 'added'|'updated'|
+// 'failed'|'rejected'|null), а фронт рапортовал успех и гасил кнопку навсегда.
+// Это молчаливая деградация ровно того класса, который описан в «Граблях» скрипта.
 export async function postSignalRead({ api, key, park, signalDate, score, fetchImpl }) {
   const f = fetchImpl || (typeof fetch !== 'undefined' ? fetch : null)
   if (!f) throw new Error('fetch недоступен')
@@ -135,5 +203,90 @@ export async function postSignalRead({ api, key, park, signalDate, score, fetchI
   if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)
   const json = await res.json()
   if (!json || json.ok !== true) throw new Error(json?.error || 'Отказ бэка')
-  return true
+  return { read: json.read || 'added', score: json.score ?? null }
+}
+
+// ── Очередь отправки (outbox) ──
+// Отметка перестаёт быть одноразовым выстрелом. Управляющие работают в ТЦ со рваной
+// связью; раньше упавший POST терялся вместе с намерением (postError жил в памяти
+// компонента и не переживал перезагрузку). Теперь намерение лежит на устройстве,
+// пока бэк его не подтвердит.
+//
+// Ретраи безопасны БЕЗ правок бэка — это его существующее свойство: appendRead_
+// дедуплицирует по (park, signal_date, source) и не трогает read_at, appendScore_
+// перезаписывает оценку. Сколько бы раз очередь ни повторила запрос, лишних строк
+// не появится, а read_at останется временем первого нажатия.
+const OUTBOX_KEY = 'bc:daily:signal_outbox'
+
+// Ошибки, при которых повторять бессмысленно: тело запроса не станет валиднее само.
+// Без этого списка очередь уходит в вечную петлю — например, doPost сверяет park с
+// whitelist БЕЗ нормализации, и 'Ohta' даст 'bad park' на любой попытке.
+const PERMANENT = ['bad key', 'bad park', 'bad date', 'unauthorized']
+export function isPermanentError(msg) {
+  const s = String(msg || '').toLowerCase()
+  return PERMANENT.some((p) => s.includes(p))
+}
+// Бэкофф между попытками; дальше — раз в открытие приложения.
+export function backoffMs(attempts) {
+  return [2000, 10000, 60000][Math.min(Math.max(attempts - 1, 0), 2)]
+}
+
+export function loadOutbox() {
+  try {
+    if (typeof localStorage === 'undefined') return []
+    const raw = JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]')
+    return Array.isArray(raw) ? raw.filter((i) => i && typeof i === 'object' && i.park && DATE_RE.test(String(i.signal_date || ''))) : []
+  } catch {
+    return []
+  }
+}
+export function saveOutbox(list) {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(Array.isArray(list) ? list : []))
+  } catch {
+    /* приватный режим / переполнение — очередь деградирует до одноразовой отправки */
+  }
+}
+export function findItem(list, park, date) {
+  return (list || []).find((i) => i.park === park && i.signal_date === date) || null
+}
+// Постановка в очередь. Повторное нажатие ОБНОВЛЯЕТ элемент, а не плодит новые:
+// ключ — пара (парк, дата сигнала), ровно как ключ дедупликации на бэке.
+// score === undefined означает «не трогать оценку» (кнопка «Прочитано» без модалки).
+export function enqueueRead(list, { park, signal_date, score }) {
+  const out = (list || []).slice()
+  const at = out.findIndex((i) => i.park === park && i.signal_date === signal_date)
+  const prev = at >= 0 ? out[at] : null
+  const item = {
+    park,
+    signal_date,
+    score: score === undefined ? (prev ? prev.score : null) : normalizeScore(score),
+    created_at: prev ? prev.created_at : new Date().toISOString(),
+    attempts: 0,          // сбрасываем: пользователь нажал заново, ждать бэкофф незачем
+    last_error: '',
+    dead: false,
+    read_ok: prev ? !!prev.read_ok : false,
+  }
+  if (at >= 0) out[at] = item
+  else out.push(item)
+  return out
+}
+export function dropItem(list, park, date) {
+  return (list || []).filter((i) => !(i.park === park && i.signal_date === date))
+}
+
+// Разбор ответа бэка → что делать с элементом очереди.
+// 'done'   — всё записано, элемент убрать;
+// 'retry'  — половина не доехала, оставить и повторить;
+// 'dead'   — повторять бессмысленно, показать человеку.
+export function resolveItem(item, res) {
+  const sentScore = item.score !== null && item.score !== undefined
+  if (!sentScore) return { action: 'done' }
+  if (res.score === 'added' || res.score === 'updated') return { action: 'done' }
+  // 'rejected' — оценка не пройдёт валидацию и на второй попытке. Прочтение при этом
+  // записано, поэтому долг снимаем, но честно говорим, что оценки нет.
+  if (res.score === 'rejected') return { action: 'dead', error: 'оценка отклонена' }
+  // 'failed' | null — прочтение доехало, оценка нет. Досылаем только её.
+  return { action: 'retry', error: 'оценка не сохранилась', readOk: true }
 }
