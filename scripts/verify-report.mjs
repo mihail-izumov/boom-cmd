@@ -26,8 +26,9 @@ import { dirname, resolve } from 'node:path'
 import {
   emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
   yesterdayISO, todayISO, softWarnings,
-  RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS, isRetriableStatus,
 } from '../src/composables/reportModel.js'
+// Политика повторов общая для записи и чтения — живёт в netPolicy.js (05.08, вечер).
+import { RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS, isRetriableStatus } from '../src/composables/netPolicy.js'
 import {
   rub, L, FIELD_LABELS, WEATHER_OPTIONS, TIPS, TIPS_IYUN,
   WEEKLY_NOTE, CHECKS_INTRO, CHECKS_INTRO_IYUN, FIELD_HINTS, hintFor,

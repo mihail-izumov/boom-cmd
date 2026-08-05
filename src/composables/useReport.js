@@ -1,8 +1,10 @@
 import { ref } from 'vue'
 import { useAccessKey } from './useAccessKey.js'
-// Политика повторов — в чистом reportModel.js: там она проверяется приёмкой
-// без jsdom и таймеров (см. комментарий по месту).
-import { RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS, isRetriableStatus } from './reportModel.js'
+// Политика повторов — в чистом netPolicy.js: там она проверяется приёмкой без
+// jsdom и таймеров и делится с чтением дневного слоя (useDaily).
+import {
+  RETRY_DELAYS_MS, isRetriableStatus, failure, wait, fetchWithTimeout, transportFailure, runWithRetries,
+} from './netPolicy.js'
 
 // Отправка «Отчёта дня» (D-12) — ЕДИНСТВЕННАЯ пишущая операция фронта.
 // POST JSON → Apps Script doPost → append строки ТОЛЬКО в лист `inbox`
@@ -51,35 +53,6 @@ const GATE_API =
     import.meta.env.VITE_PROJECTS_API) ||
   ''
 
-function failure(message, retriable) {
-  const e = new Error(message)
-  e.retriable = !!retriable
-  return e
-}
-
-function wait(ms) {
-  return new Promise((r) => setTimeout(r, ms))
-}
-
-// fetch с потолком ожидания. AbortController есть во всех целевых браузерах
-// (browserslist: iOS ≥ 15), но guard оставлен: без него падение было бы не
-// «отчёт не ушёл», а белый экран.
-async function fetchOnce(url, body) {
-  const canAbort = typeof AbortController !== 'undefined'
-  const ctrl = canAbort ? new AbortController() : null
-  const timer = canAbort ? setTimeout(() => ctrl.abort(), ATTEMPT_TIMEOUT_MS) : null
-  try {
-    return await fetch(url, {
-      method: 'POST',
-      body,
-      redirect: 'follow',
-      ...(ctrl ? { signal: ctrl.signal } : {}),
-    })
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
-
 export function useReport() {
   const sending = ref(false)
   const sent = ref(false) // успех — экран «Отчёт принят»
@@ -97,10 +70,10 @@ export function useReport() {
   async function attemptOnce(url, body) {
     let res
     try {
-      res = await fetchOnce(url, body)
+      res = await fetchWithTimeout(url, { method: 'POST', body, redirect: 'follow' })
     } catch (e) {
       // Сеть отвалилась или сработал потолок ожидания — оба случая повторяемы.
-      throw failure(e?.name === 'AbortError' ? 'Ответ не пришёл вовремя' : 'Сеть недоступна', true)
+      throw transportFailure(e)
     }
     if (!res.ok) {
       throw failure(`Источник недоступен (${res.status})`, isRetriableStatus(res.status))
@@ -145,24 +118,18 @@ export function useReport() {
       }
 
       const body = JSON.stringify({ key, ...payload })
-      for (let i = 0; ; i++) {
-        try {
-          await attemptOnce(API, body)
-          sent.value = true
-          return
-        } catch (e) {
-          const last = i >= RETRY_DELAYS_MS.length
-          if (!e.retriable || last) throw e
-          // Счётчик поднимаем ДО паузы, а не в начале следующего витка: пауза —
-          // это бо́льшая часть времени повтора, и всё это время кнопка обязана
-          // говорить «пробуем ещё», иначе экран выглядит зависшим.
-          attempt.value = i + 2
+      // Счётчик попыток поднимает onRetry — ДО паузы, а не в начале следующего
+      // витка: пауза это бо́льшая часть времени повтора, и всё это время кнопка
+      // обязана говорить «пробуем ещё», иначе экран выглядит зависшим.
+      await runWithRetries(() => attemptOnce(API, body), {
+        onRetry: (n, e) => {
+          attempt.value = n
           if (typeof console !== 'undefined') {
-            console.warn(`report submit retry ${i + 2}/${RETRY_DELAYS_MS.length + 1}:`, e.message)
+            console.warn(`report submit retry ${n}/${RETRY_DELAYS_MS.length + 1}:`, e.message)
           }
-          await wait(RETRY_DELAYS_MS[i])
-        }
-      }
+        },
+      })
+      sent.value = true
     } catch (e) {
       if (typeof console !== 'undefined') console.warn('report submit failed:', e)
       sendError.value = true

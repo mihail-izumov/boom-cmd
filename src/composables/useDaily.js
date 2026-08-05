@@ -1,5 +1,8 @@
 import { ref } from 'vue'
 import { useAccessKey } from './useAccessKey.js'
+import {
+  RETRY_DELAYS_MS, isRetriableStatus, failure, fetchWithTimeout, transportFailure, runWithRetries,
+} from './netPolicy.js'
 
 // Источник данных под-страницы «Контроль дня». Клон паттерна useAnalytics.js:
 //   • публичный API: { data, loading, error, reload };
@@ -68,6 +71,41 @@ function normalize(raw) {
   return out
 }
 
+// Одна попытка чтения: запрос → статус → JSON. Бросает ошибку с полем `retriable`
+// (см. netPolicy). Не-JSON в ответе считаем повторяемым: так выглядят страница
+// логина Google при сбое доступа к развёртыванию и обрыв на 302 к googleusercontent.
+// Ответ `{error:'unauthorized'}` — валидный JSON и сюда не попадает: это осознанный
+// отказ гейта, его разбирает вызывающий.
+async function fetchDaily(url) {
+  let res
+  try {
+    res = await fetchWithTimeout(url, { cache: 'no-store' })
+  } catch (e) {
+    throw transportFailure(e)
+  }
+  if (!res.ok) throw failure(`Источник недоступен (${res.status})`, isRetriableStatus(res.status))
+  try {
+    return await res.json()
+  } catch {
+    throw failure('Ответ не разобран', true)
+  }
+}
+
+// ── СКЛЕЙКА ОДНОВРЕМЕННЫХ ЗАПРОСОВ (05.08, вечер) ──
+// От `useDaily` кормятся ПЯТЬ экранов (Главная, Контроль Дня, Сводки, Разборы,
+// Драйверы), и каждый вызов заводит свои ref-ы и свой запрос. При старте
+// приложения это несколько одинаковых `?action=daily` подряд, каждый по 5–11 с
+// (журнал выполнений 04–05.08). Хуже того, они независимы: 05.08 запрос Главной
+// осёкся, а запрос «Контроля Дня» прошёл — и на одном экране были прочерки, на
+// другом живые цифры. Один и тот же payload не может «быть» и «не быть» разом.
+//
+// Здесь склеиваются только ПАРАЛЛЕЛЬНЫЕ запросы: пока один в полёте, остальные
+// ждут его результат. Кэш с временем жизни сознательно НЕ вводится — он меняет
+// поведение перехода между экранами и требует инвалидации; правильное место для
+// него — `CacheService` на стороне Apps Script (NET-22), там он даст тот же
+// выигрыш без риска показать вчерашние данные.
+let inflight = null
+
 export function useDaily() {
   const data = ref(EMPTY)
   const loading = ref(false)
@@ -117,9 +155,18 @@ export function useDaily() {
       }
 
       const url = `${API}?key=${encodeURIComponent(key)}&action=daily`
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)
-      const json = await res.json()
+      // Один запрос на всё приложение, пока он в полёте. Промис снимается в
+      // finally — следующий вход на экран запросит заново.
+      if (!inflight) {
+        inflight = runWithRetries(() => fetchDaily(url), {
+          onRetry: (n, e) => {
+            if (typeof console !== 'undefined') {
+              console.warn(`daily reload retry ${n}/${RETRY_DELAYS_MS.length + 1}:`, e.message)
+            }
+          },
+        }).finally(() => { inflight = null })
+      }
+      const json = await inflight
 
       if (json && json.error === 'unauthorized') {
         logout('unauthorized')

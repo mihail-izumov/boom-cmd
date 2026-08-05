@@ -382,6 +382,10 @@ console.log('✓  lib-сборка готова')
 // давал неверный вывод в отчёте владельцу, см. §2.2 задания D-36).
 let postMode = 'ok' // 'ok' | 'reject' | 'neterror' | 'score-fail'
 let getPayload = {} // что отдаёт GET (гейт + ?action=daily); меняется в кейсах сводок
+// v2.4 (05.08): режим и счётчик GET-ов. 400 выбран сознательно — он НЕ повторяемый
+// (isRetriableStatus), поэтому ошибка всплывает сразу и проверка не ждёт 5,5 с пауз.
+let getMode = 'ok' // 'ok' | 'fail400'
+let getCalls = 0
 const postedBodies = []
 global.fetch = async (url, opts = {}) => {
   const json = (obj) => ({ ok: true, status: 200, json: async () => obj })
@@ -397,6 +401,8 @@ global.fetch = async (url, opts = {}) => {
     if (postMode === 'score-fail') return json({ ok: true, read: 'added', score: hasScore ? 'failed' : null })
     return json({ ok: true, read: 'added', score: hasScore ? 'added' : null })
   }
+  getCalls++
+  if (getMode === 'fail400') return { ok: false, status: 400, json: async () => ({}) }
   return json(getPayload) // гейт: 200 без error → фраза ок
 }
 
@@ -3009,6 +3015,62 @@ console.log('\n=== ТЗ-6: пикер месяцев на «Контроле д�
 
   scr.app.unmount(); document.body.innerHTML = ''
   bundle.setPark('network')
+  getPayload = {}
+}
+
+console.log('\n=== jsdom: v2.4 — Главная не молчит об ошибке загрузки ===')
+{
+  // 05.08: запрос Главной осёкся, «Контроль Дня» в тот же момент показывал цифры.
+  // Главная отрисовала одни прочерки и ни слова о причине — единственный экран
+  // дневного слоя, который не читал `error` из useDaily.
+  localStorage.clear()
+  bundle.clearSubView()
+  getMode = 'fail400'
+  const { el, app } = mount(bundle.HomeScreen, {})
+  await flush()
+  const err = el.querySelector('[data-test="home-load-error"]')
+  check('плашка «Данные не загрузились» видна', !!err && err.textContent.includes('Данные не загрузились'))
+  check('причина названа, а не спрятана', !!err && err.textContent.includes('400'))
+  const btn = el.querySelector('[data-test="home-load-retry"]')
+  check('кнопка «Повторить» есть, тач-таргет ≥44pt (HIG)',
+    !!btn && (btn.getAttribute('style') || '').includes('44px'))
+  check('виджеты при этом не исчезли — прочерки на местах', el.textContent.includes('План/Факт'))
+
+  getMode = 'ok'
+  getPayload = { updated: '2025-05-20', sets: {}, stats: { checkups: 7, signals: 5 }, reviews: [] }
+  await fire(btn, 'click')
+  await flush()
+  check('после «Повторить» плашка ушла', !el.querySelector('[data-test="home-load-error"]'))
+  check('счётчики загрузились', el.textContent.includes('7') && el.textContent.includes('5'))
+  app.unmount()
+  getPayload = {}
+}
+
+console.log('\n=== jsdom: v2.4 — параллельные экраны склеиваются в ОДИН запрос ===')
+{
+  // От useDaily кормятся пять экранов, и каждый заводил свой запрос по 5–11 с.
+  // Хуже времени было расхождение: один запрос падал, другой проходил, и payload
+  // «был» и «не был» одновременно.
+  localStorage.clear()
+  bundle.clearSubView()
+  getPayload = { updated: '2025-05-20', sets: {}, stats: { checkups: 3, signals: 2 }, reviews: [] }
+  getCalls = 0
+  const a = mount(bundle.HomeScreen, {})
+  const b = mount(bundle.ReviewsScreen, {})
+  await flush()
+  check('два экрана в один тик → ОДИН GET, а не два', getCalls === 1, getCalls)
+  check('оба получили данные (склейка отдаёт результат всем)',
+    a.el.textContent.includes('3') && !b.el.textContent.includes('Не удалось'))
+  a.app.unmount()
+  b.app.unmount()
+
+  // Промис снимается после завершения: следующий вход на экран запрашивает заново,
+  // кэша с временем жизни здесь сознательно нет (его место — CacheService, NET-22).
+  getCalls = 0
+  const c = mount(bundle.HomeScreen, {})
+  await flush()
+  check('после завершения запроса следующий экран идёт в сеть снова', getCalls === 1, getCalls)
+  c.app.unmount()
   getPayload = {}
 }
 

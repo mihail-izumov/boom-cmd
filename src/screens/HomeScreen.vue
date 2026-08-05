@@ -24,7 +24,11 @@ import { reviewCount } from '../composables/reviews.js'
 const NM_DAILY = 'Контроль\nДня'
 const NM_GOALS = 'Цели и\nпланы'
 
-const { data, loading } = useDaily()
+// error/reload (05.08): раньше экран брал только data и loading, и любая осечка
+// запроса выглядела как «данных нет» — прочерки во всех виджетах сразу, без единого
+// намёка, что запрос упал. Остальные экраны дневного слоя (DailyScreen, Сводки,
+// Разборы, Драйверы) состояние ошибки показывали, Главная — единственная — нет.
+const { data, loading, error, reload } = useDaily()
 const sets = computed(() => data.value?.sets || {})
 const parkIdsWithDaily = computed(() =>
   PARKS.map((p) => p.id).filter((id) => Object.values(sets.value).some((s) => s.park === id)),
@@ -113,6 +117,30 @@ function goDrivers() { setSubView('drivers') } // 30.07: драйверы рос
 
 <template>
   <section class="flex flex-col px-4 pb-6 pt-0">
+    <!-- Загрузка не удалась. Виджеты ниже остаются на своих местах с прочерками —
+         подменять весь экран нечем и незачем, — но человек теперь видит ПРИЧИНУ
+         и может повторить, не перезапуская приложение. Цвет только фоном
+         (color-mix от --negative), текст монохромный: контраст 14,4:1. -->
+    <div
+      v-if="error && !loading"
+      data-test="home-load-error"
+      role="alert"
+      class="mb-3 flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
+      style="background: color-mix(in srgb, var(--negative) 12%, var(--surface))"
+    >
+      <div class="min-w-0">
+        <p class="text-[0.9375rem] font-medium leading-snug text-[var(--text)]">{{ L.load_error }}</p>
+        <p class="mt-0.5 truncate text-[0.8125rem] leading-snug text-[var(--text-secondary)]">{{ error }}</p>
+      </div>
+      <button
+        type="button"
+        data-test="home-load-retry"
+        class="shrink-0 rounded-full bg-[var(--surface)] px-4 text-[0.9375rem] font-medium text-[var(--text)] active:opacity-90"
+        style="min-height: 44px"
+        @click="reload"
+      >{{ L.load_retry }}</button>
+    </div>
+
     <!-- v3.1/D-19: полоса-счётчик (система): чекапы · сигналы · разборы.
          Чекапы/сигналы → «Контроль Дня» (заглушка — своей страницы пока нет,
          бэклог: boom-cmd-data/tasks/ЗАДАНИЕ-фронт-экран-Чекапы-Сигналы.md);
