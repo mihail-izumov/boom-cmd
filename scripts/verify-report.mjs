@@ -26,6 +26,7 @@ import { dirname, resolve } from 'node:path'
 import {
   emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
   yesterdayISO, todayISO, softWarnings,
+  RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS, isRetriableStatus,
 } from '../src/composables/reportModel.js'
 import {
   rub, L, FIELD_LABELS, WEATHER_OPTIONS, TIPS, TIPS_IYUN,
@@ -218,6 +219,19 @@ console.log('\n=== reportModel: мягкие предупреждения §4 (�
   check('пустая форма → без предупреждений', softWarnings(emptyForm('iyun', NOW)).length === 0)
 }
 
+console.log('\n=== useReport: политика повторов (v2.4) ===')
+check('две повторные попытки, всего три', RETRY_DELAYS_MS.length === 2, RETRY_DELAYS_MS.join('/'))
+check('паузы растут и не нулевые',
+  RETRY_DELAYS_MS.every((ms) => ms > 0) && RETRY_DELAYS_MS[1] > RETRY_DELAYS_MS[0])
+check('суммарное ожидание повторов ≤ 8 с (человек ждёт у кассы)',
+  RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) <= 8000)
+check('5xx повторяем', [500, 502, 503, 504].every(isRetriableStatus))
+check('429 (квота) и 408/425 повторяем', [408, 425, 429].every(isRetriableStatus))
+check('4xx кроме них НЕ повторяем', ![400, 401, 403, 404].some(isRetriableStatus))
+check('статуса нет вовсе (сетевой сбой) → повторяем', isRetriableStatus(undefined))
+check('потолок ожидания одной попытки 10–60 с (doPost на бэке — 1–3 с)',
+  ATTEMPT_TIMEOUT_MS >= 10000 && ATTEMPT_TIMEOUT_MS <= 60000, ATTEMPT_TIMEOUT_MS)
+
 console.log('\n=== i18n: тексты v2.1 §1–2, §4 (дословно из ТЗ) ===')
 check('заголовок «Отчёт Дня» (Д заглавная, §4)', L.title === 'Отчёт Дня', L.title)
 check('подпись сессий: «Чеков с пополнением (сессии)» (§1)',
@@ -323,7 +337,10 @@ await build({
 console.log('✓  lib-сборка готова')
 
 // мок fetch: GET → гейт «ок», POST → сценарий из postMode
-let postMode = 'ok' // 'ok' | 'reject' | 'neterror'
+let postMode = 'ok' // 'ok' | 'reject' | 'neterror' | 'flaky'
+// v2.4: сколько первых POST-ов режим 'flaky' завалит сетевой ошибкой, прежде чем
+// ответить успехом. Так воспроизводится утро 05.08: связь подвела, повтор прошёл.
+let postFailsLeft = 0
 const postedBodies = []
 global.fetch = async (url, opts = {}) => {
   const json = (obj) => ({ ok: true, status: 200, json: async () => obj })
@@ -331,6 +348,10 @@ global.fetch = async (url, opts = {}) => {
     postedBodies.push(String(opts.body || ''))
     if (postMode === 'neterror') return { ok: false, status: 500, json: async () => ({}) }
     if (postMode === 'reject') return json({ ok: false, error: 'bad key' })
+    if (postMode === 'flaky' && postFailsLeft > 0) {
+      postFailsLeft--
+      throw new TypeError('Failed to fetch') // ровно то, чем падает fetch без сети
+    }
     return json({ ok: true })
   }
   return json({}) // гейт: 200 без error → фраза ок, роль owner
@@ -342,7 +363,7 @@ const origWarn = console.warn
 console.warn = (...a) => {
   const s = a.join(' ')
   if (s.includes('[Vue warn]')) vueWarns.push(s)
-  else if (!s.startsWith('report submit failed')) origWarn(...a)
+  else if (!s.startsWith('report submit failed') && !s.startsWith('report submit retry')) origWarn(...a)
 }
 
 const bundle = await import(pathToFileURL(resolve(tmp, 'bundle.js')).href)
@@ -563,6 +584,74 @@ console.log('\n=== jsdom: ошибка бэка — данные не теряю
   check('красная плашка дословно', el.textContent.includes('Не отправилось — попробуйте ещё раз или пришлите отчёт как обычно'))
   check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' &&
     el.querySelector('#rep-site').value === '10000' && el.querySelector('#rep-park').value === 'ohta')
+  check('успеха нет', !el.textContent.includes('принят'))
+  // v2.4: осознанный отказ бэка повторять бессмысленно — тело запроса валиднее
+  // не станет. Ровно тот же список причин, по которым очередь сигналов ставит dead.
+  check('отказ бэка НЕ повторяется — POST ровно один', postedBodies.length === 1, postedBodies.length)
+  app.unmount()
+}
+
+// v2.4: заполнение формы Охты до валидного состояния — нужно трижды ниже.
+async function fillOhta(el) {
+  await setInput(el, 'rep-park', 'ohta')
+  await setInput(el, 'rep-revenue', '100000')
+  await setInput(el, 'rep-cashless', '60000')
+  await setInput(el, 'rep-cash', '30000')
+  await setInput(el, 'rep-site', '10000')
+  await setInput(el, 'rep-visitors_total', '150')
+  await setInput(el, 'rep-visitors_new', '10')
+  await setInput(el, 'rep-receipts', '140')
+  await setInput(el, 'rep-topups', '120')
+  await setInput(el, 'rep-sessions', '110')
+  await setInput(el, 'rep-weather', 'sunny')
+}
+
+console.log('\n=== jsdom: v2.4 — связь подвела, повтор прошёл ===')
+{
+  // Утро 05.08: два POST-а умерли по дороге к Google (журнал выполнений Apps
+  // Script не показал ни одного запроса), третий прошёл. Раньше это давало
+  // красную плашку на первой же осечке.
+  postMode = 'flaky'
+  postFailsLeft = 1
+  postedBodies.length = 0
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await nextTick()
+  await fillOhta(el)
+  await fire(el.querySelector('form'), 'submit')
+
+  // во время паузы перед 2-й попыткой кнопка обязана говорить, что происходит
+  await new Promise((r) => setTimeout(r, 200))
+  await nextTick()
+  check('во время паузы кнопка: «Связь подвела — пробуем ещё…»',
+    submitBtn(el).textContent.includes(L.sending_retry))
+  check('во время паузы красной плашки НЕТ (человека не пугаем раньше времени)',
+    !el.textContent.includes(L.send_error))
+
+  await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[0] + 400))
+  await nextTick()
+  check('ушло ровно два POST-а (первый упал, второй прошёл)', postedBodies.length === 2, postedBodies.length)
+  check('тела обеих попыток одинаковы', postedBodies[0] === postedBodies[1])
+  check('экран успеха после повтора', el.textContent.includes('принят'))
+  check('красной плашки нет', !el.textContent.includes(L.send_error))
+  app.unmount()
+}
+
+console.log('\n=== jsdom: v2.4 — связь легла совсем: три попытки и честная плашка ===')
+{
+  postMode = 'neterror' // 500 на каждую попытку
+  postedBodies.length = 0
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await nextTick()
+  await fillOhta(el)
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) + 600))
+  await nextTick()
+  check('попыток ровно три, дальше не мучаем', postedBodies.length === 3, postedBodies.length)
+  check('красная плашка дословно', el.textContent.includes(L.send_error))
+  check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' &&
+    el.querySelector('#rep-site').value === '10000')
+  check('кнопка вернулась в «Отправить» (не залипла в «Отправляем…»)',
+    submitBtn(el).textContent.includes(L.submit) && !submitBtn(el).textContent.includes(L.sending))
   check('успеха нет', !el.textContent.includes('принят'))
   app.unmount()
 }

@@ -23,7 +23,7 @@ import {
 // скролл к первому проблемному полю (визарда нет — один экран для рутины).
 // Ошибка сети — красная плашка, данные формы НЕ теряются.
 
-const { sending, sent, sendError, submit, resetSent } = useReport()
+const { sending, sent, sendError, attempt, submit, resetSent } = useReport()
 
 const form = reactive(emptyForm())
 const sentDate = ref('') // дата успешно отправленного отчёта (для экрана успеха)
@@ -287,7 +287,7 @@ function more() {
           : 'bg-[var(--surface-2)] text-[var(--text-muted)]'"
         :disabled="sending"
         :aria-disabled="!v.ok || sending ? 'true' : 'false'"
-      >{{ sending ? L.sending : L.submit }}</button>
+      >{{ sending ? (attempt > 1 ? L.sending_retry : L.sending) : L.submit }}</button>
     </form>
   </section>
 </template>
