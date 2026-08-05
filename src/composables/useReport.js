@@ -5,6 +5,7 @@ import { useAccessKey } from './useAccessKey.js'
 import {
   RETRY_DELAYS_MS, isRetriableStatus, failure, wait, fetchWithTimeout, transportFailure, runWithRetries,
 } from './netPolicy.js'
+import { networkHint, isOnline } from '../i18n/net.js'
 
 // Отправка «Отчёта дня» (D-12) — ЕДИНСТВЕННАЯ пишущая операция фронта.
 // POST JSON → Apps Script doPost → append строки ТОЛЬКО в лист `inbox`
@@ -57,6 +58,10 @@ export function useReport() {
   const sending = ref(false)
   const sent = ref(false) // успех — экран «Отчёт принят»
   const sendError = ref(false) // сеть/бэк — красная плашка, данные НЕ терять
+  // Подсказка «что делать» под плашкой (05.08, вечер). VPN — постоянный источник
+  // отказов у управляющих, и приложение об этом молчало. Показываем только когда
+  // осечка транспортная: при отказе бэка по существу совет про VPN был бы ложью.
+  const sendHint = ref('')
   // Номер текущей попытки (1, 2, 3). Нужен экрану: молчать 6 секунд, пока идут
   // повторы, нельзя — это читается как зависание, и человек жмёт кнопку ещё раз.
   const attempt = ref(0)
@@ -95,6 +100,7 @@ export function useReport() {
   async function submit(payload) {
     if (sending.value) return
     sendError.value = false
+    sendHint.value = ''
     sending.value = true
     attempt.value = 1
     try {
@@ -133,6 +139,7 @@ export function useReport() {
     } catch (e) {
       if (typeof console !== 'undefined') console.warn('report submit failed:', e)
       sendError.value = true
+      sendHint.value = networkHint({ retriable: !!(e && e.retriable), online: isOnline() })
     } finally {
       sending.value = false
       attempt.value = 0
@@ -143,8 +150,9 @@ export function useReport() {
   function resetSent() {
     sent.value = false
     sendError.value = false
+    sendHint.value = ''
     attempt.value = 0
   }
 
-  return { sending, sent, sendError, attempt, submit, resetSent }
+  return { sending, sent, sendError, sendHint, attempt, submit, resetSent }
 }

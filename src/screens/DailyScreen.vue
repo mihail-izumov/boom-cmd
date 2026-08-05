@@ -21,7 +21,7 @@ import SummaryMonthPicker from '../components/daily/SummaryMonthPicker.vue'
 // MARI → пустой стейт, «Вся сеть» → обзор 3 парков. Месяц по умолчанию — последний.
 // Caption «данные от …» = updated (фолбэк — max дата полного дня); «сегодня» НЕ ставим.
 
-const { data, loading, error, reload } = useDaily()
+const { data, loading, error, hint, reload } = useDaily()
 const { current: parkCtx, isNetwork } = useParkContext()
 const { setCaption, clearCaption } = useNavCaption()
 
@@ -135,6 +135,7 @@ watchEffect(() => {
     <!-- error -->
     <div v-else-if="error" class="flex min-h-[40svh] flex-col items-center justify-center gap-3 px-6 text-center">
       <p class="text-[1.0625rem] text-[var(--text)]">Не удалось загрузить дневной слой</p>
+      <p v-if="hint" data-test="net-hint" class="text-[0.9375rem] font-medium text-[var(--text)]">{{ hint }}</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ error }}</p>
       <button type="button" class="rounded-full bg-[var(--accent)] px-4 py-2 text-[0.9375rem] font-medium text-[var(--accent-ink)] active:opacity-90" style="min-height: 44px" @click="reload">Повторить</button>
     </div>

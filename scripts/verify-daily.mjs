@@ -35,6 +35,8 @@ import {
   splitSentences, focusBlocks, TOTAL_RE, splitSubItems, renderBlocks, SUBLABEL_MAX,
 } from '../src/composables/netSummary.js'
 import { cardTitle, periodLabel, addDays, monthLabel, dowTitle, asofLabel, CADENCE_SEG, L as LSUM } from '../src/i18n/summary.js'
+// Тексты сетевых сбоев — чистый модуль без vue и DOM, статический импорт безопасен.
+import { networkHint, NET_HINTS } from '../src/i18n/net.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -50,6 +52,23 @@ check('sigClass(0.92) = warn', sigClass(0.92) === 'warn', sigClass(0.92))
 check('sigClass(0.85) = warn', sigClass(0.85) === 'warn', sigClass(0.85))
 check('sigClass(0.8499) = bad', sigClass(0.8499) === 'bad', sigClass(0.8499))
 check('sigClass(null) = idle', sigClass(null) === 'idle', sigClass(null))
+
+console.log('\n=== Подсказка при сетевом сбое (05.08): развилка офлайн / VPN / отказ бэка ===')
+// Совет «выключите VPN» верен ТОЛЬКО для транспортной осечки. При отказе бэка по
+// существу (400, 500 с телом, протухшая фраза) он отправит человека крутить
+// настройки впустую и спрячет настоящую причину.
+check('офлайн → про связь, а не про VPN',
+  networkHint({ retriable: true, online: false }) === NET_HINTS.offline)
+check('офлайн ПЕРЕВЕШИВАЕТ транспортную осечку (иначе человек без интернета ищет VPN)',
+  networkHint({ retriable: true, online: false }) !== NET_HINTS.vpn)
+check('транспортная осечка онлайн → про VPN',
+  networkHint({ retriable: true, online: true }) === NET_HINTS.vpn)
+check('осознанный отказ бэка → подсказки НЕТ (показываем причину)',
+  networkHint({ retriable: false, online: true }) === '')
+check('отказ бэка в офлайне → всё равно про связь',
+  networkHint({ retriable: false, online: false }) === NET_HINTS.offline)
+check('без аргументов не падает и молчит', networkHint() === '')
+check('текст про VPN — дословно', NET_HINTS.vpn === 'Похоже, включён VPN — выключите его и нажмите «Повторить»', NET_HINTS.vpn)
 
 console.log('\n=== Инварианты по наборам ===')
 const expectFc = { 'ohta:2025-05': 'good', 'piterland:2025-05': 'warn', 'iyun:2025-05': 'bad' }
@@ -384,7 +403,7 @@ let postMode = 'ok' // 'ok' | 'reject' | 'neterror' | 'score-fail'
 let getPayload = {} // что отдаёт GET (гейт + ?action=daily); меняется в кейсах сводок
 // v2.4 (05.08): режим и счётчик GET-ов. 400 выбран сознательно — он НЕ повторяемый
 // (isRetriableStatus), поэтому ошибка всплывает сразу и проверка не ждёт 5,5 с пауз.
-let getMode = 'ok' // 'ok' | 'fail400'
+let getMode = 'ok' // 'ok' | 'fail400' | 'throw'
 let getCalls = 0
 const postedBodies = []
 global.fetch = async (url, opts = {}) => {
@@ -403,6 +422,8 @@ global.fetch = async (url, opts = {}) => {
   }
   getCalls++
   if (getMode === 'fail400') return { ok: false, status: 400, json: async () => ({}) }
+  // Транспортная осечка: ровно так падает fetch без сети и через кривой VPN.
+  if (getMode === 'throw') throw new TypeError('Failed to fetch')
   return json(getPayload) // гейт: 200 без error → фраза ок
 }
 
@@ -411,7 +432,7 @@ const origWarn = console.warn
 console.warn = (...a) => {
   const s = a.join(' ')
   if (s.includes('[Vue warn]')) vueWarns.push(s)
-  else if (!s.startsWith('signal_read failed')) origWarn(...a)
+  else if (!s.startsWith('signal_read failed') && !s.startsWith('daily reload retry')) origWarn(...a)
 }
 
 const bundle = await import(pathToFileURL(resolve(tmp, 'bundle.js')).href)
@@ -3043,6 +3064,39 @@ console.log('\n=== jsdom: v2.4 — Главная не молчит об оши�
   check('после «Повторить» плашка ушла', !el.querySelector('[data-test="home-load-error"]'))
   check('счётчики загрузились', el.textContent.includes('7') && el.textContent.includes('5'))
   app.unmount()
+  getPayload = {}
+}
+
+console.log('\n=== jsdom: подсказка про VPN на транспортной осечке ===')
+{
+  // Повод (владелец, 05.08): на Главной не грузилось, выключил VPN — загрузилось.
+  // Транспортная осечка повторяемая, поэтому проверка честно ждёт все три попытки:
+  // подсказка обязана появиться ПОСЛЕ них, а не вместо них.
+  localStorage.clear()
+  bundle.clearSubView()
+  getMode = 'throw'
+  const { el, app } = mount(bundle.HomeScreen, {})
+  await new Promise((r) => setTimeout(r, 6200))
+  await flush()
+  const err = el.querySelector('[data-test="home-load-error"]')
+  check('плашка есть', !!err)
+  check('крупно — подсказка про VPN, дословно', !!err && err.textContent.includes(NET_HINTS.vpn))
+  const reason = el.querySelector('[data-test="home-load-reason"]')
+  check('мелко — техническая причина, она НЕ потерялась',
+    !!reason && reason.textContent.trim().length > 0, reason?.textContent.trim())
+  check('«Сеть недоступна» как причина транспортной осечки',
+    !!reason && reason.textContent.includes('Сеть недоступна'), reason?.textContent.trim())
+
+  // отказ бэка по существу — подсказки быть НЕ должно
+  getMode = 'fail400'
+  await fire(el.querySelector('[data-test="home-load-retry"]'), 'click')
+  await flush()
+  const err2 = el.querySelector('[data-test="home-load-error"]')
+  check('при отказе бэка совет про VPN НЕ показываем', !!err2 && !err2.textContent.includes('VPN'))
+  check('вместо него — заголовок «Данные не загрузились»',
+    !!err2 && err2.textContent.includes('Данные не загрузились'))
+  app.unmount()
+  getMode = 'ok'
   getPayload = {}
 }
 

@@ -28,7 +28,7 @@ const NM_GOALS = 'Цели и\nпланы'
 // запроса выглядела как «данных нет» — прочерки во всех виджетах сразу, без единого
 // намёка, что запрос упал. Остальные экраны дневного слоя (DailyScreen, Сводки,
 // Разборы, Драйверы) состояние ошибки показывали, Главная — единственная — нет.
-const { data, loading, error, reload } = useDaily()
+const { data, loading, error, hint, reload } = useDaily()
 const sets = computed(() => data.value?.sets || {})
 const parkIdsWithDaily = computed(() =>
   PARKS.map((p) => p.id).filter((id) => Object.values(sets.value).some((s) => s.park === id)),
@@ -128,9 +128,15 @@ function goDrivers() { setSubView('drivers') } // 30.07: драйверы рос
       class="mb-3 flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
       style="background: color-mix(in srgb, var(--negative) 12%, var(--surface))"
     >
+      <!-- Крупно — что делать (подсказка), мелко — техническая причина. Человеку
+           нужно действие, владельцу причина; выбросить одно ради другого нельзя.
+           Подсказки нет (бэк отказал осознанно) → причина поднимается наверх. -->
       <div class="min-w-0">
-        <p class="text-[0.9375rem] font-medium leading-snug text-[var(--text)]">{{ L.load_error }}</p>
-        <p class="mt-0.5 truncate text-[0.8125rem] leading-snug text-[var(--text-secondary)]">{{ error }}</p>
+        <p class="text-[0.9375rem] font-medium leading-snug text-[var(--text)]">{{ hint || L.load_error }}</p>
+        <p
+          data-test="home-load-reason"
+          class="mt-0.5 truncate text-[0.8125rem] leading-snug text-[var(--text-secondary)]"
+        >{{ error }}</p>
       </div>
       <button
         type="button"

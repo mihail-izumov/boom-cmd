@@ -3,6 +3,7 @@ import { useAccessKey } from './useAccessKey.js'
 import {
   RETRY_DELAYS_MS, isRetriableStatus, failure, fetchWithTimeout, transportFailure, runWithRetries,
 } from './netPolicy.js'
+import { networkHint, isOnline } from '../i18n/net.js'
 
 // Источник данных под-страницы «Контроль дня». Клон паттерна useAnalytics.js:
 //   • публичный API: { data, loading, error, reload };
@@ -110,6 +111,10 @@ export function useDaily() {
   const data = ref(EMPTY)
   const loading = ref(false)
   const error = ref(null)
+  // Подсказка «что делать» отдельно от технической причины (05.08): человеку нужно
+  // действие, владельцу — причина. Смешивать их в одну строку значит потерять одно
+  // из двух. Пусто → подсказки нет, показываем только причину.
+  const hint = ref('')
   const { getKey, logout } = useAccessKey()
 
   const isDev = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
@@ -135,6 +140,7 @@ export function useDaily() {
   async function load() {
     loading.value = true
     error.value = null
+    hint.value = ''
     try {
       if (isDev) await new Promise((r) => setTimeout(r, 300))
       if (wantError()) throw new Error('Симуляция ошибки (?mockError=1)')
@@ -177,6 +183,7 @@ export function useDaily() {
       data.value = normalize(json)
     } catch (e) {
       error.value = e?.message || 'Не удалось загрузить дневной слой'
+      hint.value = networkHint({ retriable: !!(e && e.retriable), online: isOnline() })
       data.value = EMPTY
     } finally {
       loading.value = false
@@ -185,5 +192,5 @@ export function useDaily() {
 
   load()
 
-  return { data, loading, error, reload: load }
+  return { data, loading, error, hint, reload: load }
 }

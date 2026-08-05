@@ -34,6 +34,7 @@ import {
   WEEKLY_NOTE, CHECKS_INTRO, CHECKS_INTRO_IYUN, FIELD_HINTS, hintFor,
   checksIntroFor, summaryLabelFor, summaryValue, softWarnMessage,
 } from '../src/i18n/report.js'
+import { NET_HINTS } from '../src/i18n/net.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -589,6 +590,8 @@ console.log('\n=== jsdom: ошибка бэка — данные не теряю
   // v2.4: осознанный отказ бэка повторять бессмысленно — тело запроса валиднее
   // не станет. Ровно тот же список причин, по которым очередь сигналов ставит dead.
   check('отказ бэка НЕ повторяется — POST ровно один', postedBodies.length === 1, postedBodies.length)
+  // v2.5: причина в теле запроса или ключе — VPN тут ни при чём, совет был бы ложью.
+  check('при отказе бэка подсказки про VPN НЕТ', !el.querySelector('[data-test="report-send-hint"]'))
   app.unmount()
 }
 
@@ -649,6 +652,9 @@ console.log('\n=== jsdom: v2.4 — связь легла совсем: три п
   await nextTick()
   check('попыток ровно три, дальше не мучаем', postedBodies.length === 3, postedBodies.length)
   check('красная плашка дословно', el.textContent.includes(L.send_error))
+  // v2.5: транспортная осечка → подсказка про VPN прямо в плашке.
+  const hint = el.querySelector('[data-test="report-send-hint"]')
+  check('подсказка про VPN в плашке, дословно', !!hint && hint.textContent.includes(NET_HINTS.vpn))
   check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' &&
     el.querySelector('#rep-site').value === '10000')
   check('кнопка вернулась в «Отправить» (не залипла в «Отправляем…»)',

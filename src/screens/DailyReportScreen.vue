@@ -23,7 +23,7 @@ import {
 // скролл к первому проблемному полю (визарда нет — один экран для рутины).
 // Ошибка сети — красная плашка, данные формы НЕ теряются.
 
-const { sending, sent, sendError, attempt, submit, resetSent } = useReport()
+const { sending, sent, sendError, sendHint, attempt, submit, resetSent } = useReport()
 
 const form = reactive(emptyForm())
 const sentDate = ref('') // дата успешно отправленного отчёта (для экрана успеха)
@@ -275,7 +275,17 @@ function more() {
         v-if="sendError"
         class="rounded-2xl bg-[var(--negative)] px-4 py-3 text-[0.9375rem] font-medium leading-snug text-[var(--ink-on-color)]"
         role="alert"
-      >{{ L.send_error }}</div>
+      >
+        {{ L.send_error }}
+        <!-- Подсказка «что делать» — только при транспортной осечке (05.08).
+             Внутри плашки, на том же фоне: отдельная карточка увела бы взгляд
+             от главного, а совет без контекста ошибки читается как реклама. -->
+        <p
+          v-if="sendHint"
+          data-test="report-send-hint"
+          class="mt-1.5 text-[0.875rem] font-normal leading-snug"
+        >{{ sendHint }}</p>
+      </div>
 
       <!-- отправить: при ошибках тап скроллит к первому проблемному полю (§1) -->
       <button

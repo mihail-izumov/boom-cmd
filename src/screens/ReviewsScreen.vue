@@ -12,7 +12,7 @@ import { dowTitle } from '../i18n/summary.js'
 // `reviews` дневной таблицы. ТОЛЬКО рендер: сортировка/валидация — reviews.js,
 // свежие сверху. 4 состояния: loading / error / empty / список.
 // Парк-контекст не участвует: разборы — общесистемные (parkFilter: false).
-const { data, loading, error, reload } = useDaily()
+const { data, loading, error, hint, reload } = useDaily()
 const rows = computed(() => sortReviews(data.value && data.value.reviews))
 </script>
 
@@ -26,6 +26,7 @@ const rows = computed(() => sortReviews(data.value && data.value.reviews))
     <!-- error -->
     <div v-else-if="error" class="flex min-h-[40svh] flex-col items-center justify-center gap-3 px-6 text-center">
       <p class="text-[1.0625rem] text-[var(--text)]">{{ L.error }}</p>
+      <p v-if="hint" data-test="net-hint" class="text-[0.9375rem] font-medium text-[var(--text)]">{{ hint }}</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ error }}</p>
       <button
         type="button"

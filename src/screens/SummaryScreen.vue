@@ -25,7 +25,7 @@ import SummaryMonthPicker from '../components/daily/SummaryMonthPicker.vue'
 // карточки держатся заливкой. Автоскролла нет намеренно: обратная хронология уже
 // даёт фокус на актуальном, а автоскролл на длинной ленте читается как баг.
 
-const { data, loading, error, reload } = useDaily()
+const { data, loading, error, hint, reload } = useDaily()
 
 // Месяцы, по которым есть хоть одна запись; новые сверху. Выбранный месяц —
 // ref, но действующим считается только тот, что есть в списке: данные могут
@@ -90,6 +90,7 @@ watchEffect(() => {
     <!-- error -->
     <div v-else-if="error" class="flex min-h-[40svh] flex-col items-center justify-center gap-3 px-6 text-center">
       <p class="text-[1.0625rem] text-[var(--text)]">{{ L.error }}</p>
+      <p v-if="hint" data-test="net-hint" class="text-[0.9375rem] font-medium text-[var(--text)]">{{ hint }}</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ error }}</p>
       <button
         type="button"
