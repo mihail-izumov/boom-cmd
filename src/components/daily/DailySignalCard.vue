@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import {
-  sortSignals, latestSignal, feedSignals, signalDot,
+  sortSignals, latestSignal, feedSignals, signalDot, signalTint,
   statusOf, markState, loadReadStore, saveReadStore,
   readFor, isMarkable,
 } from '../../composables/dailySignals.js'
@@ -12,9 +12,22 @@ import DailyDayProgress from './DailyDayProgress.vue'
 import SignalRateSheet from './SignalRateSheet.vue'
 import SignalMarkButton from './SignalMarkButton.vue'
 
-// «Сигнал Дня» — единый блок. Сверху разбор аналитика + лента + отметка; ниже —
-// «Как идёт день». ТОЛЬКО рендерит payload (ТЗ §5); цвет — только в точке статуса,
-// текст монохромный (DESIGN-STANDARD §3.3/D-16).
+// «Сигнал Дня» + «Как идёт день» в ОДНОЙ окрашенной карточке, «Ранее» — отдельным
+// блоком под ней. ТОЛЬКО рендерит payload (ТЗ §5); текст монохромный.
+//
+// ЧТО ИЗМЕНИЛОСЬ (2026-08-06, жалоба управляющих «прилистываем и не замечаем»):
+//   • карточка окрашивается в тон статуса дня (`signalTint` — тот же приём, что у
+//     мини-карт сети в DailyNetwork, 12 % токена на `--surface`);
+//   • «Как идёт день» поднят НАВЕРХ, сразу под разбор и кнопку отметки: обе полосы
+//     отвечают на один вопрос «что сегодня», и разрывать их лентой прошлых дней
+//     было нечем;
+//   • **«Ранее» выехало из карточки отдельным блоком.** Это не вкусовщина: цвет
+//     карточки = статус СЕГОДНЯШНЕГО сигнала, а у прошлых дней свои статусы —
+//     внутри окрашенной карточки лента наследовала бы чужой цвет и врала.
+//
+// ⚠ Цена ежедневной окраски (решение владельца, зафиксировано): цвет каждый день
+// = привыкание. Через две-три недели стоит проверить, не начали ли прилистывать
+// снова; альтернатива — красить только при статусе ≠ ok.
 //
 // ЧТО ИЗМЕНИЛОСЬ (2026-08-04):
 //   • отметить можно ЛЮБОЙ сигнал в окне 14 дней, а не только самый свежий. Раньше
@@ -115,17 +128,38 @@ function rowMarker(date) {
   if (isDone(date)) return 'read'
   return localStatus(date) === 'none' ? 'new' : 'open'
 }
+
+// Заливка и граница карточки — от статуса свежего сигнала. Сигнала нет → карточка
+// обычная белая: красить нечем, а серый тон читался бы как «статус “никакой”».
+const cardTint = computed(() => (latest.value ? signalTint(latest.value.status) : ''))
+const cardEdge = computed(() =>
+  latest.value ? `color-mix(in srgb, ${signalDot(latest.value.status)} 30%, var(--line))` : '',
+)
 </script>
 
 <template>
-  <article class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
-    <!-- шапка: «Сигнал Дня» + бейдж «новое» · «разбор аналитика от DD.MM» -->
-    <div class="flex items-start justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ L.signal_title }}</h2>
-        <span v-if="latest && latestNew && !latestDone" class="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--accent-ink)]">{{ L.signal_new }}</span>
-      </div>
-      <span v-if="latest" class="shrink-0 pt-0.5 text-[0.75rem] text-[var(--text-muted)]">{{ L.signal_by }} {{ headDate }}</span>
+  <div class="flex flex-col gap-3">
+  <!-- ═══ Сегодня: разбор + «Как идёт день», окрашено по статусу дня ═══ -->
+  <article
+    data-test="signal-card"
+    :data-status="latest ? latest.status : ''"
+    class="rounded-2xl border p-4"
+    :class="latest ? '' : 'border-[var(--line)] bg-[var(--surface)]'"
+    :style="latest ? { background: cardTint, borderColor: cardEdge } : null"
+  >
+    <!-- Шапка. Заголовок стоит ОТДЕЛЬНОЙ строкой по центру (правка владельца 06.08):
+         раньше он делил строку с бейджем и датой, и на узком экране «Сигнал Дня»
+         переносился на два слова — ровно то, что бросилось в глаза на превью.
+         Теперь строка заголовка не делится ни с чем и переноситься нечему. -->
+    <h2 data-test="signal-title" class="text-center text-[1.125rem] font-bold leading-tight text-[var(--text)]">{{ L.signal_title }}</h2>
+    <div v-if="latest" class="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+      <!-- на цветной подложке --text-muted падает до 4,32:1 (focus) — ниже порога,
+           поэтому здесь на тон темнее: --text-secondary даёт 8,2:1 -->
+      <span class="text-[0.75rem] text-[var(--text-secondary)]">{{ L.signal_by }} {{ headDate }}</span>
+      <!-- Бейдж «новое» тёмный, а не жёлтый: на карточке статуса warn жёлтое на
+           бледно-жёлтом пропадает (граница 1,46:1). Чёрный бедж — принятая в
+           проекте идиома (активный парк-фильтр), контраст 14–16:1 на любом тоне. -->
+      <span v-if="latestNew && !latestDone" class="rounded-full bg-[var(--text)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--ink-on-color)]">{{ L.signal_new }}</span>
     </div>
 
     <template v-if="latest">
@@ -146,8 +180,24 @@ function rowMarker(date) {
       </div>
 
       <SignalRateSheet :open="rateOpen" :initial="rateInitial" @close="rateOpen = false" @submit="onRateSubmit" />
+    </template>
 
-      <div v-if="feed.length" class="mt-3 border-t border-[var(--line)] pt-1">
+    <!-- нет сигнала: аналитик ещё не оставил разбор -->
+    <p v-else class="mt-2 text-[0.875rem] leading-snug text-[var(--text-muted)]">{{ L.signal_empty }}</p>
+
+    <!-- «Как идёт день» — сразу под разбором: обе полосы отвечают на «что сегодня».
+         Черты-разделителя нет (правка владельца 06.08): карточку и так держит
+         заливка, а линия внутри цветного блока дробила его на две части. -->
+    <div class="mt-3.5">
+      <DailyDayProgress :m="m" :now="now" />
+    </div>
+  </article>
+
+  <!-- ═══ «Ранее» — ОТДЕЛЬНЫЙ блок, намеренно НЕ окрашен ═══
+       Цвет карточки выше = статус сегодняшнего сигнала. У прошлых дней свои
+       статусы, и внутри окрашенной карточки лента наследовала бы чужой цвет —
+       то есть врала бы. Здесь статус каждого дня несёт своя точка в строке. -->
+  <article v-if="latest && feed.length" data-test="signal-feed" class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4">
         <button
           type="button"
           data-test="signal-feed-toggle"
@@ -159,7 +209,7 @@ function rowMarker(date) {
           <span>{{ L.signal_feed }}</span>
           <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="feedOpen ? 'rotate-180' : ''" aria-hidden="true" />
         </button>
-        <ul v-if="feedOpen" class="flex flex-col">
+        <ul v-if="feedOpen" class="flex flex-col border-t border-[var(--line)]">
           <li v-for="s in feed" :key="s.date" data-test="signal-feed-row" class="border-t border-[var(--line)] first:border-t-0">
             <!-- Раскрытие строки и отметка — РАЗНЫЕ элементы: вложенный <button>
                  внутри <button> невалиден, а тач-таргеты обоих должны быть ≥44pt (HIG). -->
@@ -187,15 +237,6 @@ function rowMarker(date) {
             </div>
           </li>
         </ul>
-      </div>
-    </template>
-
-    <!-- нет сигнала: аналитик ещё не оставил разбор -->
-    <p v-else class="mt-2 text-[0.875rem] leading-snug text-[var(--text-muted)]">{{ L.signal_empty }}</p>
-
-    <!-- «Как идёт день» — влит в блок «Сигнал Дня» -->
-    <div class="mt-3 border-t border-[var(--line)] pt-3">
-      <DailyDayProgress :m="m" :now="now" />
-    </div>
   </article>
+  </div>
 </template>

@@ -148,7 +148,13 @@ function more() {
           </div>
         </div>
 
-        <!-- v2.1 §3: без border-t — поля разделяются отступом, как во всех картах -->
+        <!-- v2.1 §3: без border-t — поля разделяются отступом, как во всех картах.
+             ⚠ `input[type=date]` в Safari на iOS имеет СВОЮ внутреннюю ширину и
+             игнорирует `w-full`, пока не снят нативный вид: поле вылезало за правый
+             край белой карточки, а текст в нём вставал по центру. Лечится связкой
+             `appearance-none` + `min-w-0` + `block` (тот же приём, что у select выше).
+             Проверять после любой правки этих классов — баг чисто мобильный, на
+             десктопе и в jsdom не воспроизводится. -->
         <div class="py-2.5">
           <label for="rep-date" class="text-[0.875rem] font-medium text-[var(--text-secondary)]">{{ L.date_label }}</label>
           <input
@@ -156,7 +162,7 @@ function more() {
             v-model="form.date"
             type="date"
             :max="todayMax"
-            class="mt-1.5 w-full min-h-[44px] rounded-xl border bg-[var(--surface)] px-3 py-2.5 text-[1.0625rem] text-[var(--text)] outline-none"
+            class="mt-1.5 block w-full min-w-0 min-h-[44px] appearance-none rounded-xl border bg-[var(--surface)] px-3 py-2.5 text-left text-[1.0625rem] text-[var(--text)] outline-none"
             :class="v.errors.date_future ? 'border-[var(--negative)]' : 'border-[var(--line)] focus:border-[var(--text-muted)]'"
           />
           <!-- жёлтая плашка «не за вчера» (не блокирует) — производная от токена, без хардкода hex -->

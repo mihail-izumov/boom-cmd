@@ -591,6 +591,71 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
     el.querySelectorAll('[data-test="day-line"]').length)
   check('лента свёрнута: старые сигналы не в DOM', !el.textContent.includes('Среда провалилась по будням'))
   check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
+
+  // ── Окраска и перестройка блока (06.08, жалоба «прилистываем и не замечаем») ──
+  const card = el.querySelector('[data-test="signal-card"]')
+  const feedBlock = el.querySelector('[data-test="signal-feed"]')
+  check('карточка окрашена в тон статуса дня',
+    /color-mix\(in srgb, var\(--(positive|warning|negative)\) 12%, var\(--surface\)\)/
+      .test(card.getAttribute('style') || ''), card.getAttribute('style'))
+  check('тон берётся ИМЕННО у статуса свежего сигнала',
+    (card.getAttribute('style') || '').includes(
+      { ok: '--positive', warn: '--warning', focus: '--negative' }[card.dataset.status]),
+    card.dataset.status)
+  check('текст на цветной подложке остался монохромным (цвет только в заливке и точках)',
+    !/text-\[var\(--(positive|negative|warning)\)\]/.test(card.innerHTML))
+  check('«Как идёт день» ВНУТРИ окрашенной карточки',
+    !!card.querySelector('[data-test="day-line"]'))
+  check('«Ранее» — ОТДЕЛЬНЫЙ блок, а не часть карточки',
+    !!feedBlock && !card.contains(feedBlock))
+  // Отдельных карточек на прошлые дни на экране БЫТЬ НЕ ДОЛЖНО: все они живут
+  // внутри свёрнутого «Ранее». Проверяем явно — на превью это место читалось
+  // неоднозначно, и цена ошибки тут высокая (экран управляющего).
+  check('карточка «Сигнал Дня» на экране ровно одна — за сегодня',
+    el.querySelectorAll('[data-test="signal-card"]').length === 1,
+    el.querySelectorAll('[data-test="signal-card"]').length)
+  check('сигналы прошлых дней — только внутри «Ранее», отдельными блоками не стоят',
+    [...el.querySelectorAll('[data-test="signal-feed-row"]')].every((r) => feedBlock.contains(r)))
+  check('заголовок «Сигнал Дня» — отдельной строкой по центру, крупно и жирно',
+    (() => {
+      const t = el.querySelector('[data-test="signal-title"]')
+      return !!t && t.className.includes('text-center') && t.className.includes('font-bold')
+        && t.textContent.trim() === 'Сигнал Дня'
+    })())
+  check('заголовку нечем переноситься: он не делит строку с датой и бейджем',
+    el.querySelector('[data-test="signal-title"]').children.length === 0)
+  check('черты под кнопкой отметки нет — карточку держит заливка',
+    !/border-t/.test([...card.children].map((c) => c.className).join(' ')))
+  check('блок «Ранее» НЕ окрашен: у прошлых дней свои статусы',
+    !/color-mix/.test(feedBlock.getAttribute('style') || '')
+    && feedBlock.className.includes('bg-[var(--surface)]'))
+  const dayIdx = [...card.querySelectorAll('*')].indexOf(card.querySelector('[data-test="day-line"]'))
+  const markIdx = [...card.querySelectorAll('*')].indexOf(card.querySelector('[data-test="signal-read"]'))
+  check('«Как идёт день» поднят под разбор и кнопку, а не уехал в хвост',
+    markIdx > -1 && dayIdx > markIdx, `кнопка ${markIdx} → день ${dayIdx}`)
+  // Бейдж «новое» на цветной подложке. Жёлтый на карточке warn пропадает
+  // (граница 1,46:1) — поэтому он тёмный, как активный парк-фильтр.
+  const badge = [...card.querySelectorAll('span')].find((s) => s.textContent.trim() === 'новое')
+  check('бейдж «новое» тёмный, а не жёлтый (на warn-карточке жёлтый пропадал)',
+    !!badge && badge.className.includes('bg-[var(--text)]')
+    && badge.className.includes('text-[var(--ink-on-color)]'), badge && badge.className)
+  check('подпись «разбор аналитика от» на тон темнее (--text-muted на focus = 4,32:1 < 4,5)',
+    !![...card.querySelectorAll('span')]
+      .find((s) => s.textContent.includes('разбор аналитика')
+        && s.className.includes('text-[var(--text-secondary)]')))
+  app.unmount()
+}
+{
+  // Сигнала нет — красить нечем. Серый тон читался бы как «статус никакой».
+  // localStorage НЕ чистим: следующая проверка ждёт «viewed» с прошлого захода.
+  const { el, app } = mount(bundle.DailySignalCard, { m: { ...mOhta, signals: [] }, now: NOW_MID, signals: [] })
+  await nextTick()
+  const card = el.querySelector('[data-test="signal-card"]')
+  check('без сигнала карточка обычная белая, без тона',
+    !/color-mix/.test(card.getAttribute('style') || '')
+    && card.className.includes('bg-[var(--surface)]'))
+  check('«Как идёт день» живёт и без сигнала', !!card.querySelector('[data-test="day-line"]'))
+  check('блока «Ранее» нет', !el.querySelector('[data-test="signal-feed"]'))
   app.unmount()
 }
 {
@@ -3255,7 +3320,6 @@ console.log('\n=== jsdom: строка-сводка драйверов и мар
   ]
   const row = mount(bundle.DailyDrivers, { m: mDrv, statuses: chips })
   const cta = row.el.querySelector('[data-test="drivers-cta"]')
-  const sw = row.el.querySelector('[data-test="drivers-signal"]')
   const stLine = row.el.querySelector('[data-test="drivers-statuses"]')
   check('кнопка-вход отрисована', !!cta)
   check('кнопка яркая: заливка акцентом, текст тёмным ink (жёлтый — только заливка)',
@@ -3267,34 +3331,30 @@ console.log('\n=== jsdom: строка-сводка драйверов и мар
   check('заголовка «Активности и гипотезы» на экране нет', !row.el.textContent.includes('Активности'))
   check('процента «к плану» нигде нет (D-41)', !row.el.textContent.includes('к плану'))
 
-  // Три строки блока делят работу; ни одна не повторяет соседнюю.
-  // Подводка — СИГНАЛ, а не пересказ данных: «Включён 1: DRV-04 с 01.08» владелец
-  // забраковал как шум (у двух парков из трёх включений в месяце нет вовсе).
-  check('подводка внутри кнопки — сигнал «сможем ли узнать, работают ли драйверы»',
-    !!sw && sw.textContent.trim() === 'Без замера 1 из 2', sw && sw.textContent.trim())
-  check('подводка не пересказывает включения и не показывает результат (D-33/D-41)',
-    !/DRV-|Включ|%/.test(sw.textContent))
-  check('всё измеряется → формулировка меняется, а не пустеет',
-    driversMeasureSignal({ total: 6, measuring: 6 }) === 'Замер идёт у всех 6',
-    driversMeasureSignal({ total: 6, measuring: 6 }))
-  check('драйверов нет → сигнала нет', driversMeasureSignal({ total: 0, measuring: 0 }) === '')
-  const li = stLine.querySelectorAll('li')
-  check('статусы под кнопкой — подпись + число В КРУЖКЕ, без точек-разделителей',
-    li.length === 2 && !stLine.textContent.includes('·'), stLine.textContent.replace(/\s+/g, ' ').trim())
-  check('кружок счётчика — тот же язык, что у групп раздела (подложка --line)',
-    /rounded-full bg-\[var\(--line\)\]/.test(li[0].innerHTML))
+  // Весь блок — одна кнопка (правка владельца 06.08): статусы уехали ВНУТРЬ неё.
+  check('статусы лежат ВНУТРИ кнопки, отдельной строки под ней нет',
+    !!stLine && cta.contains(stLine), !!stLine && cta.contains(stLine))
+  // textContent склеивает соседние span-ы без пробела — сверяем по структуре,
+  // а не по строке: иначе тест ловил бы вёрстку пробелов, а не смысл.
+  const stItems = [...stLine.children].map((el) => [...el.children].map((c) => c.textContent.trim()))
+  check('подпись + число в кружке, без точек-разделителей',
+    JSON.stringify(stItems) === JSON.stringify([['Идёт', '4'], ['Готов', '2']])
+    && !stLine.textContent.includes('·'),
+    JSON.stringify(stItems))
   check('статус с нулём не печатается', !stLine.textContent.includes('Пауза'))
-  check('подпись серым токеном, по центру, не цветная',
-    /text-\[var\(--text-muted\)\]/.test(stLine.outerHTML) && /justify-center/.test(stLine.className)
-    && !/--positive|--negative|--warning/.test(stLine.outerHTML))
+  check('кружок на жёлтом — ink-размыв от заливки, а не --line (иначе грязный тон)',
+    /color-mix\(in srgb, var\(--accent-ink\) 12%, transparent\)/.test(stLine.innerHTML)
+    && !/--line/.test(stLine.innerHTML))
+  check('в блоке нет ничего, кроме кнопки — ни второй строки, ни второго фильтра',
+    row.el.querySelectorAll('button').length === 1 && row.el.children[0].children.length === 1)
 
   const noSw = bundle.computeDailyB(mkSet([
     act('DRV-08', '2025-04-01', '', 'месяц', 'невозможен', ['2025-05-01']),
   ]))
-  const rowNo = mount(bundle.DailyDrivers, { m: noSw, statuses: chips })
-  check('переключений в месяце нет → блок всё равно несёт сигнал, а не пустоту',
-    rowNo.el.querySelector('[data-test="drivers-signal"]').textContent.trim() === 'Без замера 1 из 1',
-    rowNo.el.querySelector('[data-test="drivers-signal"]').textContent.trim())
+  const rowNo = mount(bundle.DailyDrivers, { m: noSw, statuses: [] })
+  check('статусов нет → кнопка остаётся кнопкой, а не ломается',
+    !!rowNo.el.querySelector('[data-test="drivers-cta"]')
+    && !rowNo.el.querySelector('[data-test="drivers-statuses"]'))
   rowNo.app.unmount()
 
   let opened = 0
