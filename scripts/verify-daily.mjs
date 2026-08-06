@@ -3475,6 +3475,29 @@ console.log('\n=== jsdom: строка «Замер» в карточке дра
   check('результата/метрики/процентов в карточке по-прежнему нет',
     !/%|ready_pct|gaps|conflicts/.test(e.el.textContent))
   e.app.unmount()
+
+  // «~» у неточной даты запуска. Пустая точность = unknown (контракт §10.3), а не
+  // «до дня»: карточка печатала такую дату без «~», то есть выдавала ложную точность.
+  const withPeriod = (accuracy) => mount(bundle.DriverCard, {
+    driver: {
+      code: 'DRV-01', name: 'Драйвер', status: 'идёт', measure: '',
+      periods: [{ code: 'DRV-01', park: 'ohta', start: '2026-04-01', end: '', accuracy }],
+    },
+    parkIds: ['ohta'],
+  })
+  const cases = [
+    ['день', false, 'точная дата — «~» не ставим'],
+    ['месяц', true, 'точность до месяца → «~»'],
+    ['unknown', true, 'точность неизвестна → «~»'],
+    ['', true, 'ПУСТАЯ точность = unknown → «~», а не ложная точность'],
+    ['День', false, 'регистр не меняет смысла'],
+  ]
+  for (const [acc, wantTilde, label] of cases) {
+    const c = withPeriod(acc)
+    const txt = c.el.textContent
+    check(label, txt.includes('~') === wantTilde, `accuracy=«${acc}» → ${txt.includes('~') ? '~' : 'без ~'}`)
+    c.app.unmount()
+  }
 }
 
 console.log('\n=== jsdom: возврат «откуда пришли» (§3.3) ===')
