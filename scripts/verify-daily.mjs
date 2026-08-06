@@ -15,7 +15,7 @@ import { dirname, resolve } from 'node:path'
 import { computeDaily, computeNetwork, sigClass, isMeasuring } from '../src/composables/dailyModel.js'
 import { monthLayout, markStyle } from '../src/composables/monthLayout.js'
 import { daysInMonth, daysLeftInMonth, mskToday } from '../src/composables/monthDays.js'
-import { driversSummary, markTitle } from '../src/i18n/daily.js'
+import { driversMeasureSignal, driversSwitches, markTitle, ths, thsSigned } from '../src/i18n/daily.js'
 import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
   buildSignalReadBody, postSignalRead, normalizeReads, readFor, readDay,
@@ -192,9 +192,8 @@ const setWith = (activities, month = '2025-05') => ({ ...sets['ohta:2025-05'], m
     m.days.find((x) => x.iso === '2025-05-14').mark === null)
   check('драйвер-фон в таблице дней не появляется вовсе',
     m.days.find((x) => x.iso === '2025-05-01').mark === null)
-  check('сводка = как в задании §3.1',
-    driversSummary(d, '2025-05') === 'Включён 1: DRV-01 с 13.05 · работают 2 · замер идёт у 1',
-    driversSummary(d, '2025-05'))
+  check('driversSwitches остаётся источником «что переключили» для модели и title',
+    driversSwitches(d, '2025-05') === 'Включён 1: DRV-01 с 13.05', driversSwitches(d, '2025-05'))
 }
 
 {
@@ -204,11 +203,11 @@ const setWith = (activities, month = '2025-05') => ({ ...sets['ohta:2025-05'], m
     act('DRV-08', '2025-04-01', '', 'месяц', 'невозможен', ['2025-05-02']),
   ]))
   check('маркеров в месяце нет', m.days.every((x) => x.mark === null))
-  check('сводка читается нормально, а не как сломанный шаблон',
-    driversSummary(m.drivers, '2025-05') === 'Включений в мае не было · работают 2 · замер идёт у 1',
-    driversSummary(m.drivers, '2025-05'))
+  check('подводка читается нормально, а не как сломанный шаблон',
+    driversSwitches(m.drivers, '2025-05') === 'Включений в мае не было',
+    driversSwitches(m.drivers, '2025-05'))
   check('месяц в предложном падеже (август → «в августе»)',
-    driversSummary(m.drivers, '2025-08').startsWith('Включений в августе не было'))
+    driversSwitches(m.drivers, '2025-08') === 'Включений в августе не было')
 }
 
 {
@@ -221,7 +220,7 @@ const setWith = (activities, month = '2025-05') => ({ ...sets['ohta:2025-05'], m
     act('DRV-04', '2025-04-16', '2025-05-31', 'день', '', ['2025-05-01']),
   ]))
   const d = m.drivers
-  const txt = driversSummary(d, '2025-05')
+  const txt = driversSwitches(d, '2025-05')
   check('включений 4, выключение 1 → маркеров 5 (13,16,17,20 + 31)',
     m.days.filter((x) => x.mark).length === 5, m.days.filter((x) => x.mark).map((x) => x.dd).join(','))
   check('20 — включение (залитый маркер)', m.days.find((x) => x.dd === 20).mark === 'on')
@@ -232,8 +231,9 @@ const setWith = (activities, month = '2025-05') => ({ ...sets['ohta:2025-05'], m
   check('accuracy «месяц» → «~» у даты старта', txt.includes('DRV-05 с ~20.05'), txt)
   check('accuracy «день» → «~» НЕ ставится', txt.includes('DRV-03 с 17.05'), txt)
   check('выключение печатается отдельной частью', txt.includes('выключен DRV-04 с 31.05'), txt)
-  check('«замер идёт у 0» НЕ печатается', !txt.includes('замер'), txt)
-  check('полная строка', txt === 'Включено 4: DRV-05 с ~20.05, DRV-03 с 17.05 и ещё 2 · выключен DRV-04 с 31.05 · работают 5',
+  check('счётчики работающих/замера в подводку НЕ лезут — они не про этот месяц',
+    !txt.includes('работают') && !txt.includes('замер'), txt)
+  check('полная строка', txt === 'Включено 4: DRV-05 с ~20.05, DRV-03 с 17.05 и ещё 2 · выключен DRV-04 с 31.05',
     txt)
 }
 
@@ -3248,50 +3248,143 @@ console.log('\n=== jsdom: строка-сводка драйверов и мар
       start: '2025-04-01', end: '', accuracy: 'месяц', measure: 'невозможен' },
   ]))
 
-  const row = mount(bundle.DailyDrivers, { m: mDrv })
-  const btn = row.el.querySelector('[data-test="drivers-summary"]')
-  check('строка-сводка отрисована', !!btn)
-  check('подпись «Драйверы роста» + сводка одной строкой',
-    btn.textContent.includes('Драйверы роста') && btn.textContent.includes('Включён 1: DRV-04 с 13.05'),
-    btn.textContent.replace(/\s+/g, ' ').trim())
-  check('заголовка «Активности и гипотезы» на экране нет',
-    !row.el.textContent.includes('Активности'))
-  check('процента «к плану» в строке нет (D-41)', !btn.textContent.includes('к плану'))
-  check('строка — тач-таргет ≥44pt', btn.getAttribute('style').includes('min-height: 44px'))
-  check('текст сводки серый токеном, не цветной',
-    /text-\[var\(--text-muted\)\]/.test(btn.innerHTML) && !/--positive|--negative|--warning/.test(btn.innerHTML))
+  const chips = [
+    { id: 'идёт', label: 'Идёт', count: 4 },
+    { id: 'готов', label: 'Готов', count: 2 },
+    { id: 'пауза', label: 'Пауза', count: 0 },
+  ]
+  const row = mount(bundle.DailyDrivers, { m: mDrv, statuses: chips })
+  const cta = row.el.querySelector('[data-test="drivers-cta"]')
+  const sw = row.el.querySelector('[data-test="drivers-signal"]')
+  const stLine = row.el.querySelector('[data-test="drivers-statuses"]')
+  check('кнопка-вход отрисована', !!cta)
+  check('кнопка яркая: заливка акцентом, текст тёмным ink (жёлтый — только заливка)',
+    cta.className.includes('bg-[var(--accent)]') && cta.innerHTML.includes('text-[var(--accent-ink)]'))
+  check('имя раздела жирным и по центру',
+    /font-bold/.test(cta.innerHTML) && /justify-center/.test(cta.innerHTML) && cta.className.includes('text-center'))
+  check('иконка вплотную к слову и той же жирности (образец «▶ Коллекция»)',
+    /-ml-1/.test(cta.innerHTML) && /stroke-width="3.25"/.test(cta.innerHTML), 'gap снят, stroke 3.25')
+  check('заголовка «Активности и гипотезы» на экране нет', !row.el.textContent.includes('Активности'))
+  check('процента «к плану» нигде нет (D-41)', !row.el.textContent.includes('к плану'))
+
+  // Три строки блока делят работу; ни одна не повторяет соседнюю.
+  // Подводка — СИГНАЛ, а не пересказ данных: «Включён 1: DRV-04 с 01.08» владелец
+  // забраковал как шум (у двух парков из трёх включений в месяце нет вовсе).
+  check('подводка внутри кнопки — сигнал «сможем ли узнать, работают ли драйверы»',
+    !!sw && sw.textContent.trim() === 'Без замера 1 из 2', sw && sw.textContent.trim())
+  check('подводка не пересказывает включения и не показывает результат (D-33/D-41)',
+    !/DRV-|Включ|%/.test(sw.textContent))
+  check('всё измеряется → формулировка меняется, а не пустеет',
+    driversMeasureSignal({ total: 6, measuring: 6 }) === 'Замер идёт у всех 6',
+    driversMeasureSignal({ total: 6, measuring: 6 }))
+  check('драйверов нет → сигнала нет', driversMeasureSignal({ total: 0, measuring: 0 }) === '')
+  const li = stLine.querySelectorAll('li')
+  check('статусы под кнопкой — подпись + число В КРУЖКЕ, без точек-разделителей',
+    li.length === 2 && !stLine.textContent.includes('·'), stLine.textContent.replace(/\s+/g, ' ').trim())
+  check('кружок счётчика — тот же язык, что у групп раздела (подложка --line)',
+    /rounded-full bg-\[var\(--line\)\]/.test(li[0].innerHTML))
+  check('статус с нулём не печатается', !stLine.textContent.includes('Пауза'))
+  check('подпись серым токеном, по центру, не цветная',
+    /text-\[var\(--text-muted\)\]/.test(stLine.outerHTML) && /justify-center/.test(stLine.className)
+    && !/--positive|--negative|--warning/.test(stLine.outerHTML))
+
+  const noSw = bundle.computeDailyB(mkSet([
+    act('DRV-08', '2025-04-01', '', 'месяц', 'невозможен', ['2025-05-01']),
+  ]))
+  const rowNo = mount(bundle.DailyDrivers, { m: noSw, statuses: chips })
+  check('переключений в месяце нет → блок всё равно несёт сигнал, а не пустоту',
+    rowNo.el.querySelector('[data-test="drivers-signal"]').textContent.trim() === 'Без замера 1 из 1',
+    rowNo.el.querySelector('[data-test="drivers-signal"]').textContent.trim())
+  rowNo.app.unmount()
+
   let opened = 0
-  const row2 = mount(bundle.DailyDrivers, { m: mDrv, onOpen: () => { opened++ } })
-  row2.el.querySelector('[data-test="drivers-summary"]').click()
-  check('клик по строке ведёт в раздел (эмитит open)', opened === 1, opened)
+  const row2 = mount(bundle.DailyDrivers, { m: mDrv, statuses: chips, onOpen: () => { opened++ } })
+  row2.el.querySelector('[data-test="drivers-cta"]').click()
+  check('клик по кнопке ведёт в раздел (эмитит open)', opened === 1, opened)
+  check('кликабельна ТОЛЬКО кнопка — второго фильтра рядом с разделом не заводим',
+    row2.el.querySelectorAll('button').length === 1)
   row.app.unmount(); row2.app.unmount()
 
-  // Старый payload (боевой бэк до v3.14) — строки нет вовсе, а не «включений не было».
+  // Старый payload (боевой бэк до v3.14) — блока нет вовсе, а не «включений не было».
   const mOld = bundle.computeDailyB(mkSet([{ code: 'Г1', name: 'Старая', days: ['2025-05-13'] }]))
-  const old = mount(bundle.DailyDrivers, { m: mOld })
-  check('старый payload → строки-сводки нет вовсе', !old.el.querySelector('[data-test="drivers-summary"]'))
+  const old = mount(bundle.DailyDrivers, { m: mOld, statuses: chips })
+  check('старый payload → кнопки и сводки нет вовсе', !old.el.querySelector('[data-test="drivers-cta"]'))
   old.app.unmount()
 
   const wk = mount(bundle.DailyWeeks, { m: mDrv })
   const marks = wk.el.querySelectorAll('[data-test="drv-mark"]')
-  check('маркер в таблице дней ровно один (только день включения)', marks.length === 1, marks.length)
-  check('маркер залитый (включение)', marks[0].getAttribute('data-kind') === 'on')
-  check('на маркере НЕТ кода — только точка', marks[0].textContent.trim() === '', `«${marks[0].textContent.trim()}»`)
+  check('метка в таблице дней ровно одна (только день включения)', marks.length === 1, marks.length)
+  check('метка залитая (включение)', marks[0].getAttribute('data-kind') === 'on')
+  check('метка — бейдж «ДР», а не точка (правка 06.08: точка не читалась)',
+    marks[0].textContent.trim() === 'ДР', `«${marks[0].textContent.trim()}»`)
+  check('кода драйвера на бейдже нет (D-76)', !/DRV-/.test(marks[0].textContent))
   check('код и название приходят в title',
     marks[0].getAttribute('title') === 'DRV-04 · Обход зала — цифровая форма · включён 13.05',
     marks[0].getAttribute('title'))
-  check('маркер не меняет высоту строки: компенсирующий отрицательный margin на месте',
+  check('бейдж не меняет высоту строки: компенсирующий отрицательный margin на месте',
     marks[0].className.includes('-my-1') && marks[0].className.includes('h-6'))
-  // Два требования тянут в разные стороны: тач-таргет ≥44pt и «не толкать цифры».
-  // Разведены по слоям — видимая точка в потоке, активная зона absolute вне потока.
   const hit = marks[0].querySelector('span.absolute')
-  check('активная зона маркера 44×44pt и вне потока (не растит строку)',
-    !!hit && hit.className.includes('h-11') && hit.className.includes('w-11'),
-    hit && hit.className)
+  check('активная зона метки 44×44pt и вне потока (не растит строку)',
+    !!hit && hit.className.includes('h-11') && hit.className.includes('w-11'), hit && hit.className)
   let fromMark = 0
   const wk2 = mount(bundle.DailyWeeks, { m: mDrv, 'onOpen-drivers': () => { fromMark++ } })
   wk2.el.querySelector('[data-test="drv-mark"]').click()
-  check('тап по маркеру тоже ведёт в раздел (§3.3)', fromMark === 1, fromMark)
+  check('тап по метке тоже ведёт в раздел (§3.3)', fromMark === 1, fromMark)
+
+  console.log('\n— таблица недель: помещается в мобильную колонку без скролла (06.08) —')
+  const table = wk.el.querySelector('table')
+  check('горизонтального скролла нет: обёртки overflow-x-auto не осталось',
+    !/overflow-x-auto/.test(wk.el.innerHTML))
+  check('min-width таблицы снят (не распирает колонку)', !/min-w-\[\d+px\]/.test(table.className), table.className)
+  check('колонок четыре: день · план · факт · надо', table.querySelectorAll('thead th').length === 4,
+    [...table.querySelectorAll('thead th')].map((t) => t.textContent.trim()).join(' · '))
+  check('колонки «прогресс» больше нет — светофор ушёл в заливку факта',
+    ![...table.querySelectorAll('thead th')].some((t) => t.textContent.includes('прогресс')))
+  check('средний чек из таблицы убран (он живёт в «Метриках по дням»)',
+    !table.textContent.includes('чек'))
+  check('ширины колонок заданы процентами → числа не разъезжают вёрстку',
+    table.className.includes('table-fixed') && /w-\[\d+%\]/.test(table.innerHTML))
+  // Колонка дня была шире всех и оставляла провал до чисел (правка владельца 06.08).
+  const ws = [...table.querySelectorAll('thead th')].map((t) => Number((t.className.match(/w-\[(\d+)%\]/) || [])[1]))
+  check('колонка «день» уже колонки «факт» — провала между подписью и числами нет',
+    ws[0] < ws[2], ws.join('% · ') + '%')
+  check('сумма ширин = 100 %', ws.reduce((a, b) => a + b, 0) === 100, ws.reduce((a, b) => a + b, 0))
+  check('суффикс тысяч — «k», а не «тыс» (колонки должны влезать без скролла)',
+    ths(252000) === '252k' && thsSigned(-76000) === '−76k', `${ths(252000)} / ${thsSigned(-76000)}`)
+  check('в таблице не осталось «тыс»', !table.textContent.includes('тыс'))
+
+  console.log('\n— факт: плашка с числом внутри вместо полосы под числом (06.08) —')
+  // Полоса под числом сдвигала цифру (ряд переставал читаться) и её серый трек
+  // совпадал с фоном строки выходного — на субботе прогресса не было видно вовсе.
+  const factCells = [...table.querySelectorAll('tbody tr')].map((tr) => tr.children[2])
+  const filled = factCells.filter((c) => c.querySelector('span[style*="color-mix"]'))
+  check('у закрытых дней факт лежит в плашке', filled.length > 0, filled.length)
+  check('заливка плашки — тон ОТ ТОКЕНА сигнала, а не свой цвет',
+    filled.every((c) => /color-mix\(in srgb, var\(--(positive|warning|negative)\) \d+%, var\(--surface\)\)/
+      .test(c.querySelector('span[style*="color-mix"]').getAttribute('style'))),
+    filled[0].querySelector('span[style*="color-mix"]').getAttribute('style'))
+  check('число внутри плашки, а не над ней', /\d/.test(filled[0].querySelector('span[style*="color-mix"]').textContent))
+  // Плашка не должна была съесть саму долю выполнения (правка владельца 06.08):
+  // доля живёт в жёсткой границе градиента, а не в отдельной полосе.
+  check('доля выполнения сохранена — градиент с жёсткой границей на progWidth %',
+    filled.every((c) => /linear-gradient\(90deg, .+ 0 [\d.]+%, .+ [\d.]+% 100%\)/
+      .test(c.querySelector('span[style*="color-mix"]').getAttribute('style'))),
+    filled[0].querySelector('span[style*="color-mix"]').getAttribute('style'))
+  check('обе части градиента — светлые тона, тёмный текст читается и слева, и справа',
+    filled.every((c) => {
+      const st = c.querySelector('span[style*="color-mix"]').getAttribute('style')
+      const mixes = st.match(/\d+%, var\(--surface\)/g) || []
+      return mixes.length === 2
+    }))
+  // Трек был `bg-[var(--surface-2)]` — ровно тем же токеном, что фон строки выходного,
+  // поэтому в субботу и воскресенье прогресс исчезал. Проверяем именно ячейки факта:
+  // на самой строке `--surface-2` остаётся законно, это метка выходного.
+  check('серого трека, сливавшегося с фоном выходного, в ячейках факта больше нет',
+    factCells.every((c) => !/bg-\[var\(--surface-2\)\]/.test(c.innerHTML)))
+  check('полосы под числом нет — цифры дней на одной базовой линии',
+    !/h-1\.5|h-2\b/.test(table.innerHTML))
+  check('текст в плашке монохромный (цвет только в заливке)',
+    filled.every((c) => !/text-\[var\(--(positive|negative|warning)\)\]/.test(c.innerHTML)))
   wk.app.unmount(); wk2.app.unmount()
 }
 
@@ -3445,7 +3538,62 @@ console.log('\n=== Контраст WCAG: мелкий серый текст с�
   const markOn = cr('#1C1B18', '#FFFFFF')
   check(`залитый маркер --text на --surface = ${markOn.toFixed(2)}:1 ≥ 3 (несущая графика)`, markOn >= 3)
   const markOff = cr('#6F6D66', '#F1F0EC')
-  check(`пунктирный маркер --text-muted на --surface-2 = ${markOff.toFixed(2)}:1 ≥ 3`, markOff >= 3)
+  check(`пунктирный бейдж «ДР» --text-muted на --surface-2 = ${markOff.toFixed(2)}:1 ≥ 3`, markOff >= 3)
+  const badgeOn = cr('#FFFFFF', '#1C1B18')
+  check(`залитый бейдж «ДР» --ink-on-color на --text = ${badgeOn.toFixed(2)}:1 ≥ 4.5`, badgeOn >= 4.5)
+
+  // Жёлтая кнопка входа и плавающая «+»: заливка --accent, текст/иконка --accent-ink.
+  const onAccent = cr('#1C1B18', '#FFC833')
+  check(`--accent-ink на --accent = ${onAccent.toFixed(2)}:1 ≥ 4.5 (крупная строка и «+»)`, onAccent >= 4.5)
+  // Подводка приглушена ПРОЗРАЧНОСТЬЮ, а не вторым цветом: считаем по смешанному
+  // цвету, иначе проверка проходила бы на цвете, которого на экране нет.
+  const mix = (fg, bg, a) => '#' + [0, 2, 4].map((i) => {
+    const f = parseInt(fg.slice(i + 1, i + 3), 16)
+    const b = parseInt(bg.slice(i + 1, i + 3), 16)
+    return Math.round(f * a + b * (1 - a)).toString(16).padStart(2, '0')
+  }).join('')
+  const kicker = cr(mix('#1C1B18', '#FFC833', 0.7), '#FFC833')
+  check(`подводка ink 70 % на --accent = ${kicker.toFixed(2)}:1 ≥ 4.5`, kicker >= 4.5)
+}
+
+console.log('\n=== jsdom: плавающая кнопка «+» «Отчёта дня» (правка 06.08) ===')
+{
+  localStorage.clear()
+  bundle.clearSubView()
+  getPayload = { updated: '2025-05-20', sets: {}, stats: {}, reviews: [] }
+  const scr = mount(bundle.DailyScreen, {})
+  await flush()
+  const fab = scr.el.querySelector('[data-test="daily-fab"]')
+  check('плавающая кнопка есть', !!fab)
+  check('жёлтая заливка + тёмная иконка (жёлтый только заливкой)',
+    fab.className.includes('bg-[var(--accent)]') && fab.innerHTML.includes('text-[var(--accent-ink)]'))
+  check('крупный тач-таргет 56pt', fab.className.includes('h-14') && fab.className.includes('w-14'))
+  check('подписана для скринридера', fab.getAttribute('aria-label') === 'Добавить отчёт')
+  const wrap = fab.parentElement
+  check('привязана к мобильной колонке, а не к краю экрана',
+    wrap.className.includes('max-w-[430px]') && wrap.className.includes('fixed'), wrap.className)
+  check('обёртка не перехватывает клики по контенту под ней',
+    wrap.className.includes('pointer-events-none') && fab.className.includes('pointer-events-auto'))
+  // jsdom нормализует порядок слагаемых в calc(), поэтому проверяем наличие обоих,
+  // а не написание: иначе тест ловил бы форматирование, а не смысл.
+  const pb = wrap.getAttribute('style') || ''
+  check('отступ снизу считает и таб-бар, и safe-area',
+    /padding-bottom:\s*calc\(/.test(pb) && pb.includes('env(safe-area-inset-bottom)') && /\d/.test(pb), pb)
+  const { subView } = bundle.useAppNav()
+  fab.click()
+  await flush()
+  check('открывает «Отчёт дня»', subView.value === 'daily-report', subView.value)
+  // Гашение у низа страницы держится на IntersectionObserver — в jsdom его нет,
+  // поэтому проверяем САМО правило (v-show по видимости нижней кнопки), а не эффект:
+  // иначе тест подтверждал бы отсутствие наблюдателя, а не поведение.
+  const src = readFileSync(resolve(root, 'src/screens/DailyScreen.vue'), 'utf8')
+  check('гаснет, когда нижняя кнопка «Добавить отчёт» видна',
+    /v-show="!bottomCtaVisible"/.test(src) && /IntersectionObserver/.test(src))
+  check('наблюдатель отключается при уходе экрана (без утечки)',
+    /onBeforeUnmount\(\(\) => \{ if \(io\)/.test(src))
+  scr.app.unmount()
+  bundle.clearSubView()
+  getPayload = {}
 }
 
 console.log('\n=== Vue warnings ===')

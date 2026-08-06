@@ -7,6 +7,8 @@ import { useParkContext } from '../composables/useParkContext.js'
 import { useNavCaption } from '../composables/useNavCaption.js'
 import { clearTrailing, setTrailing } from '../composables/useNavTrailing.js'
 import { computeDaily, computeNetwork, monthsForPicker, pickMonth, setForParkMonth } from '../composables/dailyModel.js'
+import { joinDrivers, matches, statusCounts, statusOptions } from '../composables/driversModel.js'
+import { statusLabel } from '../i18n/drivers.js'
 import { collectSignals } from '../composables/dailySignals.js'
 import { updatedDateLabel } from '../i18n/analytics.js'
 import { monthTitle, L } from '../i18n/daily.js'
@@ -85,6 +87,23 @@ function openDrivers() {
   setSubView('drivers', { to: 'daily', label: L.title })
 }
 
+// Чипы статусов под кнопкой — правка владельца 06.08 «взять из раздела».
+// Считаем ТЕМ ЖЕ driversModel и по тому же правилу scope, что сам раздел: выбран парк
+// → драйверы с периодом в нём. Иначе на соседних экранах жили бы два разных ответа на
+// вопрос «сколько драйверов», и разъехались бы они молча.
+//
+// ⚠ Это НЕ те же цифры, что «работают N» в строке-сводке, и так и должно быть:
+// сводка считает строки daily_activities выбранного МЕСЯЦА, чипы — паспорта драйверов
+// парка целиком, без привязки к месяцу.
+const driverStatuses = computed(() => {
+  if (isNetwork.value) return []
+  const joined = joinDrivers(data.value?.drivers, data.value?.driver_periods)
+  const scoped = joined.filter((d) => matches(d, parkCtx.value, 'all'))
+  if (!scoped.length) return []
+  const counts = statusCounts(scoped)
+  return statusOptions(scoped).map((s) => ({ id: s, label: statusLabel(s), count: counts[s] }))
+})
+
 // парк выбран, но дневного слоя нет (например MARI)
 const parkEmpty = computed(() => !isNetwork.value && hasAny.value && !currentSet.value)
 
@@ -101,6 +120,23 @@ const updatedLabel = computed(() => {
   const mx = updatedDateLabel(maxFullDate())
   return mx ? `данные от ${mx}` : ''
 })
+
+// ── Плавающая кнопка «+» и её гашение у низа страницы ───────────────────────
+// Наблюдаем за нижней кнопкой «Добавить отчёт»: видна — плавающая не нужна.
+// IntersectionObserver, а не слушатель скролла: он не будит рендер на каждый кадр
+// прокрутки, а на длинной странице это заметно на телефоне.
+const bottomCta = ref(null)
+const bottomCtaVisible = ref(false)
+let io = null
+function watchBottomCta(el) {
+  if (io) { io.disconnect(); io = null }
+  bottomCtaVisible.value = false
+  if (!el || typeof IntersectionObserver === 'undefined') return
+  io = new IntersectionObserver(([e]) => { bottomCtaVisible.value = !!(e && e.isIntersecting) })
+  io.observe(el)
+}
+watch(bottomCta, (el) => watchBottomCta(el), { flush: 'post' })
+onBeforeUnmount(() => { if (io) { io.disconnect(); io = null } })
 
 const active = ref(true)
 let isActive = false
@@ -175,6 +211,7 @@ watchEffect(() => {
         :m="model"
         :reads="data?.signal_reads || []"
         :signals="signalPool"
+        :driver-statuses="driverStatuses"
         class="bc-fade-in"
         @open-drivers="openDrivers"
       />
@@ -184,6 +221,7 @@ watchEffect(() => {
          Показываем всегда (кроме загрузки) — форма не зависит от дневного слоя. -->
     <button
       v-if="!loading"
+      ref="bottomCta"
       type="button"
       class="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--surface)] shadow-sm transition-opacity active:opacity-90"
       @click="setSubView('daily-report')"
@@ -193,5 +231,29 @@ watchEffect(() => {
       </span>
       <span class="text-[1rem] font-semibold text-[var(--text)]">Добавить отчёт</span>
     </button>
+
+    <!-- Плавающий вход в «Отчёт дня» (правка владельца 06.08): экран длинный, а
+         отчёт сдают ежедневно — прокручивать до низа ради этого не нужно.
+         Гаснет, когда до нижней кнопки уже долистали: две кнопки об одном на одном
+         экране — это шум, а не подстраховка. `fixed` привязан к мобильной колонке
+         (max-w-[430px] по центру, как AppShell), отступ снизу — высота таб-бара
+         плюс safe-area. Обёртка не ловит клики, чтобы не перекрывать контент. -->
+    <div
+      v-if="!loading"
+      class="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-[430px] justify-center px-4"
+      style="padding-bottom: calc(env(safe-area-inset-bottom) + 4.75rem)"
+      aria-hidden="true"
+    >
+      <button
+        v-show="!bottomCtaVisible"
+        data-test="daily-fab"
+        type="button"
+        class="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] shadow-lg transition-opacity duration-150 active:opacity-90"
+        aria-label="Добавить отчёт"
+        @click="setSubView('daily-report')"
+      >
+        <Plus class="h-7 w-7 text-[var(--accent-ink)]" :stroke-width="2.75" aria-hidden="true" />
+      </button>
+    </div>
   </section>
 </template>

@@ -20,6 +20,8 @@ defineProps({
   m: { type: Object, required: true },
   reads: { type: Array, default: () => [] },
   signals: { type: Array, default: null },
+  // Чипы статусов драйверов парка — считает экран (общий driversModel с разделом).
+  driverStatuses: { type: Array, default: () => [] },
 })
 
 // Переход в раздел «Драйверы роста» этого парка (§3.3). Дашборд его не выполняет,
@@ -33,8 +35,8 @@ const emit = defineEmits(['open-drivers'])
     <DailyHero :m="m" />
     <DailySignalCard :m="m" :reads="reads" :signals="signals" />
     <DailyKpis :m="m" />
-    <!-- строка-сводка драйверов стоит НАД таблицей дней (§3.1) -->
-    <DailyDrivers :m="m" @open="emit('open-drivers')" />
+    <!-- вход в «Драйверы роста» стоит НАД таблицей дней (§3.1) -->
+    <DailyDrivers :m="m" :statuses="driverStatuses" @open="emit('open-drivers')" />
     <DailyWeeks :m="m" @open-drivers="emit('open-drivers')" />
     <DailySummary :m="m" />
     <DailyJournal :m="m" />
