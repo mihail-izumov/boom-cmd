@@ -12,10 +12,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { computeDaily, computeNetwork, sigClass } from '../src/composables/dailyModel.js'
+import { computeDaily, computeNetwork, sigClass, isMeasuring } from '../src/composables/dailyModel.js'
 import { monthLayout, markStyle } from '../src/composables/monthLayout.js'
 import { daysInMonth, daysLeftInMonth, mskToday } from '../src/composables/monthDays.js'
-import { actCode } from '../src/i18n/daily.js'
+import { driversSummary, markTitle } from '../src/i18n/daily.js'
 import {
   sortSignals, latestSignal, feedSignals, statusOf, markState, stateKey,
   buildSignalReadBody, postSignalRead, normalizeReads, readFor, readDay,
@@ -158,19 +158,120 @@ console.log('\n=== goalState в журнале: goal_state из payload + фол
   check('achievable в журнале сохранён', j[0].achievable === true && j[1].achievable === false)
 }
 
-console.log('\n=== actCode (v2.2 §3): короткий код бейджа, display-only ===')
-check("actCode('Питер-Г1') = 'Г1'", actCode('Питер-Г1') === 'Г1', actCode('Питер-Г1'))
-check("actCode('Охта-СемПак-А2') = 'А2' (последний дефис)", actCode('Охта-СемПак-А2') === 'А2')
-check("код без дефиса не меняется ('Г1')", actCode('Г1') === 'Г1')
-check("null/undefined → '' (не падает)", actCode(null) === '' && actCode(undefined) === '')
+console.log('\n=== Драйверы в «Контроле дня» (06.08, D-41/D-42/D-75/D-76) ===')
+// Числа приёмки задания — реальные (Охта авг: 1 маркер; Питерленд/Июнь авг: 0;
+// Охта июль: 5). Реальные данные в публичный scripts/ не кладём, поэтому здесь
+// воспроизведена их ФОРМА на выдуманных кодах и датах: те же ветки, те же границы.
+const act = (code, start, end, accuracy, measure, days) =>
+  ({ code, name: `Драйвер ${code}`, days: days || [], start, end, accuracy, measure })
+const setWith = (activities, month = '2025-05') => ({ ...sets['ohta:2025-05'], month, activities })
+
 {
-  // данные не тронуты: в модели activities/acts — ПОЛНЫЙ код из payload
-  const s = { ...sets['ohta:2025-05'], activities: [{ code: 'Охта-Г1', name: 'Тест', days: ['2025-05-03'] }] }
-  const m = computeDaily(s)
-  check('в модели activities[].code — полный код (display-only укорачивание)',
-    m.activities[0].code === 'Охта-Г1', m.activities[0].code)
-  const day = m.days.find((x) => x.iso === '2025-05-03')
-  check('в модели days[].acts — полный код', day.acts.includes('Охта-Г1'), day.acts.join(','))
+  console.log('\n— агрегат «замер идёт у N»: measure НЕ парсим, спрашиваем «начинается с идёт» —')
+  check("'идёт' → считается", isMeasuring('идёт'))
+  check("'идёт (обратный эффект зафиксирован)' → считается (реальное значение в данных)",
+    isMeasuring('идёт (обратный эффект зафиксирован)'))
+  check("'заблокирован' → НЕ считается", !isMeasuring('заблокирован'))
+  check("'невозможен' → НЕ считается", !isMeasuring('невозможен'))
+  check("'Идет' (без ё, с заглавной) → считается — мастера правятся руками", isMeasuring('Идет'))
+  check("пусто/undefined → не считается и не падает", !isMeasuring('') && !isMeasuring(undefined))
+}
+
+{
+  console.log('\n— фон месяца vs включение этого месяца: различает ТОЛЬКО start —')
+  const m = computeDaily(setWith([
+    act('DRV-01', '2025-05-13', '', 'день', 'идёт', ['2025-05-13', '2025-05-14']),
+    act('DRV-02', '2025-04-01', '', 'месяц', 'заблокирован', ['2025-05-01']),
+  ]))
+  const d = m.drivers
+  check('включений внутри месяца = 1 (фон с апреля не событие мая)', d.starts.length === 1, d.starts.length)
+  check('работают = все строки набора (2)', d.total === 2, d.total)
+  check('замер идёт у 1', d.measuring === 1, d.measuring)
+  check('маркер стоит в дне start', m.days.find((x) => x.iso === '2025-05-13').mark === 'on')
+  check('в дне работы БЕЗ переключения маркера нет (D-42: не 31 значок, а 1)',
+    m.days.find((x) => x.iso === '2025-05-14').mark === null)
+  check('драйвер-фон в таблице дней не появляется вовсе',
+    m.days.find((x) => x.iso === '2025-05-01').mark === null)
+  check('сводка = как в задании §3.1',
+    driversSummary(d, '2025-05') === 'Включён 1: DRV-01 с 13.05 · работают 2 · замер идёт у 1',
+    driversSummary(d, '2025-05'))
+}
+
+{
+  console.log('\n— «маркеров ноль»: два парка из трёх прямо сейчас, строка обязана читаться —')
+  const m = computeDaily(setWith([
+    act('DRV-07', '2025-04-01', '', 'unknown', 'идёт (обратный эффект зафиксирован)', ['2025-05-02']),
+    act('DRV-08', '2025-04-01', '', 'месяц', 'невозможен', ['2025-05-02']),
+  ]))
+  check('маркеров в месяце нет', m.days.every((x) => x.mark === null))
+  check('сводка читается нормально, а не как сломанный шаблон',
+    driversSummary(m.drivers, '2025-05') === 'Включений в мае не было · работают 2 · замер идёт у 1',
+    driversSummary(m.drivers, '2025-05'))
+  check('месяц в предложном падеже (август → «в августе»)',
+    driversSummary(m.drivers, '2025-08').startsWith('Включений в августе не было'))
+}
+
+{
+  console.log('\n— выключение, «~» у неточной даты, «и ещё N», свежие первыми —')
+  const m = computeDaily(setWith([
+    act('DRV-01', '2025-05-13', '', 'день', '', ['2025-05-13']),
+    act('DRV-03', '2025-05-17', '', 'день', '', ['2025-05-17']),
+    act('DRV-05', '2025-05-20', '', 'месяц', '', ['2025-05-20']),
+    act('DRV-06', '2025-05-16', '', 'день', '', ['2025-05-16']),
+    act('DRV-04', '2025-04-16', '2025-05-31', 'день', '', ['2025-05-01']),
+  ]))
+  const d = m.drivers
+  const txt = driversSummary(d, '2025-05')
+  check('включений 4, выключение 1 → маркеров 5 (13,16,17,20 + 31)',
+    m.days.filter((x) => x.mark).length === 5, m.days.filter((x) => x.mark).map((x) => x.dd).join(','))
+  check('20 — включение (залитый маркер)', m.days.find((x) => x.dd === 20).mark === 'on')
+  check('31 — выключение (пунктирный маркер)', m.days.find((x) => x.dd === 31).mark === 'off')
+  check('свежие первыми: DRV-05 (20.05) впереди DRV-03 (17.05)',
+    d.starts[0].code === 'DRV-05' && d.starts[1].code === 'DRV-03', d.starts.map((e) => e.code).join(','))
+  check('кодов максимум два, остаток → «и ещё N»', txt.includes('и ещё 2'), txt)
+  check('accuracy «месяц» → «~» у даты старта', txt.includes('DRV-05 с ~20.05'), txt)
+  check('accuracy «день» → «~» НЕ ставится', txt.includes('DRV-03 с 17.05'), txt)
+  check('выключение печатается отдельной частью', txt.includes('выключен DRV-04 с 31.05'), txt)
+  check('«замер идёт у 0» НЕ печатается', !txt.includes('замер'), txt)
+  check('полная строка', txt === 'Включено 4: DRV-05 с ~20.05, DRV-03 с 17.05 и ещё 2 · выключен DRV-04 с 31.05 · работают 5',
+    txt)
+}
+
+{
+  console.log('\n— несколько переключений в один день → ОДИН маркер, подписи все (D-76) —')
+  const m = computeDaily(setWith([
+    act('DRV-01', '2025-05-10', '', 'день', '', ['2025-05-10']),
+    act('DRV-02', '2025-04-01', '2025-05-10', 'день', '', ['2025-05-10']),
+  ]))
+  const day = m.days.find((x) => x.dd === 10)
+  check('маркер один', m.days.filter((x) => x.mark).length === 1)
+  check('включение перевешивает выключение', day.mark === 'on', day.mark)
+  check('в title обе подписи через перенос строки', markTitle(day.markEvents).split('\n').length === 2)
+  check('в подписи есть код и название, на маркере кода нет',
+    markTitle(day.markEvents).startsWith('DRV-01 · Драйвер DRV-01 · включён 10.05'),
+    markTitle(day.markEvents).split('\n')[0])
+}
+
+{
+  console.log('\n— обратная совместимость: старый payload (боевой Apps Script до v3.14) —')
+  const old = computeDaily(setWith([{ code: 'Г1', name: 'Старая активность', days: ['2025-05-13'] }]))
+  check('ready=false → сводка и маркеры СКРЫТЫ (не врём «включений не было»)',
+    old.drivers.ready === false, old.drivers.ready)
+  check('маркеров нет', old.days.every((x) => x.mark === null))
+  check('дневной слой при этом жив (дни и план на месте)', old.days.length === 31 && old.T > 0)
+  const empty = computeDaily(setWith([]))
+  check('пустая вкладка daily_activities → total 0, ничего не рисуем',
+    empty.drivers.total === 0 && empty.drivers.ready === false)
+  check('без ключа activities вовсе — не падает',
+    computeDaily({ ...sets['ohta:2025-05'], activities: undefined }).drivers.total === 0)
+}
+
+{
+  console.log('\n— чего в «Контроле дня» больше НЕТ —')
+  const m = computeDaily(sets['ohta:2025-05'])
+  check('модель не отдаёт activities[] с процентом «к плану» (D-41)', m.activities === undefined)
+  check('в строках дней нет acts[] (бейджи под каждым днём убраны, D-42)',
+    m.weeks.every((w) => w.rows.every((r) => r.acts === undefined)))
 }
 
 console.log('\n=== «Вся сеть» (агрегат 3 парков) ===')
@@ -352,7 +453,12 @@ export { useSignalRead } from '${root}/src/composables/useSignalRead.js'
 export { collectSignals, isMarkable, signalAgeDays, SIGNAL_MARKABLE_DAYS, enqueueRead, resolveItem, isPermanentError } from '${root}/src/composables/dailySignals.js'
 export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
-export { useAppNav, clearSubView } from '${root}/src/composables/useAppNav.js'
+export { useAppNav, clearSubView, setSubView } from '${root}/src/composables/useAppNav.js'
+export { default as DailyDrivers } from '${root}/src/components/daily/DailyDrivers.vue'
+export { default as DailyWeeks } from '${root}/src/components/daily/DailyWeeks.vue'
+export { default as DriverCard } from '${root}/src/components/drivers/DriverCard.vue'
+export { default as DriversSection } from '${root}/src/components/drivers/DriversSection.vue'
+export { computeDaily as computeDailyB } from '${root}/src/composables/dailyModel.js'
 `)
 
 // jsdom-глобали ДО импортов vite/vue (runtime-dom кэширует document при загрузке)
@@ -436,7 +542,7 @@ console.warn = (...a) => {
 }
 
 const bundle = await import(pathToFileURL(resolve(tmp, 'bundle.js')).href)
-const { createApp, nextTick } = await import('vue')
+const { createApp, nextTick, h, ref: vRef, KeepAlive } = await import('vue')
 
 // «входим» фразой, чтобы memKey был установлен (нужен для POST)
 const ak = bundle.useAccessKey()
@@ -3126,6 +3232,220 @@ console.log('\n=== jsdom: v2.4 — параллельные экраны скл�
   check('после завершения запроса следующий экран идёт в сеть снова', getCalls === 1, getCalls)
   c.app.unmount()
   getPayload = {}
+}
+
+console.log('\n=== jsdom: строка-сводка драйверов и маркер в дне (задание 06.08) ===')
+{
+  localStorage.clear()
+  bundle.clearSubView()
+  const mkSet = (activities) => ({
+    ...sets['ohta:2025-05'], activities,
+  })
+  const mDrv = bundle.computeDailyB(mkSet([
+    { code: 'DRV-04', name: 'Обход зала — цифровая форма', days: ['2025-05-13'],
+      start: '2025-05-13', end: '', accuracy: 'день', measure: 'идёт' },
+    { code: 'DRV-08', name: 'Фоновый драйвер', days: ['2025-05-01'],
+      start: '2025-04-01', end: '', accuracy: 'месяц', measure: 'невозможен' },
+  ]))
+
+  const row = mount(bundle.DailyDrivers, { m: mDrv })
+  const btn = row.el.querySelector('[data-test="drivers-summary"]')
+  check('строка-сводка отрисована', !!btn)
+  check('подпись «Драйверы роста» + сводка одной строкой',
+    btn.textContent.includes('Драйверы роста') && btn.textContent.includes('Включён 1: DRV-04 с 13.05'),
+    btn.textContent.replace(/\s+/g, ' ').trim())
+  check('заголовка «Активности и гипотезы» на экране нет',
+    !row.el.textContent.includes('Активности'))
+  check('процента «к плану» в строке нет (D-41)', !btn.textContent.includes('к плану'))
+  check('строка — тач-таргет ≥44pt', btn.getAttribute('style').includes('min-height: 44px'))
+  check('текст сводки серый токеном, не цветной',
+    /text-\[var\(--text-muted\)\]/.test(btn.innerHTML) && !/--positive|--negative|--warning/.test(btn.innerHTML))
+  let opened = 0
+  const row2 = mount(bundle.DailyDrivers, { m: mDrv, onOpen: () => { opened++ } })
+  row2.el.querySelector('[data-test="drivers-summary"]').click()
+  check('клик по строке ведёт в раздел (эмитит open)', opened === 1, opened)
+  row.app.unmount(); row2.app.unmount()
+
+  // Старый payload (боевой бэк до v3.14) — строки нет вовсе, а не «включений не было».
+  const mOld = bundle.computeDailyB(mkSet([{ code: 'Г1', name: 'Старая', days: ['2025-05-13'] }]))
+  const old = mount(bundle.DailyDrivers, { m: mOld })
+  check('старый payload → строки-сводки нет вовсе', !old.el.querySelector('[data-test="drivers-summary"]'))
+  old.app.unmount()
+
+  const wk = mount(bundle.DailyWeeks, { m: mDrv })
+  const marks = wk.el.querySelectorAll('[data-test="drv-mark"]')
+  check('маркер в таблице дней ровно один (только день включения)', marks.length === 1, marks.length)
+  check('маркер залитый (включение)', marks[0].getAttribute('data-kind') === 'on')
+  check('на маркере НЕТ кода — только точка', marks[0].textContent.trim() === '', `«${marks[0].textContent.trim()}»`)
+  check('код и название приходят в title',
+    marks[0].getAttribute('title') === 'DRV-04 · Обход зала — цифровая форма · включён 13.05',
+    marks[0].getAttribute('title'))
+  check('маркер не меняет высоту строки: компенсирующий отрицательный margin на месте',
+    marks[0].className.includes('-my-1') && marks[0].className.includes('h-6'))
+  // Два требования тянут в разные стороны: тач-таргет ≥44pt и «не толкать цифры».
+  // Разведены по слоям — видимая точка в потоке, активная зона absolute вне потока.
+  const hit = marks[0].querySelector('span.absolute')
+  check('активная зона маркера 44×44pt и вне потока (не растит строку)',
+    !!hit && hit.className.includes('h-11') && hit.className.includes('w-11'),
+    hit && hit.className)
+  let fromMark = 0
+  const wk2 = mount(bundle.DailyWeeks, { m: mDrv, 'onOpen-drivers': () => { fromMark++ } })
+  wk2.el.querySelector('[data-test="drv-mark"]').click()
+  check('тап по маркеру тоже ведёт в раздел (§3.3)', fromMark === 1, fromMark)
+  wk.app.unmount(); wk2.app.unmount()
+}
+
+console.log('\n=== jsdom: строка «Замер» в карточке драйвера (D-77, §3.4) ===')
+{
+  const card = (over) => mount(bundle.DriverCard, {
+    driver: { code: 'DRV-01', name: 'Драйвер', status: 'идёт', measure: 'заблокирован', periods: [], ...over },
+    parkIds: ['ohta'],
+  })
+  const a = card({})
+  const rowM = a.el.querySelector('[data-test="driver-measure"]')
+  check('у статуса «идёт» строка «Замер» видна', !!rowM && rowM.textContent.includes('заблокирован'))
+  check('строка серая, без цвета и без сигнальной точки',
+    rowM.innerHTML.includes('--text-muted') && !/--positive|--negative|--warning|rounded-full/.test(rowM.innerHTML))
+  a.app.unmount()
+  const b = card({ status: 'пауза' })
+  check('у статуса «пауза» строка видна', !!b.el.querySelector('[data-test="driver-measure"]'))
+  b.app.unmount()
+  for (const st of ['готов', 'разработка', 'backlog', 'закрыт']) {
+    const c = card({ status: st })
+    check(`у статуса «${st}» строки «Замер» НЕТ`, !c.el.querySelector('[data-test="driver-measure"]'))
+    c.app.unmount()
+  }
+  const d = card({ measure: '' })
+  check('поле пустое → строки нет', !d.el.querySelector('[data-test="driver-measure"]'))
+  d.app.unmount()
+  const e = card({})
+  check('результата/метрики/процентов в карточке по-прежнему нет',
+    !/%|ready_pct|gaps|conflicts/.test(e.el.textContent))
+  e.app.unmount()
+}
+
+console.log('\n=== jsdom: возврат «откуда пришли» (§3.3) ===')
+{
+  const { subView, subOrigin } = bundle.useAppNav()
+  bundle.clearSubView()
+  bundle.setSubView('drivers', { to: 'daily', label: 'Контроль Дня' })
+  check('открыта под-страница драйверов', subView.value === 'drivers', subView.value)
+  check('запомнено, откуда пришли', subOrigin.value && subOrigin.value.to === 'daily')
+  bundle.setSubView('daily')
+  check('возврат ведёт в «Контроль дня», а не на Главную', subView.value === 'daily', subView.value)
+  check('origin снят — следующий заход не потянет старый возврат', subOrigin.value === null)
+  bundle.setSubView('drivers')
+  check('заход с Главной origin не заводит', subOrigin.value === null)
+  bundle.clearSubView()
+}
+
+console.log('\n=== jsdom: Д-1 — заход из «Контроля дня» не меняет дефолт раздела ===')
+{
+  // Регресс, который ловим: tab='list' переживал keep-alive, и следующий заход
+  // С ГЛАВНОЙ тоже открывался списком — то есть один клик по строке-сводке молча
+  // отменял дефолт «Вклад в план» (D-50) на всю сессию.
+  localStorage.clear()
+  bundle.clearSubView()
+  getPayload = {
+    updated: '2025-05-20',
+    sets: {},
+    drivers: data.drivers,
+    driver_periods: data.driver_periods,
+    driver_contrib: data.driver_contrib,
+    driver_contrib_items: data.driver_contrib_items,
+  }
+  const view = () => {
+    const on = [...sec.el.querySelectorAll('[data-test="view-switch"] [role="tab"]')]
+      .find((b) => b.getAttribute('aria-selected') === 'true')
+    return on ? on.textContent.trim() : '(переключателя нет)'
+  }
+  const tabBtn = (label) => [...sec.el.querySelectorAll('[data-test="view-switch"] [role="tab"]')]
+    .find((b) => b.textContent.trim() === label)
+  // Хост повторяет AppShell: keep-alive + подмена компонента при смене под-страницы.
+  // Без него onActivated не срабатывает, и тест «проходил» бы на невыполненном коде —
+  // ровно тот класс ошибки, из-за которого правило «тест ходит боевым путём» и записано.
+  const away = { render: () => h('i') }
+  const shown = vRef(true)
+  const Host = {
+    setup: () => () => h(KeepAlive, null, {
+      default: () => (shown.value ? h(bundle.DriversSection) : h(away)),
+    }),
+  }
+  const leave = async () => { shown.value = false; await flush() }
+  const enter = async (origin) => {
+    await leave()
+    bundle.setSubView('drivers', origin || null)
+    shown.value = true
+    await flush()
+  }
+  const enterFromHome = () => enter(null)
+  const enterFromDaily = () => enter({ to: 'daily', label: 'Контроль Дня' })
+
+  bundle.setSubView('drivers')
+  const sec = mount(Host, {})
+  await flush()
+  check('1. Главная → «Драйверы»: открывается «Вклад в план»', view() === 'Вклад в план', view())
+
+  await enterFromDaily()
+  check('2. из «Контроля дня»: открылся «Список драйверов»', view() === 'Список драйверов', view())
+  const statusOn = () => {
+    const on = [...sec.el.querySelectorAll('[aria-label="Фильтр по статусу"] [aria-selected="true"]')][0]
+    return on ? on.textContent.replace(/\s+/g, ' ').trim() : '(нет)'
+  }
+  check('   статус сброшен на «Все» (а не залипший «пауза» с прошлого захода)',
+    statusOn().startsWith('Все'), statusOn())
+
+  await enterFromHome()
+  check('3. снова с Главной: вернулся «Вклад в план», а не залипший список',
+    view() === 'Вклад в план', view())
+
+  tabBtn('Список драйверов').click()
+  await flush()
+  check('4. переключил руками на «Список»', view() === 'Список драйверов', view())
+  bundle.clearSubView()
+  await enterFromHome()
+  check('   собственный выбор память держит: заход с Главной остался «Списком»',
+    view() === 'Список драйверов', view())
+
+  await enterFromDaily()
+  await enterFromHome()
+  check('   и после захода из «Контроля дня» возвращается ЕГО выбор, а не дефолт',
+    view() === 'Список драйверов', view())
+
+  // Сброс статуса проверяем на ЗАГРЯЗНЁННОМ состоянии: иначе «Все» стоял бы и без
+  // сброса, и проверка ничего не значила бы.
+  await enterFromDaily()
+  const stTabs = [...sec.el.querySelectorAll('[aria-label="Фильтр по статусу"] [role="tab"]')]
+  const stOther = stTabs.find((b) => b.getAttribute('aria-selected') !== 'true')
+  if (stOther) { stOther.click(); await flush() }
+  check('   (подготовка) статус руками уведён с «Все»',
+    !statusOn().startsWith('Все'), `${stTabs.length} чипов, выбран: ${statusOn()}`)
+  await enterFromDaily()
+  check('   следующий заход из «Контроля дня» снова сбрасывает статус на «Все»',
+    statusOn().startsWith('Все'), statusOn())
+
+  sec.app.unmount()
+  bundle.clearSubView()
+  getPayload = {}
+}
+
+console.log('\n=== Контраст WCAG: мелкий серый текст сводки и строки «Замер» ===')
+{
+  // Считаем по формуле, а не «на память»: токены --text-muted #6F6D66 на --surface #FFFFFF.
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const lum = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
+  const onSurface = cr('#6F6D66', '#FFFFFF')
+  check(`--text-muted на --surface = ${onSurface.toFixed(2)}:1 ≥ 4.5`, onSurface >= 4.5)
+  const onSurface2 = cr('#6F6D66', '#F1F0EC') // строка дня-выходного подсвечена --surface-2
+  check(`--text-muted на --surface-2 = ${onSurface2.toFixed(2)}:1 ≥ 4.5`, onSurface2 >= 4.5)
+  const markOn = cr('#1C1B18', '#FFFFFF')
+  check(`залитый маркер --text на --surface = ${markOn.toFixed(2)}:1 ≥ 3 (несущая графика)`, markOn >= 3)
+  const markOff = cr('#6F6D66', '#F1F0EC')
+  check(`пунктирный маркер --text-muted на --surface-2 = ${markOff.toFixed(2)}:1 ≥ 3`, markOff >= 3)
 }
 
 console.log('\n=== Vue warnings ===')

@@ -75,10 +75,54 @@ export function rubWhole(n) {
   return `${formatInt(Math.round(Number(n)))}${NBSP}₽`
 }
 
-// Короткий код активности для бейджей (v2.2 §3, display-only): суффикс после
-// последнего дефиса — «Питер-Г1» → «Г1». В данных/payload код остаётся полным,
-// парко-имённым; в пультах контура B — тот же split('-').pop().
-export const actCode = (c) => String(c ?? '').split('-').pop()
+// ── ДРАЙВЕРЫ РОСТА В «КОНТРОЛЕ ДНЯ» (задание 06.08, §3.1–3.2) ────────────────
+// Предложный падеж месяца — только для «Включений в августе не было». Два парка из
+// трёх прямо сейчас живут именно в этом случае, поэтому строка обязана читаться
+// нормально, а не выглядеть сломанным шаблоном.
+const MONTH_PREP = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре']
+export function monthPrep(ym) {
+  const mi = Number(String(ym).split('-')[1])
+  return MONTH_PREP[mi - 1] || 'этом месяце'
+}
+
+// «DRV-04 с 01.08», «DRV-07 с ~23.07» (точность даты ≠ день).
+const evLabel = (e) => `${e.code} с ${e.approx ? '~' : ''}${ddmm(e.iso)}`
+
+// Часть сводки по одному типу событий. Кодов печатаем максимум ДВА: колонка узкая,
+// а третий код уже не читается — остаток уходит в «и ещё N» (§3.1).
+function evPart(list, one, many) {
+  if (!list.length) return ''
+  if (list.length === 1) return `${one} ${evLabel(list[0])}`
+  const head = list.slice(0, 2).map(evLabel).join(', ')
+  const rest = list.length - 2
+  return `${many(list.length)}: ${head}${rest > 0 ? ` и ещё ${rest}` : ''}`
+}
+
+/**
+ * Одна строка-сводки над таблицей дней (§3.1). Разделитель « · » — интерфейсный;
+ * запрет «·» из D-70/D-72 касается текста сводок для мессенджера, а не UI.
+ * Части, которых нет, НЕ печатаются: «замер идёт у 0» и «выключено 0» — шум.
+ */
+export function driversSummary(d, ym) {
+  if (!d) return ''
+  const parts = []
+  parts.push(
+    d.starts.length
+      ? evPart(d.starts, 'Включён 1:', (n) => `Включено ${n}`)
+      : `Включений в ${monthPrep(ym)} не было`,
+  )
+  const off = evPart(d.ends, 'выключен', (n) => `выключено ${n}`)
+  if (off) parts.push(off)
+  parts.push(`работают ${d.total}`)
+  if (d.measuring > 0) parts.push(`замер идёт у ${d.measuring}`)
+  return parts.join(' · ')
+}
+
+// Подпись маркера в дне: `DRV-04 · Обход зала «Как помочь?» · включён 01.08`.
+// Кода на самом маркере нет (D-76) — он живёт здесь и в строке-сводке.
+export const markLabel = (e) =>
+  `${e.code} · ${e.name} · ${e.kind === 'on' ? 'включён' : 'выключен'} ${e.approx ? '~' : ''}${ddmm(e.iso)}`
+export const markTitle = (events) => (events || []).map(markLabel).join('\n')
 
 // Токен-класс заливки по sigClass → CSS-переменная сигнала.
 export const SIG_VAR = { good: 'var(--positive)', warn: 'var(--warning)', bad: 'var(--negative)', idle: 'var(--line)' }
@@ -122,7 +166,11 @@ export const L = {
   journal: 'Журнал прогноза',
   metrics: 'Метрики по дням',
   coef: 'Коэффициенты дней недели',
-  activities: 'Активности и гипотезы',
+  // Заголовка-секции «Активности и гипотезы» больше нет — ни под этим именем, ни
+  // под каким другим (D-75). Вместо блока-списка — подпись строки-сводки, ведущей
+  // в раздел «Драйверы роста»: список живёт там, дублировать его нельзя (разъедется).
+  drivers_row: 'Драйверы роста',
+  drivers_aria: 'Драйверы роста этого парка — открыть раздел',
   lever: 'Главный рычаг цели',
   network: 'Вся сеть',
   net_target: 'цель сети',

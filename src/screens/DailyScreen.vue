@@ -74,6 +74,17 @@ const signalPool = computed(() =>
 
 const monthLabel = computed(() => (model.value ? monthTitle(model.value.month) : ''))
 
+// ── Строка-сводка драйверов → раздел «Драйверы роста» (задание 06.08 §3.3) ──
+// Чип парка в разделе предвыбран сам: он читает ОБЩИЙ `useParkContext`, а мы уходим
+// с дашборда конкретного парка — то есть контекст уже стоит на нужном парке.
+// Отдельного «предвыбора» здесь нет намеренно: второй источник истины по парку
+// разъехался бы с пилюлей в шапке при первом же возврате.
+// `origin` — чтобы кнопка «Назад» вернула в «Контроль дня», а не на Главную:
+// экран под keep-alive, поэтому раскрытые недели и выбранный месяц переживут переход.
+function openDrivers() {
+  setSubView('drivers', { to: 'daily', label: L.title })
+}
+
 // парк выбран, но дневного слоя нет (например MARI)
 const parkEmpty = computed(() => !isNetwork.value && hasAny.value && !currentSet.value)
 
@@ -160,7 +171,13 @@ watchEffect(() => {
     <!-- конкретный парк -->
     <template v-else-if="model">
       <p class="bc-fade-in px-1 text-[0.8125rem] capitalize text-[var(--text-muted)]">{{ monthLabel }}</p>
-      <DailyDashboard :m="model" :reads="data?.signal_reads || []" :signals="signalPool" class="bc-fade-in" />
+      <DailyDashboard
+        :m="model"
+        :reads="data?.signal_reads || []"
+        :signals="signalPool"
+        class="bc-fade-in"
+        @open-drivers="openDrivers"
+      />
     </template>
 
     <!-- «Отчёт дня» (D-12): вход в единственную пишущую страницу.

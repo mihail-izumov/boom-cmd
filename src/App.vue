@@ -1,5 +1,5 @@
 <script setup>
-import { watchEffect } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { ChartColumnBig, Layers, Newspaper } from 'lucide-vue-next'
 import AppShell from './components/AppShell.vue'
 import HomeScreen from './screens/HomeScreen.vue'
@@ -119,12 +119,25 @@ const subViews = {
   },
 }
 
-const { active, subView } = useAppNav()
+const { active, subView, subOrigin } = useAppNav()
 
-// Назад с под-страницы: у «Отчёта дня» возврат на «Контроль Дня» (backTo),
-// у остальных — на Главную (как раньше).
+// Возврат «откуда пришли» (задание 06.08 §3.3). У «Отчёта дня» родитель статический
+// (`backTo` в конфиге), у «Драйверов роста» он зависит от входа: с Главной — назад на
+// Главную, из «Контроля дня» — назад в «Контроль дня», чтобы не потерять раскрытые
+// недели и выбранный месяц. Динамический вход накладываем поверх конфига здесь, а не
+// правим конфиг — так у под-страницы остаётся понятное значение по умолчанию.
+const navSubViews = computed(() => {
+  const key = subView.value
+  const o = subOrigin.value
+  if (!key || !o || !subViews[key]) return subViews
+  return {
+    ...subViews,
+    [key]: { ...subViews[key], backTo: o.to, backLabel: o.label || subViews[key].backLabel },
+  }
+})
+
 function onBack() {
-  const sv = subView.value && subViews[subView.value]
+  const sv = subView.value && navSubViews.value[subView.value]
   if (sv && sv.backTo) setSubView(sv.backTo)
   else clearSubView()
 }
@@ -171,7 +184,7 @@ watchEffect(() => setThemeColor(authed.value ? APP_THEME_COLOR : AUTH_THEME_COLO
     :tabs="tabs"
     :active="active"
     :sub-view="subView"
-    :sub-views="subViews"
+    :sub-views="navSubViews"
     @update:active="(id) => setActive(id)"
     @back="onBack"
   />

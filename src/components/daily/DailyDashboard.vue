@@ -9,7 +9,7 @@ import DailySummary from './DailySummary.vue'
 import DailyJournal from './DailyJournal.vue'
 import DailyMetrics from './DailyMetrics.vue'
 import DailyCoef from './DailyCoef.vue'
-import DailyActivities from './DailyActivities.vue'
+import DailyDrivers from './DailyDrivers.vue'
 
 // reads (D-36) — проекция payload.signal_reads: «показанный сигнал уже отмечен?».
 // signals (Ф-7) — пул сигналов окна отметки СКВОЗЬ границу месяца: карточка живёт по
@@ -21,6 +21,10 @@ defineProps({
   reads: { type: Array, default: () => [] },
   signals: { type: Array, default: null },
 })
+
+// Переход в раздел «Драйверы роста» этого парка (§3.3). Дашборд его не выполняет,
+// а прокидывает наверх: навигация — дело экрана, не секции.
+const emit = defineEmits(['open-drivers'])
 </script>
 
 <template>
@@ -29,11 +33,12 @@ defineProps({
     <DailyHero :m="m" />
     <DailySignalCard :m="m" :reads="reads" :signals="signals" />
     <DailyKpis :m="m" />
-    <DailyWeeks :m="m" />
+    <!-- строка-сводка драйверов стоит НАД таблицей дней (§3.1) -->
+    <DailyDrivers :m="m" @open="emit('open-drivers')" />
+    <DailyWeeks :m="m" @open-drivers="emit('open-drivers')" />
     <DailySummary :m="m" />
     <DailyJournal :m="m" />
     <DailyMetrics :m="m" />
     <DailyCoef :m="m" />
-    <DailyActivities :m="m" />
   </div>
 </template>

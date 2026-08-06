@@ -27,6 +27,20 @@ const props = defineProps({
 const launched = computed(() => (props.driver.periods || []).length > 0)
 const periodOf = (pid) => (props.driver.periods || []).find((p) => p.park === pid) || null
 const approx = (per) => (per && per.accuracy && per.accuracy !== 'день' ? '~' : '')
+
+// Строка «Замер» (D-77, задание 06.08 §3.4). Показываем ТОЛЬКО у работающих
+// статусов: у backlog/разработка/готов/закрыт замера нет по определению, и пустая
+// строка там читалась бы как «замер потеряли». Поле пустое → строки нет.
+// Значение — свободный текст контура B, печатаем как есть, не парсим.
+// Ё/е нормализуем: статусы приезжают из рукописных мастеров контура B, и «идет»
+// рано или поздно приедет — точный литерал молча спрятал бы строку (тот же приём,
+// что в isMeasuring дневной модели).
+const norm = (s) => String(s ?? '').trim().toLowerCase().replace(/ё/g, 'е')
+const MEASURE_STATUSES = new Set(['идет', 'пауза'])
+const measure = computed(() => {
+  const v = String(props.driver.measure || '').trim()
+  return v && MEASURE_STATUSES.has(norm(props.driver.status)) ? v : ''
+})
 </script>
 
 <template>
@@ -68,6 +82,12 @@ const approx = (per) => (per && per.accuracy && per.accuracy !== 'день' ? '~
           </div>
           <span v-else class="text-[var(--text-muted)]">{{ L.not_launched }}</span>
         </dd>
+      </div>
+
+      <!-- Замер — приглушённо, мельче остальных строк, БЕЗ цвета и сигнальной точки -->
+      <div v-if="measure" data-test="driver-measure" class="flex gap-2 text-[0.75rem] leading-snug">
+        <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_measure }}</dt>
+        <dd class="min-w-0 flex-1 text-[var(--text-muted)]">{{ measure }}</dd>
       </div>
 
       <!-- Запуск -->

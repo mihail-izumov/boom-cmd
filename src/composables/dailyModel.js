@@ -46,6 +46,90 @@ const METRICS = [
   { key: 'reviews', label: 'отзывы', get: (z) => (z && (z.rev_y != null || z.rev_vk != null) ? (z.rev_y || 0) + (z.rev_vk || 0) : null) },
 ]
 
+// ── ДРАЙВЕРЫ РОСТА В «КОНТРОЛЕ ДНЯ» (задание 06.08, D-41/D-42/D-75/D-76/D-77) ──
+// До 06.08 блок «Активности и гипотезы» печатал у каждого драйвера «% к плану» и
+// ставил бейдж с кодом ПОД КАЖДЫМ днём его работы. Оба числа убраны, и по разным
+// причинам:
+//   • процент считался как Σфакт ÷ Σплан по дням работы драйвера. У драйвера,
+//     идущего весь месяц, окно = весь месяц, поэтому число равнялось показателю
+//     месяца, а у всех вложенных окон отличалось только длиной окна. Это арифметика
+//     окна, а не эффект драйвера (D-41); вердикт по эффекту ставит человек (D-33);
+//   • бейдж повторял один факт «драйвер работает» столько раз, сколько в месяце
+//     дней: 6 драйверов × 31 день = 186 значков за август по одному парку (D-42).
+//
+// Остаётся ровно то, чего в других местах нет: КОГДА в этом парке в этом месяце
+// что-то переключили. Информация живёт в двух местах и больше нигде — одна
+// строка-сводка над таблицей дней и точка-маркер в дне переключения.
+//
+// Отличить «включили в этом месяце» от «работает с прошлых месяцев» можно ТОЛЬКО
+// по полю `start`: в `days` фон и свежее включение выглядят одинаково.
+const inMonth = (iso, ym) => typeof iso === 'string' && iso.length >= 7 && iso.slice(0, 7) === ym
+
+// Агрегат «замер идёт у N» (§2 задания). `measure` — СВОБОДНЫЙ ТЕКСТ контура B
+// («заблокирован» · «невозможен» · «идёт» · «идёт (обратный эффект зафиксирован)»),
+// парсить его нельзя — можно только спросить «начинается с “идёт”». Ё/е нормализуем:
+// мастера правятся руками, и «идет» рано или поздно приедет.
+export const isMeasuring = (v) =>
+  String(v ?? '').trim().toLowerCase().replace(/ё/g, 'е').startsWith('идет')
+
+// Несколько переключений в один день → ОДИН маркер (D-76). Включение перевешивает:
+// «здесь что-то включили» — более сильное событие, чем «что-то выключили».
+export function markKind(events) {
+  if (!events || !events.length) return null
+  return events.some((e) => e.kind === 'on') ? 'on' : 'off'
+}
+
+/**
+ * Драйверы одного набора (парк × месяц) для «Контроля дня».
+ *
+ * Возвращает:
+ *   total     — сколько драйверов работает в наборе (все строки `activities`);
+ *   measuring — у скольких замер идёт (правило выше);
+ *   starts[]  — включения ВНУТРИ месяца, свежие первыми;
+ *   ends[]    — выключения внутри месяца, свежие первыми;
+ *   marksBy   — ISO-дата → события этого дня (для маркера в таблице дней);
+ *   ready     — приехали ли новые поля вообще.
+ *
+ * `ready === false` — это боевой случай, а не край: боевой Apps Script до v3.14
+ * отдаёт `activities` без `start/end/accuracy/measure`. Тогда «включений не было»
+ * было бы ЛОЖЬЮ (у Охты 01.08 включение есть), поэтому сводка и маркеры скрываются
+ * целиком и экран деградирует к прежнему виду — без блока, но и без вранья.
+ */
+export function computeDrivers(set) {
+  const ym = String((set && set.month) || '')
+  const acts = Array.isArray(set && set.activities) ? set.activities : []
+  const ev = (a, kind, iso) => ({
+    code: String(a.code || ''),
+    name: String(a.name || ''),
+    kind,
+    iso,
+    // «~» — про точность ДАТЫ СТАРТА (§2 задания), поэтому только у включений.
+    // 35 строк из 47 имеют accuracy ≠ «день»: это норма, а не редкий случай, и без
+    // «~» фронт печатал бы ложную точность.
+    approx: kind === 'on' && String(a.accuracy || 'unknown') !== 'день',
+  })
+  const starts = []
+  const ends = []
+  for (const a of acts) {
+    if (!a) continue
+    if (inMonth(a.start, ym)) starts.push(ev(a, 'on', a.start))
+    if (inMonth(a.end, ym)) ends.push(ev(a, 'off', a.end))
+  }
+  const freshFirst = (x, y) => (x.iso < y.iso ? 1 : x.iso > y.iso ? -1 : 0)
+  starts.sort(freshFirst)
+  ends.sort(freshFirst)
+  const marksBy = {}
+  for (const e of starts.concat(ends)) (marksBy[e.iso] || (marksBy[e.iso] = [])).push(e)
+  return {
+    total: acts.length,
+    measuring: acts.filter((a) => a && isMeasuring(a.measure)).length,
+    starts,
+    ends,
+    marksBy,
+    ready: acts.some((a) => a && (a.start || a.end || a.measure)),
+  }
+}
+
 // Основная модель одного набора (парк × месяц). set — объект payload формы §2.2.
 export function computeDaily(set) {
   if (!set || typeof set !== 'object') return null
@@ -56,8 +140,9 @@ export function computeDaily(set) {
   const hol = new Set(set.holidays || [])
   const coefArr = Array.isArray(set.dow_coef) ? set.dow_coef : []
 
-  const actBy = {}
-  ;(set.activities || []).forEach((a) => (a.days || []).forEach((dt) => { (actBy[dt] = actBy[dt] || []).push(a.code) }))
+  // Драйверы роста в «Контроле дня» (D-41/D-42/D-75/D-76, задание 06.08): не список
+  // с процентом и не бейдж под каждым днём работы, а одна сводка + маркер переключения.
+  const drivers = computeDrivers(set)
   const byDate = {}
   ;(set.days || []).forEach((x) => { byDate[x.date] = x })
 
@@ -73,7 +158,10 @@ export function computeDaily(set) {
     const full = !!(f && f.status === 'full')
     days.push({
       dd, iso, dow, dowRu: DOW_RU[dow - 1], weekend: dow >= 6,
-      holiday: hol.has(iso), acts: actBy[iso] || [],
+      holiday: hol.has(iso),
+      // D-42/D-76: событий в дне может быть несколько — маркер один, подписи все.
+      mark: markKind(drivers.marksBy[iso]),
+      markEvents: drivers.marksBy[iso] || [],
       coef, weight: coef * fac,
       fact: f ? f.rev : null, chk: f ? f.chk : null,
       status: f ? f.status : null, outlier: !!(f && f.outlier),
@@ -146,7 +234,7 @@ export function computeDaily(set) {
     // строки дней для таблицы недели
     w.rows = w.days.map((x) => ({
       dd: x.dd, dowRu: x.dowRu, weekend: x.weekend, holiday: x.holiday,
-      acts: x.acts, plan: x.plan, fact: x.fact, need: x.need,
+      mark: x.mark, markEvents: x.markEvents, plan: x.plan, fact: x.fact, need: x.need,
       status: x.status, outlier: x.outlier, full: x.full, chk: x.chk,
       isLastFact: x.iso === lastFactISO,
       ratio: x.full ? x.fact / x.plan : null,
@@ -194,16 +282,6 @@ export function computeDaily(set) {
     }
   })
 
-  // активности: результат к плану по дням активности
-  const activities = (set.activities || []).map((a) => {
-    const dd = (a.days || []).map((iso) => days.find((x) => x.iso === iso)).filter(Boolean)
-    const fullA = dd.filter((x) => x.full)
-    let result = null; let sig = 'idle'
-    if (!fullA.length) result = dd.some((x) => x.status === 'partial') ? 'ongoing' : 'ahead'
-    else { const rr = sum(fullA, (x) => x.fact) / sum(fullA, (x) => x.plan); result = rr - 1; sig = sigClass(rr) }
-    return { code: a.code, name: a.name, days: (a.days || []).map((iso) => Number(iso.slice(8))), result, sig }
-  })
-
   // панель коэффициентов
   const calib = set.calib || {}
   const coefRows = DOW_RU.map((dn, i) => ({
@@ -227,7 +305,7 @@ export function computeDaily(set) {
     achievable, goalState, remainTarget, factPct, landPct, gap,
     onPlan, tailCum, spread: remaining.length ? Math.abs(tailCum) / remaining.length : 0,
     currentPace, needPerDay, paceGap, futureCount: futureDays.length,
-    days, weeks, dayStats, metColumns, metRows, journal, activities,
+    days, weeks, dayStats, metColumns, metRows, journal, drivers,
     coefRows, maxCoef, calib, holidays: set.holidays || [],
     lead: set.lead || null,
     crossCheck: set.cross_check || null,

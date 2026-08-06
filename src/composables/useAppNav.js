@@ -12,22 +12,36 @@ import { ref } from 'vue'
 const active = ref('home')
 const subView = ref(null) // null | 'parks'
 
+// ── ОТКУДА ПРИШЛИ (задание 06.08 §3.3) ──────────────────────────────────────
+// Под-страница может открываться из РАЗНЫХ мест: «Драйверы роста» — плиткой с
+// Главной и строкой-сводкой из «Контроля дня». Возврат обязан вести туда, откуда
+// зашли, иначе клик по сводке стоит владельцу потери состояния «Контроля дня»
+// (раскрытых недель и выбранного месяца) — а он туда вернётся.
+//
+// Это НЕ стек: глубина по-прежнему 1, помним ровно один шаг назад. Форма —
+// `{ to, label }`: `to` — ключ под-страницы для возврата, `label` — подпись
+// back-кнопки. `null` = зашли обычным путём, возврат на Главную, как раньше.
+const subOrigin = ref(null)
+
 export function setActive(id) {
   if (id === active.value && subView.value === null) return
   active.value = id
   // Смена вкладки сбрасывает под-страницу (паттерн iOS: вкладка переключилась →
   // глубину сбрасываем).
   subView.value = null
+  subOrigin.value = null
 }
 
-export function setSubView(name) {
+export function setSubView(name, origin = null) {
   subView.value = name || null
+  subOrigin.value = name ? origin : null
 }
 
 export function clearSubView() {
   subView.value = null
+  subOrigin.value = null
 }
 
 export function useAppNav() {
-  return { active, subView, setActive, setSubView, clearSubView }
+  return { active, subView, subOrigin, setActive, setSubView, clearSubView }
 }

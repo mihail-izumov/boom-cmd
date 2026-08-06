@@ -1,6 +1,7 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
 import { useDaily } from '../../composables/useDaily.js'
+import { useAppNav } from '../../composables/useAppNav.js'
 import { useParkContext } from '../../composables/useParkContext.js'
 import {
   joinDrivers,
@@ -82,6 +83,15 @@ const isOpen = (s) => (fStatus.value !== 'all' ? true : !!openMap[s])
 // Переключатель без второго рабочего состояния был бы кнопкой в пустоту.
 const canContrib = computed(() => hasContrib(data.value))
 const tab = ref('contrib')
+// Вид, выбранный владельцем САМИМ. Заход из «Контроля дня» — временное исключение
+// (§3.3), а не смена дефолта раздела: по D-50 раздел открывается «Вкладом в план».
+// Без этой памяти tab='list' переживает keep-alive, и следующий заход С ГЛАВНОЙ
+// тоже откроется списком.
+const tabPref = ref('contrib')
+function pickTab(id) {
+  tab.value = id
+  tabPref.value = id
+}
 // Отдельный computed, а не watch по canContrib: в момент первого рендера данные ещё
 // грузятся, canContrib === false, и watch навсегда увёл бы дефолт на список —
 // «Вклад в план» переставал бы быть дефолтным ровно там, где он есть.
@@ -90,6 +100,22 @@ const VIEW_TABS = [
   { id: 'contrib', label: L.tab_contrib },
   { id: 'list', label: L.tab_list },
 ]
+
+// ── Заход из «Контроля дня» (задание 06.08 §3.3) ────────────────────────────
+// Строка-сводка отвечает на «что переключили в этом парке в этом месяце», а глубину
+// — «что вообще идёт и с какого числа» — владелец идёт смотреть сюда. Значит ему
+// нужен СПИСОК, а не «Вклад в план»: попасть с клика по «Включён 1: DRV-04 с 01.08»
+// на диаграмму ёмкости — промах. Статус-чип сбрасываем на «Все» (§3.3): раздел под
+// keep-alive, и прошлый выбор («пауза») спрятал бы ровно тот драйвер, ради которого
+// пришли. Заход с Главной ничего не сбрасывает — там состояние осмысленно.
+const { subOrigin } = useAppNav()
+function applyOrigin() {
+  const fromDaily = !!(subOrigin.value && subOrigin.value.to === 'daily')
+  tab.value = fromDaily ? 'list' : tabPref.value
+  if (fromDaily) fStatus.value = 'all'
+}
+onMounted(applyOrigin)
+onActivated(applyOrigin)
 </script>
 
 <template>
@@ -141,7 +167,7 @@ const VIEW_TABS = [
           ? 'bg-[var(--surface)] font-semibold text-[var(--text)] shadow-[var(--card-shadow)]'
           : 'text-[var(--text-secondary)]'"
         style="min-height: 44px"
-        @click="tab = t.id"
+        @click="pickTab(t.id)"
       >{{ t.label }}</button>
     </div>
 
