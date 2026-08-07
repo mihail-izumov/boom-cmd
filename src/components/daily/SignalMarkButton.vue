@@ -63,17 +63,50 @@ const readDate = computed(() => {
 const label = computed(() => (done.value ? L.signal_read_done : L.signal_read))
 const disabled = computed(() => done.value || state.value === 'sending' || !markable.value)
 
-// Общие классы: кнопка на всю ширину, тач-таргет ≥44pt (HIG).
-const BTN = 'flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--surface-2)] px-4 ' +
-  'text-[0.9375rem] font-medium text-[var(--text)] transition-opacity active:opacity-90 disabled:opacity-100'
-// Бейдж числа: белая пилюля с кантом. Цифра — на --surface, контраст 17,22:1.
+// ── ОКРАСКА КНОПОК (правка владельца 07.08: «не видно на цветной карточке») ──
+// Прежняя заливка --surface-2 (#F1F0EC) на окрашенной карточке пропадала совсем:
+// фон карточки — signalTint = 12 % цвета статуса на --surface, и контраст заливок
+// по WCAG выходил 1,00–1,08:1 (focus #FAE6E4 → 1,05:1). Не «плохо видно» — границы
+// кнопки нет вовсе. Жёлтый как заливка тоже отпадает: --accent на warn-карточке
+// даёт 1,46:1 — та же ловушка, что уже ловили с бейджем «новое».
+//
+// Схема: главное действие — тёмная плашка (идиома проекта: чёрный бейдж работает
+// на любом тоне), второстепенное и выполненное — белая плашка с ТЁМНЫМ кантом.
+// Кант, а не заливка: белая заливка на светлом тинте сама даёт лишь 1,20:1, всю
+// работу по отделению кнопки от фона делает линия.
+const BTN = 'flex w-full items-center justify-center gap-2 rounded-xl border px-4 ' +
+  'text-[0.9375rem] font-medium transition-opacity active:opacity-90 disabled:opacity-100'
+// Призыв к действию. --text на любом тинте: 14,36:1 (focus) … 16,27:1 (warn);
+// белый текст на самой плашке — 17,22:1.
+const BTN_PRIMARY = 'border-transparent bg-[var(--text)] text-[var(--ink-on-color)]'
+// Второстепенное действие. Кант --text-secondary: 8,24:1 к тинту, 9,88:1 к своей
+// заливке — линия читается и на цветной карточке, и на белом фоне ленты «Ранее».
+const BTN_QUIET = 'border-[var(--text-secondary)] bg-[var(--surface)] text-[var(--text)]'
+// Сделано / архив: действия больше нет, но кнопка обязана остаться различимой.
+// Кант --text-muted: 4,32:1 к тинту, 5,18:1 к заливке — выше порога 3:1 для
+// нетекстовых элементов (WCAG 1.4.11), но заметно тише призыва.
+const BTN_MUTED = 'border-[var(--text-muted)] bg-[var(--surface)] text-[var(--text)]'
+
+const btnMark = computed(
+  () => `${BTN} ${done.value || !markable.value ? BTN_MUTED : BTN_PRIMARY}`,
+)
+
+// Бейдж числа: пилюля с кантом. Раньше была белая на --line — на белой кнопке
+// (а бейдж живёт ИМЕННО на ней: дата появляется в состоянии «Прочитано») такая
+// пилюля исчезала, кант --line к --surface даёт 1,31:1. Теперь заливка --surface-2
+// с кантом --text-muted: кант 4,54:1, цифра 15,10:1.
 // Отдельная плашка вместо «· 04.08» — точка-разделитель посреди строки читалась
 // как случайный символ, а не как структура.
-const BADGE = 'inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--surface)] ' +
+const BADGE = 'inline-flex items-center rounded-full border border-[var(--text-muted)] bg-[var(--surface-2)] ' +
   'px-2 py-0.5 text-[0.8125rem] font-semibold tabular-nums text-[var(--text)]'
-// Подпись-статус словом (не число) — --text-secondary даёт 8,66:1 на --surface-2;
-// --text-muted там же даёт лишь 4,54:1, запас копеечный.
-const NOTE = 'text-[0.8125rem] font-normal text-[var(--text-secondary)]'
+// Подпись-статус словом (не число). Цвет зависит от плашки под ней: на тёмной
+// --text-secondary даёт 1,74:1 (нечитаемо), поэтому там текст белый, а второстепенность
+// несёт НЕ цвет, а начертание — font-normal против font-medium у подписи кнопки.
+// На белой плашке --text-secondary даёт 9,88:1.
+const NOTE = 'text-[0.8125rem] font-normal'
+const noteMark = computed(
+  () => `${NOTE} ${done.value || !markable.value ? 'text-[var(--text-secondary)]' : 'text-[var(--ink-on-color)]'}`,
+)
 </script>
 
 <template>
@@ -84,14 +117,14 @@ const NOTE = 'text-[0.8125rem] font-normal text-[var(--text-secondary)]'
       data-test="signal-read"
       :data-state="state"
       :disabled="disabled"
-      :class="BTN"
+      :class="btnMark"
       style="min-height: 44px"
       @click="!disabled && emit('mark', date)"
     >
       <span>{{ label }}{{ done ? ' ✓' : '' }}</span>
-      <span v-if="state === 'sending'" data-test="signal-read-sending" :class="NOTE">{{ L.signal_read_sending }}</span>
+      <span v-if="state === 'sending'" data-test="signal-read-sending" :class="noteMark">{{ L.signal_read_sending }}</span>
       <span v-else-if="done && readDate" data-test="signal-read-date" :class="BADGE">{{ readDate }}</span>
-      <span v-else-if="!markable" data-test="signal-archive" :class="NOTE">{{ L.signal_archive }}</span>
+      <span v-else-if="!markable" data-test="signal-archive" :class="noteMark">{{ L.signal_archive }}</span>
     </button>
 
     <!-- 2. Оценка — видна СРАЗУ, наравне с отметкой, а не дорисовывается после неё.
@@ -100,7 +133,7 @@ const NOTE = 'text-[0.8125rem] font-normal text-[var(--text-secondary)]'
       v-if="markable"
       type="button"
       data-test="signal-rate-cta"
-      :class="BTN"
+      :class="[BTN, BTN_QUIET]"
       style="min-height: 44px"
       @click="emit('rate', date)"
     >

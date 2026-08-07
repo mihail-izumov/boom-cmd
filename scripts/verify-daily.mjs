@@ -3637,6 +3637,103 @@ console.log('\n=== Контраст WCAG: мелкий серый текст с�
   }).join('')
   const kicker = cr(mix('#1C1B18', '#FFC833', 0.7), '#FFC833')
   check(`подводка ink 70 % на --accent = ${kicker.toFixed(2)}:1 ≥ 4.5`, kicker >= 4.5)
+
+  // ── Кнопки сигнала на ОКРАШЕННОЙ карточке (правка владельца 07.08) ──
+  // Карточка красится в signalTint = 12 % цвета статуса на --surface, и кнопка
+  // обязана держаться на любом из этих тонов. Считаем по всем статусам разом:
+  // раньше заливка --surface-2 давала 1,00–1,08:1 — кнопки на экране просто не было.
+  const TINTS = {
+    ok: mix('#2F9E54', '#FFFFFF', 0.12),
+    warn: mix('#FFC833', '#FFFFFF', 0.12),
+    focus: mix('#D92D20', '#FFFFFF', 0.12),
+    'без статуса': mix('#6F6D66', '#FFFFFF', 0.12),
+  }
+  for (const [name, tint] of Object.entries(TINTS)) {
+    // Заливка primary-кнопки — несущая графика, порог 3:1 (WCAG 1.4.11).
+    const prim = cr('#1C1B18', tint)
+    check(`primary --text на карточке «${name}» (${tint}) = ${prim.toFixed(2)}:1 ≥ 3`, prim >= 3)
+    // У белых кнопок фон почти совпадает с тинтом — кнопку отделяет КАНТ, его и меряем.
+    const quiet = cr('#45433E', tint)
+    check(`кант --text-secondary на «${name}» = ${quiet.toFixed(2)}:1 ≥ 3`, quiet >= 3)
+    const muted = cr('#6F6D66', tint)
+    check(`кант --text-muted (сделано/архив) на «${name}» = ${muted.toFixed(2)}:1 ≥ 3`, muted >= 3)
+    // Контрольная величина: почему НЕ жёлтая заливка и НЕ прежняя --surface-2.
+    const old = cr('#F1F0EC', tint)
+    check(`   прежняя заливка --surface-2 действительно проваливалась (${old.toFixed(2)}:1 < 3)`, old < 3)
+  }
+  const onPrimary = cr('#FFFFFF', '#1C1B18')
+  check(`--ink-on-color на primary-кнопке = ${onPrimary.toFixed(2)}:1 ≥ 4.5`, onPrimary >= 4.5)
+  const onQuiet = cr('#1C1B18', '#FFFFFF')
+  check(`--text на белой кнопке = ${onQuiet.toFixed(2)}:1 ≥ 4.5`, onQuiet >= 4.5)
+  // Бейдж даты/оценки живёт на БЕЛОЙ кнопке: прежний кант --line там пропадал.
+  const badgeEdge = cr('#6F6D66', '#FFFFFF')
+  check(`кант бейджа --text-muted на белой кнопке = ${badgeEdge.toFixed(2)}:1 ≥ 3`, badgeEdge >= 3)
+  const badgeInk = cr('#1C1B18', '#F1F0EC')
+  check(`цифра бейджа --text на --surface-2 = ${badgeInk.toFixed(2)}:1 ≥ 4.5`, badgeInk >= 4.5)
+  const oldBadgeEdge = cr('#E3E1DB', '#FFFFFF')
+  check(`   прежний кант бейджа --line на белом проваливался (${oldBadgeEdge.toFixed(2)}:1 < 3)`, oldBadgeEdge < 3)
+}
+
+console.log('\n=== jsdom: окраска кнопок сигнала по состояниям (правка 07.08) ===')
+{
+  // Проверяем боевым путём — на смонтированной карточке, а не по исходнику: цвет
+  // выбирается computed'ом от done/markable, и подмена состояния мимо компонента
+  // проверяла бы строку, а не поведение.
+  const cls = (el, sel) => el.querySelector(sel)?.className || ''
+  const PRIMARY = 'bg-[var(--text)]'
+  const QUIET = 'border-[var(--text-secondary)]'
+  const MUTED = 'border-[var(--text-muted)]'
+
+  resetSignals()
+  postMode = 'ok'; postedBodies.length = 0
+  const fresh = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  const markCls = cls(fresh.el, '[data-test="signal-read"]')
+  check('свежий сигнал: «Отметить прочитанным» — тёмная плашка (призыв)',
+    markCls.includes(PRIMARY) && markCls.includes('text-[var(--ink-on-color)]'), markCls)
+  check('   и она НЕ красится прежней --surface-2', !markCls.includes('bg-[var(--surface-2)]'))
+  const rateCls = cls(fresh.el, '[data-test="signal-rate-cta"]')
+  check('«Оценить» — белая плашка с тёмным кантом (второстепенное действие)',
+    rateCls.includes(QUIET) && rateCls.includes('bg-[var(--surface)]'), rateCls)
+  check('обе кнопки держат кант-класс (иначе border-width некому задать)',
+    markCls.split(' ').includes('border') && rateCls.split(' ').includes('border'))
+  // Подпись «отправляем» ложится на ТЁМНУЮ плашку: --text-secondary дал бы там 1,74:1.
+  await fire(fresh.el.querySelector('[data-test="signal-read"]'), 'click')
+  await nextTick()
+  check('состояние «отправляем»: плашка ещё тёмная, подпись белая',
+    cls(fresh.el, '[data-test="signal-read"]').includes(PRIMARY) &&
+    cls(fresh.el, '[data-test="signal-read-sending"]').includes('text-[var(--ink-on-color)]'))
+  await drainOutbox()
+  await nextTick()
+  const doneCls = cls(fresh.el, '[data-test="signal-read"]')
+  check('после подтверждения бэка: кнопка гаснет до белой с кантом --text-muted',
+    doneCls.includes(MUTED) && doneCls.includes('bg-[var(--surface)]') && !doneCls.includes(PRIMARY), doneCls)
+  check('бейдж даты внутри белой кнопки не растворяется: кант --text-muted, заливка --surface-2',
+    cls(fresh.el, '[data-test="signal-read-date"]').includes('border-[var(--text-muted)]') &&
+    cls(fresh.el, '[data-test="signal-read-date"]').includes('bg-[var(--surface-2)]'))
+  fresh.app.unmount()
+
+  // Архив (старше окна 14 дней): действия нет, но кнопка обязана остаться видимой.
+  resetSignals()
+  const oldSig = { park: 'ohta', month: '2025-05', signals: [{ date: '2025-03-01', status: 'ok', headline: 'старый', action: '' }] }
+  const arch = mount(bundle.DailySignalCard, { m: { ...mOhta, ...oldSig }, now: NOW_MID, signals: oldSig.signals })
+  await nextTick()
+  const archCls = cls(arch.el, '[data-test="signal-read"]')
+  check('архивный сигнал: тихая белая кнопка с кантом, а не тёмный призыв',
+    archCls.includes(MUTED) && !archCls.includes(PRIMARY), archCls)
+  check('подпись «архив» на белой плашке — --text-secondary (9,88:1)',
+    cls(arch.el, '[data-test="signal-archive"]').includes('text-[var(--text-secondary)]'))
+  arch.app.unmount()
+
+  // Тот же компонент живёт и в ленте «Ранее» на БЕЛОМ фоне — цвета там те же,
+  // отдельной ветки нет: кант работает на обоих фонах, это и была цель правки.
+  const src = readFileSync(resolve(root, 'src/components/daily/SignalMarkButton.vue'), 'utf8')
+  check('в компоненте не осталось заливки --surface-2 у самих кнопок',
+    !/bg-\[var\(--surface-2\)\][^\n]*px-4/.test(src) &&
+    (src.match(/bg-\[var\(--surface-2\)\]/g) || []).length === 1, // только бейдж
+    String((src.match(/bg-\[var\(--surface-2\)\]/g) || []).length))
+  check('жёлтый как заливку кнопки не использовали (1,46:1 на warn-карточке)',
+    !src.includes('bg-[var(--accent)]'))
 }
 
 console.log('\n=== jsdom: плавающая кнопка «+» «Отчёта дня» (правка 06.08) ===')
