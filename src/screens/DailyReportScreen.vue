@@ -11,7 +11,7 @@ import { PARKS_BY_ID } from '../data/parks.js'
 import {
   L, FIELD_LABELS, SECTION_TITLES, WEATHER_OPTIONS, WEEKLY_NOTE,
   checksIntroFor, hintFor, tipFor, summaryValue, summaryLabelFor, softWarnMessage,
-  sumMismatch, dateHuman,
+  sumMismatch, dateHuman, acceptedTime,
 } from '../i18n/report.js'
 
 // «Отчёт дня» v2 (D-12) — ЕДИНСТВЕННАЯ пишущая страница фронта: форма → POST →
@@ -23,7 +23,10 @@ import {
 // скролл к первому проблемному полю (визарда нет — один экран для рутины).
 // Ошибка сети — красная плашка, данные формы НЕ теряются.
 
-const { sending, sent, sendError, sendHint, attempt, submit, resetSent } = useReport()
+const { sending, sent, sendError, sendHint, attempt, acceptedAt, submit, resetSent } = useReport()
+// Время приёма показываем ТОЛЬКО когда бэк его прислал (v3.16+). Старый деплой поля
+// не отдаёт — экран успеха тогда ровно такой, каким был, без пустой строки и прочерка.
+const acceptedHm = computed(() => acceptedTime(acceptedAt.value))
 
 const form = reactive(emptyForm())
 const sentDate = ref('') // дата успешно отправленного отчёта (для экрана успеха)
@@ -119,9 +122,15 @@ function more() {
       <span class="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--positive)]">
         <Check class="h-8 w-8 text-[var(--ink-on-color)]" :stroke-width="2.5" aria-hidden="true" />
       </span>
-      <p class="text-[1.25rem] font-semibold text-[var(--text)]">
+      <p data-test="report-success-title" class="text-[1.25rem] font-semibold text-[var(--text)]">
         {{ L.success_title(dateHuman(sentDate)) }}
       </p>
+      <!-- Время приёма — от бэка, не с часов телефона (NET-34 §3.3). -->
+      <p
+        v-if="acceptedHm"
+        data-test="report-accepted-at"
+        class="-mt-2 text-[0.9375rem] tabular-nums text-[var(--text-secondary)]"
+      >{{ L.success_at(acceptedHm) }}</p>
       <button
         type="button"
         class="mt-2 min-h-[48px] rounded-2xl bg-[var(--accent)] px-6 text-[1rem] font-semibold text-[var(--accent-ink)] active:opacity-90"

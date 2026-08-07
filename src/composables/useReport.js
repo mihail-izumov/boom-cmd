@@ -65,13 +65,25 @@ export function useReport() {
   // Номер текущей попытки (1, 2, 3). Нужен экрану: молчать 6 секунд, пока идут
   // повторы, нельзя — это читается как зависание, и человек жмёт кнопку ещё раз.
   const attempt = ref(0)
+  // ── ВРЕМЯ ПРИЁМА (NET-34 §3.3, 07.08) ──
+  // Время сдачи ставит бэк, и до сих пор управляющий узнавал его только из сводки
+  // на следующий день. Поэтому расхождение на час прожило две недели: сравнить
+  // «когда отправил» с «когда засчитали» было не с чем и негде. Теперь показываем
+  // сразу после отправки — это и обратная связь, и способ поймать такой сбой за день.
+  //
+  // ЧАСЫ ТЕЛЕФОНА НЕ ИСПОЛЬЗУЕМ. Строка приходит от бэка готовой (`submitted_msk`,
+  // МСК): считать время на клиенте — значит показать то, что человек и так видит на
+  // своих часах, и снова не заметить расхождения. Поля нет (старый деплой) — строка
+  // пустая, экран успеха выглядит ровно как раньше.
+  const acceptedAt = ref('')
   const { getKey, logout } = useAccessKey()
 
   const isDev =
     typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
 
   // Одна попытка целиком: запрос → статус → JSON → контракт {ok:true}.
-  // Бросает Error с полем retriable.
+  // Бросает Error с полем retriable. Возвращает разобранное тело: с v3.16 в нём
+  // приезжает время, которое РЕАЛЬНО записалось (NET-34 §3.3).
   async function attemptOnce(url, body) {
     let res
     try {
@@ -95,6 +107,7 @@ export function useReport() {
       // Бэк ответил осознанно: причина в теле запроса или в ключе. Не повторяем.
       throw failure(json?.error || 'Отказ бэка', false)
     }
+    return json
   }
 
   async function submit(payload) {
@@ -127,7 +140,7 @@ export function useReport() {
       // Счётчик попыток поднимает onRetry — ДО паузы, а не в начале следующего
       // витка: пауза это бо́льшая часть времени повтора, и всё это время кнопка
       // обязана говорить «пробуем ещё», иначе экран выглядит зависшим.
-      await runWithRetries(() => attemptOnce(API, body), {
+      const json = await runWithRetries(() => attemptOnce(API, body), {
         onRetry: (n, e) => {
           attempt.value = n
           if (typeof console !== 'undefined') {
@@ -135,6 +148,9 @@ export function useReport() {
           }
         },
       })
+      // Строка от бэка, как есть: 'yyyy-MM-dd HH:mm:ss' в МСК. Разбирать зону,
+      // пересчитывать или подставлять своё время фронт не должен — он только рендерит.
+      acceptedAt.value = typeof json?.submitted_msk === 'string' ? json.submitted_msk : ''
       sent.value = true
     } catch (e) {
       if (typeof console !== 'undefined') console.warn('report submit failed:', e)
@@ -152,7 +168,8 @@ export function useReport() {
     sendError.value = false
     sendHint.value = ''
     attempt.value = 0
+    acceptedAt.value = ''
   }
 
-  return { sending, sent, sendError, sendHint, attempt, submit, resetSent }
+  return { sending, sent, sendError, sendHint, attempt, acceptedAt, submit, resetSent }
 }

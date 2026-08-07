@@ -297,6 +297,7 @@ writeFileSync(resolve(tmp, 'entry.js'), `
 export { default as DailyReportScreen } from '${root}/src/screens/DailyReportScreen.vue'
 export { default as ReporterShell } from '${root}/src/components/report/ReporterShell.vue'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
+export { acceptedTime } from '${root}/src/i18n/report.js'
 `)
 
 // jsdom-глобали ДО любых импортов vite/vue: runtime-dom кэширует `document`
@@ -354,7 +355,14 @@ global.fetch = async (url, opts = {}) => {
       postFailsLeft--
       throw new TypeError('Failed to fetch') // ровно то, чем падает fetch без сети
     }
-    return json({ ok: true })
+    // v3.16 (NET-34): бэк отдаёт время, которое РЕАЛЬНО записалось. 'ok-old' —
+    // деплой до v3.16: полей нет, экран обязан выглядеть как раньше.
+    if (postMode === 'ok-old') return json({ ok: true })
+    return json({
+      ok: true,
+      submitted_at: '2026-08-07T06:42:13+03:00',
+      submitted_msk: '2026-08-07 06:42:13',
+    })
   }
   return json({}) // гейт: 200 без error → фраза ок, роль owner
 }
@@ -559,7 +567,59 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
     !('avg_check' in body) && !('cash_share' in body) && !('new_share' in body))
   check('экран успеха: «Отчёт за … принят»', el.textContent.includes('принят'))
   check('кнопка «Внести ещё»', el.textContent.includes('Внести ещё'))
+  // NET-34 §3.3: время приёма — от БЭКА. До этой правки управляющий узнавал его
+  // только из сводки на следующий день, и расхождение на час прожило две недели.
+  const at = el.querySelector('[data-test="report-accepted-at"]')
+  check('экран успеха показывает записанное время', !!at && at.textContent.includes('06:42'), at?.textContent)
+  check('время подписано как МСК и как ЗАПИСАННОЕ, а не «вы отправили»',
+    !!at && at.textContent.includes('МСК') && at.textContent.includes('Записано'), at?.textContent)
+  check('секунды на экран не выносим — минут достаточно',
+    !!at && !at.textContent.includes('06:42:13'), at?.textContent)
   app.unmount()
+}
+
+console.log('\n=== jsdom: время приёма — деградация и источник (NET-34 §3.3) ===')
+{
+  // Старый деплой бэка (до v3.16) полей не отдаёт: экран успеха обязан выглядеть
+  // ровно как раньше — без пустой строки, прочерка и «undefined».
+  postMode = 'ok-old'
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await nextTick()
+  await setInput(el, 'rep-park', 'iyun')
+  await setInput(el, 'rep-revenue', '1000')
+  await setInput(el, 'rep-cashless', '600')
+  await setInput(el, 'rep-cash', '400')
+  await setInput(el, 'rep-site', '0')
+  await setInput(el, 'rep-visitors_total', '10')
+  await setInput(el, 'rep-visitors_new', '2')
+  await setInput(el, 'rep-topups', '5')
+  await setInput(el, 'rep-sessions', '4')
+  await setInput(el, 'rep-weather', 'sunny')
+  await setInput(el, 'rep-date', yesterdayISO(new Date()))
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, 20))
+  await nextTick()
+  check('старый бэк: отчёт принят',
+    !!el.querySelector('[data-test="report-success-title"]'), el.textContent.slice(0, 160))
+  check('старый бэк: строки времени НЕТ (а не пустая/«undefined»)',
+    !el.querySelector('[data-test="report-accepted-at"]') &&
+    !el.textContent.includes('undefined') && !el.textContent.includes('NaN'))
+  app.unmount()
+  postMode = 'ok'
+}
+
+console.log('\n=== acceptedTime: разбор штампа бэка ===')
+{
+  const { acceptedTime } = bundle
+  check('«2026-08-07 06:42:13» → 06:42', acceptedTime('2026-08-07 06:42:13') === '06:42')
+  check('ISO с T тоже разбираем', acceptedTime('2026-08-07T06:42:13+03:00') === '06:42')
+  // Час — цена вердикта «в срок / просрочка» после переезда дедлайна на 06:00,
+  // поэтому подставлять своё время или показывать половину строки нельзя.
+  check('чужой формат → пусто, а не «половина строки»',
+    acceptedTime('07.08.2026 6:42') === '' && acceptedTime('шесть сорок') === '')
+  check('пусто/undefined/null → пусто',
+    acceptedTime('') === '' && acceptedTime(undefined) === '' && acceptedTime(null) === '')
+  check('полночь не теряется', acceptedTime('2026-08-07 00:05:00') === '00:05')
 }
 
 console.log('\n=== jsdom: ошибка бэка — данные не теряются ===')
