@@ -12,7 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { computeDaily, computeNetwork, sigClass, isMeasuring } from '../src/composables/dailyModel.js'
+import { computeDaily, computeNetwork, sigClass, isMeasuring, eventKind as bundleEventKind } from '../src/composables/dailyModel.js'
 import { monthLayout, markStyle } from '../src/composables/monthLayout.js'
 import { daysInMonth, daysLeftInMonth, mskToday } from '../src/composables/monthDays.js'
 import { driversMeasureSignal, driversSwitches, markTitle, ths, thsSigned } from '../src/i18n/daily.js'
@@ -250,6 +250,55 @@ const setWith = (activities, month = '2025-05') => ({ ...sets['ohta:2025-05'], m
   check('в подписи есть код и название, на маркере кода нет',
     markTitle(day.markEvents).startsWith('DRV-01 · Драйвер DRV-01 · включён 10.05'),
     markTitle(day.markEvents).split('\n')[0])
+}
+
+{
+  console.log('\n— ТИП СОБЫТИЯ: включён · перестроен · выключен (NET-33, задание 07.08) —')
+  // Повод: у Охты Молл строка писала «Включён 1: DRV-04 с 01.08» про обход зала,
+  // который идёт непрерывно с 16.07 — 01.08 его ПЕРЕСТРОИЛИ. Слово было ложное,
+  // потому что типа события в схеме не было: всякое начало периода = запуск.
+  const evk = (v) => bundleEventKind(v)
+  check("'перестроен' → rebuilt", evk('перестроен') === 'rebuilt', evk('перестроен'))
+  check("'выключен' → off", evk('выключен') === 'off', evk('выключен'))
+  check("'включён' → on", evk('включён') === 'on', evk('включён'))
+  check("'Перестроен' / без ё — мастера правятся руками", evk('Перестроен') === 'rebuilt' && evk('включен') === 'on')
+  check('поля нет вовсе → on (поведение до правки, обратная совместимость)',
+    evk(undefined) === 'on' && evk('') === 'on')
+  check('незнакомое значение → on, а не потеря маркера', evk('переименован') === 'on')
+
+  const m = computeDaily(setWith([
+    { ...act('DRV-04', '2025-05-01', '', 'день', 'идёт', ['2025-05-01']), event: 'перестроен' },
+    { ...act('DRV-03', '2025-04-01', '', 'день', 'заблокирован', ['2025-05-01']), event: 'включён' },
+  ]))
+  const day1 = m.days.find((x) => x.dd === 1)
+  check('маркер дня перестройки — свой вид, не «включён»', day1.mark === 'rebuilt', day1.mark)
+  check('в подписи стоит слово «перестроен»',
+    markTitle(day1.markEvents) === 'DRV-04 · Драйвер DRV-04 · перестроен 01.05', markTitle(day1.markEvents))
+  check('фон с апреля маркера не даёт (перестройка не размножилась)',
+    m.days.filter((x) => x.mark).length === 1)
+  check('перестройка НЕ печатается как включение (это и был баг)',
+    driversSwitches(m.drivers, '2025-05') === 'Включений в мае не было · перестроен DRV-04 с 01.05',
+    driversSwitches(m.drivers, '2025-05'))
+  check('«работают N» перестройка не меняет — драйвер и был включён', m.drivers.total === 2, m.drivers.total)
+
+  const mixDay = computeDaily(setWith([
+    { ...act('DRV-01', '2025-05-10', '', 'день', '', ['2025-05-10']), event: 'включён' },
+    { ...act('DRV-04', '2025-05-10', '', 'день', '', ['2025-05-10']), event: 'перестроен' },
+    { ...act('DRV-02', '2025-04-01', '2025-05-10', 'день', '', ['2025-05-10']), event: 'включён' },
+  ]))
+  const d10 = mixDay.days.find((x) => x.dd === 10)
+  check('три события в один день → ОДИН маркер (D-76)', mixDay.days.filter((x) => x.mark).length === 1)
+  check('приоритет включение > перестройка > выключение', d10.mark === 'on', d10.mark)
+  check('в title все три подписи, каждая своим глаголом',
+    markTitle(d10.markEvents).split('\n').map((s) => s.split(' · ')[2].split(' ')[0]).join(',')
+      === 'включён,перестроен,выключен',
+    markTitle(d10.markEvents).replace(/\n/g, ' | '))
+  const onlyReb = computeDaily(setWith([
+    { ...act('DRV-04', '2025-05-10', '2025-05-20', 'день', '', ['2025-05-10']), event: 'перестроен' },
+  ]))
+  check('перестройка перевешивает выключение',
+    onlyReb.days.find((x) => x.dd === 10).mark === 'rebuilt'
+    && onlyReb.days.find((x) => x.dd === 20).mark === 'off')
 }
 
 {
@@ -3386,6 +3435,33 @@ console.log('\n=== jsdom: строка-сводка драйверов и мар
   const hit = marks[0].querySelector('span.absolute')
   check('активная зона метки 44×44pt и вне потока (не растит строку)',
     !!hit && hit.className.includes('h-11') && hit.className.includes('w-11'), hit && hit.className)
+  // NET-33 §2.2: три вида метки по типу события. Проверяем именно ВИД, а не только
+  // data-kind: залитый и «залитый с обводкой» обязаны отличаться на экране, иначе
+  // перестройка снова станет неотличимой от запуска.
+  const mReb = bundle.computeDailyB(mkSet([
+    { code: 'DRV-04', name: 'Обход зала — цифровая форма', days: ['2025-05-13'],
+      start: '2025-05-13', end: '', accuracy: 'день', measure: 'идёт', event: 'перестроен' },
+    { code: 'DRV-02', name: 'Снятый драйвер', days: ['2025-05-20'],
+      start: '2025-04-01', end: '2025-05-20', accuracy: 'день', measure: '', event: 'включён' },
+  ]))
+  const wkR = mount(bundle.DailyWeeks, { m: mReb })
+  const mR = [...wkR.el.querySelectorAll('[data-test="drv-mark"]')]
+  check('меток две: перестройка 13-го и выключение 20-го', mR.length === 2, mR.length)
+  check('перестройка помечена своим типом', mR[0].getAttribute('data-kind') === 'rebuilt', mR[0].getAttribute('data-kind'))
+  const badge = (b) => b.querySelector('i').className
+  check('перестроен = ЗАЛИТЫЙ с обводкой (заливка --text + outline)',
+    /bg-\[var\(--text\)\]/.test(badge(mR[0])) && /outline/.test(badge(mR[0])), badge(mR[0]))
+  check('выключен остался пунктирным без заливки',
+    /border-dashed/.test(badge(mR[1])) && !/bg-\[var\(--text\)\]/.test(badge(mR[1])), badge(mR[1]))
+  check('включён и перестроен различимы: у включения обводки нет',
+    !/outline/.test(badge(marks[0])), badge(marks[0]))
+  check('в title перестройки стоит слово «перестроен», а не «включён»',
+    mR[0].getAttribute('title').includes('перестроен') && !mR[0].getAttribute('title').includes('включён'),
+    mR[0].getAttribute('title'))
+  check('обводка НЕ ring: offset красился бы фоном, а строка выходного идёт на --surface-2',
+    !/ring-/.test(badge(mR[0])), badge(mR[0]))
+  wkR.app.unmount()
+
   let fromMark = 0
   const wk2 = mount(bundle.DailyWeeks, { m: mDrv, 'onOpen-drivers': () => { fromMark++ } })
   wk2.el.querySelector('[data-test="drv-mark"]').click()
@@ -3601,6 +3677,61 @@ console.log('\n=== jsdom: Д-1 — заход из «Контроля дня» �
     statusOn().startsWith('Все'), statusOn())
 
   sec.app.unmount()
+  bundle.clearSubView()
+  getPayload = {}
+}
+
+console.log('\n=== jsdom: две группы под парком — «работают» и «применимы» (NET-33 §2.3) ===')
+{
+  // Боевой повод: владелец 07.08 открыл раздел под парком и не увидел сетевые
+  // драйверы вообще. Тест ходит боевым путём — монтирует раздел и читает ЗАГОЛОВКИ
+  // групп, а не зовёт модель: разъехаться могли именно шаблон и модель.
+  localStorage.clear()
+  bundle.clearSubView()
+  // Без driver_contrib переключателя видов нет и раздел открывается списком —
+  // ровно то состояние, в котором живут группы.
+  getPayload = {
+    updated: '2025-05-20', sets: {},
+    drivers: data.drivers, driver_periods: data.driver_periods,
+  }
+  bundle.setPark('piterland')
+  const sec = mount(bundle.DriversSection, {})
+  await flush()
+  const groups = () => [...sec.el.querySelectorAll('section > button')].map((b) => {
+    const t = [...b.children].filter((c) => c.tagName !== 'svg')
+    return t.map((c) => c.textContent.trim()).join(' ')
+  })
+  check('под парком групп ровно две', groups().length === 2, groups().join(' | '))
+  check('первой идёт «Работают в парке» — сперва «что тут работает»',
+    groups()[0] === 'Работают в парке 3', groups()[0])
+  check('второй — «Применимы, не включены» (ответ «что предстоит»)',
+    groups()[1] === 'Применимы, не включены 2', groups()[1])
+  check('групп по статусу под парком больше нет',
+    !groups().some((g) => /^(Идёт|Готов|Разработка|Backlog|Пауза|Закрыт)/.test(g)), groups().join(' | '))
+  check('счётчик всего = сумме групп (никто не потерялся)',
+    sec.el.textContent.includes('Всего 5 драйверов'),
+    (sec.el.textContent.match(/Всего [^·\n]+/) || [''])[0].trim())
+  check('обе группы по дефолту свёрнуты, как в «Задачах»',
+    [...sec.el.querySelectorAll('section > button')].every((b) => b.getAttribute('aria-expanded') === 'false'))
+
+  // Раскрываем «применимы» — там вместо дат условие запуска, приглушённо.
+  ;[...sec.el.querySelectorAll('section > button')][1].click()
+  await flush()
+  const appl = sec.el.querySelector('[data-test="driver-applicable"]')
+  check('в применимых вместо строки «Парки» — строка «Запуск»', !!appl, !!appl)
+  check('условие запуска приглушённое, датой не притворяется',
+    appl.innerHTML.includes('--text-muted') && !/\d{2}\.\d{2}\.\d{2}/.test(appl.textContent), appl.textContent.trim())
+  check('«не запущен ни в одном парке» в применимых не печатается — это не про парк',
+    !appl.closest('article').textContent.includes('не запущен ни в одном'))
+
+  bundle.setPark('network')
+  await flush()
+  check('«Вся сеть» → группировка по статусу вернулась (без парка «применим» бессмыслен)',
+    groups().some((g) => /^(Идёт|Готов|Разработка|Backlog|Пауза|Закрыт)/.test(g))
+    && !groups().some((g) => g.startsWith('Работают в парке')), groups().join(' | '))
+
+  sec.app.unmount()
+  bundle.setPark('network')
   bundle.clearSubView()
   getPayload = {}
 }

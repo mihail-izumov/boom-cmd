@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0d0a2e">
+<title>ТУРБО игры — Бумбастик</title>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+   b00m-cmd · /media/turbo/ · страница ТУРБО для ТВ-панелей у кассы (DRV-10)
+  ═══════════════════════════════════════════════════════════════════════════
+  Отдельный контур `media/` — носители для парков. К Vue-приложению «Мастерплан»
+  отношения не имеет: свой Vite-вход, свой дизайн, БЕЗ гейта доступа.
+  Дизайн согласован владельцем (5 итераций, 06.08) — см. обоснование по блокам
+  в boom-cmd-data/drivers/DRV-06-turbo/mehanika/ТУРБО-веб-страница.md.
+
+  ⚠ DESIGN-STANDARD-boom-cmd.md на эту страницу НЕ распространяется — это
+    рекламный носитель для гостя, а не экран приложения. Тёмная тема и
+    палитра-плейсхолдер здесь легальны и являются задокументированным
+    исключением. Токены приложения сюда не тянем и наоборот.
+
+  ПАРАМЕТРЫ URL
+    ?park=ohta|piterland|iyun  — жёстко фиксирует парк, переключатель скрыт (режим панели)
+    ?tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
+    ?demo=1                    — песочница: панель предпросмотра состояний внизу справа
+    ?mockError=1               — принудительная ошибка источника (отладка)
+
+  ДАННЫЕ
+    Живой fetch: VITE_TURBO_API (подставляется Vite на сборке из repo Variable)
+      → GET <API>?action=turbo&park=<код>
+    Эндпойнт ПУБЛИЧНЫЙ (без ключа): страница висит на панели в зале, вводить
+    фразу доступа некому. Поэтому он не отдаёт ничего, кроме того, что и так
+    напечатано на носителях. Полное расписание недели наружу НЕ выходит —
+    срезается на стороне Apps Script (механика §6: валюта email-подписки).
+    Контракт: boom-cmd/docs/DATA-CONTRACT-turbo.md
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ПЛЕЙСХОЛДЕРЫ фирменных цветов — дизайнер заменит */
+    --bg:#0d0a2e;
+    --tile:#171243;
+    --tile2:#1e1856;
+    --blue:#2d6bff;
+    --green:#3fe06c;
+    --lime:#c6f52e;
+    --yellow:#ffd530;
+    --pink:#ff3d68;
+    --white:#ffffff;
+    --muted:#9b94d0;
+    --dark:#0d0a2e;
+    --radius:22px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--white);
+    font-family:'Inter',system-ui,sans-serif;
+    overflow:hidden;
+  }
+  .page{
+    height:100dvh;
+    display:grid;
+    grid-template-columns: 1.05fr 1.5fr 1.05fr;
+    grid-template-rows: 62px 1.2fr 1fr 0.85fr 38px;
+    grid-template-areas:
+      "head   head  head"
+      "timer  hero  packs"
+      "steps  hero  packs"
+      "bottom bottom bottom"
+      "fineband fineband fineband";
+    gap:14px;
+    padding:14px;
+    max-width:1500px;
+    margin:0 auto;
+  }
+  .tile{
+    background:var(--tile);
+    border-radius:var(--radius);
+    padding:20px 22px;
+    position:relative;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+
+  /* ── шапка: слоган по центру + переключатель парков справа ── */
+  .head{
+    grid-area:head;
+    background:var(--tile);
+    border-radius:var(--radius);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+  }
+  .head .slogan{
+    font-family:'Unbounded';font-weight:700;font-size:clamp(16px,1.6vw,23px);
+    color:var(--white);letter-spacing:.5px;
+  }
+  .head .slogan b{color:var(--lime)}
+  .parks{
+    position:absolute;right:14px;top:50%;transform:translateY(-50%);
+    display:flex;gap:4px;background:rgba(255,255,255,.06);
+    border-radius:12px;padding:4px;
+  }
+  .parks button{
+    background:transparent;border:none;color:var(--muted);
+    font-family:'Inter';font-weight:700;font-size:12.5px;
+    padding:7px 12px;border-radius:9px;cursor:pointer;white-space:nowrap;
+  }
+  .parks button.on{background:var(--blue);color:#fff}
+  .parks[hidden]{display:none}
+
+  /* ── герой ── */
+  .hero{
+    grid-area:hero;
+    background:
+      radial-gradient(90% 70% at 50% 30%, rgba(45,107,255,.45) 0%, rgba(45,107,255,0) 70%),
+      linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
+    align-items:center;text-align:center;
+    justify-content:space-between;
+    padding:24px 24px 22px;
+    overflow:visible;
+  }
+  .turbo{
+    font-family:'Unbounded';font-weight:900;
+    font-size:clamp(60px, 6.8vw, 102px);
+    line-height:.95;letter-spacing:2px;
+    color:var(--white);
+  }
+  .turbo-sub{
+    display:inline-block;
+    font-family:'Unbounded';font-weight:900;
+    font-size:clamp(22px,2.4vw,34px);
+    letter-spacing:8px;text-indent:8px;
+    color:var(--dark);background:var(--lime);
+    padding:6px 20px;border-radius:14px;
+    transform:rotate(-2deg);
+    margin-top:10px;
+    box-shadow:0 6px 18px rgba(198,245,46,.25);
+  }
+  /* автоматы — иконки-приложения со счётчиками */
+  .apps{display:flex;gap:18px;justify-content:center;margin:20px 0 14px}
+  .apps .app{
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+  }
+  .apps .app .box{
+    position:relative;
+    width:56px;height:56px;border-radius:16px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:30px;
+    background:linear-gradient(160deg,#2a2274 0%,#191352 100%);
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 6px 16px rgba(0,0,0,.35);
+  }
+  .apps .app .lbl{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.3px}
+  .apps .cnt{
+    position:absolute;top:-8px;right:-8px;
+    min-width:24px;height:24px;padding:0 6px;
+    background:var(--pink);color:#fff;
+    border:2px solid #241d66;border-radius:999px;
+    font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .hero-claim{
+    font-family:'Unbounded';font-weight:700;
+    font-size:clamp(15px,1.5vw,21px);line-height:1.35;
+  }
+  .hero-claim b{color:var(--yellow)}
+  .hero-claim small{
+    display:block;font-family:'Inter';font-weight:600;font-size:13.5px;
+    color:var(--muted);margin-top:6px;letter-spacing:0;
+  }
+  .cta{
+    margin-top:18px;width:100%;
+    background:var(--white);color:var(--dark);
+    border:none;border-radius:16px;
+    padding:15px 20px;
+    display:flex;align-items:center;justify-content:space-between;
+    font-family:'Inter';font-weight:800;font-size:17px;
+    cursor:pointer;text-decoration:none;
+    transition:transform .15s;
+    position:relative;overflow:visible;
+  }
+  .cta:hover{transform:scale(1.02)}
+  .cta .price{font-family:'Unbounded';font-weight:900;font-size:22px}
+  .cta .tag{
+    position:absolute;right:-16px;top:-18px;
+    background:var(--pink);color:#fff;
+    font-family:'Unbounded';font-weight:900;font-size:14px;
+    padding:7px 14px;border-radius:10px;transform:rotate(-7deg);
+    white-space:nowrap;
+    box-shadow:0 8px 20px rgba(255,61,104,.45);
+  }
+
+  /* ── таймер: отсчёт сверху, подпись под ним ── */
+  .timer{grid-area:timer;border:2px solid transparent;justify-content:flex-start;padding-top:26px}
+  .timer .count{font-family:'Unbounded';font-weight:900;font-size:42px;letter-spacing:1px;line-height:1}
+  .timer .count small{display:block;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+  .timer .state{font-family:'Unbounded';font-weight:700;font-size:19px;line-height:1.25;margin-top:14px}
+  .timer .note{font-size:13px;color:var(--muted);margin-top:10px;font-weight:600;line-height:1.4}
+  .timer.now{border-color:var(--green);background:linear-gradient(160deg,#0f3d24 0%,var(--tile) 70%)}
+  .timer.now .count{color:var(--green)}
+  .timer.today .state{color:var(--yellow)}
+  .timer.none .state,
+  .timer.soon .state{font-size:19px;margin-top:0}
+
+  /* ── как это работает / победители недели ── */
+  .steps{grid-area:steps;background:var(--tile2)}
+  .steps h3{font-family:'Unbounded';font-weight:700;font-size:15px;margin-bottom:12px}
+  .step{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+  .step:last-child{margin-bottom:0}
+  .step .n{
+    flex:none;width:24px;height:24px;border-radius:50%;
+    background:var(--blue);color:#fff;font-weight:800;font-size:13px;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .step p{font-size:13.5px;font-weight:600;color:var(--muted);line-height:1.4}
+  .step p b{color:var(--white)}
+  /* победители недели — подменяют «как это работает» (механика §6в) */
+  .win{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  .win:last-child{margin-bottom:0}
+  .win .medal{
+    flex:none;width:34px;height:34px;border-radius:50%;
+    background:var(--yellow);color:var(--dark);
+    display:flex;align-items:center;justify-content:center;font-size:18px;
+  }
+  .win .who{font-family:'Unbounded';font-weight:700;font-size:15px;line-height:1.2}
+  .win .prize{font-size:12.5px;font-weight:600;color:var(--muted);margin-top:3px}
+
+  /* ── пакеты: единый белый блок ── */
+  .packs{
+    grid-area:packs;
+    background:var(--white);
+    border-radius:var(--radius);
+    padding:18px 0 0;
+    display:flex;flex-direction:column;
+    overflow:hidden; /* фикс: нижняя плашка не выходит за скругление */
+    box-shadow:0 0 0 3px rgba(198,245,46,.9), 0 18px 50px rgba(45,107,255,.25);
+  }
+  .packs .ptitle{
+    font-family:'Unbounded';font-weight:900;font-size:15px;color:var(--dark);
+    padding:0 22px 10px;letter-spacing:.5px;
+  }
+  .pack{
+    flex:1;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 22px;text-decoration:none;color:var(--dark);
+    border-top:1px solid #e8e6f5;
+    transition:background .15s;position:relative;
+  }
+  .pack:hover{background:#f2f6ff}
+  .pack .games{font-family:'Unbounded';font-weight:900;font-size:30px;line-height:1}
+  .pack .games small{
+    display:flex;align-items:center;gap:6px;
+    font-family:'Inter';font-weight:700;font-size:11.5px;color:#6b6885;
+    letter-spacing:.5px;margin-top:5px;
+  }
+  .pack .buy{text-align:right}
+  .pack .rub{font-family:'Unbounded';font-weight:900;font-size:24px}
+  .pack .per{font-size:11px;color:#1d4fd0;font-weight:800;margin-top:2px}
+  .pack.best{background:#eaffe0}
+  .pack.best:hover{background:#ddffcf}
+  .pack .badge{
+    background:var(--green);color:#06340f;font-size:10px;font-weight:800;
+    padding:2px 8px;border-radius:6px;letter-spacing:.5px;
+  }
+  .pack .badge.try{background:#1d4fd0;color:#fff}
+
+  /* ── нижняя полоса: колонки выровнены с сеткой страницы ── */
+  .bottom{grid-area:bottom;display:grid;grid-template-columns:1.7fr 0.85fr 1.05fr;gap:14px}
+
+  /* три сценария: карточки внутри одной плашки, без перегородок */
+  .getwrap{
+    background:var(--tile2);border-radius:var(--radius);
+    display:flex;align-items:stretch;gap:10px;padding:10px;
+  }
+  .gcard{
+    flex:1;padding:14px 16px;
+    background:var(--tile);border-radius:16px;
+    display:flex;flex-direction:column;justify-content:center;
+    transition:transform .15s;
+  }
+  .gcard:hover{transform:translateY(-3px)}
+  .gcard .ico{font-size:26px;margin-bottom:8px}
+  .gcard h4{font-family:'Unbounded';font-weight:700;font-size:14px;margin-bottom:5px}
+  .gcard p{font-size:12px;color:var(--muted);font-weight:600;line-height:1.4}
+
+  /* турбо-вторник: агрессивно */
+  .tue{
+    background:repeating-linear-gradient(-45deg,var(--yellow) 0 26px,#ffc400 26px 52px);
+    color:var(--dark);
+    align-items:flex-start;
+  }
+  .tue .day{
+    font-family:'Unbounded';font-weight:900;font-size:21px;line-height:1.15;
+    background:var(--dark);color:var(--yellow);
+    padding:6px 12px;border-radius:10px;transform:rotate(-2deg);
+  }
+  .tue p{font-size:13px;font-weight:800;margin-top:10px;line-height:1.35}
+
+  /* подписка: большая кнопка → модалка */
+  .sub{background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%)}
+  .sub h3{font-family:'Unbounded';font-weight:700;font-size:15px;line-height:1.3}
+  .sub p{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:4px}
+  .sub .bigbtn{
+    margin-top:12px;width:100%;
+    background:var(--lime);color:#1a2500;border:none;border-radius:14px;
+    padding:14px;font-family:'Inter';font-weight:800;font-size:15px;cursor:pointer;
+    transition:transform .15s;
+  }
+  .sub .bigbtn:hover{transform:scale(1.03)}
+
+  /* модалка email */
+  .modal{
+    position:fixed;inset:0;background:rgba(6,4,26,.75);backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;z-index:50;
+  }
+  .modal.open{display:flex}
+  .mbox{
+    width:min(440px,90vw);
+    background:var(--tile2);border-radius:var(--radius);
+    padding:28px;position:relative;
+  }
+  .mbox h3{font-family:'Unbounded';font-weight:900;font-size:20px;line-height:1.3}
+  .mbox p{font-size:13.5px;color:var(--muted);font-weight:600;margin-top:8px;line-height:1.45}
+  .mbox form{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+  .mbox input{
+    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);
+    border-radius:12px;padding:14px;color:#fff;font-family:'Inter';font-size:15px;outline:none;
+  }
+  .mbox input::placeholder{color:var(--muted)}
+  .mbox button[type=submit]{
+    background:var(--lime);color:#1a2500;border:none;border-radius:12px;
+    padding:14px;font-weight:800;font-size:15px;cursor:pointer;
+  }
+  .mbox .close{
+    position:absolute;top:14px;right:16px;background:none;border:none;
+    color:var(--muted);font-size:22px;cursor:pointer;line-height:1;
+  }
+  .mbox .ok{display:none;margin-top:16px;font-weight:800;color:var(--green);font-size:15px}
+
+  /* ── условия: своя плашка ── */
+  .fineband{
+    grid-area:fineband;
+    background:rgba(255,255,255,.04);
+    border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;color:var(--muted);font-weight:600;
+    padding:0 18px;text-align:center;
+  }
+
+  /* ── индикатор устаревших данных: только для персонала, не для гостя ── */
+  .stale{
+    position:fixed;left:10px;bottom:8px;z-index:9;
+    display:none;align-items:center;gap:6px;
+    background:rgba(0,0,0,.5);border-radius:8px;padding:4px 8px;
+    font-size:10px;font-weight:700;color:#8f88bd;letter-spacing:.5px;
+  }
+  .stale.on{display:flex}
+  .stale i{width:6px;height:6px;border-radius:50%;background:var(--pink);font-style:normal}
+
+  /* ── панель песочницы (?demo=1) ── */
+  .demo{
+    position:fixed;right:12px;bottom:8px;display:none;gap:6px;align-items:center;
+    background:rgba(0,0,0,.55);border-radius:10px;padding:6px 8px;z-index:9;
+  }
+  .demo.on{display:flex}
+  .demo span{font-size:10px;color:#8f88bd;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+  .demo button{
+    background:#2a2360;color:#cfc9ff;border:none;border-radius:7px;
+    padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;
+  }
+  .demo button.on{background:var(--blue);color:#fff}
+
+  /* ── режим ТВ: панель без указателя ── */
+  body.tv{cursor:none}
+  body.tv .cta,body.tv .pack,body.tv .bigbtn{cursor:default}
+
+  /* мобильный фолбэк */
+  @media (max-width:900px){
+    body{overflow:auto}
+    .page{
+      height:auto;grid-template-columns:1fr;
+      grid-template-areas:"head" "hero" "timer" "packs" "steps" "bottom" "fineband";
+      grid-template-rows:auto;
+    }
+    .bottom{grid-template-columns:1fr}
+    .getwrap{flex-direction:column}
+    .fineband{padding:10px 18px}
+    .parks{position:static;transform:none;margin-left:12px}
+    .head{flex-wrap:wrap;gap:6px;padding:10px}
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="head">
+    <div class="slogan" id="slogan">Играй больше — <b>плати меньше</b></div>
+    <div class="parks" id="parks"></div>
+  </header>
+
+  <!-- ТАЙМЕР: отсчёт сверху -->
+  <section class="tile timer" id="timer">
+    <div class="count" id="t-count"><small id="t-label">Турбо-часы</small><span id="t-num"></span></div>
+    <div class="state" id="t-state"></div>
+    <div class="note" id="t-note"></div>
+  </section>
+
+  <!-- ГЕРОЙ -->
+  <section class="tile hero">
+    <div>
+      <div class="turbo">ТУРБО</div>
+      <div class="turbo-sub">ИГРЫ</div>
+      <div class="apps" id="apps"></div>
+      <div class="hero-claim" id="claim">
+        <b>Любой</b> аркадный автомат
+        <small>Игры не сгорают — остаток ждёт следующих турбо-часов</small>
+      </div>
+    </div>
+    <a class="cta" id="cta" href="https://b00m.fun" target="_blank" rel="noopener">
+      <span id="cta-text">Купить в личном кабинете</span>
+      <span class="price" id="cta-price">от 350 ₽</span>
+      <span class="tag" id="cta-tag">10 ИГР</span>
+    </a>
+  </section>
+
+  <!-- КАК ЭТО РАБОТАЕТ · подменяется победителями недели, когда они опубликованы -->
+  <section class="tile steps" id="steps">
+    <h3 id="steps-title">Как это работает</h3>
+    <div id="steps-body">
+      <div class="step"><div class="n">1</div><p><b>Возьми турбо-игры</b> в любой момент — на кассе или в ЛК</p></div>
+      <div class="step"><div class="n">2</div><p><b>Дождись турбо-часов</b> — время слева, вторник весь день</p></div>
+      <div class="step"><div class="n">3</div><p><b>Играй</b> — на любых аркадных автоматах, остаток не сгорает</p></div>
+    </div>
+  </section>
+
+  <!-- ПАКЕТЫ -->
+  <section class="packs">
+    <div class="ptitle">ПАКЕТЫ</div>
+    <div id="packs-body" style="flex:1;display:flex;flex-direction:column"></div>
+  </section>
+
+  <!-- НИЗ: плашка получения + ТУРБО-ВТОРНИК + подписка -->
+  <div class="bottom">
+    <div class="getwrap">
+      <div class="gcard">
+        <div class="ico">💳</div>
+        <h4>Купить</h4>
+        <p>На кассе или в личном кабинете — в любой день</p>
+      </div>
+      <div class="gcard">
+        <div class="ico">🎟️</div>
+        <h4>Выиграть</h4>
+        <p>Обменяй тикеты в призотеке на турбо-игры</p>
+      </div>
+      <div class="gcard">
+        <div class="ico">🎁</div>
+        <h4>Подарить</h4>
+        <p>Турбо-карта — готовый подарок с играми внутри</p>
+      </div>
+    </div>
+    <section class="tile tue">
+      <div class="day">ТУРБО-ВТОРНИК</div>
+      <p>Турбо-часы — весь день.<br>Каждую неделю, без исключений.</p>
+    </section>
+    <section class="tile sub">
+      <h3>Когда следующие<br>турбо-часы?</h3>
+      <p id="sub-note">Первым узнают подписчики. Каждую неделю разыгрываем 15 турбо-игр.</p>
+      <button class="bigbtn" id="openmodal">Узнавать первым</button>
+    </section>
+  </div>
+
+  <!-- УСЛОВИЯ -->
+  <div class="fineband" id="fineband">Турбо-игры действуют на аркадных автоматах (без выдачи тикетов) в турбо-часы. Покупка — в любое время. Остаток игр не сгорает.</div>
+
+</div>
+
+<!-- МОДАЛКА EMAIL -->
+<div class="modal" id="modal">
+  <div class="mbox">
+    <button class="close" id="closemodal">✕</button>
+    <h3>Турбо-часы — тебе первому</h3>
+    <p>Оставь email — пришлём расписание турбо-часов на неделю и включим тебя в еженедельный розыгрыш 15 турбо-игр.</p>
+    <form id="subform">
+      <input type="email" placeholder="твой email" required id="email">
+      <button type="submit">Подписаться</button>
+    </form>
+    <div class="ok" id="sub-ok">Готово! Письмо с расписанием уже летит ✈️</div>
+  </div>
+</div>
+
+<!-- индикатор «данные не свежие» — для персонала -->
+<div class="stale" id="stale"><i></i><span id="stale-txt">нет связи с расписанием</span></div>
+
+<!-- панель предпросмотра состояний: только ?demo=1 -->
+<div class="demo" id="demo">
+  <span>Состояние:</span>
+  <button data-mode="now">Идут сейчас</button>
+  <button data-mode="today">Сегодня позже</button>
+  <button data-mode="none">Без расписания</button>
+  <button data-mode="tue">Вторник</button>
+  <button data-mode="soon">Пауза парка</button>
+  <button data-mode="auto">Авто</button>
+</div>
+
+<!-- Логика — отдельным модулем: только в type="module" работает import.meta.env,
+     через который Vite подставляет URL источника. Инлайн-скриптом нельзя. -->
+<script type="module" src="./turbo.js"></script>
+</body>
+</html>

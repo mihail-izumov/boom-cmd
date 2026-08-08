@@ -8,8 +8,14 @@ import DriverCard from './DriverCard.vue'
 // по дефолту свёрнута. Цветной точки статуса в шапке нет — статус несёт подпись
 // (DESIGN-STANDARD §3.4); цвет живёт в бейдже на карточке.
 
+// NET-33: та же группа обслуживает и деление по статусу (сеть), и деление
+// «работают / применимы» под выбранным парком. Отличаются только подпись (`label`)
+// и режим карточки (`mode`); механика сворачивания одна — второй компонент с той же
+// механикой разъехался бы с этим при первой же правке.
 defineProps({
   status: { type: String, required: true },
+  label: { type: String, default: '' },
+  mode: { type: String, default: '' },
   drivers: { type: Array, default: () => [] },
   parkIds: { type: Array, default: () => [] },
   open: { type: Boolean, default: false },
@@ -33,14 +39,14 @@ defineEmits(['toggle'])
         :stroke-width="2"
         aria-hidden="true"
       />
-      <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ statusLabel(status) }}</h2>
+      <h2 class="text-[1rem] font-semibold text-[var(--text)]">{{ label || statusLabel(status) }}</h2>
       <span
         class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--line)] px-1.5 text-[0.8125rem] font-medium leading-none text-[var(--text-secondary)]"
       >{{ drivers.length }}</span>
     </button>
 
     <div v-show="open" :id="`drv-group-${status}`" class="flex flex-col gap-3">
-      <DriverCard v-for="d in drivers" :key="d.code" :driver="d" :park-ids="parkIds" />
+      <DriverCard v-for="d in drivers" :key="d.code" :driver="d" :park-ids="parkIds" :mode="mode" />
     </div>
   </section>
 </template>

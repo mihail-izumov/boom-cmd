@@ -1,0 +1,231 @@
+/**
+ * verify-turbo.mjs — приёмка носителя /media/turbo/ (DRV-10).
+ *
+ * Проверяет СОБРАННЫЙ бандл, а не исходник: именно он поедет на панель.
+ * Сценарии гоняются в jsdom с подставленным fetch — так ловятся ошибки,
+ * которые глазами в песочнице не видно (сдвиг часов панели, «весь день»
+ * без границ, парк на паузе).
+ *
+ * Запуск:  node scripts/verify-turbo.mjs
+ * Сам собирает во временный каталог, свой мусор убирает.
+ */
+import { execSync } from 'node:child_process'
+import { readFileSync, readdirSync, rmSync, existsSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { JSDOM } from 'jsdom'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+// По умолчанию — временная папка в репо (в .gitignore, как у прочих verify-*).
+// VERIFY_OUT нужен для сред, где удаление внутри рабочего дерева запрещено.
+const OUT = process.env.VERIFY_OUT || resolve(ROOT, '.tmp-verify-turbo')
+const API = 'https://example.invalid/exec'
+
+let failed = 0
+const ok = (name, cond, extra = '') => {
+  console.log(`  ${cond ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`)
+  if (!cond) failed++
+}
+
+// ── сборка ──────────────────────────────────────────────────────────────────
+if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true })
+console.log('Сборка носителя…')
+execSync(`npm run build -- --outDir ${OUT} --emptyOutDir`, {
+  cwd: ROOT,
+  stdio: 'pipe',
+  env: { ...process.env, VITE_TURBO_API: API },
+})
+
+const html = readFileSync(resolve(OUT, 'media/turbo/index.html'), 'utf8')
+const bundleName = readdirSync(resolve(OUT, 'assets')).find(
+  (f) => f.startsWith('turbo-') && f.endsWith('.js'),
+)
+if (!bundleName) {
+  console.error('✗ бандл носителя не собрался')
+  process.exit(1)
+}
+// Бандл — ES-модуль и начинается с импорта modulepreload-полифила. Для eval в
+// jsdom импорт срезаем: полифил влияет только на предзагрузку чанков, а чанк
+// у носителя один. Остальной код исполняется ровно тот, что поедет на панель.
+const bundle = readFileSync(resolve(OUT, 'assets', bundleName), 'utf8')
+  .replace(/import\s*["'][^"']+["'];?/g, '')
+
+// ── эталонный ответ источника ───────────────────────────────────────────────
+const base = {
+  version: 'test',
+  park: 'ohta',
+  park_ru: 'Охта Молл',
+  turbo_status: 'active',
+  open: '10:00',
+  close: '22:00',
+  is_tuesday: false,
+  today: [],
+  parks: [
+    { park: 'ohta', park_ru: 'Охта Молл' },
+    { park: 'iyun', park_ru: 'ТЦ Июнь' },
+  ],
+  machines: [
+    { category: 'race', label_ru: 'гонки', icon: '🏎️', count: 28 },
+    { category: 'music', label_ru: 'танцы', icon: '🎵', count: 4 },
+    { category: 'ghost', label_ru: 'пусто', icon: '👻', count: 0 },
+  ],
+  packages: [
+    { games: 25, price: 750, badge_ru: 'МАКСИМУМ ФАНА', badge_kind: 'best', sort: 3, url: 'https://b00m.fun' },
+    { games: 10, price: 350, badge_ru: 'ПОПРОБОВАТЬ', badge_kind: 'try', sort: 1, url: 'https://b00m.fun' },
+    { games: 15, price: 500, sort: 2, url: 'https://b00m.fun' },
+  ],
+  winners: [],
+  copy: {},
+  settings: { refresh_sec: 300 },
+}
+
+async function run(query, payload) {
+  const dom = new JSDOM(html, {
+    url: `https://b00m-cmd.ru/media/turbo/${query}`,
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+  })
+  const { window } = dom
+  window.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => payload,
+  })
+  window.eval(bundle)
+  // load() асинхронна: даём микро- и макрозадачам отработать
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+  const $ = (id) => window.document.getElementById(id)
+  return {
+    cls: $('timer').className,
+    state: $('t-state').textContent,
+    label: $('t-label').textContent,
+    num: $('t-num').textContent,
+    note: $('t-note').textContent,
+    apps: $('apps').innerHTML,
+    packs: $('packs-body').innerHTML,
+    steps: $('steps-title').textContent,
+    price: $('cta-price').textContent,
+    tag: $('cta-tag').textContent,
+    parksHidden: $('parks').hidden,
+    stale: $('stale').className,
+    window,
+  }
+}
+
+// server_time задаёт «сейчас» на панели: страница правит свои часы по нему,
+// поэтому сценарии детерминированы независимо от часов машины, где идёт прогон.
+const at = (iso) => iso
+
+console.log('\n── Машина состояний ──')
+
+// 1. Идут турбо-часы
+{
+  const r = await run('?park=ohta', {
+    ...base,
+    server_time: at('2026-08-06T11:00:00+03:00'),
+    today: [{ from: '10:00', to: '12:00', all_day: false }],
+  })
+  ok('now: зелёная рамка', r.cls.includes('now'), r.cls)
+  ok('now: подпись «До 12:00»', r.state === 'До 12:00', r.state)
+  ok('now: отсчёт час', r.num.startsWith('0:59') || r.num.startsWith('1:00'), r.num)
+}
+
+// 2. Окно сегодня, ещё впереди
+{
+  const r = await run('?park=ohta', {
+    ...base,
+    server_time: at('2026-08-06T11:00:00+03:00'),
+    today: [{ from: '16:00', to: '18:00', all_day: false }],
+  })
+  ok('today: жёлтый акцент', r.cls.includes('today'), r.cls)
+  ok('today: «Сегодня с 16:00»', r.state === 'Сегодня с 16:00', r.state)
+}
+
+// 3. Турбо-вторник: границы «весь день» берутся из часов работы парка
+{
+  const r = await run('?park=ohta', {
+    ...base,
+    server_time: at('2026-08-04T15:00:00+03:00'),
+    is_tuesday: true,
+    today: [{ from: '', to: '', all_day: true }],
+  })
+  ok('tue: состояние как now', r.cls.includes('now'), r.cls)
+  ok('tue: подпись «Турбо-вторник»', r.label === 'Турбо-вторник', r.label)
+  ok('tue: «Играй весь день»', r.state === 'Играй весь день', r.state)
+  ok('tue: отсчёт до закрытия парка (7 ч)', r.num.startsWith('6:59') || r.num.startsWith('7:00'), r.num)
+}
+
+// 4. Окон нет
+{
+  const r = await run('?park=ohta', {
+    ...base,
+    server_time: at('2026-08-06T11:00:00+03:00'),
+    today: [],
+  })
+  ok('none: нейтральное состояние', r.cls.includes('none'), r.cls)
+  ok('none: увод в подписку', r.state === 'Расписание — у подписчиков', r.state)
+}
+
+// 5. Парк на паузе (Питерленд, PIT-21) — пустой календарь показывать нельзя
+{
+  const r = await run('?park=piterland', {
+    ...base,
+    park: 'piterland',
+    turbo_status: 'paused',
+    server_time: at('2026-08-06T11:00:00+03:00'),
+    today: [],
+  })
+  ok('paused: состояние soon', r.cls.includes('soon'), r.cls)
+  ok('paused: «Турбо-часы скоро»', r.state === 'Турбо-часы скоро', r.state)
+  ok('paused: отсчёт скрыт', r.num === '' || r.num === '0:00:00', JSON.stringify(r.num))
+}
+
+console.log('\n── Блоки ──')
+{
+  const r = await run('?park=ohta&tv=1', {
+    ...base,
+    server_time: at('2026-08-06T11:00:00+03:00'),
+    today: [{ from: '10:00', to: '12:00', all_day: false }],
+    winners: [{ week: '2026-W33', display_name: 'Александр К.', prize_ru: '15 турбо-игр' }],
+  })
+  ok('аппараты: нулевая категория не рисуется', !r.apps.includes('пусто'))
+  ok('аппараты: счётчик 28', r.apps.includes('>28<'))
+  ok('пакеты: отсортированы по sort', r.packs.indexOf('10 игр') < r.packs.indexOf('25 игр'))
+  ok('пакеты: ₽/игра посчитан', r.packs.includes('35 ₽ за игру') && r.packs.includes('30 ₽ за игру'))
+  ok('пакеты: best подсвечен', r.packs.includes('pack best'))
+  ok('CTA: минимальный пакет', r.price === 'от 350 ₽' && r.tag === '10 ИГР', `${r.price} / ${r.tag}`)
+  ok('победители подменили «как это работает»', r.steps === 'Победители недели', r.steps)
+  ok('?park= скрывает переключатель парков', r.parksHidden === true)
+  ok('?tv=1 включает режим панели', r.window.document.body.className.includes('tv'))
+  ok('свежие данные — метки «нет связи» нет', !r.stale.includes('on'), r.stale)
+}
+
+console.log('\n── Отказ источника ──')
+{
+  const dom = new JSDOM(html, {
+    url: 'https://b00m-cmd.ru/media/turbo/?park=ohta&mockError=1',
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+  })
+  dom.window.fetch = async () => { throw new Error('offline') }
+  dom.window.eval(bundle)
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+  const d = dom.window.document
+  ok('источник молчит → состояние none', d.getElementById('timer').className.includes('none'))
+  ok('зажглась метка «нет связи»', d.getElementById('stale').className.includes('on'))
+  ok('страница не упала', d.querySelector('.turbo').textContent === 'ТУРБО')
+}
+
+console.log('\n── Гигиена сборки ──')
+{
+  ok('мок вырезан из прод-бандла', !bundle.includes('МАКСИМУМ ФАНА') && !bundle.includes('turbo.mock'))
+  ok('носитель не тянет код приложения', !html.includes('/assets/app-'))
+  ok('noindex на месте', html.includes('noindex'))
+  const sw = readFileSync(resolve(OUT, 'sw.js'), 'utf8')
+  ok('/media/ исключён из service worker', sw.includes("BASE + 'media/'"))
+  ok('аппшелл собран', existsSync(resolve(OUT, 'index.html')))
+}
+
+rmSync(OUT, { recursive: true, force: true })
+console.log(failed ? `\n✗ ПРОВАЛЕНО ПРОВЕРОК: ${failed}` : '\n✓ Приёмка носителя пройдена')
+process.exit(failed ? 1 : 0)

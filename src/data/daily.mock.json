@@ -6,6 +6,16 @@
       "name": "Пример акции на кассе",
       "type": "promo",
       "status": "идёт",
+      "parks": [
+        "ohta",
+        "piterland"
+      ],
+      "scope": "сеть",
+      "scope_parks": [
+        "ohta",
+        "piterland",
+        "iyun"
+      ],
       "measure": "идёт",
       "launch": "",
       "goal": "средний чек",
@@ -17,6 +27,11 @@
       "name": "Пример готового драйвера",
       "type": "loyalty",
       "status": "готов",
+      "parks": [],
+      "scope": "ohta",
+      "scope_parks": [
+        "ohta"
+      ],
       "measure": "",
       "launch": "по триггеру: условие-заглушка",
       "goal": "возвраты",
@@ -28,6 +43,17 @@
       "name": "Пример активных продаж",
       "type": "sales",
       "status": "идёт",
+      "parks": [
+        "ohta",
+        "piterland",
+        "iyun"
+      ],
+      "scope": "сеть",
+      "scope_parks": [
+        "ohta",
+        "piterland",
+        "iyun"
+      ],
       "measure": "заблокирован",
       "launch": "",
       "goal": "средний чек",
@@ -39,6 +65,13 @@
       "name": "Пример в разработке",
       "type": "product",
       "status": "разработка",
+      "parks": [],
+      "scope": "сеть",
+      "scope_parks": [
+        "ohta",
+        "piterland",
+        "iyun"
+      ],
       "measure": "",
       "launch": "ориентир-заглушка: следующий квартал",
       "goal": "средний чек",
@@ -50,6 +83,13 @@
       "name": "Пример из бэклога",
       "type": "traffic",
       "status": "backlog",
+      "parks": [],
+      "scope": "сеть",
+      "scope_parks": [
+        "ohta",
+        "piterland",
+        "iyun"
+      ],
       "measure": "",
       "launch": "",
       "goal": "трафик",
@@ -61,6 +101,13 @@
       "name": "Пример на паузе",
       "type": "ops",
       "status": "пауза",
+      "parks": [
+        "ohta"
+      ],
+      "scope": "ohta",
+      "scope_parks": [
+        "ohta"
+      ],
       "measure": "невозможен",
       "launch": "",
       "goal": "возвраты",
@@ -72,6 +119,13 @@
       "name": "Пример завершённого",
       "type": "promo",
       "status": "закрыт",
+      "parks": [
+        "piterland"
+      ],
+      "scope": "piterland",
+      "scope_parks": [
+        "piterland"
+      ],
       "measure": "",
       "launch": "",
       "goal": "трафик",
@@ -85,49 +139,56 @@
       "park": "ohta",
       "start": "2026-04-01",
       "end": "",
-      "accuracy": "день"
+      "accuracy": "день",
+      "event": "включён"
     },
     {
       "code": "DRV-01",
       "park": "piterland",
       "start": "2026-04-01",
       "end": "",
-      "accuracy": "месяц"
+      "accuracy": "месяц",
+      "event": "включён"
     },
     {
       "code": "DRV-03",
       "park": "ohta",
       "start": "2026-07-13",
       "end": "",
-      "accuracy": "день"
+      "accuracy": "день",
+      "event": "включён"
     },
     {
       "code": "DRV-03",
       "park": "piterland",
       "start": "2026-07-13",
       "end": "",
-      "accuracy": "день"
+      "accuracy": "день",
+      "event": "включён"
     },
     {
       "code": "DRV-03",
       "park": "iyun",
       "start": "2026-07-13",
       "end": "",
-      "accuracy": "день"
+      "accuracy": "день",
+      "event": "включён"
     },
     {
       "code": "DRV-06",
       "park": "ohta",
       "start": "2026-05-01",
       "end": "2026-06-15",
-      "accuracy": "день"
+      "accuracy": "день",
+      "event": "включён"
     },
     {
       "code": "DRV-07",
       "park": "piterland",
       "start": "2026-03-01",
       "end": "2026-04-30",
-      "accuracy": "unknown"
+      "accuracy": "unknown",
+      "event": "включён"
     }
   ],
   "stats": {
@@ -647,7 +708,8 @@
           "start": "2025-05-13",
           "end": "",
           "accuracy": "день",
-          "measure": "идёт"
+          "measure": "идёт",
+          "event": "перестроен"
         },
         {
           "code": "DRV-02",
@@ -659,7 +721,8 @@
           "start": "2025-04-01",
           "end": "",
           "accuracy": "месяц",
-          "measure": "заблокирован"
+          "measure": "заблокирован",
+          "event": "включён"
         },
         {
           "code": "DRV-03",
@@ -671,7 +734,8 @@
           "start": "2025-04-15",
           "end": "2025-05-20",
           "accuracy": "unknown",
-          "measure": "идёт (обратный эффект зафиксирован)"
+          "measure": "идёт (обратный эффект зафиксирован)",
+          "event": "включён"
         }
       ],
       "journal": [
@@ -1102,7 +1166,8 @@
           "start": "2025-04-01",
           "end": "",
           "accuracy": "unknown",
-          "measure": "идёт (обратный эффект зафиксирован)"
+          "measure": "идёт (обратный эффект зафиксирован)",
+          "event": "включён"
         },
         {
           "code": "DRV-08",
@@ -1113,7 +1178,8 @@
           "start": "2025-04-01",
           "end": "",
           "accuracy": "месяц",
-          "measure": "невозможен"
+          "measure": "невозможен",
+          "event": "включён"
         }
       ],
       "journal": [

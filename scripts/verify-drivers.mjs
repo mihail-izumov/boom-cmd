@@ -18,6 +18,14 @@ const eq = (name, got, exp) => {
 eq('mock.drivers = 7', mock.drivers.length, 7)
 eq('mock.driver_periods = 7 (mari убран)', mock.driver_periods.length, 7)
 eq('в mock нет ни одного park=mari', mock.driver_periods.every((p) => p.park !== 'mari'), true)
+// NET-33: контракт расширен, mock обязан идти ВПЕРЕДИ боевого поля (BOUNDARY).
+eq('у каждого драйвера мока есть scope и scope_parks',
+  mock.drivers.every((d) => 'scope' in d && Array.isArray(d.scope_parks) && Array.isArray(d.parks)), true)
+eq('scope=сеть развёрнут в ТРИ действующих парка, MARI не входит',
+  mock.drivers.filter((d) => d.scope === 'сеть').every((d) => d.scope_parks.join(';') === 'ohta;piterland;iyun'), true)
+eq('parks ⊆ scope_parks у всех (работать вне охвата нельзя)',
+  mock.drivers.every((d) => d.parks.every((p) => d.scope_parks.includes(p))), true)
+eq('у каждого периода есть event', mock.driver_periods.every((p) => !!p.event), true)
 
 const joined = m.joinDrivers(mock.drivers, mock.driver_periods)
 eq('joined = 7', joined.length, 7)
@@ -26,19 +34,64 @@ eq('DRV-03 периодов = 3 (ohta/piterland/iyun)', joined.find((d) => d.cod
 // ── §0.1 п.2: парки раздела = ровно три СПб, без mari, не из данных ──
 eq('parkOptions = [ohta,piterland,iyun] (фикс, без mari)', m.parkOptions(), ['ohta', 'piterland', 'iyun'])
 
-// ── §0.1 п.1/п.4: выбран парк → ТОЛЬКО драйверы с периодом; незапущенные лишь в сети ──
-eq('park=ohta → только с периодом в Охте', m.visibleDrivers(joined, 'ohta', 'all').map((d) => d.code), ['DRV-01', 'DRV-03', 'DRV-06'])
-eq('park=iyun → только DRV-03', m.visibleDrivers(joined, 'iyun', 'all').map((d) => d.code), ['DRV-03'])
-eq('backlog НЕ виден под парком (не утекает)', m.matches(joined.find((d) => d.code === 'DRV-05'), 'ohta', 'all'), false)
-eq('готов НЕ виден под парком', m.matches(joined.find((d) => d.code === 'DRV-02'), 'ohta', 'all'), false)
-eq('backlog виден во «Всей сети»', m.matches(joined.find((d) => d.code === 'DRV-05'), 'all', 'all'), true)
+// ── NET-33 (07.08): фильтр по парку — по ОХВАТУ, не по периодам ──────────────
+// ⚠ ПРАВИЛО ЗАМЕНИЛО §0.1 п.1/п.4 («выбран парк → только драйверы с периодом в нём,
+// незапущенные видны лишь во Всей сети»). Прежнее правило и было дефектом: у
+// незапущенного драйвера периодов нет, значит парка нет ниоткуда, значит на вопрос
+// «что мне ещё предстоит в этом парке» раздел отвечал молчанием. Шесть карточек из
+// тринадцати не показывались НИ У ОДНОГО парка.
+const D = (c) => joined.find((d) => d.code === c)
+eq('park=ohta → все применимые к Охте (6, DRV-07 со scope=piterland не попал)',
+  m.visibleDrivers(joined, 'ohta', 'all').map((d) => d.code),
+  ['DRV-01', 'DRV-03', 'DRV-06', 'DRV-02', 'DRV-04', 'DRV-05'])
+eq('park=iyun → применимые к Июню', m.visibleDrivers(joined, 'iyun', 'all').map((d) => d.code),
+  ['DRV-01', 'DRV-03', 'DRV-04', 'DRV-05'])
+eq('backlog виден под парком, если парк в охвате (это и чинили)', m.matches(D('DRV-05'), 'ohta', 'all'), true)
+eq('готов виден под парком, если парк в охвате', m.matches(D('DRV-02'), 'ohta', 'all'), true)
+eq('но охват НЕ резиновый: DRV-06 (scope=ohta) под Июнем не виден', m.matches(D('DRV-06'), 'iyun', 'all'), false)
+eq('backlog виден во «Всей сети»', m.matches(D('DRV-05'), 'all', 'all'), true)
 
-// ── счётчики парков: только с периодом (без «утечки») ──
+// ── две группы внутри парка: работает ≠ применим (§2.3) ──
+const gOhta = m.splitByRun(m.visibleDrivers(joined, 'ohta', 'all'), 'ohta')
+eq('Охта: работают (парк в parks)', gOhta.running.map((d) => d.code), ['DRV-01', 'DRV-03', 'DRV-06'])
+eq('Охта: применимы, не включены', gOhta.applicable.map((d) => d.code), ['DRV-02', 'DRV-04', 'DRV-05'])
+const gIyun = m.splitByRun(m.visibleDrivers(joined, 'iyun', 'all'), 'iyun')
+eq('Июнь: работает один', gIyun.running.map((d) => d.code), ['DRV-03'])
+eq('Июнь: применимы трое — это ответ «что предстоит», а не ошибка',
+  gIyun.applicable.map((d) => d.code), ['DRV-01', 'DRV-04', 'DRV-05'])
+eq('сумма групп = список парка (никто не потерялся)',
+  gOhta.running.length + gOhta.applicable.length, m.visibleDrivers(joined, 'ohta', 'all').length)
+eq('«работает» берётся из parks, а не из статуса: DRV-06 на паузе, но включён',
+  m.runsIn(D('DRV-06'), 'ohta'), true)
+
+// ── охват vs запуск: разные множества, не путать ──
+eq('DRV-01: работает в двух, применим в трёх', [m.parkList(D('DRV-01')), m.scopeParks(D('DRV-01'))],
+  [['ohta', 'piterland'], ['ohta', 'piterland', 'iyun']])
+eq('DRV-04 не запущен нигде, но применим везде', [m.parkList(D('DRV-04')), m.scopeParks(D('DRV-04'))],
+  [[], ['ohta', 'piterland', 'iyun']])
+eq('строка «a;b» тоже читается (страховка от ручной правки листа)', m.toKeys('ohta; piterland'), ['ohta', 'piterland'])
+eq('пусто → пустой массив, не null и не «—»', [m.toKeys(''), m.toKeys(null), m.toKeys(undefined)], [[], [], []])
+
+// ── обратная совместимость: боевой payload ДО v3.17 (полей нет вовсе) ──
+// Фронт выкатывается раньше скрипта (BOUNDARY), поэтому эта ветка — боевая, не край.
+const oldPayload = m.joinDrivers(
+  [{ code: 'DRV-01', status: 'идёт' }, { code: 'DRV-09', status: 'backlog' }],
+  [{ code: 'DRV-01', park: 'ohta', start: '2026-04-01', accuracy: 'день' }],
+)
+eq('без scope_parks парк берётся из периодов (раздел работает как до правки)',
+  m.visibleDrivers(oldPayload, 'ohta', 'all').map((d) => d.code), ['DRV-01'])
+eq('без parks «работает» тоже выводится из периодов', m.runsIn(oldPayload[0], 'ohta'), true)
+eq('незапущенный без охвата под парком не появляется', m.matches(oldPayload[1], 'ohta', 'all'), false)
+
+// ── счётчики парков: по охвату, ровно то же правило, что у matches ──
 const pc = m.parkCounts(joined, m.parkOptions())
 eq('parkCounts.all = 7', pc.all, 7)
-eq('parkCounts.ohta = 3 (01,03,06)', pc.ohta, 3)
-eq('parkCounts.piterland = 3 (01,03,07)', pc.piterland, 3)
-eq('parkCounts.iyun = 1 (03)', pc.iyun, 1)
+eq('parkCounts.ohta = 6 (все, кроме DRV-07)', pc.ohta, 6)
+eq('parkCounts.piterland = 5', pc.piterland, 5)
+eq('parkCounts.iyun = 4', pc.iyun, 4)
+for (const id of m.parkOptions()) {
+  eq(`чип «${id}» и список отвечают одинаково`, pc[id], m.visibleDrivers(joined, id, 'all').length)
+}
 
 // ── §0.1 п.3: канон 6 статусов, «черновик» вне словаря, разработка = синий --info ──
 eq('STATUS_ORDER = канон 6 без черновика', i.STATUS_ORDER, ['идёт', 'пауза', 'готов', 'разработка', 'backlog', 'закрыт'])

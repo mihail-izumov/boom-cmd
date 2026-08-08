@@ -21,7 +21,12 @@ const props = defineProps({
   // Канонический набор парков из данных (section → parkOptions). У запущенного
   // драйвера показываем строку на каждый парк, «— не подключён» — где периода нет.
   parkIds: { type: Array, default: () => [] },
+  // NET-33 §2.3: 'applicable' — драйвер применим к выбранному парку, но не включён.
+  // Дат старта у него нет по определению (периодов нет), поэтому вместо строки
+  // «Парки» печатаем условие запуска, приглушённо. Пусто/'' — прежний вид.
+  mode: { type: String, default: '' },
 })
+const applicable = computed(() => props.mode === 'applicable')
 
 // «Запущен» = есть периоды (не завязано на имя статуса — устойчиво к словарю B).
 const launched = computed(() => (props.driver.periods || []).length > 0)
@@ -74,9 +79,17 @@ const measure = computed(() => {
 
     <!-- строки: показываем только непустые -->
     <dl class="flex flex-col gap-1.5 border-t border-[var(--line)] pt-2.5">
+      <!-- Группа «применимы, не включены»: вместо парков и дат — условие запуска,
+           приглушённо (§2.3). Строка «Запуск» ниже тогда не печатается: одно и то
+           же поле дважды в одной карточке читалось бы как две разные даты. -->
+      <div v-if="applicable" data-test="driver-applicable" class="flex gap-2 text-[0.8125rem] leading-snug">
+        <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_launch }}</dt>
+        <dd class="min-w-0 flex-1 text-[var(--text-muted)]">{{ driver.launch ? launchLabel(driver.launch) : L.applicable_no_launch }}</dd>
+      </div>
+
       <!-- Парки — всегда. Запущенный: строка на каждый парк сети (дата или
            «— не подключён»). Незапущенный: одна строка «не запущен…». -->
-      <div class="flex gap-2 text-[0.8125rem] leading-snug">
+      <div v-else class="flex gap-2 text-[0.8125rem] leading-snug">
         <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_parks }}</dt>
         <dd class="min-w-0 flex-1">
           <div v-if="launched" class="flex flex-col gap-0.5">
@@ -97,7 +110,7 @@ const measure = computed(() => {
       </div>
 
       <!-- Запуск -->
-      <div v-if="driver.launch" class="flex gap-2 text-[0.8125rem] leading-snug">
+      <div v-if="driver.launch && !applicable" class="flex gap-2 text-[0.8125rem] leading-snug">
         <dt class="shrink-0 basis-[4.25rem] text-[var(--text-muted)]">{{ L.row_launch }}</dt>
         <dd class="min-w-0 flex-1 text-[var(--text)]">{{ launchLabel(driver.launch) }}</dd>
       </div>

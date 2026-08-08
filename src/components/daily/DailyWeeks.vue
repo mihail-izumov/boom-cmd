@@ -77,7 +77,11 @@ function progFill(r) {
                      владельца 06.08), стал бейдж «ДР». Это НЕ код драйвера (D-76:
                      `DRV-04` в узкую колонку не влезает, а голый номер читается как
                      шум) — это метка «здесь поменяли работу парка»; код и название
-                     приходят в `title`. Залитый = включение, пунктирный = выключение.
+                     приходят в `title`. Три вида по типу события (NET-33 §2.2):
+                     залитый = включение · залитый с обводкой = перестройка ·
+                     пунктирный = выключение. Обводка сделана `outline`, а не `ring`:
+                     ring рисует offset цветом подложки, а строка выходного идёт на
+                     `--surface-2` — кольцо на ней получилось бы грязным.
                      Активная зона 44×44 — absolute-оверлеем вне потока, чтобы бейдж
                      не менял высоту строки и не толкал цифры (§3.2). -->
                 <button
@@ -99,7 +103,9 @@ function progFill(r) {
                     class="block rounded px-1 text-[0.625rem] font-bold not-italic leading-[1.4]"
                     :class="r.mark === 'on'
                       ? 'bg-[var(--text)] text-[var(--ink-on-color)]'
-                      : 'border border-dashed border-[var(--text-muted)] text-[var(--text-muted)]'"
+                      : r.mark === 'rebuilt'
+                        ? 'bg-[var(--text)] text-[var(--ink-on-color)] outline outline-1 outline-offset-[2px] outline-[var(--text-muted)]'
+                        : 'border border-dashed border-[var(--text-muted)] text-[var(--text-muted)]'"
                   >ДР</i>
                 </button>
               </td>

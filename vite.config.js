@@ -1,7 +1,10 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { resolve, isAbsolute } from 'node:path'
+import { resolve, isAbsolute, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = dirname(fileURLToPath(import.meta.url))
 
 // Плагин: заменяет плейсхолдер __BUILD_ID__ в собранном sw.js
 // на уникальную метку времени каждого билда (TZ-3.3 §5).
@@ -44,4 +47,25 @@ function swBuildIdPlugin() {
 export default defineConfig({
   plugins: [vue(), swBuildIdPlugin()],
   base: '/',   // ← корень собственного домена b00m-cmd.ru (CNAME в public/CNAME)
+
+  // MPA: два независимых входа.
+  //   app   — Vue-приложение «Мастерплан» (/)
+  //   turbo — носитель для ТВ-панелей у кассы (/media/turbo/), DRV-10
+  //
+  // Почему вход, а не файл в public/: только внутри сборки работает подстановка
+  // import.meta.env, через которую URL Apps Script приходит из repo Variable.
+  // Положив страницу в public/, пришлось бы зашить URL текстом в публичный
+  // репозиторий — прямое нарушение §4 констант.
+  //
+  // Путь входа обязан быть <root>/media/turbo/index.html: Vite раскладывает
+  // выход относительно root, и из src/media/... получилось бы dist/src/media/...
+  // Код с приложением не делится — общих импортов нет намеренно.
+  build: {
+    rollupOptions: {
+      input: {
+        app: resolve(root, 'index.html'),
+        turbo: resolve(root, 'media/turbo/index.html'),
+      },
+    },
+  },
 })

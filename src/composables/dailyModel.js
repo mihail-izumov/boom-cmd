@@ -72,11 +72,27 @@ const inMonth = (iso, ym) => typeof iso === 'string' && iso.length >= 7 && iso.s
 export const isMeasuring = (v) =>
   String(v ?? '').trim().toLowerCase().replace(/ё/g, 'е').startsWith('идет')
 
-// Несколько переключений в один день → ОДИН маркер (D-76). Включение перевешивает:
-// «здесь что-то включили» — более сильное событие, чем «что-то выключили».
+// ── ТИП СОБЫТИЯ (NET-33, задание 07.08) ─────────────────────────────────────
+// Второй дефект той же истории: у Охты Молл строка-сводка писала «Включён 1: DRV-04
+// с 01.08», хотя обход зала идёт непрерывно с 16.07 — 01.08 его ПЕРЕСТРОИЛИ (бумага
+// → Google-форма, норма раз в 2 часа). Слово было ложное, потому что типа события в
+// схеме не было вовсе: всякое начало периода читалось как запуск.
+//
+// Теперь контур B пишет `event` в daily_activities и driver_periods. Значения —
+// русские слова мастера; ё/е и регистр нормализуем (мастера правятся руками).
+// Незнакомое значение → 'on': «что-то включили» — самое безопасное прочтение, и
+// оно совпадает с поведением до этой правки.
+const EVENT_KIND = { 'включен': 'on', 'перестроен': 'rebuilt', 'выключен': 'off' }
+export const eventKind = (v) =>
+  EVENT_KIND[String(v ?? '').trim().toLowerCase().replace(/ё/g, 'е')] || 'on'
+
+// Несколько переключений в один день → ОДИН маркер (D-76). Приоритет: включение >
+// перестройка > выключение. «Здесь что-то включили» — более сильное событие, чем
+// «перестроили», а оно, в свою очередь, сильнее выключения.
+const MARK_RANK = ['on', 'rebuilt', 'off']
 export function markKind(events) {
   if (!events || !events.length) return null
-  return events.some((e) => e.kind === 'on') ? 'on' : 'off'
+  return MARK_RANK.find((k) => events.some((e) => e.kind === k)) || null
 }
 
 /**
@@ -103,16 +119,18 @@ export function computeDrivers(set) {
     name: String(a.name || ''),
     kind,
     iso,
-    // «~» — про точность ДАТЫ СТАРТА (§2 задания), поэтому только у включений.
+    // «~» — про точность ДАТЫ СТАРТА (§2 задания), поэтому не у выключений.
     // 35 строк из 47 имеют accuracy ≠ «день»: это норма, а не редкий случай, и без
     // «~» фронт печатал бы ложную точность.
-    approx: kind === 'on' && String(a.accuracy || 'unknown') !== 'день',
+    approx: kind !== 'off' && String(a.accuracy || 'unknown') !== 'день',
   })
   const starts = []
   const ends = []
   for (const a of acts) {
     if (!a) continue
-    if (inMonth(a.start, ym)) starts.push(ev(a, 'on', a.start))
+    // Тип события берём из `event` (v3.17): начало периода — это «включён» ИЛИ
+    // «перестроен», и различить их можно только этим полем. Поля нет → 'on'.
+    if (inMonth(a.start, ym)) starts.push(ev(a, eventKind(a.event), a.start))
     if (inMonth(a.end, ym)) ends.push(ev(a, 'off', a.end))
   }
   const freshFirst = (x, y) => (x.iso < y.iso ? 1 : x.iso > y.iso ? -1 : 0)
@@ -126,7 +144,7 @@ export function computeDrivers(set) {
     starts,
     ends,
     marksBy,
-    ready: acts.some((a) => a && (a.start || a.end || a.measure)),
+    ready: acts.some((a) => a && (a.start || a.end || a.measure || a.event)),
   }
 }
 

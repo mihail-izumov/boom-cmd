@@ -110,11 +110,18 @@ function evPart(list, one, many) {
  */
 export function driversSwitches(d, ym) {
   if (!d) return ''
+  // NET-33: начало периода — это «включён» ИЛИ «перестроен», и печатать их одним
+  // глаголом нельзя. Ровно на этом Охта Молл получила «Включён 1: DRV-04 с 01.08»
+  // про драйвер, который работает непрерывно с 16.07 и 01.08 был лишь перестроен.
+  const on = (d.starts || []).filter((e) => e.kind !== 'rebuilt')
+  const re = (d.starts || []).filter((e) => e.kind === 'rebuilt')
   const parts = [
-    d.starts.length
-      ? evPart(d.starts, 'Включён 1:', (n) => `Включено ${n}`)
+    on.length
+      ? evPart(on, 'Включён 1:', (n) => `Включено ${n}`)
       : `Включений в ${monthPrep(ym)} не было`,
   ]
+  const reb = evPart(re, 'перестроен', (n) => `перестроено ${n}`)
+  if (reb) parts.push(reb)
   const off = evPart(d.ends, 'выключен', (n) => `выключено ${n}`)
   if (off) parts.push(off)
   return parts.join(' · ')
@@ -140,10 +147,14 @@ export function driversMeasureSignal(d) {
   return blind > 0 ? `Без замера ${blind} из ${d.total}` : `Замер идёт у всех ${d.total}`
 }
 
-// Подпись маркера в дне: `DRV-04 · Обход зала «Как помочь?» · включён 01.08`.
+// Подпись маркера в дне: `DRV-04 · Обход зала «Как помочь?» · перестроен 01.08`.
 // Кода на самом маркере нет (D-76) — он живёт здесь и в строке-сводке.
+// Глагол — по типу события (NET-33): включён · перестроен · выключен. До 07.08
+// глагола было два, и «перестроен» печатался как «включён» — ровно та ложь, из-за
+// которой владелец 07.08 читал у Охты запуск там, где была перестройка.
+export const MARK_VERB = { on: 'включён', rebuilt: 'перестроен', off: 'выключен' }
 export const markLabel = (e) =>
-  `${e.code} · ${e.name} · ${e.kind === 'on' ? 'включён' : 'выключен'} ${e.approx ? '~' : ''}${ddmm(e.iso)}`
+  `${e.code} · ${e.name} · ${MARK_VERB[e.kind] || 'включён'} ${e.approx ? '~' : ''}${ddmm(e.iso)}`
 export const markTitle = (events) => (events || []).map(markLabel).join('\n')
 
 // Токен-класс заливки по sigClass → CSS-переменная сигнала.

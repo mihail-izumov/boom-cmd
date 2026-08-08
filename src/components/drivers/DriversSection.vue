@@ -7,6 +7,7 @@ import {
   joinDrivers,
   parkOptions,
   matches,
+  splitByRun,
   statusOptions,
   statusCounts,
 } from '../../composables/driversModel.js'
@@ -54,6 +55,23 @@ const fStatus = ref('all')
 // Выбранный статус пропал из скоупа (сменили парк) → вернуться на «Все».
 watch([present, fStatus], () => {
   if (fStatus.value !== 'all' && !present.value.includes(fStatus.value)) fStatus.value = 'all'
+})
+
+// ── Группы под ВЫБРАННЫМ ПАРКОМ (NET-33 §2.3, 07.08) ────────────────────────
+// Под парком вопрос владельца другой, чем в сети: не «в каком статусе драйвер», а
+// «что тут работает и что мне ещё предстоит». Поэтому под парком группировка по
+// статусу заменяется на две группы, а под «Всей сетью» остаётся прежней: без парка
+// вопрос «применим где?» смысла не имеет (решение владельца 07.08).
+const statusFiltered = computed(() =>
+  scoped.value.filter((d) => fStatus.value === 'all' || d.status === fStatus.value),
+)
+const parkGroups = computed(() => {
+  if (isNetwork.value) return []
+  const { running, applicable } = splitByRun(statusFiltered.value, parkCtx.value)
+  return [
+    { id: 'running', label: L.group_running, mode: 'running', drivers: running },
+    { id: 'applicable', label: L.group_applicable, mode: 'applicable', drivers: applicable },
+  ]
 })
 
 // Группировка по статусу (внутри — по коду).
@@ -204,17 +222,35 @@ onActivated(applyOrigin)
 
       <p class="bc-fade-in px-1 text-[0.8125rem] text-[var(--text-muted)]">{{ L.total(total) }}</p>
 
-      <!-- сворачиваемые группы по статусу, по дефолту свёрнуты (как «Задачи») -->
-      <DriverGroup
-        v-for="s in visibleStatuses"
-        :key="s"
-        class="bc-fade-in"
-        :status="s"
-        :drivers="grouped[s]"
-        :park-ids="parkIds"
-        :open="isOpen(s)"
-        @toggle="toggle"
-      />
+      <!-- Под парком — две группы «работают / применимы» (§2.3); под «Всей сетью» —
+           прежние группы по статусу. Обе ветки по дефолту свёрнуты (как «Задачи»):
+           счётчик в шапке группы и есть ответ на вопрос «сколько тут чего». -->
+      <template v-if="!isNetwork">
+        <DriverGroup
+          v-for="g in parkGroups"
+          :key="g.id"
+          class="bc-fade-in"
+          :status="g.id"
+          :label="g.label"
+          :mode="g.mode"
+          :drivers="g.drivers"
+          :park-ids="parkIds"
+          :open="isOpen(g.id)"
+          @toggle="toggle"
+        />
+      </template>
+      <template v-else>
+        <DriverGroup
+          v-for="s in visibleStatuses"
+          :key="s"
+          class="bc-fade-in"
+          :status="s"
+          :drivers="grouped[s]"
+          :park-ids="parkIds"
+          :open="isOpen(s)"
+          @toggle="toggle"
+        />
+      </template>
     </template>
     </template>
     </template>

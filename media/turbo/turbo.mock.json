@@ -1,0 +1,33 @@
+{
+  "_comment": "Мок для локальной разработки (?VITE_TURBO_API пуст). Подключается только в DEV и вырезается из прод-сборки. Значения — те же, что и так печатаются на носителях и висят на экране в зале, секретов здесь нет по определению; полного расписания недели тут нет и быть не может (механика §6).",
+  "version": "mock",
+  "updated": "2026-08-07",
+  "server_time": "2026-08-07T15:04:00+03:00",
+  "park": "ohta",
+  "park_ru": "Охта Молл",
+  "turbo_status": "active",
+  "open": "10:00",
+  "close": "22:00",
+  "is_tuesday": false,
+  "today": [{ "from": "10:00", "to": "12:00", "all_day": false }],
+  "parks": [
+    { "park": "ohta", "park_ru": "Охта Молл" },
+    { "park": "piterland", "park_ru": "Питерленд" },
+    { "park": "iyun", "park_ru": "ТЦ Июнь" }
+  ],
+  "machines": [
+    { "category": "race", "label_ru": "гонки", "icon": "🏎️", "count": 28 },
+    { "category": "shoot", "label_ru": "стрелялки", "icon": "🎯", "count": 15 },
+    { "category": "basket", "label_ru": "баскетбол", "icon": "🏀", "count": 6 },
+    { "category": "music", "label_ru": "танцы", "icon": "🎵", "count": 4 },
+    { "category": "other", "label_ru": "и ещё", "icon": "🕹️", "count": 44 }
+  ],
+  "packages": [
+    { "sku": "XS", "games": 10, "price": 350, "badge_ru": "ПОПРОБОВАТЬ", "badge_kind": "try", "sort": 1, "url": "https://b00m.fun" },
+    { "sku": "S", "games": 15, "price": 500, "badge_ru": "", "badge_kind": "", "sort": 2, "url": "https://b00m.fun" },
+    { "sku": "M", "games": 25, "price": 750, "badge_ru": "МАКСИМУМ ФАНА", "badge_kind": "best", "sort": 3, "url": "https://b00m.fun" }
+  ],
+  "winners": [],
+  "copy": {},
+  "settings": { "refresh_sec": 300 }
+}

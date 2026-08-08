@@ -30,6 +30,10 @@ jobs:
           VITE_DAILY_API: ${{ vars.VITE_DAILY_API }}
           VITE_GOALS_API: ${{ vars.VITE_GOALS_API }}
           VITE_REPORT_API: ${{ vars.VITE_REPORT_API }}
+          # Носитель ТВ-панелей /media/turbo/ (DRV-10). Отдельный деплой Apps
+          # Script и ПУБЛИЧНЫЙ (без ключа) — страница висит на экране в зале,
+          # вводить фразу доступа некому. Тем же Variable, не Secret.
+          VITE_TURBO_API: ${{ vars.VITE_TURBO_API }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
