@@ -325,6 +325,20 @@ console.log('\n── Гигиена сборки ──')
   ok('фавикон — общий с приложением', html.includes('href="/favicon.svg"'))
   ok('бейдж «Работает на Ранскейл» со ссылкой',
      html.includes('href="https://runscale.ru"') && html.includes('Работает на Ранскейл'))
+  ok('служебные бейджи в одной группе равной высоты',
+     html.includes('class="svc"') && html.includes('.svc > *{height:30px}'))
+  ok('двоеточие отсчёта пульсирует', html.includes('bc-blink') && html.includes('.timer .bl'))
+  // Проверяем по существу, а не по тексту комментария: старый фолбэк
+  // перестраивал сетку в одну колонку — этой перестройки быть не должно.
+  ok('заглушка для малых экранов вместо мобильного фолбэка',
+     html.includes('class="toosmall"') && html.includes('Экран для ТВ-панели') &&
+     !html.includes('"head" "hero"'))
+  ok('пороги заглушки: узкое, низкое, портрет',
+     html.includes('(max-width:899px), (max-height:559px), (orientation:portrait)'))
+  ok('«ЛК» расшифровано и перенесено', html.includes('на кассе или в личном кабинете') &&
+     !html.includes('на кассе или в ЛК'))
+  ok('«время слева» заменено на понятное',
+     html.includes('ближайшие видно на этом экране') && !html.includes('время слева'))
   ok('бейдж «бесплатно» на лайме, новых цветов в палитре нет',
      html.includes('background:var(--lime);color:var(--dark)') && !html.includes('--coral'))
   ok('shimmer-загрузка портирована из приложения', html.includes('bc-shimmer') && html.includes('bc-skeleton'))

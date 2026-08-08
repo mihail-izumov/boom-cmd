@@ -34,7 +34,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v1.8'
+const PAGE_VERSION = 'v1.9'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -131,8 +131,31 @@ function showSkeleton() {
   //   applyMode потом обращался бы к удалённому узлу. Заполняем только сам
   //   счётчик и строку состояния.
   el.num.innerHTML = sk('sk-count')
+  delete el.num.dataset.parts
   el.state.innerHTML = sk('sk-line')
   el.note.innerHTML = ''
+}
+
+/**
+ * Отрисовка отсчёта с ПУЛЬСИРУЮЩИМ двоеточием.
+ *
+ * Наивное `el.num.textContent = str` каждую секунду пересоздаёт узлы, и
+ * CSS-анимация двоеточия перезапускается с нуля раз в секунду — вместо
+ * плавной двухсекундной пульсации получается дёрганье. Поэтому структуру
+ * держим стабильной и меняем только сами цифры.
+ */
+function paintCount(str) {
+  const parts = String(str).split(':')
+  if (el.num.dataset.parts !== String(parts.length)) {
+    el.num.innerHTML = parts
+      .map((_, i) => (i ? '<span class="bl">:</span>' : '') + '<span></span>')
+      .join('')
+    el.num.dataset.parts = String(parts.length)
+  }
+  const cells = el.num.querySelectorAll('span:not(.bl)')
+  parts.forEach((p, i) => {
+    if (cells[i] && cells[i].textContent !== p) cells[i].textContent = p
+  })
 }
 
 function setBusy(on) {
@@ -490,6 +513,7 @@ function applyMode(m) {
   startMin = null
   endMin = null
   nextAt = null
+  delete el.num.dataset.parts
 
   if (m === 'now' || m === 'tue') {
     el.box.classList.add('now')
@@ -543,13 +567,13 @@ let lastWall = null
 function tick() {
   if (nextAt) {
     const left = msUntilWindow(nextAt)
-    el.num.textContent = fmtLong(left)
+    paintCount(fmtLong(left))
     if (left <= 0) load()   // окно наступило — перечитать расписание
   }
   const target = endMin !== null ? endMin : startMin
   if (target !== null) {
     const left = msUntil(target)
-    el.num.textContent = fmt(left)
+    paintCount(fmt(left))
     // Окно закрылось/открылось на ходу — пересобрать состояние, не дожидаясь fetch.
     if (left <= 0) applyMode(forcedMode || computeMode())
   }

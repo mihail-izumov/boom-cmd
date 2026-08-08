@@ -232,6 +232,13 @@
   /* ── таймер: отсчёт сверху, подпись под ним ── */
   .timer{grid-area:timer;border:2px solid transparent;justify-content:flex-start;padding-top:26px}
   .timer .count{font-family:'Unbounded';font-weight:900;font-size:clamp(38px,3.4vw,54px);letter-spacing:1px;line-height:1}
+  /* Двоеточие в отсчёте медленно пульсирует — признак живых часов, а не
+     замершей картинки. Две секунды: на витрине быстрое мигание превратилось бы
+     в раздражитель. Узел двоеточия НЕ пересоздаётся при каждом тике, иначе
+     анимация перезапускалась бы раз в секунду и сбивалась (см. paintCount). */
+  @keyframes bc-blink{0%,42%{opacity:1}58%,100%{opacity:.22}}
+  .timer .bl{animation:bc-blink 2s ease-in-out infinite}
+  @media (prefers-reduced-motion: reduce){ .timer .bl{animation:none} }
   .timer .count small{display:block;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
   .timer .state{font-family:'Unbounded';font-weight:700;font-size:19px;line-height:1.25;margin-top:14px}
   .timer .note{font-size:13px;color:var(--muted);margin-top:10px;font-weight:600;line-height:1.4}
@@ -397,6 +404,11 @@
     padding:0 18px 0 8px;text-align:right;
   }
   .fineband .terms{min-width:0}
+  /* Служебная группа: вендорский бейдж и штамп времени — одно целое, поэтому
+     стоят вплотную и одной высоты. Раньше их разносило space-between'ом
+     на всю ширину плашки, и они читались как два несвязанных элемента. */
+  .svc{display:flex;align-items:stretch;gap:6px;flex:none}
+  .svc > *{height:30px}
 
   /* Служебный бейдж — для персонала, не для гостя: по нему видно, что именно
      сейчас открыто на панели и свежие ли данные. Отсюда белый фон: он читается
@@ -410,7 +422,7 @@
     background:rgba(255,255,255,.05);
     border:1px solid rgba(255,255,255,.09);
     color:#cfcae8;
-    border-radius:9px;padding:3px 4px 3px 10px;
+    border-radius:9px;padding:0 4px 0 10px;
     font-family:'Inter';font-weight:700;font-size:11px;letter-spacing:.3px;
     white-space:nowrap;cursor:pointer;
   }
@@ -480,7 +492,7 @@
   .powered{
     flex:none;display:inline-flex;align-items:center;
     background:var(--blue);color:var(--white);
-    border-radius:9px;padding:6px 11px;
+    border-radius:9px;padding:0 12px;
     font-family:'Inter';font-weight:800;font-size:11px;letter-spacing:.3px;
     white-space:nowrap;text-decoration:none;
   }
@@ -544,21 +556,35 @@
   body.tv{cursor:none}
   body.tv .cta,body.tv .pack,body.tv .bigbtn{cursor:default}
 
-  /* мобильный фолбэк */
-  @media (max-width:900px){
-    body{overflow:auto}
-    .page{
-      height:auto;grid-template-columns:1fr;
-      grid-template-areas:"head" "hero" "timer" "packs" "steps" "bottom" "fineband";
-      grid-template-rows:auto;
-    }
-    .bottom{grid-template-columns:1fr}
-    .getwrap{flex-direction:column}
-    .fineband{padding:10px 18px}
-    .parks{position:static;transform:none;margin-left:12px}
-    .brand{position:static;transform:none}
-    .head{flex-wrap:wrap;gap:8px;padding:10px;justify-content:center}
+  /* ── Экран не подходит ──────────────────────────────────────────────────────
+     Раньше здесь был мобильный фолбэк: сетка перестраивалась в колонку со
+     скроллом. Но это носитель для ТВ-панели, а не адаптивная страница —
+     в колонке он теряет смысл (нет одного экрана, нет крупных состояний
+     времени), и человек с телефона видел бы кривую версию витрины вместо
+     понятного объяснения. Поэтому вместо перестройки — честная заглушка.
+
+     Пороги: узкое окно, низкое окно или портретная ориентация. Портрет
+     отсекаем намеренно — вертикально стоящая панель эту вёрстку не покажет. */
+  .toosmall{
+    display:none;
+    position:fixed;inset:0;z-index:70;
+    background:linear-gradient(160deg,#2d6bff 0%,#1b3fa8 100%);
+    color:var(--white);
+    align-items:center;justify-content:center;text-align:center;padding:28px;
   }
+  .toosmall .in{max-width:440px}
+  .toosmall svg{width:74px;height:74px;margin-bottom:18px}
+  .toosmall h2{
+    font-family:'Unbounded';font-weight:900;font-size:clamp(20px,5.5vw,27px);
+    line-height:1.25;margin-bottom:10px;
+  }
+  .toosmall p{font-size:clamp(13.5px,3.6vw,15.5px);font-weight:600;line-height:1.5;opacity:.92}
+  @media (max-width:899px), (max-height:559px), (orientation:portrait){
+    .page{display:none}
+    .parkerr{display:none !important}
+    .toosmall{display:flex}
+  }
+
 </style>
 </head>
 <body>
@@ -624,8 +650,8 @@
   <section class="tile steps" id="steps">
     <h3 id="steps-title">Как это работает</h3>
     <div id="steps-body">
-      <div class="step"><div class="n">1</div><p><b>Возьми турбо-игры</b> в любой момент — на кассе или в ЛК</p></div>
-      <div class="step"><div class="n">2</div><p><b>Дождись турбо-часов</b> — время слева, вторник весь день</p></div>
+      <div class="step"><div class="n">1</div><p><b>Возьми турбо-игры</b> в любой момент<br>на кассе или в личном кабинете</p></div>
+      <div class="step"><div class="n">2</div><p><b>Дождись турбо-часов</b> — ближайшие видно на этом экране, вторник весь день</p></div>
       <div class="step"><div class="n">3</div><p><b>Играй</b> — на любых аркадных автоматах, остаток не сгорает</p></div>
     </div>
   </section>
@@ -677,8 +703,9 @@
        Так техническая метка не соседствует с QR-блоком над ней и не спорит
        с ним за внимание, а длинная строка условий прижата к своему краю. -->
   <div class="fineband">
-    <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскейл</a>
     <div class="hint" id="hint"></div>
+    <div class="svc">
+    <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскейл</a>
     <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
       <i class="dot"></i>
       <span class="when" id="stamp-when">—</span>
@@ -692,9 +719,24 @@
         </svg>
       </button>
     </span>
+    </div>
     <span class="terms" id="fineband">Турбо-игры действуют на аркадных автоматах (без выдачи тикетов) в турбо-часы</span>
   </div>
 
+</div>
+
+<!-- Экран слишком мал / портрет — витрину не показываем, объясняем почему -->
+<div class="toosmall">
+  <div class="in">
+    <!-- lucide monitor -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
+    </svg>
+    <h2>Экран для ТВ-панели</h2>
+    <p>Эта страница рассчитана на большой горизонтальный экран у кассы.
+       Откройте её на панели или разверните окно шире.</p>
+  </div>
 </div>
 
 <!-- Запрошенный парк не найден — перекрываем экран, см. пояснение в CSS -->
