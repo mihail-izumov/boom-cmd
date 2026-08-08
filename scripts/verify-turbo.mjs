@@ -104,6 +104,9 @@ async function run(query, payload) {
     apps: $('apps').innerHTML,
     packs: $('packs-body').innerHTML,
     steps: $('steps-title').textContent,
+    brandPark: $('brand-park').textContent,
+    brandSep: $('brand-sep').style.display,
+    brandIcon: !!$('brand-park').closest('.head').querySelector('.brand-icon path'),
     price: $('cta-price').textContent,
     tag: $('cta-tag').textContent,
     parksHidden: $('parks').hidden,
@@ -198,6 +201,25 @@ console.log('\n── Блоки ──')
   ok('?park= скрывает переключатель парков', r.parksHidden === true)
   ok('?tv=1 включает режим панели', r.window.document.body.className.includes('tv'))
   ok('свежие данные — метки «нет связи» нет', !r.stale.includes('on'), r.stale)
+  ok('бейдж парка заполнен', r.brandPark === 'Охта Молл', r.brandPark)
+  ok('разделитель // виден', r.brandSep !== 'none', JSON.stringify(r.brandSep))
+  ok('иконка shark-eyes инлайном в шапке', r.brandIcon)
+}
+
+console.log('\n── Бренд-блок без данных ──')
+{
+  const dom = new JSDOM(html, {
+    url: 'https://b00m-cmd.ru/media/turbo/?park=ohta&mockError=1',
+    runScripts: 'outside-only', pretendToBeVisual: true,
+  })
+  dom.window.fetch = async () => { throw new Error('offline') }
+  dom.window.eval(bundle)
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+  const d = dom.window.document
+  // Источник молчит — парк неизвестен. Показать «БУМБАСТИК // » с висящим
+  // разделителем или, хуже, чужой парк — значит соврать на экране в зале.
+  ok('парк неизвестен → имя пустое', d.getElementById('brand-park').textContent === '')
+  ok('парк неизвестен → разделитель скрыт', d.getElementById('brand-sep').style.display === 'none')
 }
 
 console.log('\n── Отказ источника ──')

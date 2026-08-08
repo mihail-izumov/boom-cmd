@@ -270,6 +270,14 @@ function renderSteps() {
     .join('')
 }
 
+function renderBrand() {
+  // Пока данные не пришли, парк неизвестен — показываем только «БУМБАСТИК»
+  // без висящего разделителя. Врать названием парка на экране в зале нельзя.
+  const name = D.park_ru || ''
+  document.getElementById('brand-park').textContent = name
+  document.getElementById('brand-sep').style.display = name ? '' : 'none'
+}
+
 function renderCopy() {
   const c = D.copy || {}
   const set = (id, val, html) => {
@@ -388,6 +396,7 @@ function tick() {
 }
 
 function render() {
+  renderBrand()
   renderParks()
   renderMachines()
   renderPacks()

@@ -18,9 +18,9 @@
   "machines": [
     { "category": "race", "label_ru": "гонки", "icon": "🏎️", "count": 28 },
     { "category": "shoot", "label_ru": "стрелялки", "icon": "🎯", "count": 15 },
-    { "category": "basket", "label_ru": "баскетбол", "icon": "🏀", "count": 6 },
+    { "category": "airhockey", "label_ru": "аэрохоккей", "icon": "🥅", "count": 0 },
     { "category": "music", "label_ru": "танцы", "icon": "🎵", "count": 4 },
-    { "category": "other", "label_ru": "и ещё", "icon": "🕹️", "count": 44 }
+    { "category": "other", "label_ru": "и ещё", "icon": "🕹️", "count": 50 }
   ],
   "packages": [
     { "sku": "XS", "games": 10, "price": 350, "badge_ru": "ПОПРОБОВАТЬ", "badge_kind": "try", "sort": 1, "url": "https://b00m.fun" },
