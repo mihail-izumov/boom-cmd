@@ -119,6 +119,8 @@ async function run(query, payload) {
     subNote: $('sub-note').textContent,
     subHtml: $('sub-note').innerHTML,
     hintText: $('hint').textContent,
+    parkErr: $('parkerr').className.includes('on'),
+    parkErrAsked: $('parkerr-asked').textContent,
     skeletons: $('packs-body').ownerDocument.querySelectorAll('.bc-skeleton').length,
     window,
   }
@@ -271,6 +273,25 @@ console.log('\n── Бренд-блок без данных ──')
   ok('парк неизвестен → разделитель скрыт', d.getElementById('brand-sep').style.display === 'none')
 }
 
+console.log('\n── Опечатка в адресе панели ──')
+{
+  // ?park=piterlend (через «е») — источник молча отдаёт первый парк.
+  // Страница обязана это заметить: чужие цифры на экране хуже пустого экрана.
+  const r = await run('?park=piterlend', {
+    ...base, server_time: at('2026-08-08T14:00:00+03:00'),
+    today: [{ from: '10:00', to: '12:00', all_day: false }],
+  })
+  ok('опечатка в ?park= перекрывает экран', r.parkErr)
+  ok('в ошибке назван запрошенный код', r.parkErrAsked === '?park=piterlend', r.parkErrAsked)
+}
+{
+  const r = await run('?park=ohta', {
+    ...base, server_time: at('2026-08-08T14:00:00+03:00'),
+    today: [{ from: '10:00', to: '12:00', all_day: false }],
+  })
+  ok('корректный парк — плашки нет', !r.parkErr)
+}
+
 console.log('\n── Отказ источника ──')
 {
   const dom = new JSDOM(html, {
@@ -301,7 +322,9 @@ console.log('\n── Гигиена сборки ──')
   ok('noindex на месте', html.includes('noindex'))
   ok('заголовок вкладки — «Турбо-игры // Бумбастик»',
      html.includes('<title>Турбо-игры // Бумбастик</title>'))
-  ok('фавикон shark-eyes инлайном', /rel="icon"[^>]*data:image\/svg\+xml/.test(html))
+  ok('фавикон — общий с приложением', html.includes('href="/favicon.svg"'))
+  ok('бейдж «Работает на Ранскейл» со ссылкой',
+     html.includes('href="https://runscale.ru"') && html.includes('Работает на Ранскейл'))
   ok('бейдж «бесплатно» на лайме, новых цветов в палитре нет',
      html.includes('background:var(--lime);color:var(--dark)') && !html.includes('--coral'))
   ok('shimmer-загрузка портирована из приложения', html.includes('bc-shimmer') && html.includes('bc-skeleton'))

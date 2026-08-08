@@ -34,7 +34,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v1.7'
+const PAGE_VERSION = 'v1.8'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -362,6 +362,26 @@ function renderSteps() {
     .join('')
 }
 
+/**
+ * Сверка «просили парк X — источник вернул Y».
+ *
+ * Apps Script при неизвестном коде отдаёт первый парк по сортировке, чтобы
+ * экран в зале не пустел. Логика верная для пустого ?park=, но опасная для
+ * ОПЕЧАТКИ: `?park=piterlend` (через «е») молча превращается в Охту, и панель
+ * в Питерленде месяцами показывает чужие цифры и чужое расписание. Гость
+ * приходит в неверное время, а надпись «Охта Молл» в шапке никто не читает.
+ *
+ * Поймано в бою 08.08 владельцем. Лечим на фронте, а не в скрипте: только
+ * страница знает, какой парк у неё в URL.
+ */
+function checkPark() {
+  const el = document.getElementById('parkerr')
+  const bad = !!FIXED && hasData && D.park && FIXED !== D.park
+  el.classList.toggle('on', bad)
+  if (bad) document.getElementById('parkerr-asked').textContent = `?park=${FIXED}`
+  return bad
+}
+
 function renderBrand() {
   // Пока данные не пришли, парк неизвестен — показываем только «БУМБАСТИК»
   // без висящего разделителя. Врать названием парка на экране в зале нельзя.
@@ -541,6 +561,7 @@ function tick() {
 }
 
 function render() {
+  checkPark()
   // Мягкое появление — тот же bc-fade-in, что в приложении. Только на первой
   // отрисовке: анимировать экран каждые пять минут незачем.
   const page = document.querySelector('.page')
