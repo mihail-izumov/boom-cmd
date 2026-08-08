@@ -50,6 +50,7 @@
     --lime:#c6f52e;
     --yellow:#ffd530;
     --pink:#ff3d68;
+    --coral:#ff7f50;   /* акцент «бесплатно», добавлен 08.08 */
     --white:#ffffff;
     --muted:#9b94d0;
     --dark:#0d0a2e;
@@ -346,7 +347,27 @@
   .sub h3{font-family:'Unbounded';font-weight:700;font-size:clamp(16px,1.4vw,22px);line-height:1.2}
   /* Не var(--muted): на светлом конце градиента плитки он даёт 3,60:1 при норме
      4,5. Это инструкция гостю, а не украшение. #c5c0ea → 5,78:1. */
-  .sub p{font-size:clamp(12.5px,1.05vw,15px);color:#c5c0ea;font-weight:600;margin-top:6px;line-height:1.35}
+  .sub p{font-size:clamp(12.5px,1.05vw,15px);color:#c5c0ea;font-weight:600;margin-top:6px;line-height:1.45}
+
+  /* Коралловый бейдж «бесплатно» — единственное место на странице, где обещают
+     что-то даром, поэтому он и выделен. Текст тёмный, как на лайме и жёлтом:
+     на светлой заливке страница везде монохромна (белый на коралле дал бы 2,5:1). */
+  .sub .gift{
+    display:inline-block;margin-top:5px;
+    background:var(--coral);color:var(--dark);
+    font-weight:800;border-radius:9px;
+    padding:4px 10px;line-height:1.25;text-align:center;
+  }
+  /* «БЕСПЛАТНО» — отдельной строкой и чуть крупнее. Перенос задан РАЗМЕТКОЙ,
+     а не отдан браузеру: замер показал, что при автопереносе бейджу не хватало
+     двух пикселей до края колонки, он растягивался на всю ширину и переставал
+     читаться как бейдж — превращался в плашку. Двух пикселей запаса на разных
+     панелях не бывает. С явным переносом бейдж стабильно 115px везде. */
+  .sub .gift .free{display:block;font-size:1.06em;letter-spacing:.4px}
+  /* Куски, которые НЕЛЬЗЯ рвать переносом. «турбо-игр» браузер по умолчанию
+     ломает по дефису — на панели это читалось как «турбо-» и «игр» на разных
+     строках. Перенос допустим только там, где мы его поставили сами. */
+  .nb{white-space:nowrap}
   /* Плашка — КВАДРАТ ровно под код, без растягивания. Высота = высота плитки,
      ширина следует за ней через aspect-ratio. Белый фон обязателен: камере
      нужен контраст тёмных модулей к светлому полю, тут его убирать нельзя. */
@@ -599,7 +620,7 @@
     <section class="tile sub">
       <div class="subtext">
         <h3>Узнавай первым</h3>
-        <p id="sub-note">Каждую неделю разыгрываем 15 турбо-игр</p>
+        <p id="sub-note">Каждую неделю разыгрываем<br><b class="gift"><span class="nb">15 турбо-игр</span><span class="free">БЕСПЛАТНО</span></b></p>
       </div>
       <div class="qr"><svg class="qr-img" viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: https://b00m.fun/turbo/index"><path fill="currentColor" d="M2 2h7v1h-7zM10 2h3v1h-3zM16 2h2v1h-2zM21 2h2v1h-2zM24 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM11 3h1v1h-1zM13 3h2v1h-2zM16 3h1v1h-1zM18 3h1v1h-1zM20 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM30 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM11 4h1v1h-1zM15 4h1v1h-1zM18 4h1v1h-1zM20 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h3v1h-3zM30 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM19 5h1v1h-1zM22 5h1v1h-1zM24 5h1v1h-1zM26 5h3v1h-3zM30 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h1v1h-1zM13 6h2v1h-2zM18 6h4v1h-4zM24 6h1v1h-1zM26 6h3v1h-3zM30 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM10 7h4v1h-4zM16 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM24 7h1v1h-1zM30 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h7v1h-7zM11 9h1v1h-1zM13 9h2v1h-2zM16 9h2v1h-2zM20 9h1v1h-1zM3 10h7v1h-7zM12 10h2v1h-2zM15 10h1v1h-1zM17 10h2v1h-2zM20 10h1v1h-1zM25 10h2v1h-2zM30 10h1v1h-1zM2 11h3v1h-3zM9 11h2v1h-2zM14 11h3v1h-3zM18 11h7v1h-7zM26 11h2v1h-2zM30 11h1v1h-1zM3 12h1v1h-1zM5 12h1v1h-1zM7 12h3v1h-3zM11 12h2v1h-2zM14 12h1v1h-1zM17 12h2v1h-2zM23 12h3v1h-3zM2 13h2v1h-2zM7 13h1v1h-1zM12 13h2v1h-2zM15 13h3v1h-3zM22 13h4v1h-4zM27 13h1v1h-1zM29 13h1v1h-1zM2 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM11 14h2v1h-2zM14 14h2v1h-2zM17 14h1v1h-1zM19 14h2v1h-2zM22 14h2v1h-2zM25 14h1v1h-1zM27 14h4v1h-4zM3 15h3v1h-3zM10 15h2v1h-2zM17 15h1v1h-1zM20 15h2v1h-2zM23 15h2v1h-2zM26 15h2v1h-2zM30 15h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM8 16h1v1h-1zM10 16h1v1h-1zM12 16h2v1h-2zM16 16h2v1h-2zM20 16h1v1h-1zM24 16h2v1h-2zM5 17h2v1h-2zM9 17h1v1h-1zM11 17h1v1h-1zM13 17h1v1h-1zM18 17h1v1h-1zM20 17h2v1h-2zM24 17h1v1h-1zM26 17h2v1h-2zM30 17h1v1h-1zM2 18h1v1h-1zM4 18h1v1h-1zM7 18h2v1h-2zM10 18h2v1h-2zM13 18h3v1h-3zM20 18h1v1h-1zM27 18h2v1h-2zM30 18h1v1h-1zM2 19h2v1h-2zM6 19h2v1h-2zM9 19h1v1h-1zM12 19h1v1h-1zM17 19h11v1h-11zM29 19h2v1h-2zM2 20h1v1h-1zM5 20h1v1h-1zM8 20h4v1h-4zM13 20h4v1h-4zM19 20h1v1h-1zM24 20h1v1h-1zM27 20h1v1h-1zM2 21h1v1h-1zM5 21h3v1h-3zM11 21h1v1h-1zM13 21h1v1h-1zM16 21h1v1h-1zM18 21h1v1h-1zM20 21h3v1h-3zM24 21h1v1h-1zM26 21h2v1h-2zM29 21h1v1h-1zM2 22h1v1h-1zM5 22h1v1h-1zM7 22h2v1h-2zM10 22h1v1h-1zM12 22h1v1h-1zM15 22h1v1h-1zM19 22h1v1h-1zM21 22h8v1h-8zM30 22h1v1h-1zM10 23h1v1h-1zM12 23h1v1h-1zM16 23h1v1h-1zM18 23h3v1h-3zM22 23h1v1h-1zM26 23h2v1h-2zM29 23h2v1h-2zM2 24h7v1h-7zM10 24h4v1h-4zM16 24h4v1h-4zM21 24h2v1h-2zM24 24h1v1h-1zM26 24h1v1h-1zM29 24h1v1h-1zM2 25h1v1h-1zM8 25h1v1h-1zM10 25h2v1h-2zM14 25h9v1h-9zM26 25h2v1h-2zM29 25h2v1h-2zM2 26h1v1h-1zM4 26h3v1h-3zM8 26h1v1h-1zM10 26h1v1h-1zM12 26h7v1h-7zM22 26h7v1h-7zM30 26h1v1h-1zM2 27h1v1h-1zM4 27h3v1h-3zM8 27h1v1h-1zM10 27h2v1h-2zM13 27h2v1h-2zM17 27h1v1h-1zM20 27h4v1h-4zM25 27h1v1h-1zM2 28h1v1h-1zM4 28h3v1h-3zM8 28h1v1h-1zM10 28h1v1h-1zM14 28h1v1h-1zM16 28h4v1h-4zM21 28h6v1h-6zM28 28h2v1h-2zM2 29h1v1h-1zM8 29h1v1h-1zM10 29h6v1h-6zM17 29h1v1h-1zM20 29h1v1h-1zM22 29h3v1h-3zM26 29h2v1h-2zM29 29h1v1h-1zM2 30h7v1h-7zM12 30h1v1h-1zM14 30h1v1h-1zM17 30h3v1h-3zM21 30h1v1h-1zM26 30h1v1h-1zM28 30h1v1h-1z"/></svg></div>
     </section>

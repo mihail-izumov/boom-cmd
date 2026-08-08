@@ -34,7 +34,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v1.5'
+const PAGE_VERSION = 'v1.6'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -382,7 +382,11 @@ function renderCopy() {
   set('claim', c.claim_html, true)
   set('fineband', c.fineband)
   set('cta-text', c.cta_text)
-  set('sub-note', c.subscribe_note)
+  // Подпись под QR содержит бейдж, поэтому приходит размеченной. Старый
+  // плоский ключ поддерживаем: если в таблице ещё лежит subscribe_note,
+  // страница не останется с пустой строкой после отката импорта.
+  if (c.subscribe_note_html) set('sub-note', c.subscribe_note_html, true)
+  else set('sub-note', c.subscribe_note)
 }
 
 /* ── 6. Машина состояний таймера ─────────────────────────────────────────────

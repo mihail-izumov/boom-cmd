@@ -117,6 +117,7 @@ async function run(query, payload) {
     qr: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img path')?.getAttribute('d') || '',
     subHead: $('packs-body').ownerDocument.querySelector('.sub h3').textContent,
     subNote: $('sub-note').textContent,
+    subHtml: $('sub-note').innerHTML,
     hintText: $('hint').textContent,
     skeletons: $('packs-body').ownerDocument.querySelectorAll('.bc-skeleton').length,
     window,
@@ -246,6 +247,9 @@ console.log('\n── Блоки ──')
   ok('модалка email удалена', !r.window.document.getElementById('modal'))
   ok('после загрузки скелетонов не осталось', r.skeletons === 0, String(r.skeletons))
   ok('розыгрыш переехал в блок с QR', r.subNote.includes('15 турбо-игр'), r.subNote)
+  ok('«БЕСПЛАТНО» выделено бейджем', /<b class="gift">/.test(r.subHtml))
+  ok('«турбо-игр» защищено от переноса по дефису', /<span class="nb">15 турбо-игр<\/span>/.test(r.subHtml))
+  ok('перенос в бейдже задан разметкой, а не автопереносом', /class="free"/.test(r.subHtml))
   ok('бейдж парка заполнен', r.brandPark === 'Охта Молл', r.brandPark)
   ok('разделитель // виден', r.brandSep !== 'none', JSON.stringify(r.brandSep))
   ok('иконка shark-eyes инлайном в шапке', r.brandIcon)
