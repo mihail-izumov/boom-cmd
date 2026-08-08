@@ -325,66 +325,103 @@
   }
   .tue p{font-size:13px;font-weight:800;margin-top:10px;line-height:1.35}
 
-  /* подписка: большая кнопка → модалка */
-  .sub{background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%)}
+  /* подписка: QR вместо кнопки.
+     Панель у кассы — витрина, а не интерфейс: нажать на неё гость не может.
+     Кнопка на неинтерактивном экране — обещание действия, которого нет.
+     Поэтому единственный способ увести гостя дальше — его собственный телефон. */
+  .sub{
+    background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%);
+    justify-content:flex-start;padding:16px 18px;
+  }
   .sub h3{font-family:'Unbounded';font-weight:700;font-size:15px;line-height:1.3}
-  .sub p{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:4px}
-  .sub .bigbtn{
-    margin-top:12px;width:100%;
-    background:var(--lime);color:#1a2500;border:none;border-radius:14px;
-    padding:14px;font-family:'Inter';font-weight:800;font-size:15px;cursor:pointer;
-    transition:transform .15s;
+  /* Не var(--muted): на светлом конце градиента этой плитки он даёт 3,60:1 при
+     норме 4,5. Раньше строка была необязательным пояснением под кнопкой, теперь
+     это единственная инструкция гостю — «наведи камеру». #c5c0ea → 5,78:1. */
+  .sub p{font-size:12px;color:#c5c0ea;font-weight:600;margin-top:4px}
+  .sub .qr{
+    margin-top:10px;flex:1;min-height:0;
+    background:var(--white);border-radius:14px;
+    display:flex;align-items:center;justify-content:center;padding:8px;
   }
-  .sub .bigbtn:hover{transform:scale(1.03)}
+  .sub .qr-img{height:100%;width:auto;max-width:100%;color:var(--dark);display:block}
 
-  /* модалка email */
-  .modal{
-    position:fixed;inset:0;background:rgba(6,4,26,.75);backdrop-filter:blur(4px);
-    display:none;align-items:center;justify-content:center;z-index:50;
-  }
-  .modal.open{display:flex}
-  .mbox{
-    width:min(440px,90vw);
-    background:var(--tile2);border-radius:var(--radius);
-    padding:28px;position:relative;
-  }
-  .mbox h3{font-family:'Unbounded';font-weight:900;font-size:20px;line-height:1.3}
-  .mbox p{font-size:13.5px;color:var(--muted);font-weight:600;margin-top:8px;line-height:1.45}
-  .mbox form{display:flex;flex-direction:column;gap:10px;margin-top:16px}
-  .mbox input{
-    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);
-    border-radius:12px;padding:14px;color:#fff;font-family:'Inter';font-size:15px;outline:none;
-  }
-  .mbox input::placeholder{color:var(--muted)}
-  .mbox button[type=submit]{
-    background:var(--lime);color:#1a2500;border:none;border-radius:12px;
-    padding:14px;font-weight:800;font-size:15px;cursor:pointer;
-  }
-  .mbox .close{
-    position:absolute;top:14px;right:16px;background:none;border:none;
-    color:var(--muted);font-size:22px;cursor:pointer;line-height:1;
-  }
-  .mbox .ok{display:none;margin-top:16px;font-weight:800;color:var(--green);font-size:15px}
-
-  /* ── условия: своя плашка ── */
+  /* ── условия: своя плашка. Слева юр. строка, справа служебный бейдж ── */
   .fineband{
     grid-area:fineband;
     background:rgba(255,255,255,.04);
     border-radius:14px;
-    display:flex;align-items:center;justify-content:center;
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
     font-size:12px;color:var(--muted);font-weight:600;
-    padding:0 18px;text-align:center;
+    padding:0 8px 0 18px;text-align:left;
   }
+  .fineband .terms{min-width:0}
 
-  /* ── индикатор устаревших данных: только для персонала, не для гостя ── */
-  .stale{
-    position:fixed;left:10px;bottom:8px;z-index:9;
-    display:none;align-items:center;gap:6px;
-    background:rgba(0,0,0,.5);border-radius:8px;padding:4px 8px;
-    font-size:10px;font-weight:700;color:#8f88bd;letter-spacing:.5px;
+  /* Служебный бейдж — для персонала, не для гостя: по нему видно, что именно
+     сейчас открыто на панели и свежие ли данные. Отсюда белый фон: он читается
+     с расстояния и намеренно отличается от остальной страницы. */
+  .stamp{
+    flex:none;display:flex;align-items:center;gap:9px;
+    background:var(--white);color:var(--dark);
+    border-radius:9px;padding:4px 5px 4px 10px;
+    font-family:'Inter';font-weight:800;font-size:11px;letter-spacing:.3px;
+    white-space:nowrap;
   }
-  .stale.on{display:flex}
-  .stale i{width:6px;height:6px;border-radius:50%;background:var(--pink);font-style:normal}
+  .stamp .dot{
+    width:6px;height:6px;border-radius:50%;background:var(--green);flex:none;
+  }
+  .stamp.stale .dot{background:var(--pink)}
+  .stamp.stale .when{color:#b00d33}
+  .stamp .ver{color:#5a5775}
+  .stamp .rl{
+    display:flex;align-items:center;justify-content:center;
+    width:26px;height:26px;flex:none;
+    background:#eceaf5;border:none;border-radius:7px;
+    color:var(--dark);cursor:pointer;padding:0;
+  }
+  .stamp .rl:hover{background:#dedaf0}
+  .stamp .rl svg{width:15px;height:15px}
+  .stamp .rl.spin svg{animation:bc-spin .8s linear infinite}
+  @keyframes bc-spin{to{transform:rotate(360deg)}}
+
+  /* ── загрузка: тот же shimmer-«перелив», что во всех разделах приложения ──
+     Портирован из src/styles/main.css (@keyframes bc-shimmer). Там он на светлых
+     токенах, здесь — на тёмной плитке, поэтому блик задан прозрачным белым.
+     Показываем ТОЛЬКО когда показывать ещё нечего: фоновое обновление раз в
+     5 минут не должно мигать скелетоном на работающей панели в зале —
+     для него крутится иконка в служебном бейдже. */
+  @keyframes bc-shimmer{
+    0%{background-position:200% 0}
+    100%{background-position:-200% 0}
+  }
+  .bc-skeleton{
+    background-color:rgba(255,255,255,.06);
+    background-image:linear-gradient(90deg,
+      rgba(255,255,255,.06) 0%,
+      rgba(255,255,255,.15) 50%,
+      rgba(255,255,255,.06) 100%);
+    background-size:200% 100%;
+    background-repeat:no-repeat;
+    animation:bc-shimmer 1.4s ease-in-out infinite;
+    border-radius:12px;
+  }
+  .sk-line{height:14px;margin-bottom:9px}
+  .sk-count{height:42px;width:70%;margin-bottom:14px}
+  .sk-app{width:56px;height:56px;border-radius:16px}
+  .sk-pack{height:100%;margin:0 22px 12px;background-color:rgba(0,0,0,.07)}
+  .sk-pack.bc-skeleton{
+    background-image:linear-gradient(90deg,
+      rgba(0,0,0,.06) 0%, rgba(0,0,0,.13) 50%, rgba(0,0,0,.06) 100%);
+  }
+  @keyframes bc-fade-in{
+    from{opacity:0;transform:translateY(4px)}
+    to{opacity:1;transform:none}
+  }
+  .bc-fade-in{animation:bc-fade-in .28s ease-out both}
+  @media (prefers-reduced-motion: reduce){
+    .bc-skeleton{animation:none}
+    .bc-fade-in{animation:none}
+    .stamp .rl.spin svg{animation:none}
+  }
 
   /* ── панель песочницы (?demo=1) ── */
   .demo{
@@ -518,34 +555,38 @@
       <div class="day">ТУРБО-ВТОРНИК</div>
       <p>Турбо-часы — весь день.<br>Каждую неделю, без исключений.</p>
     </section>
+    <!-- QR сгенерирован офлайн (segno, ECC Q, 29 модулей) и вшит одним <path>:
+         на панели это на один запрос меньше и картинка не «поедет» при сбое сети.
+         Кодирует https://b00m.fun/turbo/index — поменяется адрес, QR надо
+         перегенерировать, руками этот путь не правится. -->
     <section class="tile sub">
-      <h3>Когда следующие<br>турбо-часы?</h3>
-      <p id="sub-note">Первым узнают подписчики. Каждую неделю разыгрываем 15 турбо-игр.</p>
-      <button class="bigbtn" id="openmodal">Узнавать первым</button>
+      <h3>Узнавай первым</h3>
+      <p id="sub-note">Наведи камеру — пришлём турбо-часы недели</p>
+      <div class="qr"><svg class="qr-img" viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: https://b00m.fun/turbo/index"><path fill="currentColor" d="M2 2h7v1h-7zM10 2h3v1h-3zM16 2h2v1h-2zM21 2h2v1h-2zM24 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM11 3h1v1h-1zM13 3h2v1h-2zM16 3h1v1h-1zM18 3h1v1h-1zM20 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM30 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM11 4h1v1h-1zM15 4h1v1h-1zM18 4h1v1h-1zM20 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h3v1h-3zM30 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM19 5h1v1h-1zM22 5h1v1h-1zM24 5h1v1h-1zM26 5h3v1h-3zM30 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h1v1h-1zM13 6h2v1h-2zM18 6h4v1h-4zM24 6h1v1h-1zM26 6h3v1h-3zM30 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM10 7h4v1h-4zM16 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM24 7h1v1h-1zM30 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h7v1h-7zM11 9h1v1h-1zM13 9h2v1h-2zM16 9h2v1h-2zM20 9h1v1h-1zM3 10h7v1h-7zM12 10h2v1h-2zM15 10h1v1h-1zM17 10h2v1h-2zM20 10h1v1h-1zM25 10h2v1h-2zM30 10h1v1h-1zM2 11h3v1h-3zM9 11h2v1h-2zM14 11h3v1h-3zM18 11h7v1h-7zM26 11h2v1h-2zM30 11h1v1h-1zM3 12h1v1h-1zM5 12h1v1h-1zM7 12h3v1h-3zM11 12h2v1h-2zM14 12h1v1h-1zM17 12h2v1h-2zM23 12h3v1h-3zM2 13h2v1h-2zM7 13h1v1h-1zM12 13h2v1h-2zM15 13h3v1h-3zM22 13h4v1h-4zM27 13h1v1h-1zM29 13h1v1h-1zM2 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM11 14h2v1h-2zM14 14h2v1h-2zM17 14h1v1h-1zM19 14h2v1h-2zM22 14h2v1h-2zM25 14h1v1h-1zM27 14h4v1h-4zM3 15h3v1h-3zM10 15h2v1h-2zM17 15h1v1h-1zM20 15h2v1h-2zM23 15h2v1h-2zM26 15h2v1h-2zM30 15h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM8 16h1v1h-1zM10 16h1v1h-1zM12 16h2v1h-2zM16 16h2v1h-2zM20 16h1v1h-1zM24 16h2v1h-2zM5 17h2v1h-2zM9 17h1v1h-1zM11 17h1v1h-1zM13 17h1v1h-1zM18 17h1v1h-1zM20 17h2v1h-2zM24 17h1v1h-1zM26 17h2v1h-2zM30 17h1v1h-1zM2 18h1v1h-1zM4 18h1v1h-1zM7 18h2v1h-2zM10 18h2v1h-2zM13 18h3v1h-3zM20 18h1v1h-1zM27 18h2v1h-2zM30 18h1v1h-1zM2 19h2v1h-2zM6 19h2v1h-2zM9 19h1v1h-1zM12 19h1v1h-1zM17 19h11v1h-11zM29 19h2v1h-2zM2 20h1v1h-1zM5 20h1v1h-1zM8 20h4v1h-4zM13 20h4v1h-4zM19 20h1v1h-1zM24 20h1v1h-1zM27 20h1v1h-1zM2 21h1v1h-1zM5 21h3v1h-3zM11 21h1v1h-1zM13 21h1v1h-1zM16 21h1v1h-1zM18 21h1v1h-1zM20 21h3v1h-3zM24 21h1v1h-1zM26 21h2v1h-2zM29 21h1v1h-1zM2 22h1v1h-1zM5 22h1v1h-1zM7 22h2v1h-2zM10 22h1v1h-1zM12 22h1v1h-1zM15 22h1v1h-1zM19 22h1v1h-1zM21 22h8v1h-8zM30 22h1v1h-1zM10 23h1v1h-1zM12 23h1v1h-1zM16 23h1v1h-1zM18 23h3v1h-3zM22 23h1v1h-1zM26 23h2v1h-2zM29 23h2v1h-2zM2 24h7v1h-7zM10 24h4v1h-4zM16 24h4v1h-4zM21 24h2v1h-2zM24 24h1v1h-1zM26 24h1v1h-1zM29 24h1v1h-1zM2 25h1v1h-1zM8 25h1v1h-1zM10 25h2v1h-2zM14 25h9v1h-9zM26 25h2v1h-2zM29 25h2v1h-2zM2 26h1v1h-1zM4 26h3v1h-3zM8 26h1v1h-1zM10 26h1v1h-1zM12 26h7v1h-7zM22 26h7v1h-7zM30 26h1v1h-1zM2 27h1v1h-1zM4 27h3v1h-3zM8 27h1v1h-1zM10 27h2v1h-2zM13 27h2v1h-2zM17 27h1v1h-1zM20 27h4v1h-4zM25 27h1v1h-1zM2 28h1v1h-1zM4 28h3v1h-3zM8 28h1v1h-1zM10 28h1v1h-1zM14 28h1v1h-1zM16 28h4v1h-4zM21 28h6v1h-6zM28 28h2v1h-2zM2 29h1v1h-1zM8 29h1v1h-1zM10 29h6v1h-6zM17 29h1v1h-1zM20 29h1v1h-1zM22 29h3v1h-3zM26 29h2v1h-2zM29 29h1v1h-1zM2 30h7v1h-7zM12 30h1v1h-1zM14 30h1v1h-1zM17 30h3v1h-3zM21 30h1v1h-1zM26 30h1v1h-1zM28 30h1v1h-1z"/></svg></div>
     </section>
   </div>
 
   <!-- УСЛОВИЯ -->
-  <div class="fineband" id="fineband">Турбо-игры действуют на аркадных автоматах (без выдачи тикетов) в турбо-часы. Покупка — в любое время. Остаток игр не сгорает.</div>
-
-</div>
-
-<!-- МОДАЛКА EMAIL -->
-<div class="modal" id="modal">
-  <div class="mbox">
-    <button class="close" id="closemodal">✕</button>
-    <h3>Турбо-часы — тебе первому</h3>
-    <p>Оставь email — пришлём расписание турбо-часов на неделю и включим тебя в еженедельный розыгрыш 15 турбо-игр.</p>
-    <form id="subform">
-      <input type="email" placeholder="твой email" required id="email">
-      <button type="submit">Подписаться</button>
-    </form>
-    <div class="ok" id="sub-ok">Готово! Письмо с расписанием уже летит ✈️</div>
+  <div class="fineband">
+    <span class="terms" id="fineband">Турбо-игры действуют на аркадных автоматах (без выдачи тикетов) в турбо-часы. Покупка — в любое время. Остаток игр не сгорает.</span>
+    <!-- Служебный бейдж: когда последний раз пришли данные, какая версия
+         носителя открыта и кнопка перезагрузки для персонала. Не для гостя. -->
+    <span class="stamp" id="stamp">
+      <i class="dot"></i>
+      <span class="when" id="stamp-when">—</span>
+      <span class="ver" id="stamp-ver">v—</span>
+      <button class="rl" id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
+        <!-- lucide rotate-cw — та же иконка, что в приложении -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+          <path d="M21 3v5h-5"/>
+        </svg>
+      </button>
+    </span>
   </div>
-</div>
 
-<!-- индикатор «данные не свежие» — для персонала -->
-<div class="stale" id="stale"><i></i><span id="stale-txt">нет связи с расписанием</span></div>
+</div>
 
 <!-- панель предпросмотра состояний: только ?demo=1 -->
 <div class="demo" id="demo">

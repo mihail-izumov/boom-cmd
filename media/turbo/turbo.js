@@ -23,6 +23,11 @@ const MOCKERR = Q.get('mockError') === '1'
    В репозитории лежит только имя переменной — сам URL туда не попадает (§4). */
 const API = import.meta.env.VITE_TURBO_API || ''
 
+/* Версия НОСИТЕЛЯ (не Apps Script — у него своя). Видна в служебном бейдже
+   внизу справа: по ней персонал и владелец понимают, что именно сейчас открыто
+   на панели в зале. Поднимать при каждой правке страницы, иначе бейдж врёт. */
+const PAGE_VERSION = 'v1.2'
+
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
 const DEFAULT_REFRESH_SEC = 300
@@ -94,6 +99,37 @@ const EMPTY = {
 }
 let D = EMPTY
 let forcedMode = null // песочница перебивает реальное состояние
+let hasData = false   // приходил ли хоть один успешный ответ
+
+/* ── Загрузочные состояния ───────────────────────────────────────────────────
+   Тот же shimmer-«перелив», что во всех разделах приложения (bc-skeleton).
+   Ключевое отличие от приложения — КОГДА он показывается.
+
+   Приложение живёт сессиями: пользователь зашёл, увидел скелетон, получил
+   данные. Панель в зале работает месяцами и перечитывает расписание раз в
+   пять минут. Мигать скелетоном на работающем экране каждые пять минут —
+   значит превратить витрину в мигалку. Поэтому:
+     первая загрузка (показывать нечего) → скелетоны на месте данных;
+     фоновое обновление (данные уже есть) → крутится только иконка в бейдже. */
+const sk = (cls) => `<div class="bc-skeleton ${cls}"></div>`
+
+function showSkeleton() {
+  document.getElementById('apps').innerHTML =
+    Array.from({ length: 5 }, () => `<span class="app">${sk('sk-app')}</span>`).join('')
+  document.getElementById('packs-body').innerHTML =
+    Array.from({ length: 3 }, () => sk('sk-pack')).join('')
+  // ⚠ Писать в el.count нельзя: внутри него лежит <small id="t-label">, и
+  //   innerHTML снёс бы подпись «Турбо-часы» / «Турбо-вторник» насовсем —
+  //   applyMode потом обращался бы к удалённому узлу. Заполняем только сам
+  //   счётчик и строку состояния.
+  el.num.innerHTML = sk('sk-count')
+  el.state.innerHTML = sk('sk-line')
+  el.note.innerHTML = ''
+}
+
+function setBusy(on) {
+  document.getElementById('reload').classList.toggle('spin', !!on)
+}
 
 function normalize(j) {
   const o = { ...EMPTY, ...(j || {}) }
@@ -133,15 +169,31 @@ function writeCache(data) {
   } catch { /* приватный режим / переполнение — не критично, работаем без кэша */ }
 }
 
-const staleEl = document.getElementById('stale')
-const staleTxt = document.getElementById('stale-txt')
-function setStale(on, txt) {
-  staleEl.classList.toggle('on', !!on)
-  if (txt) staleTxt.textContent = txt
+const stampEl = document.getElementById('stamp')
+const stampWhen = document.getElementById('stamp-when')
+
+const fmtWhen = (ms) =>
+  new Date(ms).toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).replace(',', '')
+
+/**
+ * Служебный бейдж внизу справа. Заменил плавающую метку «нет связи»: две
+ * индикации одного и того же состояния в разных углах — лишний шум на экране,
+ * который персонал всё равно будет читать в одном месте.
+ *   stale=false → зелёная точка и время последнего успешного ответа
+ *   stale=true  → розовая точка и время данных, которые сейчас показываются
+ */
+function setStamp(stale, at) {
+  stampEl.classList.toggle('stale', !!stale)
+  stampWhen.textContent = at ? fmtWhen(at) : '—'
 }
+document.getElementById('stamp-ver').textContent = PAGE_VERSION
 
 async function load() {
   const park = parkParam()
+  if (!hasData) showSkeleton()
+  setBusy(true)
   try {
     if (MOCKERR) throw new Error('Симуляция ошибки (?mockError=1)')
 
@@ -150,7 +202,9 @@ async function load() {
       // литеральная проверка DEV нужна, чтобы бандлер вырезал ветку из сборки.
       if (import.meta.env.DEV) {
         D = normalize((await import('./turbo.mock.json')).default)
-        setStale(true, 'мок-данные (dev)')
+        hasData = true
+        setStamp(true, Date.now())
+        setBusy(false)
         render()
         return
       }
@@ -168,7 +222,8 @@ async function load() {
     D = normalize(j)
     writeCache(j)
     if (D.park) { try { localStorage.setItem('boom-turbo-park', D.park) } catch {} }
-    setStale(false)
+    hasData = true
+    setStamp(false, Date.now())
   } catch (e) {
     // Сеть отвалилась — показываем последнее известное, но честно помечаем, что
     // данные не свежие. Кэш старше суток не берём: расписание за ночь наверняка
@@ -176,16 +231,15 @@ async function load() {
     const c = readCache()
     if (c && Date.now() - c.at < CACHE_MAX_MS) {
       D = normalize(c.data)
-      const when = new Date(c.at).toLocaleString('ru-RU', {
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-      })
-      setStale(true, `расписание от ${when}`)
+      hasData = true
+      setStamp(true, c.at)   // время данных, которые сейчас на экране
     } else {
       D = EMPTY
-      setStale(true, 'нет связи с расписанием')
+      setStamp(true, null)
     }
     if (import.meta.env.DEV) console.warn('[turbo]', e)
   }
+  setBusy(false)
   render()
 }
 
@@ -371,10 +425,13 @@ function applyMode(m) {
     el.state.textContent = 'Турбо-часы скоро'
     el.note.textContent = 'Часы этого парка ещё назначаются. Подпишись — пришлём, как только появятся'
   } else {
+    // Плитка слева — СОСТОЯНИЕ, нижний блок — ДЕЙСТВИЕ (QR). Раньше здесь стоял
+    // призыв «нажми кнопку внизу», и это была двойная ошибка: текст дублировал
+    // нижний блок, а нажать на панель в зале всё равно нельзя.
     el.box.classList.add('none')
     el.count.style.display = 'none'
-    el.state.textContent = 'Расписание — у подписчиков'
-    el.note.textContent = 'Нажми «Узнавать первым» внизу — пришлём турбо-часы недели'
+    el.state.textContent = 'Когда следующие турбо-часы?'
+    el.note.textContent = 'Каждую неделю разыгрываем 15 турбо-игр.'
   }
   tick()
 }
@@ -396,6 +453,13 @@ function tick() {
 }
 
 function render() {
+  // Мягкое появление — тот же bc-fade-in, что в приложении. Только на первой
+  // отрисовке: анимировать экран каждые пять минут незачем.
+  const page = document.querySelector('.page')
+  if (hasData && !page.dataset.shown) {
+    page.dataset.shown = '1'
+    page.classList.add('bc-fade-in')
+  }
   renderBrand()
   renderParks()
   renderMachines()
@@ -430,20 +494,22 @@ if (TV) {
   }, 60000)
 }
 
-/* ── 8. Модалка email ────────────────────────────────────────────────────────
-   ⚠ Приём подписки пока МОК: базы нет, письмо не уходит. Реальный приём —
-   отдельная задача (ТУРБО-веб-страница §5.1: куда пишем базу, double opt-in). */
-const modal = document.getElementById('modal')
-document.getElementById('openmodal').addEventListener('click', () => modal.classList.add('open'))
-document.getElementById('closemodal').addEventListener('click', () => modal.classList.remove('open'))
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open') })
-document.getElementById('subform').addEventListener('submit', (e) => {
-  e.preventDefault()
-  document.getElementById('sub-ok').style.display = 'block'
-  e.target.style.display = 'none'
+/* ── 8. Перезагрузка для персонала ──────────────────────────────────────────
+   Иконка в служебном бейдже. «Жёсткая» здесь означает «гарантированно свежая»,
+   и достаточно обычного reload: HTML носителя намеренно не кэшируется service
+   worker'ом (см. public/sw.js), а бандл лежит под хешированным именем — новая
+   сборка = новое имя. Единственное, что реально может залипнуть, — кэш
+   расписания в localStorage, поэтому его чистим перед перезагрузкой.
+
+   Модалка email убрана вместе с кнопкой: собирать адрес на экране, к которому
+   нельзя прикоснуться, невозможно, а приём подписки всё равно был моком —
+   страница обещала письмо, которое никто не отправлял. Теперь подписка живёт
+   там, куда ведёт QR. */
+document.getElementById('reload').addEventListener('click', () => {
+  setBusy(true)
+  try { localStorage.removeItem(CACHE_KEY) } catch {}
+  location.reload()
 })
-// На панели никто не закроет модалку — снимаем её сами.
-if (TV) setInterval(() => modal.classList.remove('open'), 30000)
 
 /* ── 9. Песочница (?demo=1) — в бой не идёт, кнопки скрыты без параметра ─── */
 document.querySelectorAll('.demo button').forEach((b) => {

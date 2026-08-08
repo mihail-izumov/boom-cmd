@@ -110,7 +110,12 @@ async function run(query, payload) {
     price: $('cta-price').textContent,
     tag: $('cta-tag').textContent,
     parksHidden: $('parks').hidden,
-    stale: $('stale').className,
+    stampStale: $('stamp').className.includes('stale'),
+    stampWhen: $('stamp-when').textContent,
+    stampVer: $('stamp-ver').textContent,
+    qr: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img path')?.getAttribute('d') || '',
+    subHead: $('packs-body').ownerDocument.querySelector('.sub h3').textContent,
+    skeletons: $('packs-body').ownerDocument.querySelectorAll('.bc-skeleton').length,
     window,
   }
 }
@@ -153,7 +158,7 @@ console.log('\n── Машина состояний ──')
     today: [{ from: '', to: '', all_day: true }],
   })
   ok('tue: состояние как now', r.cls.includes('now'), r.cls)
-  ok('tue: подпись «Турбо-вторник»', r.label === 'Турбо-вторник', r.label)
+  ok('tue: подпись «Турбо-вторник» пережила скелетон', r.label === 'Турбо-вторник', r.label)
   ok('tue: «Играй весь день»', r.state === 'Играй весь день', r.state)
   ok('tue: отсчёт до закрытия парка (7 ч)', r.num.startsWith('6:59') || r.num.startsWith('7:00'), r.num)
 }
@@ -166,7 +171,7 @@ console.log('\n── Машина состояний ──')
     today: [],
   })
   ok('none: нейтральное состояние', r.cls.includes('none'), r.cls)
-  ok('none: увод в подписку', r.state === 'Расписание — у подписчиков', r.state)
+  ok('none: показывает состояние, а не призыв', r.state === 'Когда следующие турбо-часы?', r.state)
 }
 
 // 5. Парк на паузе (Питерленд, PIT-21) — пустой календарь показывать нельзя
@@ -200,7 +205,14 @@ console.log('\n── Блоки ──')
   ok('победители подменили «как это работает»', r.steps === 'Победители недели', r.steps)
   ok('?park= скрывает переключатель парков', r.parksHidden === true)
   ok('?tv=1 включает режим панели', r.window.document.body.className.includes('tv'))
-  ok('свежие данные — метки «нет связи» нет', !r.stale.includes('on'), r.stale)
+  ok('свежие данные — точка бейджа зелёная', !r.stampStale)
+  ok('бейдж: время последнего обновления', /^\d{2}\.\d{2} \d{2}:\d{2}$/.test(r.stampWhen), r.stampWhen)
+  ok('бейдж: версия носителя', /^v\d+\.\d+$/.test(r.stampVer), r.stampVer)
+  ok('QR вшит в блок подписки', r.qr.length > 1000, `${r.qr.length} симв. пути`)
+  ok('в блоке подписки нет кнопки (панель некликабельна)',
+     !r.window.document.querySelector('.sub button'))
+  ok('модалка email удалена', !r.window.document.getElementById('modal'))
+  ok('после загрузки скелетонов не осталось', r.skeletons === 0, String(r.skeletons))
   ok('бейдж парка заполнен', r.brandPark === 'Охта Молл', r.brandPark)
   ok('разделитель // виден', r.brandSep !== 'none', JSON.stringify(r.brandSep))
   ok('иконка shark-eyes инлайном в шапке', r.brandIcon)
@@ -234,8 +246,15 @@ console.log('\n── Отказ источника ──')
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
   const d = dom.window.document
   ok('источник молчит → состояние none', d.getElementById('timer').className.includes('none'))
-  ok('зажглась метка «нет связи»', d.getElementById('stale').className.includes('on'))
+  ok('бейдж пометил данные несвежими', d.getElementById('stamp').className.includes('stale'))
+  ok('нет данных → время не выдумывается', d.getElementById('stamp-when').textContent === '—')
   ok('страница не упала', d.querySelector('.turbo').textContent === 'ТУРБО')
+  ok('состояние none: «Когда следующие турбо-часы?»',
+     d.getElementById('t-state').textContent === 'Когда следующие турбо-часы?',
+     d.getElementById('t-state').textContent)
+  ok('состояние none: не зовёт нажимать кнопку',
+     !d.getElementById('t-note').textContent.includes('Нажми'),
+     d.getElementById('t-note').textContent)
 }
 
 console.log('\n── Гигиена сборки ──')
@@ -243,6 +262,8 @@ console.log('\n── Гигиена сборки ──')
   ok('мок вырезан из прод-бандла', !bundle.includes('МАКСИМУМ ФАНА') && !bundle.includes('turbo.mock'))
   ok('носитель не тянет код приложения', !html.includes('/assets/app-'))
   ok('noindex на месте', html.includes('noindex'))
+  ok('shimmer-загрузка портирована из приложения', html.includes('bc-shimmer') && html.includes('bc-skeleton'))
+  ok('иконка перезагрузки в шапке плашки условий', html.includes('id="reload"'))
   const sw = readFileSync(resolve(OUT, 'sw.js'), 'utf8')
   ok('/media/ исключён из service worker', sw.includes("BASE + 'media/'"))
   ok('аппшелл собран', existsSync(resolve(OUT, 'index.html')))
