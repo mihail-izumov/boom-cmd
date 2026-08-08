@@ -299,6 +299,11 @@ console.log('\n── Гигиена сборки ──')
   ok('мок вырезан из прод-бандла', !bundle.includes('МАКСИМУМ ФАНА') && !bundle.includes('turbo.mock'))
   ok('носитель не тянет код приложения', !html.includes('/assets/app-'))
   ok('noindex на месте', html.includes('noindex'))
+  ok('заголовок вкладки — «Турбо-игры // Бумбастик»',
+     html.includes('<title>Турбо-игры // Бумбастик</title>'))
+  ok('фавикон shark-eyes инлайном', /rel="icon"[^>]*data:image\/svg\+xml/.test(html))
+  ok('бейдж «бесплатно» на лайме, новых цветов в палитре нет',
+     html.includes('background:var(--lime);color:var(--dark)') && !html.includes('--coral'))
   ok('shimmer-загрузка портирована из приложения', html.includes('bc-shimmer') && html.includes('bc-skeleton'))
   ok('иконка перезагрузки в шапке плашки условий', html.includes('id="reload"'))
   ok('служебная плашка не белая (не спорит с QR)', !html.includes('background:var(--white);color:var(--dark);\n    border-radius:9px'))
