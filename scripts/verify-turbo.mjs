@@ -98,6 +98,7 @@ async function run(query, payload) {
   return {
     cls: $('timer').className,
     state: $('t-state').textContent,
+    stateHtml: $('t-state').innerHTML,
     label: $('t-label').textContent,
     num: $('t-num').textContent,
     note: $('t-note').textContent,
@@ -171,7 +172,10 @@ console.log('\n── Машина состояний ──')
     today: [],
   })
   ok('none: нейтральное состояние', r.cls.includes('none'), r.cls)
-  ok('none: показывает состояние, а не призыв', r.state === 'Когда следующие турбо-часы?', r.state)
+  // Сверяем разметку, а не текст: в состоянии `none` заголовок переносится
+  // через <br>, и textContent склеивает слова без пробела.
+  ok('none: показывает состояние, а не призыв',
+     r.stateHtml === 'Когда следующие<br>турбо-часы?', r.stateHtml)
 }
 
 // 5. Парк на паузе (Питерленд, PIT-21) — пустой календарь показывать нельзя
@@ -249,9 +253,9 @@ console.log('\n── Отказ источника ──')
   ok('бейдж пометил данные несвежими', d.getElementById('stamp').className.includes('stale'))
   ok('нет данных → время не выдумывается', d.getElementById('stamp-when').textContent === '—')
   ok('страница не упала', d.querySelector('.turbo').textContent === 'ТУРБО')
-  ok('состояние none: «Когда следующие турбо-часы?»',
-     d.getElementById('t-state').textContent === 'Когда следующие турбо-часы?',
-     d.getElementById('t-state').textContent)
+  ok('состояние none: «Когда следующие / турбо-часы?» с переносом',
+     d.getElementById('t-state').innerHTML === 'Когда следующие<br>турбо-часы?',
+     d.getElementById('t-state').innerHTML)
   ok('состояние none: не зовёт нажимать кнопку',
      !d.getElementById('t-note').textContent.includes('Нажми'),
      d.getElementById('t-note').textContent)
