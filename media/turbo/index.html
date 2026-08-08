@@ -227,7 +227,7 @@
 
   /* ── таймер: отсчёт сверху, подпись под ним ── */
   .timer{grid-area:timer;border:2px solid transparent;justify-content:flex-start;padding-top:26px}
-  .timer .count{font-family:'Unbounded';font-weight:900;font-size:42px;letter-spacing:1px;line-height:1}
+  .timer .count{font-family:'Unbounded';font-weight:900;font-size:clamp(38px,3.4vw,54px);letter-spacing:1px;line-height:1}
   .timer .count small{display:block;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
   .timer .state{font-family:'Unbounded';font-weight:700;font-size:19px;line-height:1.25;margin-top:14px}
   .timer .note{font-size:13px;color:var(--muted);margin-top:10px;font-weight:600;line-height:1.4}
@@ -334,23 +334,32 @@
      Панель у кассы — витрина, а не интерфейс: нажать на неё гость не может.
      Кнопка на неинтерактивном экране — обещание действия, которого нет.
      Поэтому единственный способ увести гостя дальше — его собственный телефон. */
-  .sub{background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%)}
-  .sub h3{font-family:'Unbounded';font-weight:700;font-size:15px;line-height:1.3}
-  /* Не var(--muted): на светлом конце градиента этой плитки он даёт 3,60:1 при
-     норме 4,5. Раньше строка была необязательным пояснением под кнопкой, теперь
-     это единственная инструкция гостю — «наведи камеру». #c5c0ea → 5,78:1. */
-  .sub p{font-size:12px;color:#c5c0ea;font-weight:600;margin-top:4px}
-  /* Плашка стоит ровно на месте бывшей кнопки: тот же margin-top, ширина и
-     радиус. Занимает остаток высоты плитки — это безопасно ТОЛЬКО потому, что
-     ряды сетки зафиксированы через minmax(0,·). Замер на живой странице:
-     1290×823 → QR 76px, при 720p сам ужимается до 61px, ряд остаётся 178px
-     и все три плитки нижнего ряда равны. */
+  /* Горизонтальная компоновка: тексты слева, QR квадратом справа.
+     Вертикальная делила высоту плитки между текстом и кодом, и обоим было
+     тесно — QR выходил 76px. В строку QR получает ВСЮ высоту плитки (≈138px,
+     +80%), а тексты — всю оставшуюся ширину, поэтому их можно укрупнить. */
+  .sub{
+    background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%);
+    flex-direction:row;align-items:center;gap:16px;
+  }
+  .sub .subtext{flex:1;min-width:0}
+  .sub h3{font-family:'Unbounded';font-weight:700;font-size:clamp(16px,1.4vw,22px);line-height:1.2}
+  /* Не var(--muted): на светлом конце градиента плитки он даёт 3,60:1 при норме
+     4,5. Это инструкция гостю, а не украшение. #c5c0ea → 5,78:1. */
+  .sub p{font-size:clamp(12.5px,1.05vw,15px);color:#c5c0ea;font-weight:600;margin-top:6px;line-height:1.35}
+  /* Плашка — КВАДРАТ ровно под код, без растягивания. Высота = высота плитки,
+     ширина следует за ней через aspect-ratio. Белый фон обязателен: камере
+     нужен контраст тёмных модулей к светлому полю, тут его убирать нельзя. */
   .sub .qr{
-    margin-top:12px;width:100%;flex:1;min-height:0;
+    /* Потолок 170px не произвольный: без него на панели 1080p квадрат вырастает
+       до 198px и отжимает текст до 151px — подпись уходит в четыре строки в
+       узкой колонке. Замерено в браузере на 720/823/1080. Ограничивать по
+       ШИРИНЕ нельзя: max-width при height:100% ломает квадрат в прямоугольник. */
+    flex:none;height:min(100%,170px);aspect-ratio:1;width:auto;
     background:var(--white);border-radius:14px;
     display:flex;align-items:center;justify-content:center;padding:6px;
   }
-  .sub .qr-img{height:100%;width:auto;max-width:100%;color:var(--dark);display:block}
+  .sub .qr-img{height:100%;width:100%;color:var(--dark);display:block}
 
   /* ── условия: своя плашка. Слева юр. строка, справа служебный бейдж ── */
   .fineband{
@@ -366,27 +375,48 @@
   /* Служебный бейдж — для персонала, не для гостя: по нему видно, что именно
      сейчас открыто на панели и свежие ли данные. Отсюда белый фон: он читается
      с расстояния и намеренно отличается от остальной страницы. */
+  /* Служебная плашка намеренно ПРИГЛУШЕНА: белая слишком спорила за внимание
+     с QR-кодом, который стоит прямо над ней. Это техническая метка для
+     персонала — она должна читаться, когда её ищут, и не лезть в глаза,
+     когда смотрят на предложение. Контраст при этом держим выше нормы. */
   .stamp{
     flex:none;display:flex;align-items:center;gap:9px;
-    background:var(--white);color:var(--dark);
-    border-radius:9px;padding:4px 5px 4px 10px;
-    font-family:'Inter';font-weight:800;font-size:11px;letter-spacing:.3px;
-    white-space:nowrap;
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.09);
+    color:#cfcae8;
+    border-radius:9px;padding:3px 4px 3px 10px;
+    font-family:'Inter';font-weight:700;font-size:11px;letter-spacing:.3px;
+    white-space:nowrap;cursor:pointer;
   }
   .stamp .dot{
-    width:6px;height:6px;border-radius:50%;background:var(--green);flex:none;
+    width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;
   }
   .stamp.stale .dot{background:var(--pink)}
-  .stamp.stale .when{color:#b00d33}
-  .stamp .ver{color:#5a5775}
+  .stamp.stale .when{color:#ff9db4}
+  .stamp .ver{color:#8f88bd}
   .stamp .rl{
     display:flex;align-items:center;justify-content:center;
-    width:26px;height:26px;flex:none;
-    background:#eceaf5;border:none;border-radius:7px;
-    color:var(--dark);cursor:pointer;padding:0;
+    width:24px;height:24px;flex:none;
+    background:rgba(255,255,255,.07);border:none;border-radius:7px;
+    color:#cfcae8;cursor:pointer;padding:0;
   }
-  .stamp .rl:hover{background:#dedaf0}
-  .stamp .rl svg{width:15px;height:15px}
+  .stamp .rl:hover{background:rgba(255,255,255,.14)}
+  .stamp .rl svg{width:14px;height:14px}
+
+  /* Подсказка по точке. На панели нет курсора и нет hover, поэтому title=""
+     там бесполезен — нужен именно клик. */
+  .fineband{position:relative}
+  .hint{
+    position:absolute;right:8px;bottom:calc(100% + 8px);
+    max-width:min(520px,70vw);
+    background:var(--tile2);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;padding:10px 13px;
+    font-size:12px;font-weight:600;color:var(--white);line-height:1.4;
+    box-shadow:0 12px 30px rgba(0,0,0,.45);
+    display:none;z-index:20;text-align:left;white-space:normal;
+  }
+  .hint.on{display:block}
+  .hint b{color:var(--lime)}
   .stamp .rl.spin svg{animation:bc-spin .8s linear infinite}
   @keyframes bc-spin{to{transform:rotate(360deg)}}
 
@@ -567,8 +597,10 @@
          Кодирует https://b00m.fun/turbo/index — поменяется адрес, QR надо
          перегенерировать, руками этот путь не правится. -->
     <section class="tile sub">
-      <h3>Узнавай первым</h3>
-      <p id="sub-note">Пришлём турбо-часы недели</p>
+      <div class="subtext">
+        <h3>Узнавай первым</h3>
+        <p id="sub-note">Пришлём турбо-часы недели. Каждую неделю разыгрываем 15 турбо-игр.</p>
+      </div>
       <div class="qr"><svg class="qr-img" viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: https://b00m.fun/turbo/index"><path fill="currentColor" d="M2 2h7v1h-7zM10 2h3v1h-3zM16 2h2v1h-2zM21 2h2v1h-2zM24 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM11 3h1v1h-1zM13 3h2v1h-2zM16 3h1v1h-1zM18 3h1v1h-1zM20 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM30 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM11 4h1v1h-1zM15 4h1v1h-1zM18 4h1v1h-1zM20 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h3v1h-3zM30 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM19 5h1v1h-1zM22 5h1v1h-1zM24 5h1v1h-1zM26 5h3v1h-3zM30 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h1v1h-1zM13 6h2v1h-2zM18 6h4v1h-4zM24 6h1v1h-1zM26 6h3v1h-3zM30 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM10 7h4v1h-4zM16 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM24 7h1v1h-1zM30 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h7v1h-7zM11 9h1v1h-1zM13 9h2v1h-2zM16 9h2v1h-2zM20 9h1v1h-1zM3 10h7v1h-7zM12 10h2v1h-2zM15 10h1v1h-1zM17 10h2v1h-2zM20 10h1v1h-1zM25 10h2v1h-2zM30 10h1v1h-1zM2 11h3v1h-3zM9 11h2v1h-2zM14 11h3v1h-3zM18 11h7v1h-7zM26 11h2v1h-2zM30 11h1v1h-1zM3 12h1v1h-1zM5 12h1v1h-1zM7 12h3v1h-3zM11 12h2v1h-2zM14 12h1v1h-1zM17 12h2v1h-2zM23 12h3v1h-3zM2 13h2v1h-2zM7 13h1v1h-1zM12 13h2v1h-2zM15 13h3v1h-3zM22 13h4v1h-4zM27 13h1v1h-1zM29 13h1v1h-1zM2 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM11 14h2v1h-2zM14 14h2v1h-2zM17 14h1v1h-1zM19 14h2v1h-2zM22 14h2v1h-2zM25 14h1v1h-1zM27 14h4v1h-4zM3 15h3v1h-3zM10 15h2v1h-2zM17 15h1v1h-1zM20 15h2v1h-2zM23 15h2v1h-2zM26 15h2v1h-2zM30 15h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM8 16h1v1h-1zM10 16h1v1h-1zM12 16h2v1h-2zM16 16h2v1h-2zM20 16h1v1h-1zM24 16h2v1h-2zM5 17h2v1h-2zM9 17h1v1h-1zM11 17h1v1h-1zM13 17h1v1h-1zM18 17h1v1h-1zM20 17h2v1h-2zM24 17h1v1h-1zM26 17h2v1h-2zM30 17h1v1h-1zM2 18h1v1h-1zM4 18h1v1h-1zM7 18h2v1h-2zM10 18h2v1h-2zM13 18h3v1h-3zM20 18h1v1h-1zM27 18h2v1h-2zM30 18h1v1h-1zM2 19h2v1h-2zM6 19h2v1h-2zM9 19h1v1h-1zM12 19h1v1h-1zM17 19h11v1h-11zM29 19h2v1h-2zM2 20h1v1h-1zM5 20h1v1h-1zM8 20h4v1h-4zM13 20h4v1h-4zM19 20h1v1h-1zM24 20h1v1h-1zM27 20h1v1h-1zM2 21h1v1h-1zM5 21h3v1h-3zM11 21h1v1h-1zM13 21h1v1h-1zM16 21h1v1h-1zM18 21h1v1h-1zM20 21h3v1h-3zM24 21h1v1h-1zM26 21h2v1h-2zM29 21h1v1h-1zM2 22h1v1h-1zM5 22h1v1h-1zM7 22h2v1h-2zM10 22h1v1h-1zM12 22h1v1h-1zM15 22h1v1h-1zM19 22h1v1h-1zM21 22h8v1h-8zM30 22h1v1h-1zM10 23h1v1h-1zM12 23h1v1h-1zM16 23h1v1h-1zM18 23h3v1h-3zM22 23h1v1h-1zM26 23h2v1h-2zM29 23h2v1h-2zM2 24h7v1h-7zM10 24h4v1h-4zM16 24h4v1h-4zM21 24h2v1h-2zM24 24h1v1h-1zM26 24h1v1h-1zM29 24h1v1h-1zM2 25h1v1h-1zM8 25h1v1h-1zM10 25h2v1h-2zM14 25h9v1h-9zM26 25h2v1h-2zM29 25h2v1h-2zM2 26h1v1h-1zM4 26h3v1h-3zM8 26h1v1h-1zM10 26h1v1h-1zM12 26h7v1h-7zM22 26h7v1h-7zM30 26h1v1h-1zM2 27h1v1h-1zM4 27h3v1h-3zM8 27h1v1h-1zM10 27h2v1h-2zM13 27h2v1h-2zM17 27h1v1h-1zM20 27h4v1h-4zM25 27h1v1h-1zM2 28h1v1h-1zM4 28h3v1h-3zM8 28h1v1h-1zM10 28h1v1h-1zM14 28h1v1h-1zM16 28h4v1h-4zM21 28h6v1h-6zM28 28h2v1h-2zM2 29h1v1h-1zM8 29h1v1h-1zM10 29h6v1h-6zM17 29h1v1h-1zM20 29h1v1h-1zM22 29h3v1h-3zM26 29h2v1h-2zM29 29h1v1h-1zM2 30h7v1h-7zM12 30h1v1h-1zM14 30h1v1h-1zM17 30h3v1h-3zM21 30h1v1h-1zM26 30h1v1h-1zM28 30h1v1h-1z"/></svg></div>
     </section>
   </div>
@@ -578,7 +610,8 @@
     <span class="terms" id="fineband">Турбо-игры действуют на аркадных автоматах (без выдачи тикетов) в турбо-часы. Покупка — в любое время. Остаток игр не сгорает.</span>
     <!-- Служебный бейдж: когда последний раз пришли данные, какая версия
          носителя открыта и кнопка перезагрузки для персонала. Не для гостя. -->
-    <span class="stamp" id="stamp">
+    <div class="hint" id="hint"></div>
+    <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
       <i class="dot"></i>
       <span class="when" id="stamp-when">—</span>
       <span class="ver" id="stamp-ver">v—</span>
@@ -600,6 +633,7 @@
   <span>Состояние:</span>
   <button data-mode="now">Идут сейчас</button>
   <button data-mode="today">Сегодня позже</button>
+  <button data-mode="next">До следующих</button>
   <button data-mode="none">Без расписания</button>
   <button data-mode="tue">Вторник</button>
   <button data-mode="soon">Пауза парка</button>

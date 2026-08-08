@@ -10,6 +10,7 @@
   "close": "22:00",
   "is_tuesday": false,
   "today": [{ "from": "10:00", "to": "12:00", "all_day": false }],
+  "next_window": { "date": "2026-08-10", "dow": 1, "from": "10:00", "to": "12:00", "all_day": false, "days_ahead": 2 },
   "parks": [
     { "park": "ohta", "park_ru": "Охта Молл" },
     { "park": "piterland", "park_ru": "Питерленд" },

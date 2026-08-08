@@ -116,6 +116,8 @@ async function run(query, payload) {
     stampVer: $('stamp-ver').textContent,
     qr: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img path')?.getAttribute('d') || '',
     subHead: $('packs-body').ownerDocument.querySelector('.sub h3').textContent,
+    subNote: $('sub-note').textContent,
+    hintText: $('hint').textContent,
     skeletons: $('packs-body').ownerDocument.querySelectorAll('.bc-skeleton').length,
     window,
   }
@@ -192,6 +194,32 @@ console.log('\n── Машина состояний ──')
   ok('paused: отсчёт скрыт', r.num === '' || r.num === '0:00:00', JSON.stringify(r.num))
 }
 
+// 6. Сегодня окон нет, но известно ближайшее → большой отсчёт
+{
+  const r = await run('?park=ohta', {
+    ...base,
+    server_time: at('2026-08-08T14:00:00+03:00'),
+    today: [],
+    next_window: { date: '2026-08-10', dow: 1, from: '10:00', to: '12:00', all_day: false, days_ahead: 2 },
+  })
+  ok('next: жёлтый акцент', r.cls.includes('today'), r.cls)
+  ok('next: подпись «До турбо-часов»', r.label === 'До турбо-часов', r.label)
+  ok('next: назван день и час', r.state === 'В понедельник с 10:00', r.state)
+  ok('next: отсчёт в днях', /^1 д (19:59|20:00)$/.test(r.num), r.num)
+}
+
+// 7. Ближайшее окно неизвестно (источник его не отдаёт) → не выдумываем
+{
+  const r = await run('?park=ohta', {
+    ...base,
+    server_time: at('2026-08-08T14:00:00+03:00'),
+    today: [],
+    next_window: null,
+  })
+  ok('нет next_window → состояние none, а не выдуманное время', r.cls.includes('none'), r.cls)
+  ok('none: уводит к подписке', r.note === 'Расписание — у подписчиков', r.note)
+}
+
 console.log('\n── Блоки ──')
 {
   const r = await run('?park=ohta&tv=1', {
@@ -210,13 +238,14 @@ console.log('\n── Блоки ──')
   ok('?park= скрывает переключатель парков', r.parksHidden === true)
   ok('?tv=1 включает режим панели', r.window.document.body.className.includes('tv'))
   ok('свежие данные — точка бейджа зелёная', !r.stampStale)
-  ok('бейдж: время последнего обновления', /^\d{2}\.\d{2} \d{2}:\d{2}$/.test(r.stampWhen), r.stampWhen)
+  ok('бейдж: время с явным поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
   ok('бейдж: версия носителя', /^v\d+\.\d+$/.test(r.stampVer), r.stampVer)
   ok('QR вшит в блок подписки', r.qr.length > 1000, `${r.qr.length} симв. пути`)
   ok('в блоке подписки нет кнопки (панель некликабельна)',
      !r.window.document.querySelector('.sub button'))
   ok('модалка email удалена', !r.window.document.getElementById('modal'))
   ok('после загрузки скелетонов не осталось', r.skeletons === 0, String(r.skeletons))
+  ok('розыгрыш переехал в блок с QR', r.subNote.includes('15 турбо-игр'), r.subNote)
   ok('бейдж парка заполнен', r.brandPark === 'Охта Молл', r.brandPark)
   ok('разделитель // виден', r.brandSep !== 'none', JSON.stringify(r.brandSep))
   ok('иконка shark-eyes инлайном в шапке', r.brandIcon)
@@ -268,6 +297,8 @@ console.log('\n── Гигиена сборки ──')
   ok('noindex на месте', html.includes('noindex'))
   ok('shimmer-загрузка портирована из приложения', html.includes('bc-shimmer') && html.includes('bc-skeleton'))
   ok('иконка перезагрузки в шапке плашки условий', html.includes('id="reload"'))
+  ok('служебная плашка не белая (не спорит с QR)', !html.includes('background:var(--white);color:var(--dark);\n    border-radius:9px'))
+  ok('блок QR — квадрат, а не растяжка', html.includes('aspect-ratio:1'))
   const sw = readFileSync(resolve(OUT, 'sw.js'), 'utf8')
   ok('/media/ исключён из service worker', sw.includes("BASE + 'media/'"))
   ok('аппшелл собран', existsSync(resolve(OUT, 'index.html')))

@@ -34,7 +34,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v1.3'
+const PAGE_VERSION = 'v1.4'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -102,7 +102,7 @@ const esc = (s) =>
 const EMPTY = {
   parks: [], park: '', park_ru: '', turbo_status: 'active',
   open: DEFAULT_OPEN, close: DEFAULT_CLOSE,
-  is_tuesday: false, today: [], machines: [], packages: [],
+  is_tuesday: false, today: [], next_window: null, machines: [], packages: [],
   winners: [], copy: {}, settings: {},
 }
 let D = EMPTY
@@ -154,6 +154,10 @@ function normalize(j) {
   if (hmToMin(o.open) === null) o.open = DEFAULT_OPEN
   if (hmToMin(o.close) === null) o.close = DEFAULT_CLOSE
   o.turbo_status = String(o.turbo_status || 'active').toLowerCase()
+  // Ближайшее будущее окно. Источник может его не прислать (schedule_visibility
+  // = today) — тогда отсчёта просто не будет, а не будет выдуманного времени.
+  const nw = j?.next_window
+  o.next_window = nw && hmToMin(nw.from) !== null ? nw : null
   return o
 }
 
@@ -180,10 +184,13 @@ function writeCache(data) {
 const stampEl = document.getElementById('stamp')
 const stampWhen = document.getElementById('stamp-when')
 
+/* «МСК» приписываем явно: браузер форматирует в поясе панели, а моноблок в
+   зале может стоять с чужим поясом — тогда без подписи не понять, чьё это
+   время. Ровно на этом мы уже спотыкались с таблицей (пояс был лос-анджелесский). */
 const fmtWhen = (ms) =>
   new Date(ms).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  }).replace(',', '')
+  }).replace(',', '') + ' МСК'
 
 /**
  * Служебный бейдж внизу справа. Заменил плавающую метку «нет связи»: две
@@ -197,6 +204,29 @@ function setStamp(stale, at) {
   stampWhen.textContent = at ? fmtWhen(at) : '—'
 }
 document.getElementById('stamp-ver').textContent = PAGE_VERSION
+
+/* Что означает точка. На панели нет курсора, поэтому hover-подсказка там
+   недоступна — нужен клик. Персоналу это единственный способ понять, живые
+   данные на экране или последние сохранённые. */
+const hintEl = document.getElementById('hint')
+let hintTimer = null
+function toggleHint() {
+  const stale = stampEl.classList.contains('stale')
+  hintEl.innerHTML = stale
+    ? '<b>Розовая точка</b> — источник не отвечает. На экране последние сохранённые ' +
+      'данные, время рядом — когда они получены. Расписание могло с тех пор ' +
+      'измениться. Нажми ⟳ справа, чтобы перезагрузить.'
+    : '<b>Зелёная точка</b> — данные свежие. Рядом время последнего ответа сервера ' +
+      'по Москве и версия страницы. Панель сама перечитывает расписание каждые ' +
+      'несколько минут.'
+  hintEl.classList.toggle('on')
+  clearTimeout(hintTimer)
+  if (hintEl.classList.contains('on')) hintTimer = setTimeout(() => hintEl.classList.remove('on'), 12000)
+}
+stampEl.addEventListener('click', (e) => {
+  if (e.target.closest('#reload')) return   // кнопка перезагрузки — не подсказка
+  toggleHint()
+})
 
 async function load() {
   const park = parkParam()
@@ -372,6 +402,7 @@ const el = {
 }
 let startMin = null // отметка начала окна, минуты от полуночи
 let endMin = null   // отметка конца окна
+let nextAt = null   // окно не сегодня: {from, days_ahead, …}
 
 function currentWindow() {
   const cur = wallMin()
@@ -398,7 +429,32 @@ function computeMode() {
   const w = currentWindow()
   if (w.active) return D.is_tuesday ? 'tue' : 'now'
   if (w.next) return 'today'
+  if (D.next_window) return 'next'   // сегодня окон нет, но известно ближайшее
   return 'none'
+}
+
+const DOW_RU = ['', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье']
+
+/**
+ * Сколько миллисекунд до начала окна, которое может быть не сегодня.
+ * Считаем в настенном времени парка: дни целиком плюс остаток внутри суток.
+ * Собственные часы панели в расчёт не берём — см. §2.
+ */
+function msUntilWindow(nw) {
+  const fromMin = hmToMin(nw.from)
+  if (fromMin === null) return 0
+  const days = Math.max(0, Number(nw.days_ahead) || 0)
+  return days * 86400000 + (fromMin - wallMin()) * 60000
+}
+
+/** «1 д 18:42» / «4:07:15» — дни отдельно, иначе часы уходят за сотню. */
+function fmtLong(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const d = Math.floor(total / 86400)
+  const rest = total % 86400
+  const h = Math.floor(rest / 3600)
+  if (d > 0) return `${d} д ${pad(h)}:${pad(Math.floor((rest % 3600) / 60))}`
+  return `${h}:${pad(Math.floor((rest % 3600) / 60))}:${pad(rest % 60)}`
 }
 
 function applyMode(m) {
@@ -409,6 +465,7 @@ function applyMode(m) {
   el.label.textContent = 'Турбо-часы'
   startMin = null
   endMin = null
+  nextAt = null
 
   if (m === 'now' || m === 'tue') {
     el.box.classList.add('now')
@@ -425,6 +482,20 @@ function applyMode(m) {
     const from = w.next?.from || D.open
     startMin = hmToMin(from)
     el.state.textContent = `Сегодня с ${from}`
+  } else if (m === 'next') {
+    // Сегодня окон нет, но ближайшее известно. Гостю нужен ответ на вопрос
+    // «когда», а не «спроси у подписчиков» — иначе витрина ничего не обещает
+    // и не удерживает. Раскрывается РОВНО одно окно, не сетка недели.
+    el.box.classList.add('today')
+    el.label.textContent = 'До турбо-часов'
+    nextAt = D.next_window
+    const nw = D.next_window
+    const when = nw.days_ahead === 0 ? 'сегодня'
+      : nw.days_ahead === 1 ? 'завтра'
+      : `в ${DOW_RU[nw.dow] || ''}`
+    el.state.textContent = nw.all_day
+      ? `${when.charAt(0).toUpperCase()}${when.slice(1)} — весь день`
+      : `${when.charAt(0).toUpperCase()}${when.slice(1)} с ${nw.from}`
   } else if (m === 'soon') {
     // Парк на паузе. Пустой календарь показывать нельзя (ЖУРНАЛ §1) — говорим
     // прямо, что часы ещё назначаются, и уводим в подписку.
@@ -439,13 +510,18 @@ function applyMode(m) {
     el.box.classList.add('none')
     el.count.style.display = 'none'
     el.state.innerHTML = 'Когда следующие<br>турбо-часы?'
-    el.note.textContent = 'Каждую неделю разыгрываем 15 турбо-игр.'
+    el.note.textContent = 'Расписание — у подписчиков'
   }
   tick()
 }
 
 let lastWall = null
 function tick() {
+  if (nextAt) {
+    const left = msUntilWindow(nextAt)
+    el.num.textContent = fmtLong(left)
+    if (left <= 0) load()   // окно наступило — перечитать расписание
+  }
   const target = endMin !== null ? endMin : startMin
   if (target !== null) {
     const left = msUntil(target)
