@@ -61,7 +61,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v2.1'
+const PAGE_VERSION = 'v2.2'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -71,6 +71,22 @@ const DEFAULT_CLOSE = '22:00'
 
 if (TV) document.body.classList.add('tv')
 if (DEMO) document.getElementById('demo').classList.add('on')
+
+/* Указатель в режиме ТВ прячется по бездействию, а не запретом (см. коммент
+   у `body.tv.idle` в разметке). Слушаем движение мыши, а не касания: на
+   тач-панели курсора нет вовсе, прятать там нечего. */
+if (TV) {
+  let idleTimer = 0
+  const goIdle = () => document.body.classList.add('idle')
+  const wake = () => {
+    document.body.classList.remove('idle')
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(goIdle, 5000)
+  }
+  window.addEventListener('mousemove', wake, { passive: true })
+  window.addEventListener('mousedown', wake, { passive: true })
+  idleTimer = setTimeout(goIdle, 5000) // мыши нет — прячем через 5 с и навсегда
+}
 
 /* ── 2. Часы: панель у кассы может врать дважды ──────────────────────────────
    Расписание задано настенным временем парка («с 16:00»), а моноблок в зале

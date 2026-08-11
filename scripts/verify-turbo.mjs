@@ -299,6 +299,38 @@ console.log('\n── Иконки категорий ──')
   ok('иконка не обрезается плиткой', !css.includes('overflow:hidden'))
 }
 
+console.log('\n── Указатель мыши в режиме ТВ ──')
+{
+  // Баг, из-за которого правка появилась: безусловное `cursor:none` на body
+  // плюс исключения с `cursor:default` — курсор пропадал и находился только
+  // над теми блоками, что попали в список исключений.
+  // Комментарии вырезаем: правка объясняется в разметке и цитирует старое
+  // правило, иначе проверка ловила бы собственное объяснение.
+  const noComments = html.replace(/\/\*[\s\S]*?\*\//g, '')
+  ok('нет безусловного скрытия курсора в режиме ТВ',
+    !/body\.tv\{[^}]*cursor:\s*none/.test(noComments))
+  ok('скрытие курсора перекрывает вложенные элементы',
+    /body\.tv\.idle\s*,\s*body\.tv\.idle\s*\*\{cursor:none !important\}/.test(html))
+
+  const r = await run('?park=ohta&tv=1', { ...base, server_time: at('2026-08-08T14:00:00+03:00') })
+  const body = r.window.document.body
+  ok('режим ТВ включён', body.classList.contains('tv'))
+  ok('сразу после загрузки курсор виден', !body.classList.contains('idle'))
+
+  // Ждём порог бездействия: 5 с в скрипте + запас. Тест намеренно живой, а не
+  // на подменённых таймерах — ломается обычно как раз связка «класс/порог».
+  await new Promise((res) => setTimeout(res, 5400))
+  ok('через 5 с без мыши курсор прячется', body.classList.contains('idle'))
+
+  r.window.dispatchEvent(new r.window.Event('mousemove'))
+  ok('движение мыши возвращает курсор', !body.classList.contains('idle'))
+
+  const r2 = await run('?park=ohta', { ...base, server_time: at('2026-08-08T14:00:00+03:00') })
+  await new Promise((res) => setTimeout(res, 5400))
+  ok('вне режима ТВ курсор не прячется никогда',
+    !r2.window.document.body.classList.contains('idle'))
+}
+
 console.log('\n── Опечатка в адресе панели ──')
 {
   // ?park=piterlend (через «е») — источник молча отдаёт первый парк.
