@@ -182,12 +182,18 @@
   }
   .apps .app .box{
     position:relative;
-    width:56px;height:56px;border-radius:16px;
+    width:clamp(56px,4.6vw,74px);aspect-ratio:1;border-radius:16px;
     display:flex;align-items:center;justify-content:center;
-    font-size:30px;
+    font-size:30px;   /* запасной путь: эмодзи, если картинки для категории нет */
     background:linear-gradient(160deg,#2a2274 0%,#191352 100%);
     border:1px solid rgba(255,255,255,.14);
     box-shadow:0 6px 16px rgba(0,0,0,.35);
+    overflow:hidden;
+  }
+  /* Картинка выходит за границы плитки на 12% — иконки нарисованы с воздухом
+     по краям, и вписанные «по размеру» они выглядели бы мелкими внутри рамки. */
+  .apps .app .box .ico{
+    width:112%;height:112%;object-fit:contain;display:block;
   }
   .apps .app .lbl{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.3px}
   .apps .cnt{

@@ -12,6 +12,33 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
+/* ── 0. Иконки категорий ─────────────────────────────────────────────────────
+   Картинки, а не эмодзи. Эмодзи рисуются системным шрифтом: на моноблоке с
+   другой ОС они выглядят иначе, чем на макете, а часть глифов может не найтись
+   вовсе. Здесь это критичнее обычного — иконки несут числа аппаратов, то есть
+   доказательство «любой автомат».
+
+   Импортируем, а не тянем из public/: Vite подставит хешированные имена, и
+   новая картинка доедет до панели сама, без чистки кэша.
+
+   ⚠ Иконки живут В КОДЕ, а поле `icon` из таблицы остаётся ЗАПАСНЫМ (см.
+   renderMachines). Причина: набор категорий фиксирован дизайном, а таблица —
+   про числа. Заведут новую категорию в таблице без картинки — она отрисуется
+   эмодзи из ячейки, а не сломает блок. */
+import iconRace from './icons/race.webp'
+import iconShoot from './icons/shoot.webp'
+import iconMusic from './icons/music.webp'
+import iconOther from './icons/other.webp'
+
+const CATEGORY_ICONS = {
+  race: iconRace,
+  shoot: iconShoot,
+  music: iconMusic,
+  other: iconOther,
+  // airhockey — картинки пока нет: категория заведена с нулём и не рисуется.
+  // Появится число → нужна и иконка, иначе выпадет на эмодзи из таблицы.
+}
+
 /* ── 1. Параметры запуска ────────────────────────────────────────────────── */
 const Q = new URLSearchParams(location.search)
 const FIXED = (Q.get('park') || '').trim().toLowerCase() // панель прибита к парку
@@ -34,7 +61,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v1.9'
+const PAGE_VERSION = 'v2.0'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -330,12 +357,17 @@ function renderParks() {
 function renderMachines() {
   document.getElementById('apps').innerHTML = D.machines
     .filter((m) => Number(m.count) > 0)
-    .map(
-      (m) =>
-        `<span class="app"><span class="box">${esc(m.icon || '🕹️')}` +
+    .map((m) => {
+      const src = CATEGORY_ICONS[m.category]
+      // Есть картинка — рисуем её; нет — падаем на эмодзи из таблицы, чтобы
+      // новая категория не оставила пустой квадрат.
+      const inner = src
+        ? `<img class="ico" src="${src}" alt="" loading="eager" decoding="async">`
+        : esc(m.icon || '🕹️')
+      return `<span class="app"><span class="box">${inner}` +
         `<span class="cnt">${esc(m.count)}</span></span>` +
-        `<span class="lbl">${esc(m.label_ru || m.category)}</span></span>`,
-    )
+        `<span class="lbl">${esc(m.label_ru || m.category)}</span></span>`
+    })
     .join('')
 }
 
