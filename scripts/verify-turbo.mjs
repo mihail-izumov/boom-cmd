@@ -115,6 +115,7 @@ async function run(query, payload) {
     stampWhen: $('stamp-when').textContent,
     stampVer: $('stamp-ver').textContent,
     qr: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img path')?.getAttribute('d') || '',
+    qrLabel: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img')?.getAttribute('aria-label') || '',
     subHead: $('packs-body').ownerDocument.querySelector('.sub h3').textContent,
     subNote: $('sub-note').textContent,
     subHtml: $('sub-note').innerHTML,
@@ -195,6 +196,8 @@ console.log('\n── Машина состояний ──')
   ok('paused: состояние soon', r.cls.includes('soon'), r.cls)
   ok('paused: «Турбо-часы скоро»', r.state === 'Турбо-часы скоро', r.state)
   ok('paused: отсчёт скрыт', r.num === '' || r.num === '0:00:00', JSON.stringify(r.num))
+  ok('paused: QR всё равно ведёт на свой парк',
+     r.qrLabel === 'QR: https://b00m.fun/turbo?park=piterland&src=tv', r.qrLabel)
 }
 
 // 6. Сегодня окон нет, но известно ближайшее → большой отсчёт
@@ -247,6 +250,12 @@ console.log('\n── Блоки ──')
   ok('бейдж: время с явным поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
   ok('бейдж: версия носителя', /^v\d+\.\d+$/.test(r.stampVer), r.stampVer)
   ok('QR вшит в блок подписки', r.qr.length > 1000, `${r.qr.length} симв. пути`)
+  // Длина пути ничего не доказывает: чужой QR такой же длинный. Сверяем адрес.
+  ok('QR ведёт на парк, показанный на экране',
+     r.qrLabel === 'QR: https://b00m.fun/turbo?park=ohta&src=tv', r.qrLabel)
+  ok('QR помечен носителем (src=tv) — иначе не отличить экран от тейблтента',
+     r.qrLabel.includes('src=tv'))
+  ok('старый адрес /turbo/index из QR убран', !r.qrLabel.includes('/turbo/index'))
   ok('в блоке подписки нет кнопки (панель некликабельна)',
      !r.window.document.querySelector('.sub button'))
   ok('модалка email удалена', !r.window.document.getElementById('modal'))
@@ -341,6 +350,10 @@ console.log('\n── Опечатка в адресе панели ──')
   })
   ok('опечатка в ?park= перекрывает экран', r.parkErr)
   ok('в ошибке назван запрошенный код', r.parkErrAsked === '?park=piterlend', r.parkErrAsked)
+  // Ключевое: QR берётся от ПОКАЗАННОГО парка, а не от того, что в URL панели.
+  // Иначе экран показывал бы Охту, а код подписывал на Питерленд.
+  ok('при опечатке QR совпадает с тем, что на экране, а не с ?park=',
+     r.qrLabel === 'QR: https://b00m.fun/turbo?park=ohta&src=tv', r.qrLabel)
 }
 {
   const r = await run('?park=ohta', {

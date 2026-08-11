@@ -25,6 +25,7 @@
    renderMachines). Причина: набор категорий фиксирован дизайном, а таблица —
    про числа. Заведут новую категорию в таблице без картинки — она отрисуется
    эмодзи из ячейки, а не сломает блок. */
+import { TURBO_QR } from './turbo-qr.js'
 import iconRace from './icons/race.webp'
 import iconShoot from './icons/shoot.webp'
 import iconMusic from './icons/music.webp'
@@ -61,7 +62,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v2.2'
+const PAGE_VERSION = 'v2.3'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -461,6 +462,30 @@ function renderBrand() {
   document.getElementById('brand-sep').style.display = name ? '' : 'none'
 }
 
+/**
+ * QR под текущий парк. Гость, отсканировавший код у кассы Охты, попадает на
+ * страницу подписки с уже выбранной Охтой — выбирать ему нечего.
+ *
+ * ⚠ Ключ берётся из `D.park`, а НЕ из `FIXED` (то, что стоит в `?park=` URL
+ *   панели). Это принципиально: при опечатке в URL Apps Script отдаёт первый
+ *   парк по сортировке, экран показывает ЕГО цифры, и QR обязан вести туда же.
+ *   Иначе панель показывала бы расписание Охты, а код подписывал на Питерленд —
+ *   расхождение, которое в зале не увидит никто.
+ *
+ * ⚠ Парк ещё не известен (данные не пришли) → фолбэк `_`: код без парка,
+ *   страница попросит выбрать. Чужой QR на экране хуже лишнего вопроса.
+ */
+function renderQr() {
+  const q = TURBO_QR[D.park] || TURBO_QR._
+  const svg = document.getElementById('qr-svg')
+  const path = document.getElementById('qr-path')
+  if (!q || !svg || !path) return
+  if (path.getAttribute('d') === q.d) return // тот же парк — не трогаем DOM
+  svg.setAttribute('viewBox', q.viewBox)
+  svg.setAttribute('aria-label', `QR: ${q.url}`)
+  path.setAttribute('d', q.d)
+}
+
 function renderCopy() {
   const c = D.copy || {}
   const set = (id, val, html) => {
@@ -646,6 +671,7 @@ function render() {
   renderMachines()
   renderPacks()
   renderSteps()
+  renderQr()
   renderCopy()
   applyMode(forcedMode || computeMode())
 }
