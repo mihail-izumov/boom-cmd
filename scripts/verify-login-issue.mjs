@@ -20,7 +20,7 @@ import {
   verdict, vpnSuspicion, parseTrace, DIAG_BUDGET_MS, PROBE_TIMEOUT_MS,
 } from '../src/composables/loginDiagnostics.js'
 import { RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS } from '../src/composables/netPolicy.js'
-import { NET_HINTS } from '../src/i18n/net.js'
+import { NET_HINTS, networkHint } from '../src/i18n/net.js'
 import { ACCESS_RU, LOGIN_ISSUE_RU } from '../src/i18n/access.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -191,6 +191,35 @@ console.log('\n=== гейт: повторы и разбор причин ===')
   }
   check('подсказка берётся из общего словаря', /networkHint\(/.test(src))
   check('политика: 3 попытки, потолок 25 с', RETRY_DELAYS_MS.length === 2 && ATTEMPT_TIMEOUT_MS === 25000)
+
+  // ── Короткое замыкание на офлайне (вариант A, 12.08) ──
+  // Поведенчески это здесь не проверить: `VITE_PROJECTS_API` в приёмке пуст,
+  // гейт уходит в раннюю ветку «без источника» и до сети не доходит вовсе
+  // (см. блок выше). Поэтому проверяем ПОРЯДОК ВЕТОК по исходнику — а он тут
+  // и есть всё содержание правки: сдвинь проверку на строку выше или ниже,
+  // и правка либо перестаёт работать, либо начинает запирать дев-режим.
+  // Отсчёт ведём ОТ начала submitKey: `if (!API)` есть ещё и в `init()`, выше по
+  // файлу, и глобальный indexOf нашёл бы его — проверка стала бы всегда истинной
+  // и перестала бы что-либо стеречь.
+  const iSub = src.indexOf('async function submitKey')
+  const iApi = src.indexOf('if (!API) {', iSub)
+  const iOffline = src.indexOf('if (!isOnline()) {', iSub)
+  const iChecking = src.indexOf('checking.value = true', iSub)
+  check('гейт спрашивает isOnline перед попытками', iSub > 0 && iOffline > 0)
+  check(
+    'ПОРЯДОК: офлайн проверяется ПОСЛЕ «без источника» (дев-режим не запираем)',
+    iApi > 0 && iOffline > iApi,
+  )
+  check(
+    'ПОРЯДОК: офлайн проверяется ДО «Проверяем…» (не врём о ходе проверки)',
+    iChecking > 0 && iOffline < iChecking,
+  )
+  check("причина «offline» называется своим именем", /kind: 'offline'/.test(src))
+  // Вердикт в модалке уже умеет офлайн по `online: 'no'` из окружения —
+  // отдельной ветки под новый kind заводить не пришлось, и это проверяем,
+  // чтобы правка не разъехалась с диагностикой.
+  check('вердикт диагностики знает офлайн', verdict({ online: 'no' }).code === 'offline')
+  check('подсказка офлайна — из общего словаря', networkHint({ retriable: true, online: false }) === NET_HINTS.offline)
 }
 
 console.log('\n=== бюджет диагностики ===')
