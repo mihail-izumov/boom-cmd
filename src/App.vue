@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watchEffect } from 'vue'
+import { computed, watch, watchEffect } from 'vue'
 import { ChartColumnBig, Layers, Newspaper } from 'lucide-vue-next'
 import AppShell from './components/AppShell.vue'
 import HomeScreen from './screens/HomeScreen.vue'
@@ -18,6 +18,7 @@ import AccessKeyForm from './components/AccessKeyForm.vue'
 import ReporterShell from './components/report/ReporterShell.vue'
 import { useAppNav, setActive, setSubView, clearSubView } from './composables/useAppNav.js'
 import { useAccessKey } from './composables/useAccessKey.js'
+import { flushQueue } from './composables/useLoginIssue.js'
 import { setThemeColor, AUTH_THEME_COLOR, APP_THEME_COLOR } from './composables/useThemeColor.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
@@ -144,9 +145,20 @@ function onBack() {
 
 // Гейт на весь вход: пока фраза не подтверждена — экран входа вместо оболочки.
 // role === 'reporter' (вторая фраза, D-12 §9-A) → только «Отчёт дня» без оболочки.
-const { authed, role, ready, checking, keyError, netError, notice, init, submitKey } =
-  useAccessKey()
+const {
+  authed, role, ready, checking, keyError, netError, netHint, attempt, lastFailure,
+  notice, init, submitKey,
+} = useAccessKey()
 init()
+
+// D-22: досылка накопленных заявок «Проблемы со входом». Момент выбран не
+// случайно — ТОЛЬКО после успешного входа: именно тогда связь заведомо есть.
+// Заявка от человека, у которого связи не было, иначе не дошла бы никогда, а это
+// ровно те случаи, ради которых форма и делалась: без очереди мы систематически
+// видели бы только лёгкие сбои и ни одного тяжёлого.
+watch(authed, (v) => {
+  if (v) flushQueue()
+})
 
 // D-21 v2: пока идёт вход (и стартовая проверка фразы) — тёмная системная шапка,
 // как только вошли — светлая. Тёмная витрина живёт ТОЛЬКО на входе и сплэше.
@@ -172,6 +184,9 @@ watchEffect(() => setThemeColor(authed.value ? APP_THEME_COLOR : AUTH_THEME_COLO
     :error="keyError"
     :loading="checking"
     :net-error="netError"
+    :net-hint="netHint"
+    :attempt="attempt"
+    :failure="lastFailure"
     :notice="notice"
     @submit="submitKey"
   />

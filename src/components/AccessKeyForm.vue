@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { AlertCircle, Eye, EyeOff } from 'lucide-vue-next'
-import { ACCESS_RU } from '../i18n/access.js'
+import { ACCESS_RU, LOGIN_ISSUE_RU } from '../i18n/access.js'
+import LoginIssueModal from './LoginIssueModal.vue'
 
 // Экран входа (Фаза 4; ревизия D-21 от 28.07.2026 — ТЗ «экран входа: логотип Ранскейл»).
 //
@@ -38,9 +39,31 @@ const props = defineProps({
   error: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
   netError: { type: String, default: null },
+  // Подсказка «что делать» под ошибкой (D-22). Словарь общий со всем приложением
+  // (i18n/net.js): «выключите VPN» показывается ТОЛЬКО при транспортной осечке.
+  // До D-22 экран входа был единственным местом, где ошибка не сопровождалась
+  // ни одним действием — а VPN тут причина номер один (см. i18n/net.js, 05.08).
+  netHint: { type: String, default: '' },
   notice: { type: String, default: null },
+  // Номер попытки при повторах (1..3). Пауза между попытками — бо́льшая часть
+  // времени, и всё это время кнопка обязана говорить, что процесс идёт.
+  attempt: { type: Number, default: 0 },
+  // Чем закончилась последняя попытка (useAccessKey.lastFailure) — уходит в
+  // заявку «Проблемы со входом» без повторного сетевого запроса.
+  failure: { type: Object, default: null },
 })
 const emit = defineEmits(['submit'])
+
+// Модалка заявки. Открывается ссылкой под картой входа.
+const issueOpen = ref(false)
+
+// Подпись кнопки. Три состояния вместо прежних двух: покой → «Проверяем…» →
+// «Пробуем ещё…». Третье появилось вместе с повторами: без него шесть секунд
+// молчания читаются как зависание.
+const submitLabel = computed(() => {
+  if (!props.loading) return ACCESS_RU.submit
+  return props.attempt > 1 ? ACCESS_RU.retrying : ACCESS_RU.checking
+})
 
 // Логин больше не состояние: он фиксирован (ACCESS_RU.login) и не редактируется.
 const phrase = ref('')
@@ -219,15 +242,24 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
              а не декорация). Поэтому здесь текст красный, а не монохромный, как
              в остальном приложении. --negative на тёмной витрине поднят до
              #FF5C4D = 5.94:1 на карточке (брендовый #D92D20 давал 3.75:1). -->
-        <p
-          v-if="error || netError"
-          data-test="access-error"
-          class="flex items-center justify-center gap-1.5 text-[0.875rem] text-[var(--negative)]"
-          role="alert"
-        >
-          <AlertCircle class="h-4 w-4 shrink-0 text-[var(--negative)]" :stroke-width="2" aria-hidden="true" />
-          <span>{{ netError || ACCESS_RU.wrong }}</span>
-        </p>
+        <div v-if="error || netError" role="alert">
+          <p
+            data-test="access-error"
+            class="flex items-center justify-center gap-1.5 text-[0.875rem] text-[var(--negative)]"
+          >
+            <AlertCircle class="h-4 w-4 shrink-0 text-[var(--negative)]" :stroke-width="2" aria-hidden="true" />
+            <span>{{ netError || ACCESS_RU.wrong }}</span>
+          </p>
+          <!-- Подсказка — ВТОРОЙ строкой и МОНОХРОМНАЯ. Красным сказано, ЧТО не
+               так; что с этим делать — уже не сигнал, а инструкция, и красить её
+               в тот же цвет значило бы удвоить тревогу вместо того, чтобы её снять.
+               --text-secondary #9A9A9A на карточке #161616 = 6.43:1 (посчитано). -->
+          <p
+            v-if="netHint"
+            data-test="access-hint"
+            class="mt-1.5 text-center text-[0.875rem] leading-snug text-[var(--text-secondary)]"
+          >{{ netHint }}</p>
+        </div>
         <p v-else-if="notice" class="text-center text-[0.875rem] text-[var(--text-muted)]">{{ notice }}</p>
 
         <!-- Цвет — из скоупных токенов (--accent белый, --accent-ink чёрный),
@@ -244,10 +276,29 @@ const chevronMask = { ...maskOf('runscale_chevron.svg'), aspectRatio: '1080 / 92
           class="flex w-full items-center justify-center rounded-xl bg-[var(--accent)] px-4 pt-[2px] font-brand text-[1.125rem] uppercase tracking-[0.12em] text-[var(--accent-ink)] active:opacity-90 disabled:opacity-60"
           style="min-height: 52px"
         >
-          <span class="mr-[-0.12em]">{{ loading ? ACCESS_RU.checking : ACCESS_RU.submit }}</span>
+          <span class="mr-[-0.12em]">{{ submitLabel }}</span>
         </button>
       </div>
+
+      <!-- «Проблемы со входом» (D-22). Под картой, а не в подвале: это следующий
+           шаг того же сценария, и он должен лежать там, где взгляд уже находится
+           после неудачного «СТАРТ».
+           ВСЕГДА ВИДНА, а не только после ошибки. Часть отказов вообще не доходит
+           до сообщения об ошибке (человек ждёт и закрывает приложение), а ссылка,
+           которая появляется только при сбое, не находится тогда, когда нужна.
+           Монохром: --text-secondary #9A9A9A на фоне #0A0A0A = 7.36:1 (посчитано
+           по WCAG). Обёртка добирает тач-таргет до 44pt при кегле 14px. -->
+      <div class="mt-4 flex justify-center">
+        <button
+          type="button"
+          data-test="access-issue-link"
+          class="inline-flex min-h-[44px] items-center justify-center px-4 text-[0.875rem] text-[var(--text-secondary)] underline decoration-[var(--text-muted)] underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-secondary)] active:opacity-70"
+          @click="issueOpen = true"
+        >{{ LOGIN_ISSUE_RU.link }}</button>
+      </div>
     </form>
+
+    <LoginIssueModal :open="issueOpen" :failure="failure" @close="issueOpen = false" />
 
     <!-- футер: только логотип «Модуль роста» под маску, приглушённым --graphite.
          Плашка с именем продукта убрана (D-21): имя продукта теперь наверху,
