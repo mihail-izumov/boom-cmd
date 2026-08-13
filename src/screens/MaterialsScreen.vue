@@ -17,7 +17,7 @@ import MaterialDetail from '../components/materials/MaterialDetail.vue'
 // Решения владельца: группировка по type; детали — в модалке; ссылки
 // наружу только из модалки. Сворачивания групп нет (упрощение vs Проекты).
 
-const { materials, loading, error, reload } = useMaterials()
+const { materials, loading, error, hint, reload } = useMaterials()
 const { current: parkCtx, isNetwork, currentName } = useParkContext()
 
 // Фильтр по глобальному парк-контексту — чистое разделение (TZ-3.3 §1):
@@ -106,6 +106,7 @@ function close() {
       class="flex min-h-[40svh] flex-col items-center justify-center gap-3 px-6 text-center"
     >
       <p class="text-[1.0625rem] text-[var(--text)]">Не удалось загрузить материалы</p>
+      <p v-if="hint" data-test="net-hint" class="text-[0.9375rem] font-medium text-[var(--text)]">{{ hint }}</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ error }}</p>
       <button
         type="button"

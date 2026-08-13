@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 import { useAccessKey } from './useAccessKey.js'
+import { RETRY_DELAYS_MS, fetchJson, runWithRetries } from './netPolicy.js'
+import { networkHint, isOnline } from '../i18n/net.js'
 
 // Источник данных проектов — единственная точка, знающая, откуда они приходят.
 // Фаза 2 (мок): встроенный JSON.
@@ -93,6 +95,9 @@ export function useProjects() {
   const projects = ref([])
   const loading = ref(false)
   const error = ref(null)
+  // Подсказка «что делать» отдельно от технической причины (образец — useDaily):
+  // человеку нужно действие, владельцу — причина. Пусто → подсказки нет.
+  const hint = ref('')
   // Фраза доступа и сброс на логин — у синглтона гейта (гейт на весь вход).
   const { getKey, logout } = useAccessKey()
 
@@ -125,6 +130,7 @@ export function useProjects() {
   async function load() {
     loading.value = true
     error.value = null
+    hint.value = ''
     try {
       if (isDev) {
         await new Promise((r) => setTimeout(r, 350))
@@ -159,11 +165,13 @@ export function useProjects() {
       // redirect:'follow' по умолчанию — Apps Script отвечает 302 на
       // googleusercontent, fetch проходит за редиректом.
       const url = `${API}?key=${encodeURIComponent(key)}`
-      const res = await fetch(url)
-      if (!res.ok) {
-        throw new Error(`Источник недоступен (${res.status})`)
-      }
-      const data = await res.json()
+      const data = await runWithRetries(() => fetchJson(url), {
+        onRetry: (n, e) => {
+          if (typeof console !== 'undefined') {
+            console.warn(`projects reload retry ${n}/${RETRY_DELAYS_MS.length + 1}:`, e.message)
+          }
+        },
+      })
 
       if (data && data.error === 'unauthorized') {
         // Фраза перестала подходить (напр. сменили ACCESS_KEY) — на экран входа.
@@ -175,6 +183,7 @@ export function useProjects() {
       projects.value = normalize(data?.projects)
     } catch (e) {
       error.value = e?.message || 'Не удалось загрузить проекты'
+      hint.value = networkHint({ retriable: !!(e && e.retriable), online: isOnline() })
       projects.value = []
     } finally {
       loading.value = false
@@ -183,5 +192,5 @@ export function useProjects() {
 
   load()
 
-  return { projects, loading, error, reload: load }
+  return { projects, loading, error, hint, reload: load }
 }

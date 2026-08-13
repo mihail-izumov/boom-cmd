@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 import { useAccessKey } from './useAccessKey.js'
+import { RETRY_DELAYS_MS, fetchJson, runWithRetries } from './netPolicy.js'
+import { networkHint, isOnline } from '../i18n/net.js'
 
 // Источник данных Аналитики — единственная точка работы с источником.
 // Паттерн = useProjects.js (см. PATTERNS-data-section §1.1):
@@ -58,6 +60,8 @@ export function useAnalytics() {
   const data = ref(EMPTY)
   const loading = ref(false)
   const error = ref(null)
+  // Подсказка «что делать» отдельно от технической причины (образец — useDaily).
+  const hint = ref('')
   const { getKey, logout } = useAccessKey()
 
   const isDev =
@@ -90,6 +94,7 @@ export function useAnalytics() {
   async function load() {
     loading.value = true
     error.value = null
+    hint.value = ''
     try {
       if (isDev) await new Promise((r) => setTimeout(r, 350))
       if (wantError()) throw new Error('Симуляция ошибки (?mockError=1)')
@@ -115,9 +120,13 @@ export function useAnalytics() {
       // no-store: не отдавать из HTTP-кэша браузера. Свежесть данных важнее
       // (источник = живая Google-таблица, читаемая в рантайме). SW этот
       // запрос уже не перехватывает (кросс-ориджин, см. public/sw.js).
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)
-      const json = await res.json()
+      const json = await runWithRetries(() => fetchJson(url, { cache: 'no-store' }), {
+        onRetry: (n, e) => {
+          if (typeof console !== 'undefined') {
+            console.warn(`analytics reload retry ${n}/${RETRY_DELAYS_MS.length + 1}:`, e.message)
+          }
+        },
+      })
 
       if (json && json.error === 'unauthorized') {
         logout('unauthorized')
@@ -128,6 +137,7 @@ export function useAnalytics() {
       data.value = normalize(json)
     } catch (e) {
       error.value = e?.message || 'Не удалось загрузить аналитику'
+      hint.value = networkHint({ retriable: !!(e && e.retriable), online: isOnline() })
       data.value = EMPTY
     } finally {
       loading.value = false
@@ -136,5 +146,5 @@ export function useAnalytics() {
 
   load()
 
-  return { data, loading, error, reload: load }
+  return { data, loading, error, hint, reload: load }
 }

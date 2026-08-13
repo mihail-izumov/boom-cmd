@@ -12,7 +12,7 @@ import GoalMonthSection from '../components/goals/GoalMonthSection.vue'
 // (scope=park); «Вся сеть» → сетевые (scope=network). Группировка — аккордеоны по
 // месяцам (последний открыт). caption «данные от …» = updated.
 
-const { data, loading, error, reload } = useGoals()
+const { data, loading, error, hint, reload } = useGoals()
 const { current: parkCtx, isNetwork } = useParkContext()
 const { setCaption, clearCaption } = useNavCaption()
 
@@ -68,6 +68,7 @@ watch(updatedLabel, () => syncCaption())
     <!-- error -->
     <div v-else-if="error" class="flex min-h-[40svh] flex-col items-center justify-center gap-3 px-6 text-center">
       <p class="text-[1.0625rem] text-[var(--text)]">{{ L.error }}</p>
+      <p v-if="hint" data-test="net-hint" class="text-[0.9375rem] font-medium text-[var(--text)]">{{ hint }}</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ error }}</p>
       <button type="button" class="rounded-full bg-[var(--accent)] px-4 py-2 text-[0.9375rem] font-medium text-[var(--accent-ink)] active:opacity-90" style="min-height: 44px" @click="reload">{{ L.retry }}</button>
     </div>

@@ -102,6 +102,30 @@ check(
   }).code === 'flaky',
 )
 check('пробы не собрались → unknown', verdict({}).code === 'unknown')
+// ── ОБРЫВ ПРОБЫ ПО ПОТОЛКУ ≠ БЛОКИРОВКА (13.08.2026) ──
+// Потолок пробы 2 с, а doGet Apps Script живёт 5–11 с: не успеть — норма, а не
+// признак VPN. Проверяем ОБЕ стороны развилки, иначе правка вырождается в
+// «называть всё api-slow», что так же слепо, как называть всё google-blocked.
+const SLOW = { online: 'yes', probe_self_ok: 'yes', probe_api_ok: 'no', probe_api_error: 'timeout' }
+check('проба оборвалась по потолку → api-slow', verdict(SLOW).code === 'api-slow')
+check('api-slow НЕ советует выключать VPN (его может не быть)', !/VPN/.test(verdict(SLOW).advice))
+check(
+  'обрыв НЕ по потолку → по-прежнему google-blocked',
+  verdict({ ...SLOW, probe_api_error: 'TypeError' }).code === 'google-blocked',
+)
+check(
+  'пустой probe_api_error → google-blocked (старые заявки читаются как раньше)',
+  verdict({ online: 'yes', probe_self_ok: 'yes', probe_api_ok: 'no' }).code === 'google-blocked',
+)
+check(
+  'ПОРЯДОК: офлайн важнее api-slow',
+  verdict({ ...SLOW, online: 'no' }).code === 'offline',
+)
+check(
+  'api-slow не трогает ветку «источник ответил» (shape решает раньше)',
+  verdict({ online: 'yes', probe_self_ok: 'yes', probe_api_ok: 'yes', probe_api_shape: 'not-json', probe_api_error: 'timeout' })
+    .code === 'deploy-broken',
+)
 // Порядок веток — тот же дефект, что чинил networkHint: человека без интернета
 // нельзя отправлять выключать VPN, которого у него может и не быть.
 check(

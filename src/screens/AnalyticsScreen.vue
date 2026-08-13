@@ -27,7 +27,7 @@ import ReviewsView from '../components/analytics/views/ReviewsView.vue'
 // переключателем; слово «3 мес» / «12 мес» / имя месяца дублирует кнопку
 // и потому в строке не пишется.
 
-const { data, loading, error, reload } = useAnalytics()
+const { data, loading, error, hint, reload } = useAnalytics()
 const { current: parkCtx } = useParkContext()
 const { setCaption, clearCaption } = useNavCaption()
 
@@ -122,6 +122,7 @@ const hasAnyData = computed(() => ctx.value.axis.length > 0)
       class="flex min-h-[40svh] flex-col items-center justify-center gap-3 px-6 text-center"
     >
       <p class="text-[1.0625rem] text-[var(--text)]">Не удалось загрузить аналитику</p>
+      <p v-if="hint" data-test="net-hint" class="text-[0.9375rem] font-medium text-[var(--text)]">{{ hint }}</p>
       <p class="text-[0.9375rem] text-[var(--text-muted)]">{{ error }}</p>
       <button
         type="button"

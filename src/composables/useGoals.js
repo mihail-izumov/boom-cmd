@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 import { useAccessKey } from './useAccessKey.js'
+import { RETRY_DELAYS_MS, fetchJson, runWithRetries } from './netPolicy.js'
+import { networkHint, isOnline } from '../i18n/net.js'
 
 // Источник данных под-страницы «Цели и прогнозы» — лаунчер ссылок на планинг/
 // стратегические страницы. Клон паттерна useDaily/useProjects:
@@ -41,6 +43,8 @@ export function useGoals() {
   const data = ref(EMPTY)
   const loading = ref(false)
   const error = ref(null)
+  // Подсказка «что делать» отдельно от технической причины (образец — useDaily).
+  const hint = ref('')
   const { getKey, logout } = useAccessKey()
 
   const isDev = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
@@ -66,6 +70,7 @@ export function useGoals() {
   async function load() {
     loading.value = true
     error.value = null
+    hint.value = ''
     try {
       if (isDev) await new Promise((r) => setTimeout(r, 300))
       if (wantError()) throw new Error('Симуляция ошибки (?mockError=1)')
@@ -86,9 +91,13 @@ export function useGoals() {
       }
 
       const url = `${API}?key=${encodeURIComponent(key)}&action=goals`
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)
-      const json = await res.json()
+      const json = await runWithRetries(() => fetchJson(url, { cache: 'no-store' }), {
+        onRetry: (n, e) => {
+          if (typeof console !== 'undefined') {
+            console.warn(`goals reload retry ${n}/${RETRY_DELAYS_MS.length + 1}:`, e.message)
+          }
+        },
+      })
 
       if (json && json.error === 'unauthorized') {
         logout('unauthorized')
@@ -99,6 +108,7 @@ export function useGoals() {
       data.value = normalize(json)
     } catch (e) {
       error.value = e?.message || 'Не удалось загрузить цели и прогнозы'
+      hint.value = networkHint({ retriable: !!(e && e.retriable), online: isOnline() })
       data.value = EMPTY
     } finally {
       loading.value = false
@@ -107,5 +117,5 @@ export function useGoals() {
 
   load()
 
-  return { data, loading, error, reload: load }
+  return { data, loading, error, hint, reload: load }
 }

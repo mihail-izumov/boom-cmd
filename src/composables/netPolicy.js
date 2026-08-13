@@ -72,6 +72,35 @@ export function transportFailure(e) {
 }
 
 /**
+ * ОДНА попытка чтения JSON: запрос → статус → разбор. Бросает ошибку с полем
+ * `retriable`, то есть годится как `attemptFn` для `runWithRetries`.
+ *
+ * Не-JSON в ответе считаем ПОВТОРЯЕМЫМ: так выглядят страница логина Google при
+ * сбое доступа к развёртыванию и обрыв на 302 к `googleusercontent`. Ответ
+ * `{error:'unauthorized'}` — валидный JSON и сюда не попадает: это осознанный
+ * отказ гейта, и разбирает его вызывающий, каждый по-своему.
+ *
+ * ⚠ `useDaily.fetchDaily` и `useReport.attemptOnce` СОЗНАТЕЛЬНО оставлены со
+ * своими копиями (13.08.2026). Они написаны раньше, покрыты приёмкой построчно,
+ * и у записи разбор отказов другой (валидация тела). Переписывать работающее и
+ * проверенное ради красоты — риск без выгоды; новые вызовы идут сюда.
+ */
+export async function fetchJson(url, init = {}) {
+  let res
+  try {
+    res = await fetchWithTimeout(url, init)
+  } catch (e) {
+    throw transportFailure(e)
+  }
+  if (!res.ok) throw failure(`Источник недоступен (${res.status})`, isRetriableStatus(res.status))
+  try {
+    return await res.json()
+  } catch {
+    throw failure('Ответ не разобран', true)
+  }
+}
+
+/**
  * Прогон попыток. `attemptFn(i)` обязана бросать ошибку с полем `retriable`
  * (см. failure/transportFailure). Возвращает результат первой удачной попытки,
  * иначе пробрасывает последнюю ошибку.
