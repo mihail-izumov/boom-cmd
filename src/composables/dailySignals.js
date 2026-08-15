@@ -163,6 +163,66 @@ export function readDay(entry) {
   const s = String((entry && entry.read_at) || '')
   return DATE_RE.test(s.slice(0, 10)) ? s.slice(0, 10) : ''
 }
+// ⚠ ЕДИНСТВЕННОЕ место, где оценка достаётся из записи проекции (NET-62).
+// Формула `Number(entry.score)` жила в двух копиях — в кнопке и в стартовом значении
+// модалки, — и обе врали: `Number(null)` и `Number('')` дают 0, а `Number.isInteger(0)`
+// — true. Пара «прочитал, но не оценил» приходит из проекции как `score: null` и
+// рисовалась как оценка «0», то есть как суждение «сигнал бесполезен». Одиннадцать
+// дней при зелёной приёмке; управляющий Питерленда услышал на разборе свой ноль за
+// 12.08, которого не ставил. Отсюда же попадали настоящие нули в лист: модалка
+// открывалась на нуле уже «тронутой», и одно нажатие «Отправить» записывало его.
+//
+// Копий больше не заводим: и кнопка, и модалка спрашивают ЗДЕСЬ.
+// null — это «не оценил», ноль — это оценка. Разница стоила двух недель разбора.
+export function scoreOf(entry) {
+  if (!entry || typeof entry !== 'object') return null
+  return normalizeScore(entry.score)
+}
+
+// ── Эхо записанной оценки (NET-61 §2.2) ──
+// Проекция `payload.signal_reads` — канон, но она приезжает только со СЛЕДУЮЩЕЙ
+// загрузкой payload. Без локального эха экран после отправки не меняется вообще:
+// «Показывается, что прочитана, а что я поставила оценку — ничего не меняется.
+// Я думала, что не проходит, периодически даже два раза ставила оценку» (разбор
+// 14.08). Отсюда и дубли нажатий, и «забываю оценивать».
+//
+// Пишем сюда ТОЛЬКО подтверждённое бэком значение (score:'added'|'updated') — эхо
+// обязано означать «записано», а не «отправлено». Неразличимость этих двух вещей и
+// породила проблему; повторять её в новом виде смысла нет.
+//
+// ⚠ Цена: эхо пер-девайсное. Если ту же пару переоценят с другого устройства,
+// здесь останется наше последнее записанное значение, пока проекция не совпадёт с
+// ним. Для парка это один телефон, а врать «свежим» числом с чужого устройства
+// хуже, чем показать своё последнее.
+const ECHO_KEY = 'bc:daily:signal_score_echo'
+export function loadScoreEcho() {
+  try {
+    if (typeof localStorage === 'undefined') return {}
+    const raw = localStorage.getItem(ECHO_KEY)
+    const obj = raw ? JSON.parse(raw) : {}
+    return obj && typeof obj === 'object' ? obj : {}
+  } catch {
+    return {}
+  }
+}
+export function saveScoreEcho(map) {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(ECHO_KEY, JSON.stringify(map || {}))
+  } catch {
+    /* приватный режим / переполнение — эхо деградирует до сессионного */
+  }
+}
+export function setScoreEcho(map, park, date, score) {
+  const next = { ...(map || {}) }
+  const s = normalizeScore(score)
+  if (s === null) delete next[stateKey(park, date)]
+  else next[stateKey(park, date)] = s
+  return next
+}
+export function echoScore(map, park, date) {
+  return normalizeScore(map ? map[stateKey(park, date)] : null)
+}
 
 // ── Запись прочтения (signal_read) ──
 // Тело POST по контракту ТЗ §2 + v3.2: опциональная оценка пользы `score` (0–10,

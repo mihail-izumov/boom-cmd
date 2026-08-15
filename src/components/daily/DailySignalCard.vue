@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-vue-next'
 import {
   sortSignals, latestSignal, feedSignals, signalDot, signalTint,
   statusOf, markState, loadReadStore, saveReadStore,
-  readFor, isMarkable,
+  readFor, isMarkable, scoreOf,
 } from '../../composables/dailySignals.js'
 import { useSignalRead } from '../../composables/useSignalRead.js'
 import { L, ddmm } from '../../i18n/daily.js'
@@ -35,6 +35,12 @@ import SignalMarkButton from './SignalMarkButton.vue'
 //   • пул сигналов приходит СКВОЗЬ границу месяца (prop `signals`) — иначе 01.08
 //     сигнал за 31.07 исчезал вместе с возможностью его отметить;
 //   • прочтение и оценка развязаны: закрытие модалки больше не отменяет прочтение.
+//
+// ЧТО ИЗМЕНИЛОСЬ (2026-08-15, NET-61): отметка и оценка снова ОДИН шаг. Две кнопки,
+// стоявшие тут с 04.08, теряли второй шаг — доля отметок с оценкой упала с 84 % до
+// 58 % (замер по времени нажатия относительно релиза 04.08 17:04 МСК). Теперь на
+// карточке одна кнопка, она открывает шкалу, подтверждение шлёт обе величины одним
+// запросом, а отказ от оценки живёт внутри шкалы и прочтение не отменяет.
 const props = defineProps({
   m: { type: Object, required: true },
   now: { type: Date, default: null },
@@ -61,7 +67,7 @@ const store = ref(loadReadStore())
 const snapshot = { ...store.value }
 const feedOpen = ref(false)
 const openRows = ref({})
-const { statusOf: sendState, enqueue } = useSignalRead()
+const { statusOf: sendState, enqueue, echoScoreOf } = useSignalRead()
 
 const headDate = computed(() => (latest.value ? ddmm(latest.value.date) : ''))
 const localStatus = (date) => statusOf(store.value, park.value, date)
@@ -86,37 +92,49 @@ onMounted(() => {
   if (latest.value && localStatus(latest.value.date) === 'none') persist(latest.value.date, 'viewed')
 })
 
-// ── КОНТУР Б защиты от дурака ────────────────────────────────────────────────
-// Отметка и оценка — ДВА независимых действия, обе кнопки видны сразу. Раньше POST
-// уходил только из сабмита модалки: человек, не желавший оценивать, терял вместе с
-// оценкой и факт прочтения. Теперь прочтение фиксируется само по себе, а модалка
-// оценки открывается только по явному нажатию и ничего не отменяет при закрытии.
+// ── ОДИН ШАГ (NET-61) ────────────────────────────────────────────────────────
+// Нажатие на карточке открывает шкалу; подтверждение отправляет прочтение и оценку
+// ОДНИМ запросом (бэк на любой signal_read пишет и прочтение тоже, appendRead_ +
+// appendScore_ в одной ветке). Никакого второго действия на карточке не появляется.
+//
+// ⚠ ЛЮБОЕ закрытие шкалы записывает прочтение — и явный выход «Отметить без оценки»,
+// и крестик, и тап по фону. Это не небрежность, а требование §2.1: отметка не должна
+// становиться заложником оценки. Человек открыл разбор и увидел шкалу — контакт
+// состоялся, а read_at всё равно фиксирует ПЕРВОЕ нажатие и не перезаписывается.
+// Оценка при этом не отправляется вовсе: поля score в теле нет, строки в
+// signal_scores не появляется — ноль сюда попасть не может.
 const rateOpen = ref(false)
 const rateDate = ref('')
+// ⚠ Через scoreOf, и только через него: `Number(entry.score)` здесь превращал `null`
+// в 0, шкала открывалась на нуле уже готовой к отправке, и одно нажатие записывало
+// ноль, которого никто не ставил (NET-62). Никогда не возвращать приведение сюда.
 const rateInitial = computed(() => {
-  const entry = readFor(props.reads, park.value, rateDate.value)
-  const n = entry ? Number(entry.score) : NaN
-  return Number.isInteger(n) ? n : null
+  const echoed = echoScoreOf(park.value, rateDate.value)
+  return echoed !== null ? echoed : scoreOf(readFor(props.reads, park.value, rateDate.value))
 })
+// Отказ от оценки предлагаем только там, где им есть что изменить: прочтение ещё не
+// записано. Уже отмеченному дню «отметить без оценки» сказать нечего.
+const rateCanSkip = computed(() => !!rateDate.value && !isDone(rateDate.value))
 
-function onMark(date) {
-  if (!date || isDone(date) || !isMarkable(date, props.now || new Date())) return
-  // Локальный статус 'read' здесь НЕ пишем: он ставится только по подтверждению бэка
-  // (useSignalRead.confirm_). Иначе упавший запрос оставит человека с «Прочитано ✓»
-  // на экране и пустотой в контуре B — то есть ровно с исходной жалобой.
-  enqueue({ park: park.value, signal_date: date }) // score не трогаем — это другое действие
-}
-// «Оценить» / «Изменить оценку». Прочтение при этом запишется само, даже если его
-// ещё не отмечали: бэк на любой signal_read пишет и прочтение тоже.
 function onRate(date) {
   if (!date || !isMarkable(date, props.now || new Date())) return
   rateDate.value = date
   rateOpen.value = true
 }
+// Локальный статус 'read' нигде здесь НЕ пишем: он ставится только по подтверждению
+// бэка (useSignalRead.confirm_). Иначе упавший запрос оставит человека с «Прочитано ✓»
+// на экране и пустотой в контуре B — то есть ровно с исходной жалобой.
 function onRateSubmit(score) {
   if (!rateDate.value) return
   enqueue({ park: park.value, signal_date: rateDate.value, score })
   rateOpen.value = false
+}
+// Закрытие без оценки: прочтение уходит, score не трогаем (undefined ≠ 0).
+function onRateClose() {
+  const date = rateDate.value
+  rateOpen.value = false
+  if (!date || isDone(date) || !isMarkable(date, props.now || new Date())) return
+  enqueue({ park: park.value, signal_date: date })
 }
 
 function toggleFeed() { feedOpen.value = !feedOpen.value }
@@ -175,11 +193,14 @@ const cardEdge = computed(() =>
         <SignalMarkButton
           :park="park" :date="latest.date" :reads="reads"
           :local-read="localRead(latest.date)" :now="now"
-          @mark="onMark" @rate="onRate"
+          @rate="onRate"
         />
       </div>
 
-      <SignalRateSheet :open="rateOpen" :initial="rateInitial" @close="rateOpen = false" @submit="onRateSubmit" />
+      <SignalRateSheet
+        :open="rateOpen" :initial="rateInitial" :can-skip="rateCanSkip"
+        @close="onRateClose" @skip="onRateClose" @submit="onRateSubmit"
+      />
     </template>
 
     <!-- нет сигнала: аналитик ещё не оставил разбор -->
@@ -231,7 +252,7 @@ const cardEdge = computed(() =>
                 <SignalMarkButton
                   :park="park" :date="s.date" :reads="reads"
                   :local-read="localRead(s.date)" :now="now"
-                  @mark="onMark" @rate="onRate"
+                  @rate="onRate"
                 />
               </div>
             </div>

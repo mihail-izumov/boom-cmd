@@ -4,6 +4,7 @@ import {
   postSignalRead, loadOutbox, saveOutbox, findItem, enqueueRead, dropItem,
   resolveItem, isPermanentError, backoffMs,
   loadReadStore, saveReadStore, markState,
+  loadScoreEcho, saveScoreEcho, setScoreEcho, echoScore,
 } from './dailySignals.js'
 
 // Отметка «Прочитал» + оценка пользы «Сигнала Дня». ЕДИНСТВЕННАЯ пишущая операция
@@ -30,6 +31,9 @@ const isDev = typeof import.meta !== 'undefined' && import.meta.env && import.me
 // приложение. queue.value пересоздаётся целиком, чтобы vue видел изменение.
 const queue = ref(loadOutbox())
 const confirmed = ref({}) // 'park:date' → true, подтверждено бэком в этой сессии
+// Эхо ЗАПИСАННОЙ оценки: 'park:date' → целое 0–10. Переживает перезагрузку (лежит
+// на устройстве) и живёт до тех пор, пока проекция бэка не привезёт то же значение.
+const echo = ref(loadScoreEcho())
 const flushing = ref(false)
 
 const keyOf = (park, date) => `${park}:${date}`
@@ -41,11 +45,18 @@ function persistQueue(next) {
 // Подтверждение бэком — ЕДИНСТВЕННЫЙ момент, когда прочтение фиксируется на
 // устройстве. Раньше локальный статус 'read' писался в момент нажатия, ещё до ответа:
 // упавший запрос оставлял человека с «Прочитано ✓» на экране и пустотой в контуре B.
-function confirm_(park, date) {
+// `score` — значение, про которое бэк сказал 'added'|'updated', иначе null. Эхо
+// пишем только тогда: «Ваша оценка: 7» на экране обязано означать записано, а не
+// отправлено. null сюда приходит и в штатном случае (отметили без оценки) — прежнее
+// эхо в этом случае НЕ трём: read-only повтор не отменяет ранее записанную оценку.
+function confirm_(park, date, score = null) {
   confirmed.value = { ...confirmed.value, [keyOf(park, date)]: true }
   const store = loadReadStore()
   markState(store, park, date, 'read')
   saveReadStore(store)
+  if (score === null || score === undefined) return
+  echo.value = setScoreEcho(echo.value, park, date, score)
+  saveScoreEcho(echo.value)
 }
 
 let timer = null
@@ -96,7 +107,10 @@ async function flush({ fetchImpl, force = false } = {}) {
           api: API, key, park: item.park, signalDate: item.signal_date,
           score: item.score, fetchImpl,
         })
-        confirm_(item.park, item.signal_date)
+        // Эхо — только по слову бэка о ЗАПИСИ оценки. 'failed'/'rejected'/null сюда
+        // не проходят: это состояние долга, а не подтверждения.
+        const written = res.score === 'added' || res.score === 'updated' ? item.score : null
+        confirm_(item.park, item.signal_date, written)
         const verdict = resolveItem(item, res)
         const patch = (extra) => persistQueue(queue.value.map((i) => (
           i.park === item.park && i.signal_date === item.signal_date ? { ...i, ...extra } : i)))
@@ -151,18 +165,30 @@ export function useSignalRead() {
   // сразу (чтобы нажатие не потерялось) и не врать «✓» до подтверждения бэка.
   //   'idle'       — не отмечено;
   //   'sending'    — лежит в очереди, ответа нет;
+  //   'retry'      — попытка не прошла (связь), ждём следующую; человек об этом знает;
   //   'score-debt' — прочтение записано, оценка не сохранилась, досылаем;
   //   'failed'     — повторять бессмысленно, показать человеку;
   //   'done'       — подтверждено бэком.
+  //
+  // 'retry' отделён от 'sending' намеренно (NET-61 §2.2). Раньше сорвавшаяся отправка
+  // выглядела ровно как идущая: кнопка гасла и молчала, а очередь тихо ждала бэкофф.
+  // Молчание на этом экране уже один раз вышло боком — «я думала, что не проходит».
   function statusOf(park, date) {
     const item = findItem(queue.value, park, date)
     if (item && item.dead) return 'failed'
-    if (item) return item.read_ok ? 'score-debt' : 'sending'
+    if (item && item.read_ok) return 'score-debt'
+    if (item) return item.attempts > 0 ? 'retry' : 'sending'
     return confirmed.value[keyOf(park, date)] ? 'done' : 'idle'
   }
   function errorOf(park, date) {
     const item = findItem(queue.value, park, date)
     return item && item.dead ? item.last_error || 'не удалось отправить' : ''
+  }
+  // Последняя ПОДТВЕРЖДЁННАЯ бэком оценка пары на этом устройстве, либо null.
+  // Карточка показывает её, пока проекция не привезёт своё значение, — иначе после
+  // отправки на экране не меняется ничего до следующей загрузки payload.
+  function echoScoreOf(park, date) {
+    return echoScore(echo.value, park, date)
   }
 
   // Постановка в очередь — СИНХРОННАЯ. Пользователь не ждёт сеть: намерение
@@ -184,7 +210,8 @@ export function useSignalRead() {
   function reloadOutbox() {
     queue.value = loadOutbox()
     confirmed.value = {}
+    echo.value = loadScoreEcho()
   }
 
-  return { queue, statusOf, errorOf, enqueue, flush, flushing, reloadOutbox }
+  return { queue, statusOf, errorOf, echoScoreOf, enqueue, flush, flushing, reloadOutbox }
 }
