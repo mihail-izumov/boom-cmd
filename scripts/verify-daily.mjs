@@ -635,7 +635,7 @@ console.log('\n=== jsdom: блок «Сигнал Дня» (полосы A+B с�
   // 15.08 (NET-61): кнопка одна и зовёт к обоим действиям сразу.
   check('кнопка зовёт к действию, а не сообщает результат',
     !!btn && btn.disabled === false &&
-    btn.textContent.includes('Прочитал и оценить') && !el.textContent.includes('Прочитано ✓'))
+    btn.textContent.includes('Прочитать и оценить') && !el.textContent.includes('Прочитано ✓'))
   check('«Как идёт день» влит в блок', el.textContent.includes('Как идёт день'))
   check('день-строки влиты (4 на моке)', el.querySelectorAll('[data-test="day-line"]').length === 4,
     el.querySelectorAll('[data-test="day-line"]').length)
@@ -745,7 +745,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   check('на карточке одна кнопка действия, и она называет оба действия сразу',
     card0.querySelectorAll('[data-test="signal-read"]').length === 1 &&
     !el.querySelector('[data-test="signal-rate-cta"]') &&
-    card0.querySelector('[data-test="signal-read"]').textContent.includes('Прочитал и оценить'))
+    card0.querySelector('[data-test="signal-read"]').textContent.includes('Прочитать и оценить'))
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
   check('нажатие открывает шкалу — второго действия искать не нужно', !!rateSheet())
   check('POST ещё не ушёл: прочтение и оценка уедут одним телом', postedBodies.length === 0)
@@ -813,19 +813,23 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   re.app.unmount()
 }
 {
-  // Отказ от оценки — ЯВНЫЙ выход внутри шкалы. Прочтение при этом записывается:
-  // отметка не должна становиться заложником оценки (§2.1). Ноль не отправляется —
-  // поля score в теле нет вовсе.
+  // Отказ от оценки: закрыть шкалу. Прочтение при этом записывается — отметка не
+  // должна становиться заложником оценки (§2.1). Ноль не отправляется: поля score в
+  // теле нет вовсе.
+  //
+  // Отдельной кнопки «Отметить без оценки» в шкале НЕТ (решение владельца 15.08): она
+  // дублировала крестик, а читалась как приглашение пропустить оценку — то есть звала
+  // мимо шага, ради которого весь релиз. Выход остаётся, но не конкурирует с отправкой.
   resetSignals()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
   check('модалка открыта', !!rateSheet())
-  check('выход «Отметить без оценки» виден сразу, искать его не нужно',
-    !!rateSheet().querySelector('[data-test="signal-rate-skip"]') &&
-    rateSheet().textContent.includes('Отметить без оценки'))
-  await fire(rateSheet().querySelector('[data-test="signal-rate-skip"]'), 'click')
+  check('шкала не предлагает пропустить оценку отдельной кнопкой',
+    !rateSheet().querySelector('[data-test="signal-rate-skip"]') &&
+    !rateSheet().textContent.includes('без оценки'))
+  await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
   await nextTick()
   await drainOutbox()
   check('отказ от оценки: прочтение всё равно ушло', postedBodies.length === 1, String(postedBodies.length))
@@ -848,21 +852,20 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   app.unmount()
 }
 {
-  // Крестик и тап по фону — тот же смысл, что и явный отказ: прочтение записывается.
-  // Иначе «закрыл окно» снова означало бы потерю отметки, ради которой кнопки и
-  // разделяли 04.08.
+  // Тап по фону — тот же смысл, что и крестик: прочтение записывается. Иначе «закрыл
+  // окно» снова означало бы потерю отметки, ради которой кнопки и разделяли 04.08.
   resetSignals()
   postMode = 'ok'; postedBodies.length = 0
   const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   await fire(el.querySelector('[data-test="signal-read"]'), 'click')
-  await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
+  await fire(rateSheet(), 'click') // клик по скриму (@click.self)
   await nextTick()
   await drainOutbox()
-  check('закрытие крестом: прочтение всё равно ушло, score не отправлен',
+  check('закрытие тапом по фону: прочтение всё равно ушло, score не отправлен',
     postedBodies.length === 1 && JSON.parse(postedBodies[0] || '{}').score === undefined,
     postedBodies[0])
-  check('после закрытия крестом на карточке по-прежнему ОДНА кнопка',
+  check('после закрытия на карточке по-прежнему ОДНА кнопка',
     el.querySelector('[data-test="signal-card"]').querySelectorAll('[data-test="signal-read"]').length === 1)
   app.unmount()
 }
@@ -885,9 +888,6 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   check('модалка открывается на текущей оценке и сразу готова к отправке',
     rateSheet().querySelector('[data-test="signal-rate-value"]').textContent.trim() === '4' &&
     rateSheet().querySelector('[data-test="signal-rate-submit"]').disabled === false)
-  // Прочтение уже записано — «отметить без оценки» тут нечего, выход не предлагаем.
-  check('у отмеченного дня выхода «без оценки» нет: отмечать нечего',
-    !rateSheet().querySelector('[data-test="signal-rate-skip"]'))
   const sl = rateSheet().querySelector('[data-test="signal-rate-slider"]')
   sl.value = '9'; await fire(sl, 'input')
   await fire(rateSheet().querySelector('[data-test="signal-rate-submit"]'), 'click')
@@ -942,7 +942,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   await fire(rowBtn, 'click')
   await nextTick()
   check('строка ленты открывает ту же шкалу — поведение одно на все дни', !!rateSheet())
-  await fire(rateSheet().querySelector('[data-test="signal-rate-skip"]'), 'click')
+  await fire(rateSheet().querySelector('[aria-label="Закрыть"]'), 'click')
   await nextTick()
   await drainOutbox()
   check('отметка из ленты ушла на СВОЮ дату, не на дату свежего сигнала',
@@ -980,7 +980,7 @@ const resetSignals = () => { localStorage.clear(); sr.reloadOutbox() }
   check('красная плашка дословно', el.textContent.includes('Не удалось отметить. Проверьте связь и попробуйте ещё раз.'))
   check('кнопка осталась активной (повтор разрешён), «✓» нет',
     !rateSheet() && el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитал и оценить') && !el.textContent.includes('Прочитано ✓'))
+    el.textContent.includes('Прочитать и оценить') && !el.textContent.includes('Прочитано ✓'))
   // 'bad key' не станет валиднее сам собой: ретраить вечно — уйти в петлю.
   check('постоянная ошибка помечена как невосстановимая',
     sr.queue.value[0]?.dead === true, JSON.stringify(sr.queue.value[0]))
@@ -1080,7 +1080,7 @@ console.log('\n=== jsdom: D-36 — отметка из payload пережива�
   await nextTick()
   check('нет проекции (старый деплой) → кнопка активна, карточка живёт как раньше',
     el.querySelector('[data-test="signal-read"]').disabled === false &&
-    el.textContent.includes('Прочитал и оценить') && !el.textContent.includes('Прочитано ✓'))
+    el.textContent.includes('Прочитать и оценить') && !el.textContent.includes('Прочитано ✓'))
   app.unmount()
 }
 {
@@ -3977,9 +3977,6 @@ console.log('\n=== Контраст WCAG: мелкий серый текст с�
   const mutedOnFocus = cr('#6F6D66', TINTS.focus)
   check(`   --text-muted на focus-тинте провалил бы порог (${mutedOnFocus.toFixed(2)}:1 < 4.5)`,
     mutedOnFocus < 4.5)
-  // Выход «Отметить без оценки» — текст без заливки на белом полотне шита.
-  const skipInk = cr('#45433E', '#FFFFFF')
-  check(`«Отметить без оценки» --text-secondary на --surface = ${skipInk.toFixed(2)}:1 ≥ 4.5`, skipInk >= 4.5)
   const onPrimary = cr('#FFFFFF', '#1C1B18')
   check(`--ink-on-color на primary-кнопке = ${onPrimary.toFixed(2)}:1 ≥ 4.5`, onPrimary >= 4.5)
   const onQuiet = cr('#1C1B18', '#FFFFFF')
@@ -4008,7 +4005,7 @@ console.log('\n=== jsdom: окраска кнопок сигнала по сос
   const fresh = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
   await nextTick()
   const markCls = cls(fresh.el, '[data-test="signal-read"]')
-  check('свежий сигнал: «Прочитал и оценить» — тёмная плашка (призыв)',
+  check('свежий сигнал: «Прочитать и оценить» — тёмная плашка (призыв)',
     markCls.includes(PRIMARY) && markCls.includes('text-[var(--ink-on-color)]'), markCls)
   check('   и она НЕ красится прежней --surface-2', !markCls.includes('bg-[var(--surface-2)]'))
   check('кнопка держит кант-класс (иначе border-width некому задать)',

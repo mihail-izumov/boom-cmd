@@ -97,12 +97,16 @@ onMounted(() => {
 // ОДНИМ запросом (бэк на любой signal_read пишет и прочтение тоже, appendRead_ +
 // appendScore_ в одной ветке). Никакого второго действия на карточке не появляется.
 //
-// ⚠ ЛЮБОЕ закрытие шкалы записывает прочтение — и явный выход «Отметить без оценки»,
-// и крестик, и тап по фону. Это не небрежность, а требование §2.1: отметка не должна
-// становиться заложником оценки. Человек открыл разбор и увидел шкалу — контакт
-// состоялся, а read_at всё равно фиксирует ПЕРВОЕ нажатие и не перезаписывается.
-// Оценка при этом не отправляется вовсе: поля score в теле нет, строки в
-// signal_scores не появляется — ноль сюда попасть не может.
+// ⚠ ЛЮБОЕ закрытие шкалы записывает прочтение — и крестик, и тап по фону. Это не
+// небрежность, а требование §2.1: отметка не должна становиться заложником оценки.
+// Человек открыл разбор и увидел шкалу — контакт состоялся, а read_at всё равно
+// фиксирует ПЕРВОЕ нажатие и не перезаписывается. Оценка при этом не отправляется
+// вовсе: поля score в теле нет, строки в signal_scores не появляется — ноль сюда
+// попасть не может.
+//
+// Отдельной кнопки «отказаться» на этом пути нет намеренно (решение владельца 15.08):
+// она дублировала крестик и работала как приглашение пропустить оценку. Выход есть,
+// но он не рекламируется.
 const rateOpen = ref(false)
 const rateDate = ref('')
 // ⚠ Через scoreOf, и только через него: `Number(entry.score)` здесь превращал `null`
@@ -112,10 +116,6 @@ const rateInitial = computed(() => {
   const echoed = echoScoreOf(park.value, rateDate.value)
   return echoed !== null ? echoed : scoreOf(readFor(props.reads, park.value, rateDate.value))
 })
-// Отказ от оценки предлагаем только там, где им есть что изменить: прочтение ещё не
-// записано. Уже отмеченному дню «отметить без оценки» сказать нечего.
-const rateCanSkip = computed(() => !!rateDate.value && !isDone(rateDate.value))
-
 function onRate(date) {
   if (!date || !isMarkable(date, props.now || new Date())) return
   rateDate.value = date
@@ -198,8 +198,8 @@ const cardEdge = computed(() =>
       </div>
 
       <SignalRateSheet
-        :open="rateOpen" :initial="rateInitial" :can-skip="rateCanSkip"
-        @close="onRateClose" @skip="onRateClose" @submit="onRateSubmit"
+        :open="rateOpen" :initial="rateInitial"
+        @close="onRateClose" @submit="onRateSubmit"
       />
     </template>
 
