@@ -499,7 +499,7 @@ export { setPark } from '${root}/src/composables/useParkContext.js'
 export { pickMonth, monthsForPicker, DAILY_FIRST_MONTH, computeNetwork as computeNetworkB } from '${root}/src/composables/dailyModel.js'
 export { useAccessKey } from '${root}/src/composables/useAccessKey.js'
 export { useSignalRead } from '${root}/src/composables/useSignalRead.js'
-export { collectSignals, isMarkable, signalAgeDays, SIGNAL_MARKABLE_DAYS, enqueueRead, resolveItem, isPermanentError, scoreOf, normalizeScore } from '${root}/src/composables/dailySignals.js'
+export { collectSignals, isMarkable, signalAgeDays, SIGNAL_MARKABLE_DAYS, enqueueRead, resolveItem, isPermanentError, scoreOf, normalizeScore, signalPlainText, copyText } from '${root}/src/composables/dailySignals.js'
 export { buildConnectBody, normalizeBusinessName, BUSINESS_NAME_MAX } from '${root}/src/composables/useConnectRequest.js'
 export { useParkContext } from '${root}/src/composables/useParkContext.js'
 export { useAppNav, clearSubView, setSubView } from '${root}/src/composables/useAppNav.js'
@@ -1215,6 +1215,98 @@ console.log('\n=== jsdom: NET-62 — «не оценил» это null, а не 
   check('на экране по-прежнему записанное число',
     el.querySelector('[data-test="signal-score-badge"]')?.textContent.trim() === '7')
   app.unmount()
+}
+
+console.log('\n=== jsdom: копирование сигнала в буфер (15.08) ===')
+{
+  // Формат проверяем отдельно от буфера: текст должен быть пригоден для пересылки в
+  // чат смены, без подписей кнопок и служебных строк карточки.
+  const S = { date: '2025-05-16', status: 'ok', headline: 'Темп восстановлен', action: 'Держим утренний слот' }
+  const txt = bundle.signalPlainText(S, { title: 'Сигнал Дня', by: 'разбор аналитика от', date: '16.05' })
+  check('копируется заголовок с датой, разбор и действие — блоками',
+    txt === 'Сигнал Дня — разбор аналитика от 16.05\n\nТемп восстановлен\n\nДержим утренний слот', JSON.stringify(txt))
+  check('без действия — только разбор, пустого хвоста нет',
+    bundle.signalPlainText({ headline: 'Только разбор' }, { title: 'Сигнал Дня' }) === 'Сигнал Дня\n\nТолько разбор')
+  check('пустой сигнал копировать нечего',
+    bundle.signalPlainText(null) === '' && bundle.signalPlainText({}) === '')
+}
+{
+  // Буфер в jsdom не реализован — подставляем свой, как это делает браузер.
+  // navigator в Node 22 только через defineProperty, иначе присваивание молча не пройдёт.
+  const copied = []
+  let clipOk = true
+  Object.defineProperty(dom.window.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: async (t) => { if (!clipOk) throw new Error('нет прав'); copied.push(t) } },
+  })
+
+  resetSignals()
+  postMode = 'ok'; postedBodies.length = 0
+  const { el, app } = mount(bundle.DailySignalCard, { m: mOhta, now: NOW_MID })
+  await nextTick()
+  const copyBtn = el.querySelector('[data-test="signal-copy"]')
+  check('кнопка копирования есть и подписана для скринридера',
+    !!copyBtn && copyBtn.getAttribute('aria-label') === 'Скопировать сигнал')
+  check('тач-таргет 44pt, хотя иконка мелкая',
+    copyBtn.className.includes('h-11') && copyBtn.className.includes('w-11'))
+  // Копирование — служебный жест, а не второе равнозначное действие: иконка, не плашка.
+  // Полноширинная кнопка рядом с призывом вернула бы конкуренцию, снятую в NET-61.
+  check('это иконка, а не плашка-кнопка рядом с призывом',
+    !copyBtn.className.includes('w-full') &&
+    el.querySelector('[data-test="signal-card"]').querySelectorAll('[data-test="signal-read"]').length === 1)
+
+  await fire(copyBtn, 'click')
+  await flush(2)
+  check('в буфер уехал текст свежего разбора', copied.length === 1 &&
+    copied[0].includes('Темп восстановлен к выходным') && copied[0].includes('16.05'), copied[0])
+  const toast = () => document.querySelector('[data-test="signal-toast"]')
+  check('всплывашка «Сигнал скопирован» показана',
+    !!toast() && toast().textContent.includes('Сигнал скопирован'))
+  check('всплывашка объявлена скринридеру и не забирает фокус',
+    toast().getAttribute('role') === 'status' && toast().getAttribute('aria-live') === 'polite')
+  // Плашка обязана лежать ВЫШЕ таб-бара: тот же расчёт, что у плавающей кнопки «+».
+  check('всплывашка не уезжает под таб-бар и учитывает safe-area',
+    /padding-bottom:\s*calc\(4\.75rem\s*\+\s*env\(safe-area-inset-bottom\)\)/.test(toast().getAttribute('style') || ''),
+    toast().getAttribute('style'))
+  check('всплывашка привязана к мобильной колонке, а не к краю экрана',
+    toast().className.includes('max-w-[430px]') && toast().className.includes('mx-auto'))
+  check('всплывашка не перехватывает нажатия под собой',
+    toast().className.includes('pointer-events-none'))
+  // Копирование — это НЕ прочтение: read_at меряет скорость реакции на сигнал, а не
+  // факт пересылки. Смешивать события нельзя, иначе метрика начнёт мерить не то.
+  check('копирование ничего не отправляет и не отмечает прочтение',
+    postedBodies.length === 0 && !el.textContent.includes('Прочитано ✓') &&
+    sr.queue.value.length === 0)
+
+  // Отказ буфера (не защищённый контекст, старая iOS) не должен выглядеть как успех.
+  clipOk = false
+  await fire(copyBtn, 'click')
+  await flush(2)
+  check('буфер отказал — сказано словами, а не тишиной',
+    !!toast() && toast().textContent.includes('Не удалось скопировать'), toast()?.textContent)
+  clipOk = true
+
+  // Прошлые разборы пересылают тоже — кнопка есть и в раскрытой строке ленты.
+  copied.length = 0
+  await fire(el.querySelector('[data-test="signal-feed-toggle"]'), 'click')
+  await nextTick()
+  const row = el.querySelectorAll('[data-test="signal-feed-row"]')[0]
+  await fire(row.querySelector('button'), 'click')
+  await nextTick()
+  const rowCopy = row.querySelector('[data-test="signal-copy"]')
+  check('в раскрытой строке ленты кнопка копирования тоже есть', !!rowCopy)
+  await fire(rowCopy, 'click')
+  await flush(2)
+  check('строка ленты копирует СВОЙ день, а не свежий сигнал',
+    copied.length === 1 && copied[0].includes('14.05') && !copied[0].includes('16.05'), copied[0])
+
+  // Плашка не залипает: без снятия она перекрыла бы нижнюю часть экрана навсегда.
+  await new Promise((r) => setTimeout(r, 2400))
+  await nextTick()
+  check('всплывашка сама уходит через ~2 с', !toast())
+  app.unmount()
+  await nextTick()
+  check('после ухода экрана всплывашки в body не остаётся', !toast())
 }
 
 {

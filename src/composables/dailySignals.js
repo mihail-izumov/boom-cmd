@@ -179,6 +179,65 @@ export function scoreOf(entry) {
   return normalizeScore(entry.score)
 }
 
+// ── Копирование сигнала в буфер ──
+// Управляющие пересылают разбор дальше — в рабочие чаты смены. Раньше текст выделяли
+// руками на телефоне, а выделение на карточке цепляет и заголовок, и дату, и подписи
+// кнопок. Собираем ровно то, что имеет смысл переслать.
+//
+// Чистая функция без DOM: и текст, и его формат проверяются приёмкой отдельно от
+// того, доехал ли он до буфера.
+export function signalPlainText(signal, { title = 'Сигнал Дня', by = '', date = '' } = {}) {
+  if (!signal || typeof signal !== 'object') return ''
+  const head = String(signal.headline || '').trim()
+  const action = String(signal.action || '').trim()
+  if (!head && !action) return ''
+  const stamp = [by, date].filter(Boolean).join(' ')
+  const blocks = [stamp ? `${title} — ${stamp}` : title]
+  if (head) blocks.push(head)
+  if (action) blocks.push(action)
+  return blocks.join('\n\n')
+}
+
+// Копирование с запасным путём. `navigator.clipboard` есть не всегда: он требует
+// защищённого контекста, а на iOS появился в 13.4. Отказ буфера не должен выглядеть
+// как успех — функция честно возвращает false, и экран говорит об этом словами.
+//
+// ⚠ Только `window.navigator`, не голый `navigator`: голые браузерные объекты в этом
+// проекте уже дважды уходили в catch и ломали функцию молча.
+export async function copyText(text, { win = null } = {}) {
+  const s = String(text || '')
+  if (!s) return false
+  const w = win || (typeof window !== 'undefined' ? window : null)
+  if (!w) return false
+  try {
+    const clip = w.navigator && w.navigator.clipboard
+    if (clip && typeof clip.writeText === 'function') {
+      await clip.writeText(s)
+      return true
+    }
+  } catch {
+    /* нет прав или контекст не защищённый — пробуем запасной путь */
+  }
+  try {
+    const doc = w.document
+    if (!doc || typeof doc.execCommand !== 'function') return false
+    const ta = doc.createElement('textarea')
+    ta.value = s
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.top = '0'
+    ta.style.opacity = '0'
+    doc.body.appendChild(ta)
+    ta.select()
+    if (typeof ta.setSelectionRange === 'function') ta.setSelectionRange(0, s.length)
+    const ok = doc.execCommand('copy')
+    doc.body.removeChild(ta)
+    return !!ok
+  } catch {
+    return false
+  }
+}
+
 // ── Эхо записанной оценки (NET-61 §2.2) ──
 // Проекция `payload.signal_reads` — канон, но она приезжает только со СЛЕДУЮЩЕЙ
 // загрузкой payload. Без локального эха экран после отправки не меняется вообще:

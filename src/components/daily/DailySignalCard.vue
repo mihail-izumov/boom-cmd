@@ -1,10 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ChevronDown, Copy } from 'lucide-vue-next'
 import {
   sortSignals, latestSignal, feedSignals, signalDot, signalTint,
   statusOf, markState, loadReadStore, saveReadStore,
-  readFor, isMarkable, scoreOf,
+  readFor, isMarkable, scoreOf, signalPlainText, copyText,
 } from '../../composables/dailySignals.js'
 import { useSignalRead } from '../../composables/useSignalRead.js'
 import { L, ddmm } from '../../i18n/daily.js'
@@ -137,6 +137,33 @@ function onRateClose() {
   enqueue({ park: park.value, signal_date: date })
 }
 
+// ── Копирование разбора (15.08) ───────────────────────────────────────────────
+// Кнопка — ИКОНКА в шапке, а не плашка под призывом. Полноширинная кнопка рядом с
+// «Прочитать и оценить» вернула бы ровно то, что мы только что убрали: два
+// равнозначных действия на карточке, из которых второе перетягивает внимание.
+// Здесь копирование — служебное действие, оно и выглядит служебным.
+//
+// Копирование НЕ считается прочтением и ничего не отправляет: read_at меряет скорость
+// реакции на сигнал, а не факт пересылки. Смешивать эти два события нельзя, иначе
+// метрика начнёт мерить не то.
+const toast = ref('')
+let toastTimer = null
+function showToast(text) {
+  toast.value = text
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value = ''; toastTimer = null }, 2200)
+}
+onBeforeUnmount(() => { if (toastTimer) clearTimeout(toastTimer) })
+
+async function onCopy(signal) {
+  const text = signalPlainText(signal, {
+    title: L.signal_title, by: L.signal_by, date: signal ? ddmm(signal.date) : '',
+  })
+  if (!text) return
+  const ok = await copyText(text)
+  showToast(ok ? L.signal_copied : L.signal_copy_failed)
+}
+
 function toggleFeed() { feedOpen.value = !feedOpen.value }
 function toggleRow(date) {
   openRows.value = { ...openRows.value, [date]: !openRows.value[date] }
@@ -178,6 +205,18 @@ const cardEdge = computed(() =>
            бледно-жёлтом пропадает (граница 1,46:1). Чёрный бедж — принятая в
            проекте идиома (активный парк-фильтр), контраст 14–16:1 на любом тоне. -->
       <span v-if="latestNew && !latestDone" class="rounded-full bg-[var(--text)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--ink-on-color)]">{{ L.signal_new }}</span>
+      <!-- Иконка, а не плашка: служебное действие рядом со служебной строкой. Тач-таргет
+           44pt по HIG, хотя сама иконка мелкая. --text-secondary на тинте — 8,24:1. -->
+      <button
+        type="button"
+        data-test="signal-copy"
+        :aria-label="L.signal_copy"
+        :title="L.signal_copy"
+        class="-my-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-[var(--surface-2)]"
+        @click="onCopy(latest)"
+      >
+        <Copy class="h-4 w-4" :stroke-width="2" aria-hidden="true" />
+      </button>
     </div>
 
     <template v-if="latest">
@@ -244,7 +283,22 @@ const cardEdge = computed(() =>
               </span>
             </button>
             <div v-if="openRows[s.date]" class="pb-3 pl-[3.1rem] pr-1">
-              <p v-if="s.action" class="text-[0.8125rem] leading-snug text-[var(--text-secondary)]">{{ s.action }}</p>
+              <div class="flex items-start gap-2">
+                <p v-if="s.action" class="min-w-0 flex-1 text-[0.8125rem] leading-snug text-[var(--text-secondary)]">{{ s.action }}</p>
+                <span v-else class="flex-1" />
+                <!-- Тот же служебный жест, что и у свежего сигнала: пересылают и
+                     прошлые разборы, а руками выделять текст на телефоне мучительно. -->
+                <button
+                  type="button"
+                  data-test="signal-copy"
+                  :aria-label="L.signal_copy"
+                  :title="L.signal_copy"
+                  class="-mt-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-[var(--surface-2)]"
+                  @click="onCopy(s)"
+                >
+                  <Copy class="h-4 w-4" :stroke-width="2" aria-hidden="true" />
+                </button>
+              </div>
               <!-- Та же кнопка, что у свежего сигнала: именно её отсутствие здесь и
                    делало пропущенные дни неотмечаемыми навсегда. Дата отмечаемого
                    сигнала — слева в строке, поэтому в кнопке её не дублируем. -->
@@ -259,5 +313,24 @@ const cardEdge = computed(() =>
           </li>
         </ul>
   </article>
+
+  <!-- Всплывашка «Сигнал скопирован». Телепортируется в body: внутри карточки она
+       осталась бы внутри прокручиваемого содержимого и уехала бы за экран.
+       Отступ снизу считает и таб-бар, и safe-area — тот же расчёт, что у плавающей
+       кнопки «+», иначе плашка ляжет под вкладки. Тёмная плашка с --ink-on-color:
+       принятая в проекте идиома, 17,22:1 на любом фоне под ней.
+       role="status" + aria-live: скринридер сообщает результат, не забирая фокус. -->
+  <Teleport to="body">
+    <div
+      v-if="toast"
+      data-test="signal-toast"
+      role="status"
+      aria-live="polite"
+      class="pointer-events-none fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-[430px] justify-center px-4"
+      style="padding-bottom: calc(4.75rem + env(safe-area-inset-bottom))"
+    >
+      <p class="rounded-full bg-[var(--text)] px-4 py-2 text-[0.875rem] font-medium text-[var(--ink-on-color)] shadow-lg">{{ toast }}</p>
+    </div>
+  </Teleport>
   </div>
 </template>
