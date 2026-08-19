@@ -16,3 +16,21 @@ export function setThemeColor(hex) {
   const m = document.querySelector('meta[name="theme-color"]')
   if (m) m.setAttribute('content', hex)
 }
+
+// ПОЛОТНО ПОД ПРИЛОЖЕНИЕМ (баг 19.08.2026, найден на устройстве).
+//
+// Тёмная витрина входа висела на корневом div компонента, а <html>/<body>
+// оставались светлыми. При оттягивании экрана (rubber band) iOS показывает фон
+// КОРНЯ документа, а не фон прокручиваемого блока, — из-под тёмного входа
+// выезжала белая полоса. Тот же фон виден и в области safe-area.
+//
+// Красим НЕ цветом из JS, а тем же скоупным атрибутом, что и сам экран: значение
+// тогда берётся из токенов в main.css, и второго списка hex, который однажды
+// разойдётся с первым, не появляется. Внутрь приложения тема по-прежнему не
+// протекает — атрибут снимается ровно в тот момент, когда гейт пройден.
+export function setAuthCanvas(on) {
+  if (typeof document === 'undefined') return
+  const el = document.documentElement
+  if (on) el.setAttribute('data-theme', 'auth-dark')
+  else el.removeAttribute('data-theme')
+}

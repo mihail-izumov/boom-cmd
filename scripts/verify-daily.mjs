@@ -2368,33 +2368,37 @@ console.log('\n=== D-21/D-23: экран входа — логотип Ранс�
   check('шеврон — SVG-маска, цвет из токена (не хардкод #111)',
     !!chev && /mask-image/i.test(chev.getAttribute('style') || '') &&
     chev.className.includes('bg-[var(--text)]'))
-  // 53px — промерено по утверждённому мокапу v2 (780×1500 = 390×750 @2x:
-  // знак 106px = 53px CSS). Вариант A на 72px отклонён владельцем 28.07.
-  check('шеврон 53px на мобайле и ×1.5 (80px) на ≥768px',
-    chev.className.includes('h-[53px]') && chev.className.includes('md:h-[80px]'))
+  // D-23b (19.08): мобильная связка увеличена ×1.25 — 53px спорил по весу с
+  // подвальным «Модуль Роста». Базовые 53px были промерены по мокапу v2
+  // (780×1500 = 390×750 @2x: знак 106px = 53px CSS). Десктоп не трогали.
+  check('шеврон 66px на мобайле (×1.25 к прежним 53) и 80px на ≥768px',
+    chev.className.includes('h-[66px]') && chev.className.includes('md:h-[80px]'))
   // РЕГРЕСС-ЧЕК на боевой баг: без явной ширины пустой div во flex-колонке с
   // align-items:center получает ширину 0 — знак пропадал совсем (было видно на проде).
-  check('у шеврона ЯВНАЯ ширина (62/94px), а не только aspect-ratio',
-    chev.className.includes('w-[62px]') && chev.className.includes('md:w-[94px]'))
+  check('у шеврона ЯВНАЯ ширина (77/94px), а не только aspect-ratio',
+    chev.className.includes('w-[77px]') && chev.className.includes('md:w-[94px]'))
   check('ширина совпадает с пропорцией знака 1080:923.72',
-    Math.round(53 * 1080 / 923.72) === 62 && Math.round(80 * 1080 / 923.72) === 94)
+    Math.round(66 * 1080 / 923.72) === 77 && Math.round(80 * 1080 / 923.72) === 94)
   check('пропорция шеврона задана явно (бокс = знак, без прозрачных полей)',
     /aspect-ratio:\s*1080\s*\/\s*923\.72/.test(chev.getAttribute('style') || ''))
-  check('слово «Ранскеил» — голос бренда, капс, 28px, трекинг 0.06em',
+  check('слово «Ранскеил» — голос бренда, капс, 35px (×1.25), трекинг 0.06em',
     word.textContent.trim() === 'Ранскеил' && word.className.includes('font-brand') &&
-    word.className.includes('uppercase') && word.className.includes('text-[1.75rem]') &&
+    word.className.includes('uppercase') && word.className.includes('text-[2.1875rem]') &&
     word.className.includes('tracking-[0.06em]'))
-  check('зазор шеврон→слово 12px, на десктопе 18px (×1.5)',
-    word.className.includes('mt-[12px]') && word.className.includes('md:mt-[18px]'))
-  check('десктоп: слово ×1.5 = 42px', word.className.includes('md:text-[2.625rem]'))
+  check('зазор шеврон→слово 15px, на десктопе 18px',
+    word.className.includes('mt-[15px]') && word.className.includes('md:mt-[18px]'))
+  check('десктоп: слово 42px', word.className.includes('md:text-[2.625rem]'))
+  check('доля шеврона от слова не изменилась: 44% и на 53/28, и на 66/35',
+    Math.round(62 / 141.51 * 100) === Math.round(77 / (141.51 * 35 / 28) * 100))
   check('старого написания через «й» на экране входа нет', !/Ранскей/.test(el.textContent))
 
   // 1b. D-23: бейдж уровня продукта — третий ярус лочкапа
   const badge = el.querySelector('[data-test="access-badge"]')
   check('под словом есть бейдж «Ультра»', !!badge && badge.textContent.trim() === 'Ультра')
-  check('бейдж — тот же голос бренда, капс, 14px = половина слова, трекинг 0.16em',
+  check('бейдж — тот же голос бренда, капс, 17.5px = половина слова, трекинг 0.16em',
     badge.className.includes('font-brand') && badge.className.includes('uppercase') &&
-    badge.className.includes('text-[0.875rem]') && badge.className.includes('tracking-[0.16em]'))
+    badge.className.includes('text-[1.09375rem]') && badge.className.includes('tracking-[0.16em]'))
+  check('кегль бейджа — ровно половина слова', 1.09375 * 2 === 2.1875)
   // РЕГРЕСС-ЧЕК на решение владельца 19.08: бейдж — РАМКА, а не заливка.
   // Возврат к `bg-[var(--text)]` = смена решения, а не мелкая правка стиля.
   check('бейдж — обводка, а не заливка', badge.className.includes('border-[1.5px]') &&
@@ -2402,10 +2406,18 @@ console.log('\n=== D-21/D-23: экран входа — логотип Ранс�
   // РЕГРЕСС-ЧЕК на угол: радиус на объекте 22px читается как «здесь кнопка»
   // и выбивает бейдж из знака в интерфейс. Шеврон и Univers Cond — на прямых.
   check('угол ПРЯМОЙ (никаких rounded-*)', !/\brounded/.test(badge.className))
-  check('высота 22px и зазор от слова 12px, на десктопе ×1.5 (33 / 18)',
-    badge.className.includes('h-[22px]') && badge.className.includes('mt-[12px]') &&
-    badge.className.includes('md:h-[33px]') && badge.className.includes('md:mt-[18px]'))
-  check('десктоп: кегль бейджа ×1.5 = 21px, обводка 2px',
+  check('высота бейджа 27px, на десктопе 32px',
+    badge.className.includes('h-[27px]') && badge.className.includes('md:h-[32px]'))
+  // РЕГРЕСС-ЧЕК на группировку (D-23b). Бейдж прижат к слову ВПЛОТНУЮ: зазор
+  // даёт пустота под выносными элементами (0.2em при leading-none = 7px), а не
+  // margin. Возврат любого mt-[Npx] снова разведёт лочкап на три равных яруса,
+  // и «Ранскеил Ультра» перестанет читаться одним именем.
+  check('бейдж прижат к слову: mt-0, никаких mt-[Npx] и md:mt-*',
+    badge.className.includes('mt-0') && !/\bmt-\[/.test(badge.className) &&
+    !/\bmd:mt-/.test(badge.className))
+  check('зазор над словом заметно больше зазора под ним (знак отдельно, имя вместе)',
+    (15 + (0.8 - 0.722) * 35) / (0.2 * 35) >= 2)
+  check('десктоп: кегль бейджа 21px, обводка 2px',
     badge.className.includes('md:text-[1.3125rem]') && badge.className.includes('md:border-2'))
   check('бейдж скрыт от скринридера (уровень уже озвучен в aria-label лого)',
     badge.getAttribute('aria-hidden') === 'true')
@@ -2514,6 +2526,27 @@ console.log('\n=== D-21/D-23: экран входа — логотип Ранс�
   check('тач-таргет ссылки ≥44pt', link.className.includes('min-h-[44px]'))
 
   // 3. подвал
+  // D-23b: полотно документа на входе (баг «белая полоса при оттягивании»).
+  // Проверяем ПО ИСХОДНИКАМ, а не по jsdom: rubber band в jsdom не воспроизвести,
+  // а сломать связку можно только убрав одно из трёх звеньев.
+  {
+    const tc = readFileSync(resolve(root, 'src/composables/useThemeColor.js'), 'utf8')
+    const appSrc = readFileSync(resolve(root, 'src/App.vue'), 'utf8')
+    const css = readFileSync(resolve(root, 'src/styles/main.css'), 'utf8')
+    check('есть переключатель полотна (setAuthCanvas)', /export function setAuthCanvas/.test(tc))
+    check('он вешает/снимает auth-dark именно на documentElement',
+      /documentElement/.test(tc) && /setAttribute\('data-theme', 'auth-dark'\)/.test(tc) &&
+      /removeAttribute\('data-theme'\)/.test(tc))
+    check('App.vue зовёт его в ОДНОМ эффекте с theme-color (иначе полоса на стыке)',
+      /setThemeColor\([^)]*\)\s*\n\s*setAuthCanvas\(!inApp\)/.test(appSrc))
+    check('CSS красит корень и body фоном экрана входа (--bg, не --surface-2)',
+      /html\[data-theme='auth-dark'\][\s\S]{0,80}body\s*\{\s*background:\s*var\(--bg\)/.test(css))
+    check('на корне выставлен color-scheme: dark (системные полосы фоном не красятся)',
+      /html\[data-theme='auth-dark'\]\s*\{\s*color-scheme:\s*dark/.test(css))
+    check('второго списка hex для полотна не завели (цвет только из токенов)',
+      !/setAuthCanvas[\s\S]{0,400}#[0-9a-fA-F]{6}/.test(tc))
+  }
+
   check('плашки с именем продукта в подвале нет',
     !el.textContent.includes('МАСТЕРПЛАН') && !el.textContent.includes('Мастерплан') &&
     !el.textContent.includes('УЛЬТРА') && !el.querySelector('.rounded-full.border-2'))
@@ -2573,12 +2606,26 @@ console.log('\n=== D-21 v2: тёмная витрина входа ===')
     check(`--${k} = ${v} (по палитре v2)`, tok(k) === v, tok(k))
   check('жёлтого на витрине входа нет: --accent переопределён в белый',
     tok('accent') === '#F2F2F2' && tok('accent-ink') === '#0A0A0A')
-  check('тёмная тема НЕ разлита по приложению (скоуп на компоненте, html чист)',
-    !/^html\[data-theme|:root\s*{[^}]*#0A0A0A/m.test(css))
+  // ФОРМУЛИРОВКА УТОЧНЕНА 19.08 (D-23b). Прежний чек требовал, чтобы селектора
+  // html[data-theme] в CSS не было вовсе, и «проходил» только потому, что новое
+  // правило лежит внутри @layer base с отступом, — то есть проходил бы и при
+  // настоящей поломке. Теперь проверяем СМЫСЛ: тёмная витрина не может быть
+  // дефолтом (:root), а правило на html имеет право красить ТОЛЬКО полотно и
+  // color-scheme — набор токенов остаётся скоупным на [data-theme="auth-dark"].
+  check('тёмная витрина не дефолт: в :root её значений нет',
+    !/:root\s*{[^}]*#0A0A0A/m.test(css))
+  {
+    const htmlRules = css.match(/html\[data-theme='auth-dark'\][^{]*\{[^}]*\}/g) || []
+    check('правила на html красят только полотно и color-scheme, токенов не задают',
+      htmlRules.length > 0 &&
+      htmlRules.every((r) => /^[^{]*\{\s*(background:\s*var\(--bg\);|color-scheme:\s*dark;)\s*\}$/.test(r)),
+      htmlRules.join(' | '))
+  }
 
   const app = readFileSync(resolve(root, 'src/App.vue'), 'utf8')
   check('theme-color переключает App по состоянию гейта, а не форма входа',
-    /setThemeColor\(authed\.value \? APP_THEME_COLOR : AUTH_THEME_COLOR\)/.test(app))
+    /const inApp = authed\.value/.test(app) &&
+    /setThemeColor\(inApp \? APP_THEME_COLOR : AUTH_THEME_COLOR\)/.test(app))
   check('экран загрузки тоже тёмный — между ним и входом не мигает',
     /data-theme="auth-dark"[\s\S]{0,160}aria-busy/.test(app))
   const mf = JSON.parse(readFileSync(resolve(root, 'public/manifest.json'), 'utf8'))

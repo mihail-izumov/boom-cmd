@@ -19,7 +19,7 @@ import ReporterShell from './components/report/ReporterShell.vue'
 import { useAppNav, setActive, setSubView, clearSubView } from './composables/useAppNav.js'
 import { useAccessKey } from './composables/useAccessKey.js'
 import { flushQueue } from './composables/useLoginIssue.js'
-import { setThemeColor, AUTH_THEME_COLOR, APP_THEME_COLOR } from './composables/useThemeColor.js'
+import { setThemeColor, setAuthCanvas, AUTH_THEME_COLOR, APP_THEME_COLOR } from './composables/useThemeColor.js'
 
 // Конфиг вкладок. Флаг `parkFilter` — где в шапке показывать чёрный бедж
 // активного парк-фильтра (TZ-3.1 §5). `parkFilter: true` у рабочих разделов
@@ -162,7 +162,15 @@ watch(authed, (v) => {
 
 // D-21 v2: пока идёт вход (и стартовая проверка фразы) — тёмная системная шапка,
 // как только вошли — светлая. Тёмная витрина живёт ТОЛЬКО на входе и сплэше.
-watchEffect(() => setThemeColor(authed.value ? APP_THEME_COLOR : AUTH_THEME_COLOR))
+//
+// D-23b: тем же переключателем красим полотно документа. Одно условие на оба
+// вызова не случайно: шапка и фон под приложением обязаны меняться в один кадр,
+// иначе на стыке видно светлую полосу (ровно этот баг ловили 19.08).
+watchEffect(() => {
+  const inApp = authed.value
+  setThemeColor(inApp ? APP_THEME_COLOR : AUTH_THEME_COLOR)
+  setAuthCanvas(!inApp)
+})
 </script>
 
 <template>
