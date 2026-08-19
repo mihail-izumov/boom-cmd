@@ -2419,6 +2419,19 @@ console.log('\n=== D-21/D-23: экран входа — логотип Ранс�
     (15 + (0.8 - 0.722) * 35) / (0.2 * 35) >= 2)
   check('десктоп: кегль бейджа 21px, обводка 2px',
     badge.className.includes('md:text-[1.3125rem]') && badge.className.includes('md:border-2'))
+  // Оптический центр надписи в рамке (правка 19.08 по замеру на устройстве).
+  // Величина 0.095em выведена из скриншота 414×896 @3x: рамка 812…892, капс
+  // 830…867, перекос 7 device px. Число в em, а не в px, — иначе на десктопном
+  // кегле поправка перестанет соответствовать.
+  {
+    const inner = badge.querySelector('span')
+    check('надпись сдвинута к оптическому центру рамки на 0.095em',
+      !!inner && inner.className.includes('relative') && inner.className.includes('top-[0.095em]'))
+    check('поправка НЕ через padding: он двигает содержимое лишь на половину',
+      !/\bpt-\[/.test(badge.className))
+    check('поправка в em, а не в px (переезжает на десктопный кегль сама)',
+      !/top-\[[\d.]+px\]/.test(inner.className))
+  }
   check('бейдж скрыт от скринридера (уровень уже озвучен в aria-label лого)',
     badge.getAttribute('aria-hidden') === 'true')
   // Цвет — только токеном. Хардкод hex в компонентах запрещён (DESIGN-STANDARD).
