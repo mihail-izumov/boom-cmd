@@ -6,7 +6,7 @@ export default {
       // Роли начертаний (D-21). @font-face — в src/styles/main.css, файлы — в public/fonts.
       // Фолбэки обязательны: font-display:swap показывает их, пока грузится брендовый.
       fontFamily: {
-        // голос бренда: крупные действия — РАНСКЕЙЛ, СТАРТ, ключевые кнопки
+        // голос бренда: крупные действия — РАНСКЕИЛ, СТАРТ, ключевые кнопки
         brand: ['"Ranscale Display"', '"Helvetica Neue Condensed"', 'Impact', 'sans-serif'],
         // ярлыки приборов: подписи блоков и категорий — ДОСТУП
         label: ['"Ranscale Label"', '"Helvetica Neue Condensed"', 'sans-serif'],

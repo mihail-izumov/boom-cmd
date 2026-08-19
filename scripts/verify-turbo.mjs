@@ -394,8 +394,9 @@ console.log('\n── Гигиена сборки ──')
   ok('заголовок вкладки — «Турбо-игры // Бумбастик»',
      html.includes('<title>Турбо-игры // Бумбастик</title>'))
   ok('фавикон — общий с приложением', html.includes('href="/favicon.svg"'))
-  ok('бейдж «Работает на Ранскейл» со ссылкой',
-     html.includes('href="https://runscale.ru"') && html.includes('Работает на Ранскейл'))
+  ok('бейдж «Работает на Ранскеил» со ссылкой',
+     html.includes('href="https://runscale.ru"') && html.includes('Работает на Ранскеил'))
+  ok('старого написания через «й» на странице нет (D-23)', !/Ранскей/.test(html))
   ok('служебные бейджи в одной группе равной высоты',
      html.includes('class="svc"') && html.includes('.svc > *{height:30px}'))
   ok('двоеточие отсчёта пульсирует', html.includes('bc-blink') && html.includes('.timer .bl'))

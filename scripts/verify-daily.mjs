@@ -2331,22 +2331,28 @@ console.log('\n=== D-20: имя продукта ушло из шапки Гла
   nb.app.unmount()
 }
 
-console.log('\n=== D-20: «Мастерплан» → «Ранскейл» в PWA ===')
+console.log('\n=== D-20/D-23: «Мастерплан» → «Ранскеил» в PWA ===')
 {
   const banner = readFileSync(resolve(root, 'src/components/home/InstallPwaBanner.vue'), 'utf8')
   // смотрим ВИДИМЫЙ текст: <template> + строки шагов, а не комментарии-объяснения
   const bannerVisible = banner.slice(banner.indexOf('const steps'))
   check('в видимом тексте PWA-баннера «Мастерплана» нет', !bannerVisible.includes('Мастерплан'))
-  check('во всех четырёх местах баннера теперь «Ранскейл»',
-    (bannerVisible.match(/Ранскейл/g) || []).length === 4, (bannerVisible.match(/Ранскейл/g) || []).length)
-  check('баннер зовёт открыть Ранскейл', /Откройте Ранскейл/.test(banner))
+  check('во всех четырёх местах баннера теперь «Ранскеил»',
+    (bannerVisible.match(/Ранскеил/g) || []).length === 4, (bannerVisible.match(/Ранскеил/g) || []).length)
+  check('баннер зовёт открыть Ранскеил', /Откройте Ранскеил/.test(banner))
+  // D-23: старое написание через «й» не должно остаться нигде во ВИДИМОМ тексте.
+  check('написания через «й» в видимом тексте баннера нет', !/Ранскей/.test(bannerVisible))
+  // D-23: имя не склоняется — падеж берёт на себя соседнее слово. Регресс-чек
+  // ловит возврат «Ранскеила»/«Ранскеилом», которые читаются как опечатка.
+  check('имя стоит только в именительном (нет «Ранскеила»/«Ранскеилом»)',
+    !/Ранскеил[аеоуы]/.test(bannerVisible))
   const mf = JSON.parse(readFileSync(resolve(root, 'public/manifest.json'), 'utf8'))
-  check('manifest.name / short_name = «Ранскейл»', mf.name === 'Ранскейл' && mf.short_name === 'Ранскейл')
+  check('manifest.name / short_name = «Ранскеил»', mf.name === 'Ранскеил' && mf.short_name === 'Ранскеил')
   check('иконки манифеста НЕ трогали (отдельная задача владельца)',
     mf.icons.length === 4 && mf.icons.every((i) => /icon-(192|512)\.png$/.test(i.src)))
 }
 
-console.log('\n=== D-21: экран входа — логотип Ранскейл ===')
+console.log('\n=== D-21/D-23: экран входа — логотип Ранскеил + бейдж «Ультра» ===')
 {
   const { el, app } = mount(bundle.AccessKeyForm, {})
   await nextTick()
@@ -2357,7 +2363,7 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
   const word = el.querySelector('[data-test="access-wordmark"]')
   check('слогана «Расти с планом» больше нет', !el.textContent.includes('Расти'))
   check('логотип озвучен для скринридера один раз (role=img + aria-label)',
-    !!logo && logo.getAttribute('role') === 'img' && logo.getAttribute('aria-label') === 'Ранскейл' &&
+    !!logo && logo.getAttribute('role') === 'img' && logo.getAttribute('aria-label') === 'Ранскеил Ультра' &&
     word.getAttribute('aria-hidden') === 'true')
   check('шеврон — SVG-маска, цвет из токена (не хардкод #111)',
     !!chev && /mask-image/i.test(chev.getAttribute('style') || '') &&
@@ -2374,13 +2380,37 @@ console.log('\n=== D-21: экран входа — логотип Ранскей
     Math.round(53 * 1080 / 923.72) === 62 && Math.round(80 * 1080 / 923.72) === 94)
   check('пропорция шеврона задана явно (бокс = знак, без прозрачных полей)',
     /aspect-ratio:\s*1080\s*\/\s*923\.72/.test(chev.getAttribute('style') || ''))
-  check('слово «Ранскейл» — голос бренда, капс, 28px, трекинг 0.06em',
-    word.textContent.trim() === 'Ранскейл' && word.className.includes('font-brand') &&
+  check('слово «Ранскеил» — голос бренда, капс, 28px, трекинг 0.06em',
+    word.textContent.trim() === 'Ранскеил' && word.className.includes('font-brand') &&
     word.className.includes('uppercase') && word.className.includes('text-[1.75rem]') &&
     word.className.includes('tracking-[0.06em]'))
   check('зазор шеврон→слово 12px, на десктопе 18px (×1.5)',
     word.className.includes('mt-[12px]') && word.className.includes('md:mt-[18px]'))
   check('десктоп: слово ×1.5 = 42px', word.className.includes('md:text-[2.625rem]'))
+  check('старого написания через «й» на экране входа нет', !/Ранскей/.test(el.textContent))
+
+  // 1b. D-23: бейдж уровня продукта — третий ярус лочкапа
+  const badge = el.querySelector('[data-test="access-badge"]')
+  check('под словом есть бейдж «Ультра»', !!badge && badge.textContent.trim() === 'Ультра')
+  check('бейдж — тот же голос бренда, капс, 14px = половина слова, трекинг 0.16em',
+    badge.className.includes('font-brand') && badge.className.includes('uppercase') &&
+    badge.className.includes('text-[0.875rem]') && badge.className.includes('tracking-[0.16em]'))
+  // РЕГРЕСС-ЧЕК на решение владельца 19.08: бейдж — РАМКА, а не заливка.
+  // Возврат к `bg-[var(--text)]` = смена решения, а не мелкая правка стиля.
+  check('бейдж — обводка, а не заливка', badge.className.includes('border-[1.5px]') &&
+    badge.className.includes('border-[var(--text)]') && !badge.className.includes('bg-['))
+  // РЕГРЕСС-ЧЕК на угол: радиус на объекте 22px читается как «здесь кнопка»
+  // и выбивает бейдж из знака в интерфейс. Шеврон и Univers Cond — на прямых.
+  check('угол ПРЯМОЙ (никаких rounded-*)', !/\brounded/.test(badge.className))
+  check('высота 22px и зазор от слова 12px, на десктопе ×1.5 (33 / 18)',
+    badge.className.includes('h-[22px]') && badge.className.includes('mt-[12px]') &&
+    badge.className.includes('md:h-[33px]') && badge.className.includes('md:mt-[18px]'))
+  check('десктоп: кегль бейджа ×1.5 = 21px, обводка 2px',
+    badge.className.includes('md:text-[1.3125rem]') && badge.className.includes('md:border-2'))
+  check('бейдж скрыт от скринридера (уровень уже озвучен в aria-label лого)',
+    badge.getAttribute('aria-hidden') === 'true')
+  // Цвет — только токеном. Хардкод hex в компонентах запрещён (DESIGN-STANDARD).
+  check('в бейдже нет хардкода hex', !/#[0-9a-fA-F]{3,6}/.test(badge.className))
 
   // 2. карточка
   const cardLabel = el.querySelector('[data-test="access-card-label"]')
