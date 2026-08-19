@@ -2395,10 +2395,23 @@ console.log('\n=== D-21/D-23: экран входа — логотип Ранс�
   // 1b. D-23: бейдж уровня продукта — третий ярус лочкапа
   const badge = el.querySelector('[data-test="access-badge"]')
   check('под словом есть бейдж «Ультра»', !!badge && badge.textContent.trim() === 'Ультра')
-  check('бейдж — тот же голос бренда, капс, 17.5px = половина слова, трекинг 0.16em',
+  check('бейдж — тот же голос бренда, капс, 17.5px = половина слова, трекинг 0.32em',
     badge.className.includes('font-brand') && badge.className.includes('uppercase') &&
-    badge.className.includes('text-[1.09375rem]') && badge.className.includes('tracking-[0.16em]'))
+    badge.className.includes('text-[1.09375rem]') && badge.className.includes('tracking-[0.32em]'))
   check('кегль бейджа — ровно половина слова', 1.09375 * 2 === 2.1875)
+  // Разгонка и компенсация хвостового интервала ходят ТОЛЬКО парой: правка одной
+  // без другой смещает слово в рамке влево на пол-интервала (было видно у слова).
+  {
+    const tr = badge.className.match(/tracking-\[([\d.]+)em\]/)
+    const inner = badge.querySelector('span')
+    check('компенсация хвостового трекинга равна самому трекингу',
+      !!tr && inner.className.includes(`mr-[-${tr[1]}em]`), tr && tr[1])
+  }
+  // Поля — пропорция от кегля, а не два независимых числа: иначе доля бейджа от
+  // слова разъедется между брейкпоинтами и связка перестанет выглядеть одинаково.
+  check('боковые поля пропорциональны кеглю на обоих брейкпоинтах (0.571em)',
+    badge.className.includes('px-[10px]') && badge.className.includes('md:px-[12px]') &&
+    Math.abs(10 / 17.5 - 12 / 21) < 1e-9)
   // РЕГРЕСС-ЧЕК на решение владельца 19.08: бейдж — РАМКА, а не заливка.
   // Возврат к `bg-[var(--text)]` = смена решения, а не мелкая правка стиля.
   check('бейдж — обводка, а не заливка', badge.className.includes('border-[1.5px]') &&
@@ -2427,6 +2440,11 @@ console.log('\n=== D-21/D-23: экран входа — логотип Ранс�
     const inner = badge.querySelector('span')
     check('надпись сдвинута к оптическому центру рамки на 0.095em',
       !!inner && inner.className.includes('relative') && inner.className.includes('top-[0.095em]'))
+    // Своё значение для десктопа — не дубль, а замер: движки читают разные
+    // метрики шрифта (hhea 800/200 против winAscent 969), и базовая линия в
+    // строке встаёт по-разному. Мобильные 0.095em на десктопе перелетают на 1px.
+    check('у десктопа своя поправка по замеру (md:top-[0.05em])',
+      inner.className.includes('md:top-[0.05em]'))
     check('поправка НЕ через padding: он двигает содержимое лишь на половину',
       !/\bpt-\[/.test(badge.className))
     check('поправка в em, а не в px (переезжает на десктопный кегль сама)',
