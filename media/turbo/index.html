@@ -12,37 +12,60 @@
   ═══════════════════════════════════════════════════════════════════════════
   Отдельный контур `media/` — носители для парков. К Vue-приложению «Мастерплан»
   отношения не имеет: свой Vite-вход, свой дизайн, БЕЗ гейта доступа.
-  Дизайн согласован владельцем (5 итераций, 06.08) — см. обоснование по блокам
-  в boom-cmd-data/drivers/DRV-06-turbo/mehanika/ТУРБО-веб-страница.md.
 
   ⚠ DESIGN-STANDARD-boom-cmd.md на эту страницу НЕ распространяется — это
     рекламный носитель для гостя, а не экран приложения. Тёмная тема и
     палитра-плейсхолдер здесь легальны и являются задокументированным
     исключением. Токены приложения сюда не тянем и наоборот.
 
+  ─── v3.0 · NET-73: переработка после разбора сети 18.08 ───────────────────
+  Три парка сказали одно: с расстояния экран не читается. Что сделано.
+
+  1. КАНВА РЕЗИНОВАЯ ПРИ ФИКСИРОВАННОМ КЕГЛЕ.
+     Было: `height:100dvh` + `max-width:1500px` + кегли на `vw`. На панели
+     другой геометрии ряды сжимались, а `.tile{overflow:hidden}` молча срезал
+     содержимое — отсюда «поля обрезаются по краям» (владелец, 20.08).
+     Леттербокс (вписать 1920×1080 целиком) эту беду лечит, но заводит другую:
+     чёрные поля по краям — те же дырки, только снаружи.
+     Сейчас: масштаб типографики k = min(vw/1920, vh/1080) — 1920×1080 остаётся
+     эталоном кегля; логический размер канвы = vw/k × vh/k, то есть точно
+     повторяет пропорции панели. Излишек ширины забирают колонки, излишек
+     высоты — ряды. Ни полей, ни обрезки, ни пляшущего шрифта.
+     Константа 1920×1080 — `drivers/DRV-10-tv-paneli/РЕЕСТР-панелей.md` §2.1.
+
+  2. СНЯТЫ ТРИ БЛОКА: «Как это работает», «Купить/Выиграть/Подарить»,
+     кнопка «Купить в личном кабинете». Высвобожденная высота ушла в кегль:
+     таймер занимает всю левую колонку, цифры вдвое крупнее прежних.
+     Победители недели переехали в плитку подписки — по смыслу они про тот же
+     еженедельный розыгрыш, что и QR (см. renderSteps в turbo.js).
+
+  3. БЛОК «ДЕНЬ РОЖДЕНИЯ» — DRV-08 × канал №7 механики Турбо. Раскрывает
+     цепочку: 6 000 ₽ → 9 000 зарядов на карте → тикеты на приз, и отдельно
+     подарок «+50 турбо-игр». Оформление и анимация — `turbo-bday.js`.
+
+  4. КЕГЛИ ТАЙМЕРА И ПАКЕТОВ ПОДБИРАЮТСЯ ЗАМЕРОМ, а не заданы константой:
+     колонки и ряды на разных панелях разной величины, и любая константа
+     рано или поздно вылезает за плитку. См. fitCount/fitPacks в turbo.js.
+
+  ⚠ Машина состояний таймера, расчёт окон и работа с часами панели НЕ
+    трогались: v3.0 — переработка вида, а не логики расписания.
+
   ПАРАМЕТРЫ URL
-    ?park=ohta|piterland|iyun  — жёстко фиксирует парк, переключатель скрыт (режим панели)
+    ?park=ohta|piterland|iyun  — жёстко фиксирует парк, переключатель скрыт
     ?tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
-    ?demo=1                    — песочница: панель предпросмотра состояний внизу справа
+    ?demo=1                    — песочница: панель предпросмотра состояний
     ?mockError=1               — принудительная ошибка источника (отладка)
 
   ДАННЫЕ
     Живой fetch: VITE_TURBO_API (подставляется Vite на сборке из repo Variable)
       → GET <API>?action=turbo&park=<код>
-    Эндпойнт ПУБЛИЧНЫЙ (без ключа): страница висит на панели в зале, вводить
-    фразу доступа некому. Поэтому он не отдаёт ничего, кроме того, что и так
-    напечатано на носителях. Полное расписание недели наружу НЕ выходит —
-    срезается на стороне Apps Script (механика §6: валюта email-подписки).
     Контракт: boom-cmd/docs/DATA-CONTRACT-turbo.md
   ═══════════════════════════════════════════════════════════════════════════
 -->
-<!-- Фавикон — тот же, что у приложения на b00m-cmd.ru. Свой рисовать не нужно:
-     носитель живёт на том же домене, и разные иконки во вкладках только
-     путали бы. Файл лежит в public/, service worker его кэширует. -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
     /* ПЛЕЙСХОЛДЕРЫ фирменных цветов — дизайнер заменит */
@@ -54,496 +77,469 @@
     --lime:#c6f52e;
     --yellow:#ffd530;
     --pink:#ff3d68;
+    --pink-soft:#ffa8bd;
     --white:#ffffff;
     --muted:#9b94d0;
     --dark:#0d0a2e;
-    --radius:22px;
+    --radius:26px;
+    /* палитра частиц хлопушки — перерисована с референса владельца */
+    --p-purple:#9a79e8;
+    --p-green:#8ecf5a;
+    --p-yellow:#ffd530;
+    --p-red:#e8425a;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{
-    background:var(--bg);
+    background:#07051c;
     color:var(--white);
     font-family:'Inter',system-ui,sans-serif;
     overflow:hidden;
   }
+
+  /* ══ КАНВА ══════════════════════════════════════════════════════════════
+     Подробности — в шапке файла. Здесь только механика: .stage получает
+     логический размер и масштаб из JS (fitStage), сетка живёт внутри него
+     в обычных пикселях. */
+  .viewport{
+    position:fixed;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    background:#07051c;overflow:hidden;
+  }
+  .stage{flex:none;transform-origin:center center;background:var(--bg);position:relative}
+
   .page{
-    height:100dvh;
+    width:100%;height:100%;
     display:grid;
-    grid-template-columns: 1.05fr 1.5fr 1.05fr;
-    /* minmax(0,·) — не косметика: обычный `1fr` это `minmax(auto,1fr)`, то есть
-       ряд может вырасти под содержимое. Так и сломалось: QR с flex:1 поднял
-       min-content нижнего ряда с 178 до 418px и сжал всё остальное.
-       С нулевым минимумом ряд держит свою долю, а лишнее обрезает .tile. */
-    grid-template-rows: 62px minmax(0,1.2fr) minmax(0,1fr) minmax(0,0.85fr) 38px;
+    grid-template-columns:1.05fr 1.5fr 1.05fr;
+    /* Доли рядов: нижний получает 1 против 1.9 у основного. На панели выше
+       16:9 излишек высоты достаётся ему заметнее — низ поднимается, верх
+       поджимается (решение владельца 20.08). */
+    grid-template-rows:76px minmax(0,1.9fr) minmax(0,1fr) 46px;
     grid-template-areas:
-      "head   head  head"
-      "timer  hero  packs"
-      "steps  hero  packs"
-      "bottom bottom bottom"
-      "fineband fineband fineband";
-    gap:14px;
-    padding:14px;
-    max-width:1500px;
-    margin:0 auto;
+      "head  head  head"
+      "timer hero  packs"
+      "bday  bday  bday"
+      "fine  fine  fine";
+    gap:16px;
+    padding:20px;
   }
   .tile{
     background:var(--tile);
     border-radius:var(--radius);
-    padding:20px 22px;
+    padding:26px 30px;
     position:relative;
     overflow:hidden;
     display:flex;
     flex-direction:column;
     justify-content:center;
-    min-height:0;   /* пара к minmax(0,·): содержимое не распирает ячейку */
+    min-height:0;
   }
 
-  /* ── шапка: слоган по центру + переключатель парков справа ── */
+  /* ── шапка: слоган по центру, бренд слева, переключатель парков справа ── */
   .head{
-    grid-area:head;
-    background:var(--tile);
-    border-radius:var(--radius);
-    display:flex;align-items:center;justify-content:center;
-    position:relative;
+    grid-area:head;background:var(--tile);border-radius:var(--radius);
+    display:flex;align-items:center;justify-content:center;position:relative;
   }
-  .head .slogan{
-    font-family:'Unbounded';font-weight:700;font-size:clamp(16px,1.6vw,23px);
-    color:var(--white);letter-spacing:.5px;
-  }
+  .head .slogan{font-family:'Unbounded';font-weight:700;font-size:30px;color:var(--white);letter-spacing:.5px}
   .head .slogan b{color:var(--lime)}
-
-  /* ── бренд-блок слева: иконка + бейдж парка ──
-     Гость у кассы Питерленда должен видеть, что цифры на экране — про ЕГО парк,
-     а не про сеть вообще. На панели переключателя парков нет (он скрыт при
-     ?park=), поэтому бейдж — единственное место, где парк вообще назван. */
-  .brand{
-    position:absolute;left:16px;top:50%;transform:translateY(-50%);
-    display:flex;align-items:center;gap:11px;
-  }
-  .brand-icon{
-    width:34px;height:auto;flex:none;
-    color:var(--white);   /* пути в svg берут fill=currentColor */
-  }
+  /* Гость у кассы Питерленда должен видеть, что цифры на экране — про ЕГО
+     парк. На панели переключателя нет (скрыт при ?park=), поэтому бейдж —
+     единственное место, где парк вообще назван. */
+  .brand{position:absolute;left:22px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:14px}
+  .brand-icon{width:44px;height:auto;flex:none;color:var(--white)}
   .brand-badge{
-    display:inline-flex;align-items:center;gap:7px;
-    font-family:'Unbounded';font-weight:700;font-size:12px;letter-spacing:.6px;
-    background:rgba(255,255,255,.09);
-    border:1px solid rgba(255,255,255,.16);
-    border-radius:10px;padding:6px 12px;
-    color:var(--white);white-space:nowrap;
+    display:inline-flex;align-items:center;gap:9px;
+    font-family:'Unbounded';font-weight:700;font-size:16px;letter-spacing:.6px;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
   .brand-badge .sep{color:var(--lime)}
   .parks{
-    position:absolute;right:14px;top:50%;transform:translateY(-50%);
-    display:flex;gap:4px;background:rgba(255,255,255,.06);
-    border-radius:12px;padding:4px;
+    position:absolute;right:18px;top:50%;transform:translateY(-50%);
+    display:flex;gap:5px;background:rgba(255,255,255,.06);border-radius:14px;padding:5px;
   }
   .parks button{
     background:transparent;border:none;color:var(--muted);
-    font-family:'Inter';font-weight:700;font-size:12.5px;
-    padding:7px 12px;border-radius:9px;cursor:pointer;white-space:nowrap;
+    font-family:'Inter';font-weight:700;font-size:15px;
+    padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;
   }
   .parks button.on{background:var(--blue);color:#fff}
   .parks[hidden]{display:none}
 
-  /* ── герой ── */
-  .hero{
-    grid-area:hero;
-    background:
-      radial-gradient(90% 70% at 50% 30%, rgba(45,107,255,.45) 0%, rgba(45,107,255,0) 70%),
-      linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
-    align-items:center;text-align:center;
-    justify-content:space-between;
-    padding:24px 24px 22px;
-    overflow:visible;
+  /* ── ТАЙМЕР: вся левая колонка ──────────────────────────────────────────
+     Прежде делил колонку с «Как это работает» и получал ~300px высоты при
+     кегле 54px — три парка сказали, что цифры не читаются. Теперь колонка
+     его целиком.
+     ⚠ #t-label лежит ВНУТРИ #t-count не по прихоти вёрстки: applyMode
+       прячет отсчёт через `el.count.style.display='none'`, и подпись обязана
+       уезжать вместе с ним. Вынести её наружу — значит оставить на экране
+       «ТУРБО-ЧАСЫ» над пустотой в состояниях `soon` и `none`. */
+  .timer{grid-area:timer;border:3px solid transparent;justify-content:center;align-items:flex-start;text-align:left}
+  .timer .count{display:block;width:100%}
+  .timer .count small{
+    display:block;font-family:'Inter';font-weight:800;font-size:26px;letter-spacing:3px;
+    color:#b3ade0;text-transform:uppercase;margin-bottom:16px;
   }
-  .turbo{
-    font-family:'Unbounded';font-weight:900;
-    font-size:clamp(60px, 6.8vw, 102px);
-    line-height:.95;letter-spacing:2px;
-    color:var(--white);
+  /* Кегль задан здесь как стартовый потолок, фактический подбирает fitCount:
+     «1:56:14», «СР 10:00» и «Скоро» имеют разную ширину, а колонка на разных
+     панелях разной величины. Константа рано или поздно вылезает за плитку —
+     на этом уже спотыкались (v3.0-rc, цифры уходили за край). */
+  .timer #t-num{
+    display:block;font-family:'Unbounded';font-weight:900;font-size:120px;line-height:1;
+    font-variant-numeric:tabular-nums;white-space:nowrap;
   }
-  .turbo-sub{
-    display:inline-block;
-    font-family:'Unbounded';font-weight:900;
-    font-size:clamp(22px,2.4vw,34px);
-    letter-spacing:8px;text-indent:8px;
-    color:var(--dark);background:var(--lime);
-    padding:6px 20px;border-radius:14px;
-    transform:rotate(-2deg);
-    margin-top:10px;
-    box-shadow:0 6px 18px rgba(198,245,46,.25);
-  }
-  /* автоматы — иконки-приложения со счётчиками */
-  .apps{display:flex;gap:18px;justify-content:center;margin:20px 0 14px}
-  .apps .app{
-    display:flex;flex-direction:column;align-items:center;gap:6px;
-  }
-  /* Рамки у иконок нет намеренно: картинки нарисованы уже как плитки — со своим
-     скруглением, фоном и бликом. Подложка под ними давала вторую рамку вокруг
-     первой. Заодно ушёл overflow:hidden, который срезал угол у счётчика. */
-  .apps .app .box{
-    position:relative;
-    width:clamp(64px,5.4vw,88px);aspect-ratio:1;
-    display:flex;align-items:center;justify-content:center;
-    font-size:34px;   /* запасной путь: эмодзи, если картинки для категории нет */
-  }
-  .apps .app .box .ico{
-    width:100%;height:100%;object-fit:contain;display:block;
-    filter:drop-shadow(0 6px 14px rgba(0,0,0,.4));
-  }
-  .apps .app .lbl{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.3px}
-  .apps .cnt{
-    position:absolute;top:-4px;right:-4px;
-    min-width:24px;height:24px;padding:0 6px;
-    background:var(--pink);color:#fff;
-    border-radius:999px;
-    /* Рамки под цвет фона больше нет — счётчик лежит поверх картинки, а не на
-       краю плитки, и «дырка» цвета подложки резала бы саму иконку. */
-    box-shadow:0 2px 8px rgba(0,0,0,.5);
-    font-size:11.5px;font-weight:800;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .hero-claim{
-    font-family:'Unbounded';font-weight:700;
-    font-size:clamp(15px,1.5vw,21px);line-height:1.35;
-  }
-  .hero-claim b{color:var(--yellow)}
-  .hero-claim small{
-    display:block;font-family:'Inter';font-weight:600;font-size:13.5px;
-    color:var(--muted);margin-top:6px;letter-spacing:0;
-  }
-  .cta{
-    margin-top:18px;width:100%;
-    background:var(--white);color:var(--dark);
-    border:none;border-radius:16px;
-    padding:15px 20px;
-    display:flex;align-items:center;justify-content:space-between;
-    font-family:'Inter';font-weight:800;font-size:17px;
-    cursor:pointer;text-decoration:none;
-    transition:transform .15s;
-    position:relative;overflow:visible;
-  }
-  .cta:hover{transform:scale(1.02)}
-  .cta .price{font-family:'Unbounded';font-weight:900;font-size:22px}
-  .cta .tag{
-    position:absolute;right:-16px;top:-18px;
-    background:var(--pink);color:#fff;
-    font-family:'Unbounded';font-weight:900;font-size:14px;
-    padding:7px 14px;border-radius:10px;transform:rotate(-7deg);
-    white-space:nowrap;
-    box-shadow:0 8px 20px rgba(255,61,104,.45);
-  }
-
-  /* ── таймер: отсчёт сверху, подпись под ним ── */
-  .timer{grid-area:timer;border:2px solid transparent;justify-content:flex-start;padding-top:26px}
-  .timer .count{font-family:'Unbounded';font-weight:900;font-size:clamp(38px,3.4vw,54px);letter-spacing:1px;line-height:1}
-  /* Двоеточие в отсчёте медленно пульсирует — признак живых часов, а не
-     замершей картинки. Две секунды: на витрине быстрое мигание превратилось бы
-     в раздражитель. Узел двоеточия НЕ пересоздаётся при каждом тике, иначе
-     анимация перезапускалась бы раз в секунду и сбивалась (см. paintCount). */
   @keyframes bc-blink{0%,42%{opacity:1}58%,100%{opacity:.22}}
   .timer .bl{animation:bc-blink 2s ease-in-out infinite}
   @media (prefers-reduced-motion: reduce){ .timer .bl{animation:none} }
-  .timer .count small{display:block;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
-  .timer .state{font-family:'Unbounded';font-weight:700;font-size:19px;line-height:1.25;margin-top:14px}
-  .timer .note{font-size:13px;color:var(--muted);margin-top:10px;font-weight:600;line-height:1.4}
+  .timer .state{font-family:'Unbounded';font-weight:700;font-size:44px;line-height:1.2;margin-top:24px}
+  /* Не var(--muted): на зелёной подложке состояния «идут сейчас» он даёт
+     4,40:1 при норме 4,5. #b3ade0 → 5,82:1. */
+  .timer .note{font-size:28px;color:#b3ade0;margin-top:18px;font-weight:600;line-height:1.35}
   .timer.now{border-color:var(--green);background:linear-gradient(160deg,#0f3d24 0%,var(--tile) 70%)}
-  .timer.now .count{color:var(--green)}
+  .timer.now #t-num{color:var(--green)}
   .timer.today .state{color:var(--yellow)}
-  .timer.none .state,
-  .timer.soon .state{font-size:19px;margin-top:0}
+  .timer.none #t-num,.timer.soon #t-num{font-size:76px}
 
-  /* ── как это работает / победители недели ── */
-  .steps{grid-area:steps;background:var(--tile2)}
-  .steps h3{font-family:'Unbounded';font-weight:700;font-size:15px;margin-bottom:12px}
-  .step{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
-  .step:last-child{margin-bottom:0}
-  .step .n{
-    flex:none;width:24px;height:24px;border-radius:50%;
-    background:var(--blue);color:#fff;font-weight:800;font-size:13px;
-    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  /* ── ВТОРНИК: таймер и плитка внизу работают как ОДНА пара ──────────────
+     Во вторник зелёный в часах меняется на жёлтый, чтобы таймер читался
+     продолжением блока «Турбо-вторник». Одного цвета мало — связку держат
+     три общих признака: жёлтая обводка у обеих плиток, та же диагональная
+     штриховка (в таймере приглушена до 7%, иначе полосы забьют цифры) и
+     бейдж «СЕГОДНЯ» на нижней плитке — он объясняет, ПОЧЕМУ таймер пожелтел.
+     Зелёный не исчезает из языка страницы: он остаётся значением «турбо-часы
+     идут прямо сейчас» в обычные дни.
+     ⚠ Класс `tue` ДОБАВЛЯЕТСЯ к `now`, а не заменяет его: состояние в машине
+       остаётся тем же самым, меняется только вид. Правила ниже .now — на
+       равной специфичности выигрывает последнее. */
+  .timer.tue{
+    border-color:var(--yellow);
+    background:
+      repeating-linear-gradient(-45deg, rgba(255,213,48,.07) 0 26px, rgba(255,213,48,0) 26px 52px),
+      linear-gradient(160deg,#3a2d05 0%, var(--tile) 72%);
   }
-  .step p{font-size:13.5px;font-weight:600;color:var(--muted);line-height:1.4}
-  .step p b{color:var(--white)}
-  /* победители недели — подменяют «как это работает» (механика §6в) */
-  .win{display:flex;gap:12px;align-items:center;margin-bottom:10px}
-  .win:last-child{margin-bottom:0}
-  .win .medal{
-    flex:none;width:34px;height:34px;border-radius:50%;
-    background:var(--yellow);color:var(--dark);
-    display:flex;align-items:center;justify-content:center;font-size:18px;
+  .timer.tue #t-num{color:var(--yellow)}
+  .timer.tue .count small{color:var(--yellow)}
+  .timer.tue .state{color:var(--white)}
+  body.is-tue .tue{box-shadow:0 0 0 4px var(--yellow), 0 0 46px rgba(255,213,48,.35)}
+  .tue-today{display:none}
+  body.is-tue .tue-today{
+    display:inline-block;margin-top:14px;
+    background:var(--dark);color:var(--yellow);
+    font-family:'Unbounded';font-weight:900;font-size:19px;letter-spacing:1.5px;
+    padding:7px 14px;border-radius:10px;
   }
-  .win .who{font-family:'Unbounded';font-weight:700;font-size:15px;line-height:1.2}
-  .win .prize{font-size:12.5px;font-weight:600;color:var(--muted);margin-top:3px}
 
-  /* ── пакеты: единый белый блок ── */
+  /* ── ГЕРОЙ ── */
+  .hero{
+    grid-area:hero;
+    background:
+      radial-gradient(90% 70% at 50% 32%, rgba(45,107,255,.45) 0%, rgba(45,107,255,0) 70%),
+      linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
+    align-items:center;text-align:center;justify-content:center;padding:26px 28px;
+  }
+  /* «ИГРЫ» наезжает на нижнюю кромку «ТУРБО»: отрицательный margin + свой
+     слой. Тень задана в обе стороны — плашка лежит НА букве, и без верхней
+     подсветки наложение читалось бы как обрезка. Кольцом в цвет плитки не
+     обвожу: фон героя градиентный, ровная рамка на нём выглядела бы
+     приклеенным прямоугольником. */
+  .turbo{font-family:'Unbounded';font-weight:900;font-size:156px;line-height:.92;letter-spacing:2px;color:var(--white);margin-top:22px}
+  .turbo-sub{
+    display:inline-block;position:relative;z-index:2;
+    font-family:'Unbounded';font-weight:900;font-size:48px;
+    letter-spacing:12px;text-indent:12px;color:var(--dark);background:var(--lime);
+    padding:8px 26px;border-radius:18px;transform:rotate(-2deg);margin-top:-24px;
+    box-shadow:0 8px 24px rgba(198,245,46,.35), 0 -10px 26px rgba(13,10,46,.55);
+  }
+  .apps{display:flex;gap:26px;justify-content:center;margin:24px 0 16px}
+  .apps .app{display:flex;flex-direction:column;align-items:center;gap:9px}
+  /* Рамки у иконок нет намеренно: картинки нарисованы уже как плитки — со
+     своим скруглением, фоном и бликом. Подложка давала вторую рамку вокруг
+     первой, а overflow:hidden на ней срезал угол счётчика. */
+  .apps .app .box{position:relative;width:116px;height:116px;display:flex;align-items:center;justify-content:center;font-size:52px}
+  .apps .app .box .ico{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.45))}
+  .apps .app .lbl{font-size:17px;font-weight:700;color:var(--muted);letter-spacing:.3px}
+  .apps .cnt{
+    position:absolute;top:-6px;right:-6px;min-width:38px;height:38px;padding:0 10px;
+    background:var(--pink);color:#fff;border-radius:999px;
+    box-shadow:0 3px 10px rgba(0,0,0,.5);font-size:19px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .hero-claim{font-family:'Unbounded';font-weight:700;font-size:34px;line-height:1.3}
+  .hero-claim b{color:var(--yellow)}
+  .hero-claim small{display:block;font-family:'Inter';font-weight:600;font-size:23px;color:var(--muted);margin-top:12px;letter-spacing:0}
+
+  /* ── ПАКЕТЫ ─────────────────────────────────────────────────────────────
+     Кегли — производные от --pk, которую подбирает замером fitPacks.
+     Константа не годится: колонка и ряд на разных панелях разной величины,
+     и «10 игр» то ломалось на две строки, то третий пакет уезжал под край.
+
+     КОЛИЧЕСТВО против ЦЕНЫ. Раньше «10 игр» и «350 ₽» шли одним начертанием,
+     одним кеглем и одним цветом — от очереди не различить, где товар, а где
+     ценник. Разводим ФОРМОЙ: количество — крупное тёмное число на светлом,
+     единица «игр» мельче и серым; цена — в тёмной плашке белым, то есть
+     инверсия. Это сильнейший доступный контраст и одновременно родной приём
+     страницы (тёмные плашки уже работают в «ТУРБО-ВТОРНИК» и «В ПОДАРОК»).
+     Цветом не играем: на белой плитке цветные цифры теряют контраст, а лайм
+     и зелёный здесь заняты рамкой и бейджем «максимум фана». */
   .packs{
-    grid-area:packs;
-    background:var(--white);
-    border-radius:var(--radius);
-    padding:18px 0 0;
-    display:flex;flex-direction:column;
-    overflow:hidden; /* фикс: нижняя плашка не выходит за скругление */
-    box-shadow:0 0 0 3px rgba(198,245,46,.9), 0 18px 50px rgba(45,107,255,.25);
+    --pk:80px;
+    grid-area:packs;background:var(--white);border-radius:var(--radius);
+    padding:calc(var(--pk)*.22) 0 0;display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
   }
   .packs .ptitle{
-    font-family:'Unbounded';font-weight:900;font-size:15px;color:var(--dark);
-    padding:0 22px 10px;letter-spacing:.5px;
+    font-family:'Unbounded';font-weight:900;font-size:calc(var(--pk)*.33);
+    color:var(--dark);padding:0 calc(var(--pk)*.3) calc(var(--pk)*.14);letter-spacing:.5px;
   }
+  #packs-body{flex:1;display:flex;flex-direction:column;min-height:0}
+  /* Боковые поля тоже привязаны к --pk: когда подгон сбавляет кегль в узкой
+     колонке, поля ужимаются вместе с ним и строке достаётся больше места —
+     цикл сходится на большем размере. */
   .pack{
-    flex:1;display:flex;align-items:center;justify-content:space-between;
-    padding:12px 22px;text-decoration:none;color:var(--dark);
-    border-top:1px solid #e8e6f5;
-    transition:background .15s;position:relative;
+    flex:1;display:flex;align-items:center;justify-content:space-between;gap:calc(var(--pk)*.12);
+    padding:calc(var(--pk)*.14) calc(var(--pk)*.3);color:var(--dark);
+    border-top:1px solid #e8e6f5;position:relative;text-decoration:none;
   }
-  .pack:hover{background:#f2f6ff}
-  .pack .games{font-family:'Unbounded';font-weight:900;font-size:30px;line-height:1}
-  .pack .games small{
-    display:flex;align-items:center;gap:6px;
-    font-family:'Inter';font-weight:700;font-size:11.5px;color:#6b6885;
-    letter-spacing:.5px;margin-top:5px;
+  .pack > *{flex:none;min-width:0}
+  .pack .games{display:flex;flex-direction:column;align-items:flex-start;white-space:nowrap}
+  .pack .qty{display:flex;align-items:baseline;gap:calc(var(--pk)*.11)}
+  .pack .qty b{font-family:'Unbounded';font-weight:900;font-size:var(--pk);line-height:1;color:var(--dark)}
+  .pack .qty .u{font-family:'Inter';font-weight:800;font-size:calc(var(--pk)*.30);color:#5f5c78;letter-spacing:.3px}
+  .pack .games small{display:flex;align-items:center;gap:8px;margin-top:calc(var(--pk)*.10)}
+  .pack .buy{display:flex;flex-direction:column;align-items:flex-end}
+  .pack .rub{
+    display:inline-block;
+    font-family:'Unbounded';font-weight:900;font-size:calc(var(--pk)*.62);line-height:1;
+    background:var(--dark);color:var(--white);
+    border-radius:calc(var(--pk)*.17);
+    padding:calc(var(--pk)*.10) calc(var(--pk)*.24);
+    white-space:nowrap;
   }
-  .pack .buy{text-align:right}
-  .pack .rub{font-family:'Unbounded';font-weight:900;font-size:24px}
-  .pack .per{font-size:11px;color:#1d4fd0;font-weight:800;margin-top:2px}
+  .pack .per{font-size:calc(var(--pk)*.25);color:#1d4fd0;font-weight:800;margin-top:calc(var(--pk)*.08);white-space:nowrap}
   .pack.best{background:#eaffe0}
-  .pack.best:hover{background:#ddffcf}
   .pack .badge{
-    background:var(--green);color:#06340f;font-size:10px;font-weight:800;
-    padding:2px 8px;border-radius:6px;letter-spacing:.5px;
+    font-family:'Inter';background:var(--green);color:#06340f;
+    font-size:calc(var(--pk)*.25);font-weight:900;
+    padding:calc(var(--pk)*.06) calc(var(--pk)*.17);border-radius:10px;letter-spacing:.4px;white-space:nowrap;
   }
   .pack .badge.try{background:#1d4fd0;color:#fff}
 
-  /* ── нижняя полоса: колонки выровнены с сеткой страницы ── */
-  .bottom{grid-area:bottom;display:grid;grid-template-columns:1.7fr 0.85fr 1.05fr;gap:14px}
+  /* ── НИЖНИЙ РЯД: День рождения + Турбо-вторник + подписка ── */
+  .bday-row{grid-area:bday;display:grid;grid-template-columns:1.7fr 0.85fr 1.05fr;gap:16px}
 
-  /* три сценария: карточки внутри одной плашки, без перегородок */
-  .getwrap{
-    background:var(--tile2);border-radius:var(--radius);
-    display:flex;align-items:stretch;gap:10px;padding:10px;
+  /* ══ ДЕНЬ РОЖДЕНИЯ ══════════════════════════════════════════════════════
+     DRV-08 × канал №7 механики Турбо. Блок раскрывает цепочку выгоды, а не
+     один только подарок: «+50 игр» без цены и без бонуса гостю ничего не
+     объясняет (разбор владельца 20.08).
+     Выделяем формой, а не фотографией: фото довольных гостей на панели у
+     кассы с трёх метров превращается в шум, поверх него всё равно надо класть
+     текст и топить снимок затемнением. */
+  .bday{
+    position:relative;overflow:hidden;border-radius:var(--radius);
+    background:
+      radial-gradient(70% 90% at 78% 40%, rgba(255,61,104,.20) 0%, rgba(255,61,104,0) 65%),
+      linear-gradient(160deg,#241d66 0%, var(--tile) 62%);
+    box-shadow:0 0 0 4px var(--pink), 0 22px 60px rgba(255,61,104,.28);
+    padding:24px 28px;
   }
-  .gcard{
-    flex:1;padding:14px 16px;
-    background:var(--tile);border-radius:16px;
-    display:flex;flex-direction:column;justify-content:center;
-    transition:transform .15s;
+  /* Слои: ambient(1) → шары «за»(3) → плашка(4) → шары «перед» и конфетти(5)
+     → хлопушка(6) → текст(7). Текст всегда сверху: шары в переднем проходе
+     могут накрыть плашку — это игра, — но цифры накрывать нельзя. */
+  .bday .layer{position:absolute;inset:0;pointer-events:none}
+  .bday .copy{position:relative;z-index:7;height:100%;display:flex;flex-direction:column;justify-content:space-between;width:440px}
+  .bday .btitle{font-family:'Unbounded';font-weight:900;font-size:31px;line-height:1.12;letter-spacing:-.3px;color:var(--white)}
+  .bday .btitle b{color:var(--pink)}
+  /* Панель зарядов собирает всё в одном месте: бейдж «ОТ 6 ЧЕЛОВЕК» на канте,
+     чип «+3 000» перед подписью, цена строкой внутри. Три сущности разнесены
+     по трём углам и не путаются между собой. Стекло — тот же приём, что у
+     бейджа парка в шапке. */
+  .bday .grp{
+    position:relative;width:max-content;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);
+    border-radius:16px;padding:16px 20px 12px;margin-top:12px;
   }
-  .gcard:hover{transform:translateY(-3px)}
-  .gcard .ico{font-size:26px;margin-bottom:8px}
-  .gcard h4{font-family:'Unbounded';font-weight:700;font-size:14px;margin-bottom:5px}
-  .gcard p{font-size:12px;color:var(--muted);font-weight:600;line-height:1.4}
+  .bday .people{
+    position:absolute;top:-13px;left:16px;
+    font-family:'Inter';font-size:13px;font-weight:900;letter-spacing:.8px;
+    background:var(--tile2);border:1px solid rgba(255,255,255,.22);color:var(--white);
+    border-radius:8px;padding:3px 10px;white-space:nowrap;
+  }
+  .bday .grp .num{display:flex;align-items:center;gap:10px;font-family:'Unbounded';font-weight:900;font-size:54px;line-height:1;color:var(--white);white-space:nowrap}
+  .bday .grp .cap{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;color:#b3ade0;margin-top:8px;white-space:nowrap}
+  .bday .grp .chip{font-family:'Inter';font-size:13.5px;font-weight:900;letter-spacing:.4px;background:var(--pink);color:var(--dark);border-radius:7px;padding:3px 8px;flex:none}
+  .bday .grp .price{margin-top:9px;font-family:'Unbounded';font-weight:700;font-size:20px;color:#ddd9f5;white-space:nowrap}
+  /* Молния — валютный знак зарядов. Пульс + мигающий размытый дубль + три
+     искры с некратными периодами (1,3 / 1,7 / 2,3 с): ритм не совпадает
+     никогда, и глаз читает это как электричество, а не как мигалку. */
+  .boltwrap{position:relative;width:40px;height:40px;flex:none}
+  .boltwrap svg{position:absolute;inset:0;width:100%;height:100%;color:var(--pink)}
+  .boltwrap .core{animation:bolt-pulse 1.7s ease-in-out infinite}
+  .boltwrap .halo{filter:blur(6px);transform:scale(1.25);animation:bolt-halo 1.7s ease-in-out infinite}
+  @keyframes bolt-pulse{0%,100%{transform:scale(1)}42%{transform:scale(1.16)}50%{transform:scale(1.06)}58%{transform:scale(1.18)}}
+  @keyframes bolt-halo{0%,100%{opacity:.25}42%{opacity:.9}50%{opacity:.4}58%{opacity:1}}
+  .boltwrap .sp{position:absolute;width:8px;height:8px;color:var(--pink-soft)}
+  .boltwrap .sp svg{position:static;width:100%;height:100%;color:inherit}
+  .boltwrap .sp1{top:-5px;right:-3px;animation:spark 1.3s ease-in-out infinite}
+  .boltwrap .sp2{bottom:-2px;left:-6px;animation:spark 1.7s ease-in-out .4s infinite}
+  .boltwrap .sp3{top:8px;right:-9px;animation:spark 2.3s ease-in-out .9s infinite}
+  @keyframes spark{0%,72%,100%{opacity:0;transform:scale(.4)}80%{opacity:1;transform:scale(1.25)}88%{opacity:.2;transform:scale(.7)}}
+  .bday .bslogan{font-size:19px;font-weight:800;color:var(--white);white-space:nowrap;width:560px}
+  .bday .bslogan b{color:var(--pink)}
+  /* Киллер-плашка: тот же приём, что лаймовая «ИГРЫ» в герое — повёрнутая
+     плашка, Unbounded 900, разрядка, тень своим цветом. Крупнее соседей,
+     потому что это единственное, чего нет в других парках. */
+  .plate{
+    position:absolute;z-index:4;left:462px;top:50%;
+    background:var(--pink);color:var(--dark);
+    border-radius:20px;padding:18px 26px 16px;text-align:center;
+    box-shadow:0 14px 40px rgba(255,61,104,.5);
+    animation:plate-rock 5.6s ease-in-out infinite;
+  }
+  @keyframes plate-rock{0%,100%{transform:translateY(-50%) rotate(-5.5deg)}50%{transform:translateY(-53%) rotate(-3deg)}}
+  .plate .p50{font-family:'Unbounded';font-weight:900;font-size:62px;line-height:.95;letter-spacing:1px}
+  .plate .pword{font-family:'Unbounded';font-weight:900;font-size:22px;letter-spacing:4px;text-indent:4px;margin-top:4px}
+  .plate .psub{margin-top:9px;font-family:'Inter';font-weight:900;font-size:14.5px;letter-spacing:.6px;background:var(--dark);color:var(--pink);border-radius:8px;padding:4px 10px;display:inline-block}
+  .plate::after{content:'';position:absolute;inset:-6px;border-radius:24px;box-shadow:0 0 46px 10px rgba(255,61,104,.6);opacity:0;animation:breathe 3.4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:0}50%{opacity:1}}
+  .balloons{position:absolute;z-index:3;left:600px;top:-64px;width:400px;will-change:transform;filter:drop-shadow(0 16px 34px rgba(0,0,0,.55))}
+  .balloons img{width:100%;display:block;animation:bl-bob 4.2s ease-in-out infinite}
+  @keyframes bl-bob{0%,100%{transform:translateY(0) rotate(-1.6deg)}50%{transform:translateY(-9px) rotate(1.4deg)}}
+  /* Хлопушка: конус построен в осевых координатах и повёрнут группой — так
+     грани, обод и блик геометрически честные. Остриё вынесено за угол блока,
+     чтобы не было видно, кто её держит. */
+  .popper{position:absolute;z-index:6;right:-52px;bottom:-56px;width:196px;transform-origin:74% 80%;will-change:transform}
+  #confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5}
+  #confetti .p{position:absolute;left:0;top:0;will-change:transform,opacity}
+  @keyframes drift{0%,100%{transform:translateY(0) rotate(-9deg)}50%{transform:translateY(-14px) rotate(10deg)}}
+  .amb{position:absolute;animation:drift ease-in-out infinite}
+  @keyframes twinkle{0%,100%{opacity:.12}50%{opacity:.7}}
+  .star{position:absolute;animation:twinkle ease-in-out infinite}
 
-  /* турбо-вторник: агрессивно */
+  /* ── турбо-вторник ── */
   .tue{
-    background:repeating-linear-gradient(-45deg,var(--yellow) 0 26px,#ffc400 26px 52px);
-    color:var(--dark);
-    align-items:flex-start;
+    background:repeating-linear-gradient(-45deg,var(--yellow) 0 34px,#ffc400 34px 68px);
+    color:var(--dark);align-items:flex-start;justify-content:center;transition:box-shadow .3s;
   }
-  .tue .day{
-    font-family:'Unbounded';font-weight:900;font-size:21px;line-height:1.15;
-    background:var(--dark);color:var(--yellow);
-    padding:6px 12px;border-radius:10px;transform:rotate(-2deg);
-  }
-  .tue p{font-size:13px;font-weight:800;margin-top:10px;line-height:1.35}
+  .tue .day{font-family:'Unbounded';font-weight:900;font-size:36px;line-height:1.15;background:var(--dark);color:var(--yellow);padding:10px 18px;border-radius:14px;transform:rotate(-2deg)}
+  .tue p{font-size:24px;font-weight:800;margin-top:18px;line-height:1.35}
 
-  /* подписка: QR вместо кнопки.
+  /* ── подписка: QR вместо кнопки ─────────────────────────────────────────
      Панель у кассы — витрина, а не интерфейс: нажать на неё гость не может.
      Кнопка на неинтерактивном экране — обещание действия, которого нет.
-     Поэтому единственный способ увести гостя дальше — его собственный телефон. */
-  /* Горизонтальная компоновка: тексты слева, QR квадратом справа.
-     Вертикальная делила высоту плитки между текстом и кодом, и обоим было
-     тесно — QR выходил 76px. В строку QR получает ВСЮ высоту плитки (≈138px,
-     +80%), а тексты — всю оставшуюся ширину, поэтому их можно укрупнить. */
-  .sub{
-    background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%);
-    flex-direction:row;align-items:center;gap:16px;
-  }
+     Сюда же переехали победители недели (механика §6в): по смыслу они про
+     тот же еженедельный розыгрыш, что и QR рядом. */
+  .sub{background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%);flex-direction:row;align-items:center;gap:20px}
   .sub .subtext{flex:1;min-width:0}
-  .sub h3{font-family:'Unbounded';font-weight:700;font-size:clamp(16px,1.4vw,22px);line-height:1.2}
-  /* Не var(--muted): на светлом конце градиента плитки он даёт 3,60:1 при норме
-     4,5. Это инструкция гостю, а не украшение. #c5c0ea → 5,78:1. */
-  .sub p{font-size:clamp(12.5px,1.05vw,15px);color:#c5c0ea;font-weight:600;margin-top:6px;line-height:1.45}
-
-  /* Лаймовый бейдж «бесплатно» — единственное место на странице, где обещают
-     что-то даром, поэтому он и выделен. Лайм уже работает в бренд-акцентах
-     («ИГРЫ», слоган), поэтому новый цвет в палитру не вводим: два тёплых
-     акцента рядом с розовым конкурировали бы, а не работали вместе.
-     Текст тёмный, как на всех светлых заливках страницы, — 15,00:1. */
-  .sub .gift{
-    display:inline-block;margin-top:5px;
-    background:var(--lime);color:var(--dark);
-    font-weight:800;border-radius:9px;
-    padding:4px 10px;line-height:1.25;text-align:center;
-  }
-  /* «БЕСПЛАТНО» — отдельной строкой и чуть крупнее. Перенос задан РАЗМЕТКОЙ,
-     а не отдан браузеру: замер показал, что при автопереносе бейджу не хватало
-     двух пикселей до края колонки, он растягивался на всю ширину и переставал
-     читаться как бейдж — превращался в плашку. Двух пикселей запаса на разных
-     панелях не бывает. С явным переносом бейдж стабильно 115px везде. */
+  .sub h3{font-family:'Unbounded';font-weight:700;font-size:30px;line-height:1.2}
+  /* Не var(--muted): на светлом конце градиента плитки он даёт 3,60:1 при
+     норме 4,5. Это инструкция гостю, а не украшение. #c5c0ea → 5,78:1. */
+  .sub p{font-size:22px;color:#c5c0ea;font-weight:600;margin-top:10px;line-height:1.4}
+  /* Лаймовый бейдж «бесплатно» — единственное место, где обещают что-то
+     даром. Текст тёмный, как на всех светлых заливках страницы, — 15,00:1. */
+  .sub .gift{display:inline-block;margin-top:10px;background:var(--lime);color:var(--dark);font-weight:800;border-radius:12px;padding:7px 14px;line-height:1.25;text-align:center;font-size:20px}
   .sub .gift .free{display:block;font-size:1.06em;letter-spacing:.4px}
-  /* Куски, которые НЕЛЬЗЯ рвать переносом. «турбо-игр» браузер по умолчанию
-     ломает по дефису — на панели это читалось как «турбо-» и «игр» на разных
-     строках. Перенос допустим только там, где мы его поставили сами. */
+  /* Куски, которые НЕЛЬЗЯ рвать переносом: «турбо-игр» браузер по умолчанию
+     ломает по дефису, и на панели это читалось как «турбо-» и «игр». */
   .nb{white-space:nowrap}
-  /* Плашка — КВАДРАТ ровно под код, без растягивания. Высота = высота плитки,
-     ширина следует за ней через aspect-ratio. Белый фон обязателен: камере
-     нужен контраст тёмных модулей к светлому полю, тут его убирать нельзя. */
-  .sub .qr{
-    /* Потолок 170px не произвольный: без него на панели 1080p квадрат вырастает
-       до 198px и отжимает текст до 151px — подпись уходит в четыре строки в
-       узкой колонке. Замерено в браузере на 720/823/1080. Ограничивать по
-       ШИРИНЕ нельзя: max-width при height:100% ломает квадрат в прямоугольник. */
-    flex:none;height:min(100%,170px);aspect-ratio:1;width:auto;
-    background:var(--white);border-radius:14px;
-    display:flex;align-items:center;justify-content:center;padding:6px;
-  }
+  /* Плашка — КВАДРАТ ровно под код. Потолок 230px не произвольный: без него
+     на высокой панели квадрат отжимает текст, и заголовок уходит в три
+     строки. Ограничивать по ШИРИНЕ нельзя — max-width при height:100% ломает
+     квадрат в прямоугольник. */
+  .sub .qr{flex:none;height:min(100%,230px);aspect-ratio:1;width:auto;background:var(--white);border-radius:18px;display:flex;align-items:center;justify-content:center;padding:10px}
   .sub .qr-img{height:100%;width:100%;color:var(--dark);display:block}
+  /* победители недели — подменяют текст подписки, QR остаётся на месте */
+  .win{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  .win:last-child{margin-bottom:0}
+  .win .medal{flex:none;width:40px;height:40px;border-radius:50%;background:var(--yellow);color:var(--dark);display:flex;align-items:center;justify-content:center;font-size:21px}
+  .win .who{font-family:'Unbounded';font-weight:700;font-size:19px;line-height:1.2}
+  .win .prize{font-size:15px;font-weight:600;color:#c5c0ea;margin-top:3px}
 
-  /* ── условия: своя плашка. Слева юр. строка, справа служебный бейдж ── */
+  /* ── условия: слева служебный бейдж, справа юридическая строка ── */
   .fineband{
-    grid-area:fineband;
-    background:rgba(255,255,255,.04);
-    border-radius:14px;
-    display:flex;align-items:center;justify-content:space-between;gap:14px;
-    font-size:12px;color:var(--muted);font-weight:600;
-    padding:0 18px 0 8px;text-align:right;
+    grid-area:fine;background:rgba(255,255,255,.04);border-radius:16px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    font-size:17px;color:var(--muted);font-weight:600;padding:0 22px 0 10px;text-align:right;
+    position:relative;
   }
   .fineband .terms{min-width:0}
   /* Служебная группа: вендорский бейдж и штамп времени — одно целое, поэтому
-     стоят вплотную и одной высоты. Раньше их разносило space-between'ом
-     на всю ширину плашки, и они читались как два несвязанных элемента. */
-  .svc{display:flex;align-items:stretch;gap:6px;flex:none}
-  .svc > *{height:30px}
-
-  /* Служебный бейдж — для персонала, не для гостя: по нему видно, что именно
-     сейчас открыто на панели и свежие ли данные. Отсюда белый фон: он читается
-     с расстояния и намеренно отличается от остальной страницы. */
-  /* Служебная плашка намеренно ПРИГЛУШЕНА: белая слишком спорила за внимание
-     с QR-кодом, который стоит прямо над ней. Это техническая метка для
-     персонала — она должна читаться, когда её ищут, и не лезть в глаза,
-     когда смотрят на предложение. Контраст при этом держим выше нормы. */
+     стоят вплотную и одной высоты. */
+  .svc{display:flex;align-items:stretch;gap:8px;flex:none}
+  .svc > *{height:36px}
+  /* Служебная плашка намеренно ПРИГЛУШЕНА: белая спорила за внимание с QR.
+     Это техническая метка для персонала — читается, когда её ищут. */
   .stamp{
-    flex:none;display:flex;align-items:center;gap:9px;
-    background:rgba(255,255,255,.05);
-    border:1px solid rgba(255,255,255,.09);
-    color:#cfcae8;
-    border-radius:9px;padding:0 4px 0 10px;
-    font-family:'Inter';font-weight:700;font-size:11px;letter-spacing:.3px;
-    white-space:nowrap;cursor:pointer;
+    flex:none;display:flex;align-items:center;gap:11px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+    color:#cfcae8;border-radius:11px;padding:0 6px 0 13px;
+    font-family:'Inter';font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap;cursor:pointer;
   }
-  .stamp .dot{
-    width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;
-  }
+  .stamp .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
   .stamp.stale .dot{background:var(--pink)}
   .stamp.stale .when{color:#ff9db4}
   .stamp .ver{color:#8f88bd}
-  .stamp .rl{
-    display:flex;align-items:center;justify-content:center;
-    width:24px;height:24px;flex:none;
-    background:rgba(255,255,255,.07);border:none;border-radius:7px;
-    color:#cfcae8;cursor:pointer;padding:0;
-  }
+  .stamp .rl{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none;background:rgba(255,255,255,.07);border:none;border-radius:8px;color:#cfcae8;cursor:pointer;padding:0}
   .stamp .rl:hover{background:rgba(255,255,255,.14)}
-  .stamp .rl svg{width:14px;height:14px}
-
+  .stamp .rl svg{width:17px;height:17px}
+  .stamp .rl.spin svg{animation:bc-spin .8s linear infinite}
+  @keyframes bc-spin{to{transform:rotate(360deg)}}
+  /* Подпись вендора. Синий — тот же --blue, что у бейджа «попробовать». */
+  .powered{
+    flex:none;display:inline-flex;align-items:center;background:var(--blue);color:var(--white);
+    border-radius:11px;padding:0 15px;font-family:'Inter';font-weight:800;font-size:15px;
+    letter-spacing:.3px;white-space:nowrap;text-decoration:none;
+  }
+  .powered:hover{filter:brightness(1.1)}
   /* Подсказка по точке. На панели нет курсора и нет hover, поэтому title=""
      там бесполезен — нужен именно клик. */
-  .fineband{position:relative}
   .hint{
-    position:absolute;left:150px;bottom:calc(100% + 8px);
-    max-width:min(520px,70vw);
+    position:absolute;left:150px;bottom:calc(100% + 8px);max-width:min(620px,70vw);
     background:var(--tile2);border:1px solid rgba(255,255,255,.16);
-    border-radius:12px;padding:10px 13px;
-    font-size:12px;font-weight:600;color:var(--white);line-height:1.4;
-    box-shadow:0 12px 30px rgba(0,0,0,.45);
-    display:none;z-index:20;text-align:left;white-space:normal;
+    border-radius:12px;padding:12px 15px;font-size:15px;font-weight:600;color:var(--white);line-height:1.4;
+    box-shadow:0 12px 30px rgba(0,0,0,.45);display:none;z-index:20;text-align:left;white-space:normal;
   }
   .hint.on{display:block}
   .hint b{color:var(--lime)}
 
-  /* ── Запрошенный парк не найден ─────────────────────────────────────────────
+  /* ── Запрошенный парк не найден ─────────────────────────────────────────
      Источник при неизвестном коде молча отдаёт первый парк по сортировке —
      чтобы экран в зале не пустел. Но тихая подмена ХУЖЕ пустоты: панель в
-     Питерленде показывала бы цифры и расписание Охты, гость пришёл бы в
-     неверное время, а надпись «Охта Молл» в шапке никто не перечитывает.
-     Поэтому расхождение «просили X — пришёл Y» перекрываем явно.
-     Случается это при настройке панели, а не в рабочем режиме, так что
-     закрытый экран увидит установщик, а не поток гостей. */
+     Питерленде показывала бы цифры Охты, гость пришёл бы в неверное время. */
   .parkerr{
-    position:fixed;inset:0;z-index:60;
-    background:rgba(6,4,26,.86);backdrop-filter:blur(3px);
+    position:fixed;inset:0;z-index:60;background:rgba(6,4,26,.86);backdrop-filter:blur(3px);
     display:none;align-items:center;justify-content:center;padding:24px;
   }
   .parkerr.on{display:flex}
-  .parkerr .box{
-    max-width:min(680px,90vw);text-align:center;
-    background:var(--tile2);border:2px solid var(--pink);
-    border-radius:var(--radius);padding:28px 32px;
-  }
-  .parkerr h2{
-    font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.25;
-    color:var(--pink);margin-bottom:10px;
-  }
+  .parkerr .box{max-width:min(680px,90vw);text-align:center;background:var(--tile2);border:2px solid var(--pink);border-radius:var(--radius);padding:28px 32px}
+  .parkerr h2{font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.25;color:var(--pink);margin-bottom:10px}
   .parkerr p{font-size:14.5px;font-weight:600;color:var(--white);line-height:1.5}
-  .parkerr code{
-    display:inline-block;background:rgba(255,255,255,.1);
-    border-radius:7px;padding:2px 8px;font-family:ui-monospace,monospace;
-  }
+  .parkerr code{display:inline-block;background:rgba(255,255,255,.1);border-radius:7px;padding:2px 8px;font-family:ui-monospace,monospace}
   .parkerr .list{margin-top:14px;font-size:13.5px;color:var(--muted);line-height:1.7}
-  .stamp .rl.spin svg{animation:bc-spin .8s linear infinite}
-
-  /* Подпись вендора. Синий — тот же --blue, что у кружков шагов 1/2/3
-     в блоке «Как это работает»: новый цвет не вводим (4,51:1 белым). */
-  .powered{
-    flex:none;display:inline-flex;align-items:center;
-    background:var(--blue);color:var(--white);
-    border-radius:9px;padding:0 12px;
-    font-family:'Inter';font-weight:800;font-size:11px;letter-spacing:.3px;
-    white-space:nowrap;text-decoration:none;
-  }
-  .powered:hover{filter:brightness(1.1)}
-  @keyframes bc-spin{to{transform:rotate(360deg)}}
 
   /* ── загрузка: тот же shimmer-«перелив», что во всех разделах приложения ──
-     Портирован из src/styles/main.css (@keyframes bc-shimmer). Там он на светлых
-     токенах, здесь — на тёмной плитке, поэтому блик задан прозрачным белым.
      Показываем ТОЛЬКО когда показывать ещё нечего: фоновое обновление раз в
-     5 минут не должно мигать скелетоном на работающей панели в зале —
-     для него крутится иконка в служебном бейдже. */
-  @keyframes bc-shimmer{
-    0%{background-position:200% 0}
-    100%{background-position:-200% 0}
-  }
+     5 минут не должно мигать скелетоном на работающей панели в зале. */
+  @keyframes bc-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   .bc-skeleton{
     background-color:rgba(255,255,255,.06);
-    background-image:linear-gradient(90deg,
-      rgba(255,255,255,.06) 0%,
-      rgba(255,255,255,.15) 50%,
-      rgba(255,255,255,.06) 100%);
-    background-size:200% 100%;
-    background-repeat:no-repeat;
-    animation:bc-shimmer 1.4s ease-in-out infinite;
-    border-radius:12px;
+    background-image:linear-gradient(90deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.06) 100%);
+    background-size:200% 100%;background-repeat:no-repeat;
+    animation:bc-shimmer 1.4s ease-in-out infinite;border-radius:12px;
   }
-  .sk-line{height:14px;margin-bottom:9px}
-  .sk-count{height:42px;width:70%;margin-bottom:14px}
-  .sk-app{width:56px;height:56px;border-radius:16px}
-  .sk-pack{height:100%;margin:0 22px 12px;background-color:rgba(0,0,0,.07)}
-  .sk-pack.bc-skeleton{
-    background-image:linear-gradient(90deg,
-      rgba(0,0,0,.06) 0%, rgba(0,0,0,.13) 50%, rgba(0,0,0,.06) 100%);
-  }
-  @keyframes bc-fade-in{
-    from{opacity:0;transform:translateY(4px)}
-    to{opacity:1;transform:none}
-  }
+  .sk-line{height:20px;margin-bottom:12px}
+  .sk-count{height:96px;width:76%;margin-bottom:16px}
+  .sk-app{width:96px;height:96px;border-radius:22px}
+  .sk-pack{height:100%;margin:0 26px 14px;background-color:rgba(0,0,0,.07)}
+  .sk-pack.bc-skeleton{background-image:linear-gradient(90deg, rgba(0,0,0,.06) 0%, rgba(0,0,0,.13) 50%, rgba(0,0,0,.06) 100%)}
+  @keyframes bc-fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   .bc-fade-in{animation:bc-fade-in .28s ease-out both}
   @media (prefers-reduced-motion: reduce){
-    .bc-skeleton{animation:none}
-    .bc-fade-in{animation:none}
-    .stamp .rl.spin svg{animation:none}
+    .bc-skeleton,.bc-fade-in,.stamp .rl.spin svg,
+    .balloons img,.amb,.star,.plate,.boltwrap .core,.boltwrap .halo,.boltwrap .sp{animation:none}
+    #confetti{display:none}
+    .plate{transform:translateY(-50%) rotate(-5deg)}
+    .plate::after{animation:none;opacity:.5}
   }
 
   /* ── панель песочницы (?demo=1) ── */
@@ -553,71 +549,47 @@
   }
   .demo.on{display:flex}
   .demo span{font-size:10px;color:#8f88bd;font-weight:700;text-transform:uppercase;letter-spacing:1px}
-  .demo button{
-    background:#2a2360;color:#cfc9ff;border:none;border-radius:7px;
-    padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;
-  }
+  .demo button{background:#2a2360;color:#cfc9ff;border:none;border-radius:7px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
   .demo button.on{background:var(--blue);color:#fff}
 
-  /* ── режим ТВ: указатель прячется по бездействию ──────────────────────────
-     Раньше здесь стояло безусловное `body.tv{cursor:none}` плюс список
-     исключений с `cursor:default`. Получался баг: человек, открывший панель с
-     мышкой, терял курсор и находил его только над теми блоками, что попали в
-     список исключений — то есть указатель «мигал» по экрану.
-
+  /* ── режим ТВ: указатель прячется по бездействию ────────────────────────
      Задача была не «убрать курсор», а «убрать ЗАБЫТУЮ стрелку»: на моноблоке
-     мышь если и подключена, то лежит без дела, и брошенный указатель торчит
-     поверх витрины сутками. Это лечится бездействием, а не запретом.
-
-     Класс вешает JS: 5 секунд без движения мыши — прячем, любое движение —
-     возвращаем. На панели без мыши движения не будет никогда, и указатель
-     исчезнет сам через пять секунд после загрузки, как и раньше.
-
-     `*` и `!important` — обязательны: у кнопок и ссылок свой cursor, без этого
-     вернётся ровно тот баг, из-за которого правка и появилась. */
+     мышь если и подключена, то лежит без дела. Это лечится бездействием, а не
+     запретом — иначе курсор пропадает и «мигает» над исключениями.
+     `*` и `!important` обязательны: у кнопок и ссылок свой cursor. */
   body.tv.idle, body.tv.idle *{cursor:none !important}
 
-  /* ── Экран не подходит ──────────────────────────────────────────────────────
-     Раньше здесь был мобильный фолбэк: сетка перестраивалась в колонку со
-     скроллом. Но это носитель для ТВ-панели, а не адаптивная страница —
-     в колонке он теряет смысл (нет одного экрана, нет крупных состояний
-     времени), и человек с телефона видел бы кривую версию витрины вместо
-     понятного объяснения. Поэтому вместо перестройки — честная заглушка.
-
-     Пороги: узкое окно, низкое окно или портретная ориентация. Портрет
-     отсекаем намеренно — вертикально стоящая панель эту вёрстку не покажет. */
+  /* ── Экран не подходит ──────────────────────────────────────────────────
+     Это носитель для ТВ-панели, а не адаптивная страница. Канва подстроится
+     под любую ГОРИЗОНТАЛЬНУЮ геометрию, но в портрете и в крошечном окне
+     макет теряет смысл — честная заглушка вместо кривой витрины. */
   .toosmall{
-    display:none;
-    position:fixed;inset:0;z-index:70;
-    background:linear-gradient(160deg,#2d6bff 0%,#1b3fa8 100%);
-    color:var(--white);
+    display:none;position:fixed;inset:0;z-index:70;
+    background:linear-gradient(160deg,#2d6bff 0%,#1b3fa8 100%);color:var(--white);
     align-items:center;justify-content:center;text-align:center;padding:28px;
   }
   .toosmall .in{max-width:440px}
   .toosmall svg{width:74px;height:74px;margin-bottom:18px}
-  .toosmall h2{
-    font-family:'Unbounded';font-weight:900;font-size:clamp(20px,5.5vw,27px);
-    line-height:1.25;margin-bottom:10px;
-  }
+  .toosmall h2{font-family:'Unbounded';font-weight:900;font-size:clamp(20px,5.5vw,27px);line-height:1.25;margin-bottom:10px}
   .toosmall p{font-size:clamp(13.5px,3.6vw,15.5px);font-weight:600;line-height:1.5;opacity:.92}
   @media (max-width:899px), (max-height:559px), (orientation:portrait){
-    .page{display:none}
+    .viewport{display:none}
     .parkerr{display:none !important}
     .toosmall{display:flex}
   }
-
 </style>
 </head>
 <body>
 
+<div class="viewport" id="viewport">
+<div class="stage" id="stage">
 <div class="page">
 
   <header class="head">
-    <!-- Иконка shark-eyes инлайном, а не <img src="/shark-eyes-boom-icon.svg">:
-         на панели в зале это на один сетевой запрос меньше, и логотип не
-         пропадёт, если ассет не долетит. Исходник — public/shark-eyes-boom-icon.svg,
-         добавлен fill="currentColor" (в оригинале заливки нет, на тёмном фоне
-         пути были бы чёрными по чёрному). -->
+    <!-- Иконка shark-eyes инлайном, а не <img>: на панели в зале это на один
+         сетевой запрос меньше, и логотип не пропадёт, если ассет не долетит.
+         Исходник — public/shark-eyes-boom-icon.svg, добавлен fill="currentColor"
+         (в оригинале заливки нет, на тёмном фоне пути были бы чёрными). -->
     <div class="brand">
       <svg class="brand-icon" viewBox="0 0 180 114" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
            style="fill-rule:evenodd;clip-rule:evenodd" aria-label="БумБастик">
@@ -642,7 +614,7 @@
     <div class="parks" id="parks"></div>
   </header>
 
-  <!-- ТАЙМЕР: отсчёт сверху -->
+  <!-- ТАЙМЕР -->
   <section class="tile timer" id="timer">
     <div class="count" id="t-count"><small id="t-label">Турбо-часы</small><span id="t-num"></span></div>
     <div class="state" id="t-state"></div>
@@ -651,103 +623,124 @@
 
   <!-- ГЕРОЙ -->
   <section class="tile hero">
-    <div>
-      <div class="turbo">ТУРБО</div>
-      <div class="turbo-sub">ИГРЫ</div>
-      <div class="apps" id="apps"></div>
-      <div class="hero-claim" id="claim">
-        <b>Любой</b> аркадный автомат
-        <small>Игры не сгорают — остаток ждёт следующих турбо-часов</small>
-      </div>
-    </div>
-    <a class="cta" id="cta" href="https://b00m.fun" target="_blank" rel="noopener">
-      <span id="cta-text">Купить в личном кабинете</span>
-      <span class="price" id="cta-price">от 350 ₽</span>
-      <span class="tag" id="cta-tag">10 ИГР</span>
-    </a>
-  </section>
-
-  <!-- КАК ЭТО РАБОТАЕТ · подменяется победителями недели, когда они опубликованы -->
-  <section class="tile steps" id="steps">
-    <h3 id="steps-title">Как это работает</h3>
-    <div id="steps-body">
-      <div class="step"><div class="n">1</div><p><b>Возьми турбо-игры</b> в любой момент<br>на кассе или в личном кабинете</p></div>
-      <div class="step"><div class="n">2</div><p><b>Дождись турбо-часов</b> — ближайшие видно на этом экране, вторник весь день</p></div>
-      <div class="step"><div class="n">3</div><p><b>Играй</b> — на любых аркадных автоматах, остаток не сгорает</p></div>
+    <div class="turbo">ТУРБО</div>
+    <div class="turbo-sub">ИГРЫ</div>
+    <div class="apps" id="apps"></div>
+    <div class="hero-claim" id="claim">
+      <b>Любой</b> аркадный автомат
+      <small>Игры не сгорают — остаток ждёт следующих турбо-часов</small>
     </div>
   </section>
 
   <!-- ПАКЕТЫ -->
   <section class="packs">
     <div class="ptitle">ПАКЕТЫ</div>
-    <div id="packs-body" style="flex:1;display:flex;flex-direction:column"></div>
+    <div id="packs-body"></div>
   </section>
 
-  <!-- НИЗ: плашка получения + ТУРБО-ВТОРНИК + подписка -->
-  <div class="bottom">
-    <div class="getwrap">
-      <div class="gcard">
-        <div class="ico">💳</div>
-        <h4>Купить</h4>
-        <p>На кассе или в личном кабинете — в любой день</p>
+  <!-- НИЗ: День рождения + Турбо-вторник + подписка -->
+  <div class="bday-row">
+
+    <section class="bday" id="bdaytile">
+      <div class="layer" id="ambient"></div>
+      <div class="balloons" id="balloons"><img src="./img/balloons.png" alt="" loading="eager" decoding="async"></div>
+
+      <div class="plate">
+        <div class="p50">+50</div>
+        <div class="pword">ТУРБО-ИГР</div>
+        <div class="psub">В ПОДАРОК</div>
       </div>
-      <div class="gcard">
-        <div class="ico">🎟️</div>
-        <h4>Выиграть</h4>
-        <p>Обменяй тикеты в призотеке на турбо-игры</p>
+
+      <div id="confetti"></div>
+
+      <svg class="popper" id="popper" viewBox="0 0 150 150" aria-hidden="true">
+        <defs>
+          <linearGradient id="faceL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8ba0"/><stop offset="1" stop-color="#e8425a"/></linearGradient>
+          <linearGradient id="faceR" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c22c47"/><stop offset="1" stop-color="#8c1730"/></linearGradient>
+          <linearGradient id="mouthG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe8ed"/><stop offset="1" stop-color="#ffb3c2"/></linearGradient>
+        </defs>
+        <g transform="translate(75 84) rotate(-40)">
+          <path d="M0 64 L-30 -52 L0 -46 Z" fill="url(#faceL)"/>
+          <path d="M0 64 L0 -46 L30 -52 Z" fill="url(#faceR)"/>
+          <ellipse cx="0" cy="-52" rx="30" ry="11.5" fill="url(#mouthG)"/>
+          <ellipse cx="0" cy="-50.2" rx="22" ry="7.6" fill="#ff8aa1" opacity=".55"/>
+          <ellipse cx="0" cy="-52" rx="30" ry="11.5" fill="none" stroke="#8c1730" stroke-width="3.2"/>
+          <path d="M-16 -38 L-3 46" stroke="#ffffff" stroke-opacity=".4" stroke-width="5.5" stroke-linecap="round"/>
+          <circle cx="-9" cy="-8" r="4.4" fill="var(--p-yellow)"/>
+          <circle cx="7" cy="22" r="3.4" fill="var(--p-purple)"/>
+          <circle cx="-4" cy="34" r="2.8" fill="#ffffff" opacity=".7"/>
+        </g>
+      </svg>
+
+      <div class="copy">
+        <div class="btitle">ДЕНЬ РОЖДЕНИЯ<br><b>В БУМБАСТИКЕ</b></div>
+        <div class="grp">
+          <div class="people">ОТ 6 ЧЕЛОВЕК</div>
+          <div class="num">
+            <span class="boltwrap">
+              <svg class="halo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
+              <svg class="core" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
+              <span class="sp sp1"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></span>
+              <span class="sp sp2"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></span>
+              <span class="sp sp3"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></span>
+            </span>
+            <span id="bday-charge">9 000</span>
+          </div>
+          <div class="cap"><span class="chip" id="bday-bonus">+3 000</span> зарядов на карте</div>
+          <div class="price" id="bday-price">за 6 000 ₽</div>
+        </div>
+        <div class="bslogan" id="bday-slogan">Все тикеты праздника — <b>в крутой приз имениннику</b></div>
       </div>
-      <div class="gcard">
-        <div class="ico">🎁</div>
-        <h4>Подарить</h4>
-        <p>Турбо-карта — готовый подарок с играми внутри</p>
-      </div>
-    </div>
+    </section>
+
     <section class="tile tue">
       <div class="day">ТУРБО-ВТОРНИК</div>
       <p>Турбо-часы — весь день.<br>Каждую неделю, без исключений.</p>
+      <span class="tue-today">СЕГОДНЯ</span>
     </section>
+
     <!-- QR сгенерирован офлайн (segno, ECC Q, 33 модуля) и вшит одним <path>:
-         на панели это на один запрос меньше и картинка не «поедет» при сбое сети.
-         С v2.3 у КАЖДОГО ПАРКА СВОЙ КОД: ведёт на b00m.fun/turbo?park=<код>&src=tv,
-         и страница подписки открывается сразу с нужным парком, без выбора.
-         Пути лежат в turbo-qr.js, подставляет их renderQr() — здесь пусто,
-         потому что до прихода данных парк неизвестен, а чужой QR на экране
-         хуже пустого места. Руками не правится: перегенерировать
-         boom-cmd-data/tools/build_turbo_qr.py. -->
+         на панели это на один запрос меньше и картинка не «поедет» при сбое
+         сети. С v2.3 у КАЖДОГО ПАРКА СВОЙ КОД. Пути лежат в turbo-qr.js,
+         подставляет их renderQr() — здесь пусто, потому что до прихода данных
+         парк неизвестен, а чужой QR на экране хуже пустого места.
+         Руками не правится: перегенерировать boom-cmd-data/tools/build_turbo_qr.py -->
     <section class="tile sub">
       <div class="subtext">
-        <h3>Узнавай первым</h3>
-        <p id="sub-note">Каждую неделю разыгрываем<br><b class="gift"><span class="nb">15 турбо-игр</span><span class="free">БЕСПЛАТНО</span></b></p>
+        <h3 id="steps-title">Узнавай первым</h3>
+        <div id="steps-body">
+          <p id="sub-note">Каждую неделю разыгрываем<br><b class="gift"><span class="nb">15 турбо-игр</span><span class="free">БЕСПЛАТНО</span></b></p>
+        </div>
       </div>
       <div class="qr"><svg class="qr-img" id="qr-svg" viewBox="0 0 37 37" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: подписка на турбо-часы"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg></div>
     </section>
   </div>
 
-  <!-- УСЛОВИЯ -->
-  <!-- Порядок: служебный бейдж СЛЕВА, юридическая строка справа.
-       Так техническая метка не соседствует с QR-блоком над ней и не спорит
-       с ним за внимание, а длинная строка условий прижата к своему краю. -->
+  <!-- УСЛОВИЯ. Порядок: служебный бейдж СЛЕВА, юридическая строка справа —
+       так техническая метка не соседствует с QR-блоком над ней. -->
   <div class="fineband">
     <div class="hint" id="hint"></div>
     <div class="svc">
-    <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
-    <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
-      <i class="dot"></i>
-      <span class="when" id="stamp-when">—</span>
-      <span class="ver" id="stamp-ver">v—</span>
-      <button class="rl" id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
-        <!-- lucide rotate-cw — та же иконка, что в приложении -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-          <path d="M21 3v5h-5"/>
-        </svg>
-      </button>
-    </span>
+      <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
+      <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
+        <i class="dot"></i>
+        <span class="when" id="stamp-when">—</span>
+        <span class="ver" id="stamp-ver">v—</span>
+        <button class="rl" id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
+          <!-- lucide rotate-cw — та же иконка, что в приложении -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+          </svg>
+        </button>
+      </span>
     </div>
     <span class="terms" id="fineband">Турбо-игры действуют на аркадных автоматах (без выдачи тикетов) в турбо-часы</span>
   </div>
 
+</div>
+</div>
 </div>
 
 <!-- Экран слишком мал / портрет — витрину не показываем, объясняем почему -->

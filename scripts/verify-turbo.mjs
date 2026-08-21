@@ -108,8 +108,6 @@ async function run(query, payload) {
     brandPark: $('brand-park').textContent,
     brandSep: $('brand-sep').style.display,
     brandIcon: !!$('brand-park').closest('.head').querySelector('.brand-icon path'),
-    price: $('cta-price').textContent,
-    tag: $('cta-tag').textContent,
     parksHidden: $('parks').hidden,
     stampStale: $('stamp').className.includes('stale'),
     stampWhen: $('stamp-when').textContent,
@@ -117,8 +115,14 @@ async function run(query, payload) {
     qr: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img path')?.getAttribute('d') || '',
     qrLabel: $('packs-body').ownerDocument.querySelector('.sub .qr .qr-img')?.getAttribute('aria-label') || '',
     subHead: $('packs-body').ownerDocument.querySelector('.sub h3').textContent,
-    subNote: $('sub-note').textContent,
-    subHtml: $('sub-note').innerHTML,
+    // С v3.0 победители недели живут в плитке подписки и подменяют это
+    // приглашение — тогда узла #sub-note на странице нет вовсе.
+    subNote: $('sub-note')?.textContent ?? '',
+    subHtml: $('sub-note')?.innerHTML ?? '',
+    winners: $('steps-body').innerHTML,
+    bday: $('bdaytile')?.textContent ?? '',
+    stageW: $('stage')?.style.width ?? '',
+    stageTransform: $('stage')?.style.transform ?? '',
     hintText: $('hint').textContent,
     parkErr: $('parkerr').className.includes('on'),
     parkErrAsked: $('parkerr-asked').textContent,
@@ -165,6 +169,10 @@ console.log('\n── Машина состояний ──')
     today: [{ from: '', to: '', all_day: true }],
   })
   ok('tue: состояние как now', r.cls.includes('now'), r.cls)
+  // Вид меняется, СОСТОЯНИЕ — нет: класс `tue` добавляется к `now`, а не
+  // заменяет его. Иначе это была бы правка машины состояний под цвет.
+  ok('tue: жёлтый вид добавлен, а не подменил состояние',
+     r.cls.includes('tue') && r.cls.includes('now'), r.cls)
   ok('tue: подпись «Турбо-вторник» пережила скелетон', r.label === 'Турбо-вторник', r.label)
   ok('tue: «Играй весь день»', r.state === 'Играй весь день', r.state)
   ok('tue: отсчёт до закрытия парка (7 ч)', r.num.startsWith('6:59') || r.num.startsWith('7:00'), r.num)
@@ -239,11 +247,19 @@ console.log('\n── Блоки ──')
   ok('иконки категорий — картинки, а не эмодзи',
      /<img class="ico" src="[^"]*race[^"]*\.webp"/.test(r.apps), r.apps.slice(0,90))
 
-  ok('пакеты: отсортированы по sort', r.packs.indexOf('10 игр') < r.packs.indexOf('25 игр'))
+  ok('пакеты: отсортированы по sort', r.packs.indexOf('>10<') < r.packs.indexOf('>25<'))
   ok('пакеты: ₽/игра посчитан', r.packs.includes('35 ₽ за игру') && r.packs.includes('30 ₽ за игру'))
   ok('пакеты: best подсвечен', r.packs.includes('pack best'))
-  ok('CTA: минимальный пакет', r.price === 'от 350 ₽' && r.tag === '10 ИГР', `${r.price} / ${r.tag}`)
-  ok('победители подменили «как это работает»', r.steps === 'Победители недели', r.steps)
+  // Количество и цена разведены формой, а не только размером: число отдельным
+  // узлом, единица «игр» отдельным, цена — в тёмной плашке. Проверка держит
+  // это решение: без неё правка вернула бы «10 игр 350 ₽» одним начертанием,
+  // которое от очереди не различить (разбор владельца 20.08).
+  ok('пакеты: количество — отдельное число с единицей',
+     /<span class="qty"><b>10<\/b><span class="u">игр<\/span><\/span>/.test(r.packs), r.packs.slice(0, 120))
+  ok('пакеты: цена в плашке, отдельным узлом', /<div class="rub">350 ₽<\/div>/.test(r.packs))
+  ok('победители недели переехали в плитку подписки', r.steps === 'Победители недели', r.steps)
+  ok('победители: имя и приз отрисованы',
+     r.winners.includes('Александр К.') && r.winners.includes('15 турбо-игр'))
   ok('?park= скрывает переключатель парков', r.parksHidden === true)
   ok('?tv=1 включает режим панели', r.window.document.body.className.includes('tv'))
   ok('свежие данные — точка бейджа зелёная', !r.stampStale)
@@ -260,13 +276,64 @@ console.log('\n── Блоки ──')
      !r.window.document.querySelector('.sub button'))
   ok('модалка email удалена', !r.window.document.getElementById('modal'))
   ok('после загрузки скелетонов не осталось', r.skeletons === 0, String(r.skeletons))
-  ok('розыгрыш переехал в блок с QR', r.subNote.includes('15 турбо-игр'), r.subNote)
-  ok('«БЕСПЛАТНО» выделено бейджем', /<b class="gift">/.test(r.subHtml))
-  ok('«турбо-игр» защищено от переноса по дефису', /<span class="nb">15 турбо-игр<\/span>/.test(r.subHtml))
-  ok('перенос в бейдже задан разметкой, а не автопереносом', /class="free"/.test(r.subHtml))
   ok('бейдж парка заполнен', r.brandPark === 'Охта Молл', r.brandPark)
   ok('разделитель // виден', r.brandSep !== 'none', JSON.stringify(r.brandSep))
   ok('иконка shark-eyes инлайном в шапке', r.brandIcon)
+}
+
+console.log('\n── Подписка без победителей ──')
+{
+  // Победителей нет → в плитке остаётся приглашение подписаться. Отдельный
+  // прогон: в блоке выше они опубликованы и подменяют этот текст, там узла
+  // #sub-note на странице нет вовсе.
+  const r = await run('?park=ohta', {
+    ...base, server_time: at('2026-08-08T14:00:00+03:00'), winners: [],
+  })
+  ok('без победителей — приглашение в подписку', r.steps === 'Узнавай первым', r.steps)
+  ok('розыгрыш стоит в блоке с QR', r.subNote.includes('15 турбо-игр'), r.subNote)
+  ok('«БЕСПЛАТНО» выделено бейджем', /<b class="gift">/.test(r.subHtml))
+  ok('«турбо-игр» защищено от переноса по дефису', /<span class="nb">15 турбо-игр<\/span>/.test(r.subHtml))
+  ok('перенос в бейдже задан разметкой, а не автопереносом', /class="free"/.test(r.subHtml))
+}
+
+console.log('\n── Блок «День рождения» (DRV-08) ──')
+{
+  const r = await run('?park=ohta', { ...base, server_time: at('2026-08-08T14:00:00+03:00') })
+  // Цепочка выгоды целиком: без цены и бонуса «+50 игр» гостю ничего
+  // не объясняет — на этом блок и переделывали (разбор владельца 20.08).
+  ok('назван вход: от 6 человек', r.bday.includes('ОТ 6 ЧЕЛОВЕК'))
+  ok('назван результат: 9 000 зарядов', r.bday.includes('9 000') && r.bday.includes('зарядов на карте'))
+  ok('назван бонус', r.bday.includes('+3 000'))
+  ok('названа цена', r.bday.includes('за 6 000 ₽'))
+  ok('назван подарок', r.bday.includes('+50') && r.bday.includes('ТУРБО-ИГР'))
+  ok('назван приз за тикеты', r.bday.includes('приз имениннику'))
+  // «На следующий визит» было прямой ложью: по механике §7 подарок играется
+  // уже на празднике, а остаток ждёт турбо-часов. Держим формулировку.
+  ok('нет обещания «на следующий визит»', !r.bday.includes('на следующий визит'))
+}
+
+console.log('\n── Канва: ни полей, ни обрезки ──')
+{
+  // jsdom отдаёт нулевые размеры окна, поэтому проверяем не число, а сам
+  // механизм: канва обязана получить ЯВНЫЙ размер и масштаб из JS. Пока это
+  // так, логический размер повторяет пропорции панели, и полей не будет.
+  // Комментарии вырезаем: шапка файла перечисляет снятые блоки по именам,
+  // и без этого проверка ловила бы собственное объяснение — те же грабли,
+  // что были с правилом про курсор мыши.
+  const html2 = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '')
+  ok('в CSS нет старой резиновой канвы (max-width/100dvh)',
+     !/\.page\{[^}]*max-width/.test(html2) && !/\.page\{[^}]*100dvh/.test(html2))
+  // Имена функций минификатор переименовывает — проверяем по следам, которые
+  // он оставить обязан: узлы канвы и переменная кегля пакетов.
+  ok('канва — отдельный узел со своим масштабом',
+     html.includes('id="stage"') && html.includes('id="viewport"') &&
+     /\.stage\{[^}]*transform-origin/.test(html))
+  ok('кегли пакетов производны от одной переменной',
+     /--pk:\d+px/.test(html) && html.includes('calc(var(--pk)'))
+  ok('связка «вторник» проведена до плитки внизу', bundle.includes('is-tue'))
+  ok('снятые блоки не вернулись',
+     !html2.includes('Как это работает') && !html2.includes('Купить в личном кабинете') &&
+     !html2.includes('Обменяй тикеты в призотеке'))
 }
 
 console.log('\n── Бренд-блок без данных ──')
@@ -397,8 +464,10 @@ console.log('\n── Гигиена сборки ──')
   ok('бейдж «Работает на Ранскеил» со ссылкой',
      html.includes('href="https://runscale.ru"') && html.includes('Работает на Ранскеил'))
   ok('старого написания через «й» на странице нет (D-23)', !/Ранскей/.test(html))
+  // Высоту не фиксируем числом: она росла вместе с кеглем подвала. Держим
+  // само требование — бейджи в одной группе и одной высоты.
   ok('служебные бейджи в одной группе равной высоты',
-     html.includes('class="svc"') && html.includes('.svc > *{height:30px}'))
+     html.includes('class="svc"') && /\.svc > \*\{height:\d+px\}/.test(html))
   ok('двоеточие отсчёта пульсирует', html.includes('bc-blink') && html.includes('.timer .bl'))
   // Проверяем по существу, а не по тексту комментария: старый фолбэк
   // перестраивал сетку в одну колонку — этой перестройки быть не должно.
@@ -407,10 +476,9 @@ console.log('\n── Гигиена сборки ──')
      !html.includes('"head" "hero"'))
   ok('пороги заглушки: узкое, низкое, портрет',
      html.includes('(max-width:899px), (max-height:559px), (orientation:portrait)'))
-  ok('«ЛК» расшифровано и перенесено', html.includes('на кассе или в личном кабинете') &&
-     !html.includes('на кассе или в ЛК'))
-  ok('«время слева» заменено на понятное',
-     html.includes('ближайшие видно на этом экране') && !html.includes('время слева'))
+  // Обращение к гостю — на «ты» по всей странице (решение владельца 20.08).
+  ok('вежливых форм в текстах для гостя нет',
+     !/успевайте|Успейте|Подпишитесь|Возьми турбо-игры/.test(html))
   ok('бейдж «бесплатно» на лайме, новых цветов в палитре нет',
      html.includes('background:var(--lime);color:var(--dark)') && !html.includes('--coral'))
   ok('shimmer-загрузка портирована из приложения', html.includes('bc-shimmer') && html.includes('bc-skeleton'))

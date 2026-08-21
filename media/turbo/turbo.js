@@ -26,6 +26,7 @@
    про числа. Заведут новую категорию в таблице без картинки — она отрисуется
    эмодзи из ячейки, а не сломает блок. */
 import { TURBO_QR } from './turbo-qr.js'
+import { initBday } from './turbo-bday.js'
 import iconRace from './icons/race.webp'
 import iconShoot from './icons/shoot.webp'
 import iconMusic from './icons/music.webp'
@@ -62,7 +63,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v2.3'
+const PAGE_VERSION = 'v3.0'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -167,7 +168,7 @@ const sk = (cls) => `<div class="bc-skeleton ${cls}"></div>`
 
 function showSkeleton() {
   document.getElementById('apps').innerHTML =
-    Array.from({ length: 5 }, () => `<span class="app">${sk('sk-app')}</span>`).join('')
+    Array.from({ length: 4 }, () => `<span class="app">${sk('sk-app')}</span>`).join('')
   document.getElementById('packs-body').innerHTML =
     Array.from({ length: 3 }, () => sk('sk-pack')).join('')
   // ⚠ Писать в el.count нельзя: внутри него лежит <small id="t-label">, и
@@ -200,6 +201,67 @@ function paintCount(str) {
   parts.forEach((p, i) => {
     if (cells[i] && cells[i].textContent !== p) cells[i].textContent = p
   })
+  fitCount(str)
+}
+
+/* ── Подгон кеглей замером ──────────────────────────────────────────────────
+   Ни у часов, ни у пакетов кегль НЕ задан константой. Причина одна на оба
+   блока: колонки и ряды на разных панелях разной величины (канва резиновая),
+   а метрики Unbounded шире табличных оценок. Любая константа рано или поздно
+   вылезает за плитку — на этом уже спотыкались: «1:56:14» уходило за край
+   таймера, «10 игр» ломалось на две строки, третий пакет уезжал под низ.
+   Замер работает и тогда, когда брендовый шрифт не долетел и подменился
+   системным. */
+
+/** Часы: сбавляем кегль, пока строка не влезет в ширину плитки. */
+let lastCountKey = ''
+function fitCount(str) {
+  const box = el.num.parentElement
+  if (!box) return
+  // Ключ = длина строки + ширина плитки. Пересчитываем только когда меняется
+  // одно из них: paintCount зовётся раз в секунду, а гонять цикл с чтением
+  // layout каждую секунду на моноблоке незачем.
+  const key = `${String(str).length}|${box.clientWidth}`
+  if (key === lastCountKey) return
+  lastCountKey = key
+  let size = 120
+  el.num.style.fontSize = `${size}px`
+  while (el.num.scrollWidth > box.clientWidth - 4 && size > 44) {
+    size -= 2
+    el.num.style.fontSize = `${size}px`
+  }
+}
+
+/** Пакеты: одна переменная --pk, от неё производны все кегли и поля плитки. */
+function packsFit(body) {
+  if (body.scrollHeight > body.clientHeight + 1) return false
+  const rows = body.querySelectorAll('.pack')
+  for (const r of rows) {
+    /* clientWidth ВКЛЮЧАЕТ паддинги — вычитаем их и зазор явно, из computed
+       style, а не константой: иначе правка полей в CSS разойдётся с проверкой
+       (ровно так цена и уезжала за правый край в первой версии подгона). */
+    const cs = getComputedStyle(r)
+    const avail =
+      r.clientWidth -
+      parseFloat(cs.paddingLeft) -
+      parseFloat(cs.paddingRight) -
+      (parseFloat(cs.columnGap) || 0)
+    let sum = 0
+    for (const kid of r.children) sum += kid.offsetWidth
+    if (sum > avail) return false
+  }
+  return true
+}
+function fitPacks() {
+  const packs = document.querySelector('.packs')
+  const body = document.getElementById('packs-body')
+  if (!packs || !body || !body.querySelector('.pack')) return
+  let size = 104 // на «длинной» панели колонка шире 700px — есть куда расти
+  packs.style.setProperty('--pk', `${size}px`)
+  while (size > 30 && !packsFit(body)) {
+    size -= 2
+    packs.style.setProperty('--pk', `${size}px`)
+  }
 }
 
 function setBusy(on) {
@@ -388,6 +450,12 @@ function renderMachines() {
     .join('')
 }
 
+/**
+ * Пакеты. Количество игр и цена разведены НАЧЕРТАНИЕМ И ФОРМОЙ, а не только
+ * размером: число — крупное тёмное на светлой плитке, единица «игр» мельче и
+ * серым, цена — в тёмной плашке белым. Обоснование — в CSS блока `.packs`.
+ * Кегль всей плитки подбирает fitPacks замером, здесь только разметка.
+ */
 function renderPacks() {
   const list = [...D.packages].sort((a, b) => (a.sort || 0) - (b.sort || 0))
   document.getElementById('packs-body').innerHTML = list
@@ -399,29 +467,32 @@ function renderPacks() {
         : ''
       return (
         `<a class="pack${kind === 'best' ? ' best' : ''}" href="${esc(p.url || '#')}" target="_blank" rel="noopener">` +
-        `<div class="games">${esc(p.games)} игр${badge}</div>` +
+        `<div class="games"><span class="qty"><b>${esc(p.games)}</b><span class="u">игр</span></span>${badge}</div>` +
         `<div class="buy"><div class="rub">${esc(p.price)} ₽</div>` +
         (per ? `<div class="per">${per} ₽ за игру</div>` : '') +
         `</div></a>`
       )
     })
     .join('')
-
-  // CTA берёт минимальный пакет — «от N ₽» и бейдж с числом игр
-  const cheapest = [...list].sort((a, b) => (a.price || 0) - (b.price || 0))[0]
-  if (cheapest) {
-    document.getElementById('cta-price').textContent = `от ${cheapest.price} ₽`
-    document.getElementById('cta-tag').textContent = `${cheapest.games} ИГР`
-    if (cheapest.url) document.getElementById('cta').href = cheapest.url
-  }
+  fitPacks()
 }
 
+/**
+ * Победители недели (механика §6в, решение 07.08).
+ *
+ * ⚠ С v3.0 живут в ПЛИТКЕ ПОДПИСКИ, а не в снятом блоке «как это работает».
+ *   Переезд не косметический: победители — про тот же еженедельный розыгрыш,
+ *   на который зовёт QR рядом, и стоять они должны у него, а не в третьем
+ *   углу экрана. Идентификаторы `steps-title`/`steps-body` сохранены нарочно:
+ *   контракт с источником и приёмка от них зависят, переименование дало бы
+ *   молчаливую регрессию вместо честной ошибки сборки.
+ *
+ * Показываем только то, что контур данных пометил опубликованным: имя на
+ * экране в зале — ответственность парка, а не автоподстановка из журнала.
+ */
 function renderSteps() {
-  // Победители недели подменяют «как это работает» (механика §6в, решение 07.08).
-  // Показываем только то, что контур данных пометил опубликованным: имя на экране
-  // в зале — ответственность парка, а не автоподстановка из журнала розыгрыша.
   const w = D.winners.filter((x) => x && x.display_name)
-  if (!w.length) return // дефолтная разметка «как это работает» уже в HTML
+  if (!w.length) return // дефолтная разметка приглашения в подписку уже в HTML
   document.getElementById('steps-title').textContent = 'Победители недели'
   document.getElementById('steps-body').innerHTML = w
     .slice(0, 3)
@@ -488,16 +559,27 @@ function renderQr() {
 
 function renderCopy() {
   const c = D.copy || {}
+  /* ⚠ Проверка на null обязательна. Состав блоков страницы менялся уже дважды
+     (v3.0 снял CTA и «как это работает»), а ключи в листе `turbo_copy` живут
+     своей жизнью в Google. Ключ, которому больше некуда лечь, должен молча
+     игнорироваться, а не ронять весь рендер — иначе одна лишняя строка в
+     таблице гасит экран в зале целиком. */
   const set = (id, val, html) => {
     if (!val) return
     const n = document.getElementById(id)
+    if (!n) return
     if (html) n.innerHTML = val
     else n.textContent = val
   }
   set('slogan', c.slogan_html, true)
   set('claim', c.claim_html, true)
   set('fineband', c.fineband)
-  set('cta-text', c.cta_text)
+  set('cta-text', c.cta_text)   // блока нет с v3.0 — set() сам пропустит
+  // Блок «День рождения»: числа приходят из таблицы, если заведены.
+  set('bday-charge', c.bday_charge)
+  set('bday-bonus', c.bday_bonus)
+  set('bday-price', c.bday_price)
+  set('bday-slogan', c.bday_slogan_html, true)
   // Подпись под QR содержит бейдж, поэтому приходит размеченной. Старый
   // плоский ключ поддерживаем: если в таблице ещё лежит subscribe_note,
   // страница не останется с пустой строкой после отката импорта.
@@ -588,11 +670,19 @@ function applyMode(m) {
   nextAt = null
   delete el.num.dataset.parts
 
+  document.body.classList.toggle('is-tue', m === 'tue')
+
   if (m === 'now' || m === 'tue') {
     el.box.classList.add('now')
     const to = w.active?.to || D.close
     endMin = hmToMin(to)
     if (m === 'tue') {
+      /* ⚠ Класс `tue` ДОБАВЛЯЕТСЯ к `now`, а не заменяет его. Состояние в
+         машине то же самое — идут турбо-часы, отсчёт до закрытия парка;
+         меняется только вид: зелёный уступает жёлтому, чтобы таймер читался
+         продолжением плитки «Турбо-вторник» внизу (просьба владельца 20.08).
+         Замена класса означала бы правку СОСТОЯНИЯ, а не оформления. */
+      el.box.classList.add('tue')
       el.label.textContent = 'Турбо-вторник'
       el.state.textContent = 'Играй весь день'
     } else {
@@ -676,7 +766,55 @@ function render() {
   applyMode(forcedMode || computeMode())
 }
 
+/* ── 6а. Канва ───────────────────────────────────────────────────────────────
+   Полное обоснование — в шапке index.html. Коротко: было «вписать 1920×1080
+   целиком», и на панели другой геометрии по краям появлялись поля, а до этого —
+   резиновая сетка, которая срезала содержимое плиток.
+
+   Сейчас: k = min(vw/1920, vh/1080) — масштаб ТИПОГРАФИКИ, эталон 1920×1080;
+   логический размер канвы = vw/k × vh/k, то есть точно повторяет пропорции
+   панели и всегда не меньше эталона. Излишек ширины разбирают колонки,
+   излишек высоты — ряды (нижнему ряду дана доля 1 против 1.9 у основного,
+   поэтому на высокой панели он растёт заметнее). Полей нет, обрезки нет. */
+const stageEl = document.getElementById('stage')
+const viewportEl = document.getElementById('viewport')
+let bday = null
+
+function fitStage() {
+  if (!stageEl || !viewportEl) return
+  const vw = viewportEl.clientWidth
+  const vh = viewportEl.clientHeight
+  if (!vw || !vh) return
+  const k = Math.min(vw / 1920, vh / 1080)
+  stageEl.style.width = `${Math.round(vw / k)}px`
+  stageEl.style.height = `${Math.round(vh / k)}px`
+  stageEl.style.transform = `scale(${k})`
+  fitCount(el.num.textContent || '')
+  fitPacks()
+  if (bday) bday.reset()
+}
+
+/* Шрифт долетает позже разметки, и ширина строк после этого меняется —
+   подгон повторяем. Таймер на 1,2 с — страховка для случая, когда
+   document.fonts недоступен или промис не разрешится. */
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStage)
+setTimeout(fitStage, 1200)
+window.addEventListener('resize', fitStage)
+
 /* ── 7. Жизненный цикл ───────────────────────────────────────────────────── */
+fitStage()
+/* ⚠ try/catch не перестраховка. Декор блока «День рождения» — единственное
+   на странице, что трогает Web Animations API и requestAnimationFrame, а
+   браузер моноблока ТЦ Июня нам неизвестен (реестр панелей §2.2, П-1).
+   Инициализация идёт ДО load(), поэтому любое исключение отсюда оставило бы
+   панель вообще без расписания — ради конфетти. Праздник может не
+   состояться; турбо-часы обязаны показываться всегда. */
+try {
+  bday = initBday() || null
+} catch (e) {
+  bday = null
+  if (import.meta.env.DEV) console.warn('[turbo] декор ДР не запустился', e)
+}
 setInterval(tick, 1000)
 load()
 
