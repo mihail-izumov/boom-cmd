@@ -213,20 +213,33 @@ function paintCount(str) {
    Замер работает и тогда, когда брендовый шрифт не долетел и подменился
    системным. */
 
-/** Часы: сбавляем кегль, пока строка не влезет в ширину плитки. */
+/**
+ * Часы: сбавляем кегль, пока строка не влезет в ширину плитки.
+ *
+ * ⚠ Мерим `offsetWidth` САМОГО отсчёта, а не его `scrollWidth`. Разница не
+ *   стилистическая, на ней уже погорели: `#t-num` — блок во всю ширину
+ *   родителя, и у блока, который ВЛЕЗАЕТ, `scrollWidth === clientWidth`.
+ *   Условие «scrollWidth больше clientWidth» оказывалось истинным всегда, и
+ *   цикл ужимал цифры до самого пола — на панели вместо 120px было ~47px,
+ *   отсчёт стал мельче строки состояния под ним.
+ *   Поэтому `#t-num` сделан `inline-block` (ширина по тексту), и сравнение
+ *   идёт с шириной РОДИТЕЛЯ. Тогда «влезает» и «не влезает» — разные числа.
+ *
+ * ⚠ Статус шрифта — часть ключа кэша. Unbounded долетает после первой
+ *   отрисовки и шире системного фолбэка; без этого подгон, посчитанный на
+ *   фолбэке, больше никогда бы не пересчитался.
+ */
 let lastCountKey = ''
 function fitCount(str) {
   const box = el.num.parentElement
   if (!box) return
-  // Ключ = длина строки + ширина плитки. Пересчитываем только когда меняется
-  // одно из них: paintCount зовётся раз в секунду, а гонять цикл с чтением
-  // layout каждую секунду на моноблоке незачем.
-  const key = `${String(str).length}|${box.clientWidth}`
+  const fontsState = document.fonts ? document.fonts.status : 'none'
+  const key = `${String(str).length}|${box.clientWidth}|${fontsState}`
   if (key === lastCountKey) return
   lastCountKey = key
   let size = 120
   el.num.style.fontSize = `${size}px`
-  while (el.num.scrollWidth > box.clientWidth - 4 && size > 44) {
+  while (el.num.offsetWidth > box.clientWidth && size > 44) {
     size -= 2
     el.num.style.fontSize = `${size}px`
   }

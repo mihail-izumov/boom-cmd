@@ -185,8 +185,12 @@
      «1:56:14», «СР 10:00» и «Скоро» имеют разную ширину, а колонка на разных
      панелях разной величины. Константа рано или поздно вылезает за плитку —
      на этом уже спотыкались (v3.0-rc, цифры уходили за край). */
+  /* ⚠ inline-block, а НЕ block. Ширина отсчёта обязана равняться ширине
+     текста: подгон кегля сравнивает её с шириной родителя. У блока во всю
+     ширину эти два числа совпадают, когда строка влезает, — и подгон уводил
+     цифры в самый пол (на панели было ~47px вместо 120). См. fitCount. */
   .timer #t-num{
-    display:block;font-family:'Unbounded';font-weight:900;font-size:120px;line-height:1;
+    display:inline-block;font-family:'Unbounded';font-weight:900;font-size:120px;line-height:1;
     font-variant-numeric:tabular-nums;white-space:nowrap;
   }
   @keyframes bc-blink{0%,42%{opacity:1}58%,100%{opacity:.22}}
@@ -198,6 +202,14 @@
   .timer .note{font-size:28px;color:#b3ade0;margin-top:18px;font-weight:600;line-height:1.35}
   .timer.now{border-color:var(--green);background:linear-gradient(160deg,#0f3d24 0%,var(--tile) 70%)}
   .timer.now #t-num{color:var(--green)}
+  /* У `today` рамки не было вовсе, и плитка читалась пустой — а это состояние
+     держит экран бо́льшую часть дня (окно ещё впереди). Даём приглушённую
+     янтарную рамку и такую же подложку: тот же язык, что у `now`, но тише —
+     «скоро», а не «идёт». Ярко-жёлтый не берём, он занят вторником. */
+  .timer.today{
+    border-color:rgba(255,213,48,.5);
+    background:linear-gradient(160deg,#332a05 0%,var(--tile) 72%);
+  }
   .timer.today .state{color:var(--yellow)}
   .timer.none #t-num,.timer.soon #t-num{font-size:76px}
 
@@ -528,7 +540,10 @@
     animation:bc-shimmer 1.4s ease-in-out infinite;border-radius:12px;
   }
   .sk-line{height:20px;margin-bottom:12px}
-  .sk-count{height:96px;width:76%;margin-bottom:16px}
+  /* Ширина в пикселях, а не процентом: скелетон лежит внутри inline-block
+     #t-num, чья ширина определяется содержимым, — процент от такого родителя
+     схлопнулся бы в ноль, и на первой загрузке плитка была бы пустой. */
+  .sk-count{height:96px;width:340px;margin-bottom:16px}
   .sk-app{width:96px;height:96px;border-radius:22px}
   .sk-pack{height:100%;margin:0 26px 14px;background-color:rgba(0,0,0,.07)}
   .sk-pack.bc-skeleton{background-image:linear-gradient(90deg, rgba(0,0,0,.06) 0%, rgba(0,0,0,.13) 50%, rgba(0,0,0,.06) 100%)}
