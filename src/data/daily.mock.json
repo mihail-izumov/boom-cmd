@@ -378,6 +378,50 @@
           "action": "Неделю закрываем по плану. Сохраняйте текущий ритм."
         }
       ],
+      "dow_coef": [
+        0.7,
+        1.0,
+        0.9,
+        1.05,
+        1.1,
+        1.45,
+        1.3
+      ],
+      "dow_n": [
+        2,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dow_src": [
+        "данные",
+        "операторы",
+        "данные",
+        "данные",
+        "данные",
+        "данные",
+        "данные"
+      ],
+      "calib": {
+        "clean_n": 14,
+        "weeks_equiv": 2.0,
+        "weekday_base": 44000,
+        "tue_bonus": 60000,
+        "mon_dip": 0.92,
+        "wknd_mult": 1.7,
+        "min_obs": 2,
+        "outliers": [
+          "2025-05-07"
+        ],
+        "oper_days": [
+          "Вт"
+        ],
+        "note": "ВЫДУМАНО. Вт — логика админов (мало данных). Выброс: 2025-05-07."
+      },
+      "holidays": [],
       "days": [
         {
           "date": "2025-05-01",
@@ -652,51 +696,6 @@
           "outlier": false
         }
       ],
-      "dow_coef": [
-        0.7,
-        1.0,
-        0.9,
-        1.05,
-        1.1,
-        1.45,
-        1.3
-      ],
-      "dow_n": [
-        2,
-        1,
-        2,
-        2,
-        2,
-        2,
-        2
-      ],
-      "dow_src": [
-        "данные",
-        "операторы",
-        "данные",
-        "данные",
-        "данные",
-        "данные",
-        "данные"
-      ],
-      "calib": {
-        "clean_n": 14,
-        "weeks_equiv": 2.0,
-        "weekday_base": 44000,
-        "tue_bonus": 60000,
-        "mon_dip": 0.92,
-        "wknd_mult": 1.7,
-        "min_obs": 2,
-        "outliers": [
-          "2025-05-07"
-        ],
-        "oper_days": [
-          "Вт"
-        ],
-        "note": "ВЫДУМАНО. Вт — логика админов (мало данных). Выброс: 2025-05-07."
-      },
-      "holidays": [],
-      "cross_check": "мок — сверка не применяется",
       "activities": [
         {
           "code": "DRV-01",
@@ -738,64 +737,99 @@
           "event": "включён"
         }
       ],
+      "day_factors": {
+        "2025-05-16": {
+          "mult": 1.12,
+          "why": "прохладно 15.8 °C (<22 = 1,12)"
+        },
+        "2025-05-17": {
+          "mult": 0.8,
+          "why": "жара 28.4 °C (≥27 = 0,80)"
+        },
+        "2025-05-18": {
+          "mult": 0.96,
+          "why": "тепло 24.1 °C (22–27 = 0,96)"
+        },
+        "2025-05-24": {
+          "mult": 1.12,
+          "why": "прохладно 17.2 °C (<22 = 1,12)"
+        }
+      },
+      "plan_lock": {
+        "2025-05-01": 48489,
+        "2025-05-02": 50798,
+        "2025-05-03": 66962,
+        "2025-05-04": 60035,
+        "2025-05-05": 32326,
+        "2025-05-06": 46180,
+        "2025-05-07": 41562,
+        "2025-05-08": 48489,
+        "2025-05-09": 50798,
+        "2025-05-10": 66962,
+        "2025-05-11": 60035,
+        "2025-05-12": 32326,
+        "2025-05-13": 46180,
+        "2025-05-14": 41562,
+        "2025-05-15": 48489
+      },
       "journal": [
         {
           "date": "2025-05-01",
           "n": 1,
           "realized": 42000,
-          "landing": 1344000,
-          "landing_pct": 0.8671,
-          "on_plan": 0.8671,
+          "landing": 1342560,
+          "landing_pct": 0.8662,
+          "on_plan": 0.8662,
           "achievable": false,
-          "goal_state": "ok"
+          "goal_state": "out"
         },
         {
           "date": "2025-05-02",
           "n": 2,
           "realized": 87000,
-          "landing": 1359628,
-          "landing_pct": 0.8772,
-          "on_plan": 0.8772,
+          "landing": 1358171,
+          "landing_pct": 0.8762,
+          "on_plan": 0.8762,
           "achievable": false,
-          "goal_state": "ok"
+          "goal_state": "out"
         },
         {
           "date": "2025-05-03",
           "n": 3,
           "realized": 147000,
-          "landing": 1372000,
-          "landing_pct": 0.8852,
-          "on_plan": 0.8852,
+          "landing": 1370530,
+          "landing_pct": 0.8842,
+          "on_plan": 0.8842,
           "achievable": false,
-          "goal_state": "record"
+          "goal_state": "out"
         },
         {
           "date": "2025-05-04",
           "n": 4,
           "realized": 205000,
-          "landing": 1405714,
-          "landing_pct": 0.9069,
-          "on_plan": 0.9069,
+          "landing": 1404208,
+          "landing_pct": 0.9059,
+          "on_plan": 0.9059,
           "achievable": false,
-          "goal_state": "ok"
+          "goal_state": "out"
         },
         {
           "date": "2025-05-05",
           "n": 5,
           "realized": 243000,
-          "landing": 1458000,
-          "landing_pct": 0.9406,
-          "on_plan": 0.9406,
+          "landing": 1456438,
+          "landing_pct": 0.9396,
+          "on_plan": 0.9396,
           "achievable": true,
-          "goal_state": "out"
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-06",
           "n": 6,
           "realized": 297000,
-          "landing": 1512000,
-          "landing_pct": 0.9755,
-          "on_plan": 0.9755,
+          "landing": 1510380,
+          "landing_pct": 0.9744,
+          "on_plan": 0.9744,
           "achievable": true,
           "goal_state": "ok"
         },
@@ -803,19 +837,19 @@
           "date": "2025-05-07",
           "n": 7,
           "realized": 393000,
-          "landing": 1567500,
-          "landing_pct": 1.0113,
-          "on_plan": 1.1359,
+          "landing": 1565880,
+          "landing_pct": 1.0102,
+          "on_plan": 1.1347,
           "achievable": true,
-          "goal_state": "record"
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-08",
           "n": 8,
           "realized": 436000,
-          "landing": 1549333,
-          "landing_pct": 0.9996,
-          "on_plan": 1.1054,
+          "landing": 1547733,
+          "landing_pct": 0.9985,
+          "on_plan": 1.1042,
           "achievable": true,
           "goal_state": "ok"
         },
@@ -823,9 +857,9 @@
           "date": "2025-05-09",
           "n": 9,
           "realized": 482000,
-          "landing": 1538537,
-          "landing_pct": 0.9926,
-          "on_plan": 1.0827,
+          "landing": 1536949,
+          "landing_pct": 0.9916,
+          "on_plan": 1.0816,
           "achievable": true,
           "goal_state": "ok"
         },
@@ -833,19 +867,19 @@
           "date": "2025-05-10",
           "n": 10,
           "realized": 544000,
-          "landing": 1532235,
-          "landing_pct": 0.9885,
-          "on_plan": 1.0624,
+          "landing": 1530654,
+          "landing_pct": 0.9875,
+          "on_plan": 1.0613,
           "achievable": true,
-          "goal_state": "record"
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-11",
           "n": 11,
           "realized": 601000,
-          "landing": 1531957,
-          "landing_pct": 0.9884,
-          "on_plan": 1.0507,
+          "landing": 1530376,
+          "landing_pct": 0.9873,
+          "on_plan": 1.0495,
           "achievable": true,
           "goal_state": "ok"
         },
@@ -853,19 +887,19 @@
           "date": "2025-05-12",
           "n": 12,
           "realized": 640000,
-          "landing": 1554098,
-          "landing_pct": 1.0026,
-          "on_plan": 1.059,
+          "landing": 1552493,
+          "landing_pct": 1.0016,
+          "on_plan": 1.0579,
           "achievable": true,
-          "goal_state": "out"
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-13",
           "n": 13,
           "realized": 695000,
-          "landing": 1579886,
-          "landing_pct": 1.0193,
-          "on_plan": 1.0685,
+          "landing": 1578253,
+          "landing_pct": 1.0182,
+          "on_plan": 1.0674,
           "achievable": true,
           "goal_state": "ok"
         },
@@ -873,23 +907,24 @@
           "date": "2025-05-14",
           "n": 14,
           "realized": 736000,
-          "landing": 1580255,
-          "landing_pct": 1.0195,
-          "on_plan": 1.0636,
+          "landing": 1578621,
+          "landing_pct": 1.0185,
+          "on_plan": 1.0625,
           "achievable": true,
-          "goal_state": "record"
+          "goal_state": "ok"
         },
         {
           "date": "2025-05-15",
           "n": 15,
           "realized": 780000,
-          "landing": 1572356,
-          "landing_pct": 1.0144,
-          "on_plan": 1.0535,
+          "landing": 1570731,
+          "landing_pct": 1.0134,
+          "on_plan": 1.0524,
           "achievable": true,
           "goal_state": "ok"
         }
-      ]
+      ],
+      "cross_check": "мок — сверка не применяется"
     },
     "piterland:2025-05": {
       "park": "piterland",

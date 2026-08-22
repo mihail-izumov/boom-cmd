@@ -5,7 +5,9 @@
 // моке) — пинует МАТ-ИНВАРИАНТЫ модели, не реальные бизнес-числа (граница: реальные
 // значения в публичный scripts/ не кладутся; сверка с пультами — приватный шаг «уровня B»).
 //
-// Инварианты: Σплан=цель РОВНО · sigClass 1.00/0.85 (зел/жёлт/крас) ·
+// Инварианты: Σплан=цель (РОВНО без замка плана; с ним — допуск округления контура B) ·
+// план закрытого дня не переписывается при переснятии погоды (NET-87) ·
+// sigClass 1.00/0.85 (зел/жёлт/крас) ·
 // journal[-1].landing === round(model.landing) · адаптивные колонки метрик ·
 // goalState v2.1 §5 (out/record/ok, границы ×1.001 к maxObs и ×1.25 к implied).
 
@@ -76,9 +78,15 @@ for (const [key, set] of Object.entries(sets)) {
   const m = computeDaily(set)
   console.log(`\n— ${key} —`)
 
-  // 1) Σплан = цель РОВНО
+  // 1) Σплан = цель. РОВНО — пока у набора нет замка плана (plan_lock, D-132). С замком
+  // допуск ТОТ ЖЕ, что в контуре B (tools/verify_daily.py): max(1, число замков / 2) ₽ —
+  // замок хранит целые рубли, и на этом одном источнике расхождение и заканчивается.
+  // Допуск шире брать нельзя: он перестанет ловить рассинхрон замка с целью месяца.
+  const nLock = Object.keys(set.plan_lock || {}).length
+  const tol = nLock ? Math.max(1, nLock / 2) : 1e-6 * (m.T || 1) + 1e-6
   const sumPlan = m.days.reduce((a, x) => a + x.plan, 0)
-  check(`Σплан = цель (${Math.round(sumPlan)} vs ${m.T})`, Math.abs(sumPlan - m.T) < 1e-6 * (m.T || 1) + 1e-6)
+  check(`Σплан = цель (${Math.round(sumPlan)} vs ${m.T}${nLock ? `, замков ${nLock}, допуск ${tol} ₽` : ', РОВНО'})`,
+    Math.abs(sumPlan - m.T) <= tol)
 
   // 2) заработано = Σ полных дней (вкл. выброс)
   const earned = set.days.filter((d) => d.status === 'full').reduce((a, d) => a + d.rev, 0)
@@ -100,6 +108,66 @@ for (const [key, set] of Object.entries(sets)) {
     `прогноз ${Math.round(m.landing).toLocaleString('ru-RU')} (${(m.landDev * 100).toFixed(1)}%) · ` +
     `on_plan ${m.onPlan == null ? '—' : (m.onPlan * 100).toFixed(1) + '%'} · достижима ${m.achievable ? 'да' : 'нет'} · goalState ${m.goalState}`)
   console.log(`   метрик-колонок: [${m.metColumns.map((c) => c.key).join(', ') || '—'}]`)
+}
+
+console.log('\n=== NET-87: погодный множитель веса дня и замок плана (D-13 / D-132) ===')
+{
+  const set = sets['ohta:2025-05']
+  const m = computeDaily(set)
+  const day = (iso) => m.days.find((x) => x.iso === iso)
+  const COEF_SAT = set.dow_coef[5] // 17.05.2025 — суббота
+
+  // множитель меняет ВЕС дня, а вес — всё остальное; пороги (t_max) во фронт не переносятся
+  check('вес незакрытого дня = коэф. дня недели × mult (17.05: ×0.80)',
+    Math.abs(day('2025-05-17').weight - COEF_SAT * 0.8) < 1e-9, day('2025-05-17').weight)
+  check('дня нет в day_factors → множитель 1 (вес = коэф. дня недели)',
+    Math.abs(day('2025-05-19').weight - set.dow_coef[0]) < 1e-9, day('2025-05-19').weight)
+  check('у закрытых дней множителя нет по построению (контур ставит его только на незакрытые)',
+    Object.keys(set.day_factors).every((iso) => (set.days.find((d) => d.date === iso) || {}).status !== 'full'))
+
+  // замок: план закрытого дня берётся из payload как есть, а не считается
+  check('план закрытого дня = значение из plan_lock РОВНО (15.05)',
+    day('2025-05-15').plan === set.plan_lock['2025-05-15'], day('2025-05-15').plan)
+  check('все закрытые дни взяты из замка, ни один не пересчитан',
+    m.days.filter((x) => x.full).every((x) => x.plan === set.plan_lock[x.iso]))
+  check('незакрытый день в замке НЕ лежит и считается по формуле',
+    !('2025-05-20' in set.plan_lock) && Math.abs(day('2025-05-20').plan - (m.T * day('2025-05-20').weight) /
+      m.days.reduce((a, x) => a + x.weight, 0)) < 1e-6)
+
+  // ГЛАВНОЕ СВОЙСТВО ЗАМКА: переснятие погоды на БУДУЩЕЕ не переписывает историю.
+  // Контрольная группа тут обязательна: без неё тест зелёный и когда замок не работает.
+  const shifted = JSON.parse(JSON.stringify(set))
+  shifted.day_factors['2025-05-20'] = { mult: 0.8, why: 'жара пришла в прогноз позже' }
+  shifted.day_factors['2025-05-21'] = { mult: 0.8, why: 'жара пришла в прогноз позже' }
+  shifted.day_factors['2025-05-22'] = { mult: 0.8, why: 'жара пришла в прогноз позже' }
+  shifted.day_factors['2025-05-23'] = { mult: 0.8, why: 'жара пришла в прогноз позже' }
+  const mShift = computeDaily(shifted)
+  const planOf = (mm, iso) => mm.days.find((x) => x.iso === iso).plan
+  check('замок держит: после смены множителей 4 будущих дней план закрытых дней НЕ изменился',
+    m.days.filter((x) => x.full).every((x) => planOf(mShift, x.iso) === x.plan))
+  check('«% плана дня» закрытого дня тоже не поехал (15.05)',
+    mShift.days.find((x) => x.iso === '2025-05-15').fact / planOf(mShift, '2025-05-15') ===
+    day('2025-05-15').fact / day('2025-05-15').plan)
+  check('план БУДУЩИХ дней при этом изменился (иначе тест выше ничего не проверяет)',
+    planOf(mShift, '2025-05-20') !== planOf(m, '2025-05-20'))
+
+  const noLock = JSON.parse(JSON.stringify(shifted))
+  delete noLock.plan_lock
+  const mNoLock = computeDaily(noLock)
+  check('контрольная группа: БЕЗ замка план закрытого дня уехал бы задним числом',
+    planOf(mNoLock, '2025-05-15') !== planOf(m, '2025-05-15'))
+  check('без замка Σплан = цель РОВНО (старое поведение цело)',
+    Math.abs(mNoLock.days.reduce((a, x) => a + x.plan, 0) - mNoLock.T) < 1e-6 * mNoLock.T + 1e-6)
+
+  // деградация: ключей нет вовсе → модель считает как до NET-87
+  const bare = JSON.parse(JSON.stringify(set))
+  delete bare.day_factors; delete bare.plan_lock
+  const mBare = computeDaily(bare)
+  check('нет обоих ключей → веса чисто по дню недели',
+    mBare.days.every((x) => Math.abs(x.weight - x.coef) < 1e-9))
+  check('нет обоих ключей → Σплан = цель РОВНО',
+    Math.abs(mBare.days.reduce((a, x) => a + x.plan, 0) - mBare.T) < 1e-6 * mBare.T + 1e-6)
+  check('нет обоих ключей → модель не падает и считает прогноз', Number.isFinite(mBare.landing))
 }
 
 console.log('\n=== Адаптивные колонки метрик ===')
