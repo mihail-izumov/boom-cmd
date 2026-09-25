@@ -2,21 +2,26 @@
 import { computed, reactive, ref } from 'vue'
 import { Check, ChevronDown } from 'lucide-vue-next'
 import ReportField from '../components/report/ReportField.vue'
+import ReportHowTo from '../components/report/ReportHowTo.vue'
+import ReportResubmitConfirm from '../components/report/ReportResubmitConfirm.vue'
 import { useReport } from '../composables/useReport.js'
+import { useAccessKey } from '../composables/useAccessKey.js'
+import { useDaily } from '../composables/useDaily.js'
 import {
   REPORT_PARK_IDS, emptyForm, fieldGroupsFor, numericFieldsFor, derived,
-  todayISO, validate, buildPayload, softWarnings,
+  todayISO, validate, buildPayload, softWarnings, existingRevenue,
 } from '../composables/reportModel.js'
 import { PARKS_BY_ID } from '../data/parks.js'
 import {
   L, FIELD_LABELS, SECTION_TITLES, WEATHER_OPTIONS, WEEKLY_NOTE,
   checksIntroFor, hintFor, tipFor, summaryValue, summaryLabelFor, softWarnMessage,
-  sumMismatch, dateHuman, acceptedTime,
+  sumMismatch, dateHuman, acceptedTime, receiptsRatioMessage, sessionsRatioMessage,
 } from '../i18n/report.js'
 
 // «Отчёт дня» v2 (D-12) — ЕДИНСТВЕННАЯ пишущая страница фронта: форма → POST →
-// Apps Script doPost → строка в лист `inbox` дневной таблицы. Канон не читается
-// и не пишется. Дата по умолчанию — ВЧЕРА; будущие запрещены; не-вчера —
+// Apps Script doPost → строка в лист `inbox` дневной таблицы. Канон не пишется;
+// читается (v2.4 Ф-3) только дневной слой — узнать, есть ли уже выручка за выбранную
+// дату, и спросить перед пересдачей. Дата по умолчанию — ВЧЕРА; будущие запрещены; не-вчера —
 // жёлтая плашка (не блокирует). Форма — смысловые карты (ТЗ v2 §1): Деньги /
 // Игроки / Чеки / День + живая сводка «Проверь себя» (§5, в payload не уходит).
 // Валидация §2–3 блокирует отправку; тап «Отправить» с ошибками — плавный
@@ -30,6 +35,22 @@ const acceptedHm = computed(() => acceptedTime(acceptedAt.value))
 
 const form = reactive(emptyForm())
 const sentDate = ref('') // дата успешно отправленного отчёта (для экрана успеха)
+
+// ── v2.4 Ф-3: пересдача за уже сданную дату ──
+// Дневной слой читаем ради одного вопроса: есть ли у парка выручка за выбранную дату.
+// Только НЕ в режиме репортёра (D-12 §9-A): его фраза по замыслу не открывает ни
+// одного data-запроса, а `useDaily` на отказ гейта делает logout — управляющего
+// выкинуло бы из формы. Сейчас режим репортёра выключен (D-14, все входят общей
+// фразой), и вопрос работает у всех; включат репортёра — у него вопроса просто не будет.
+//
+// Слой не успел загрузиться или не загрузился вовсе — отправляем без вопроса. Отчёт
+// важнее подсказки: не пропустить законную отправку из-за сбоя ЧТЕНИЯ.
+const { role } = useAccessKey()
+const daily = role.value === 'reporter' ? null : useDaily()
+const existingRev = computed(() =>
+  daily ? existingRevenue(daily.data.value, form.park, form.date) : null)
+const confirmOpen = ref(false)
+const confirmRev = ref(0)
 
 const parks = REPORT_PARK_IDS.map((id) => ({ id, name: PARKS_BY_ID[id]?.name || id }))
 const todayMax = todayISO()
@@ -61,6 +82,9 @@ function isInvalid(key) {
   if (e.sum && (key === 'revenue' || key === 'cashless' || key === 'cash' || key === 'site')) return true
   if (e.visitors && (key === 'visitors_total' || key === 'visitors_new')) return true
   if (e.sessions && (key === 'topups' || key === 'sessions')) return true
+  // v2.4: подсвечиваем ОБА числа пары — ошибка может быть в любом из них
+  if (e.receipts_ratio && (key === 'receipts' || key === 'topups')) return true
+  if (e.sessions_ratio && (key === 'topups' || key === 'sessions')) return true
   return false
 }
 
@@ -72,6 +96,8 @@ const errorMessages = computed(() => {
   if (e.sum && v.value.sum) out.push(sumMismatch(v.value.sum.sum, v.value.sum.revenue))
   if (e.visitors) out.push(L.err_visitors)
   if (e.sessions) out.push(L.err_sessions)
+  if (e.receipts_ratio) out.push(receiptsRatioMessage(e.receipts_ratio)) // v2.4 Ф-1
+  if (e.sessions_ratio) out.push(sessionsRatioMessage(e.sessions_ratio)) // v2.4 Ф-2
   return out
 })
 
@@ -97,11 +123,31 @@ function scrollToProblem() {
 }
 
 async function onSubmit() {
-  if (sending.value) return
+  if (sending.value || confirmOpen.value) return
   if (!v.value.ok) { scrollToProblem(); return } // ТЗ v2 §1
+  // v2.4 Ф-3: за эту дату в дневном слое уже есть выручка → сначала спросить
+  const rev = existingRev.value
+  if (rev != null) {
+    confirmRev.value = rev
+    confirmOpen.value = true
+    return
+  }
+  await send()
+}
+
+async function send() {
   const date = form.date
   await submit(buildPayload(form))
   if (sent.value) sentDate.value = date
+}
+
+// «Да, пересдаю» — отправка ровно того, что в форме; «Отмена» — назад, поля не трогаем.
+function onResubmitYes() {
+  confirmOpen.value = false
+  send()
+}
+function onResubmitCancel() {
+  confirmOpen.value = false
 }
 
 // «Внести ещё»: сброс формы; парк оставляем (управляющий вносит свой парк).
@@ -186,6 +232,8 @@ function more() {
       <!-- смысловые карты (ТЗ v2 §1): Деньги / Игроки / Чеки; поля — только отступы -->
       <template v-if="form.park">
         <template v-for="g in groups" :key="g.section">
+          <!-- v2.4 Ф-6: «Как получить отчёт» — свёрнутая строка над картой «Чеки» -->
+          <ReportHowTo v-if="g.section === 'checks'" :park="form.park" />
           <section class="bc-fade-in rounded-2xl bg-[var(--surface)] px-4 pb-1.5 pt-3 shadow-sm">
             <h2 class="text-[0.875rem] font-semibold text-[var(--text-secondary)]">{{ SECTION_TITLES[g.section] }}</h2>
             <!-- вводная строка карты «Чеки»: Охта/Питер (v2.2 §2) и Июнь (v2.3 §2) -->
@@ -314,5 +362,13 @@ function more() {
         :aria-disabled="!v.ok || sending ? 'true' : 'false'"
       >{{ sending ? (attempt > 1 ? L.sending_retry : L.sending) : L.submit }}</button>
     </form>
+
+    <!-- v2.4 Ф-3: за эту дату отчёт уже есть — спросить перед отправкой -->
+    <ReportResubmitConfirm
+      :open="confirmOpen"
+      :revenue="confirmRev"
+      @confirm="onResubmitYes"
+      @cancel="onResubmitCancel"
+    />
   </section>
 </template>

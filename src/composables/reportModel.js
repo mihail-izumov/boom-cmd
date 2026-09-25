@@ -11,9 +11,16 @@
 //   • только Июнь дополнительно: promo, rev_y, rev_vk (необязательные);
 //   • валидация БЕЗ допусков: cashless + cash + site === revenue ровно, до
 //     рубля; visitors_new ≤ visitors_total; дата не в будущем; sessions ≤
-//     topups (у всех, у кого оба поля). topups ≤ receipts НЕ проверять —
-//     пакеты дают «Кол-во» без чеков;
+//     topups (у всех, у кого оба поля);
 //   • comment — необязателен.
+//
+// v2.4 (NET-152) — жёсткие стопы по отношениям, пороги замерены контуром B по истории:
+//   • Ф-1: receipts ÷ topups вне 1,0–3,0 — стоп (Охта/Питер). Прежнее «topups ≤
+//     receipts не проверять — пакеты дают „Кол-во“ без чеков» СНЯТО: с D-160
+//     пополнения считаются только по строкам «Очки-Деньги» с операцией «Покупка
+//     очков», бонусные пакеты в них не входят, и чеков дня меньше, чем пополнений,
+//     не было ни разу за 161 день (минимум отношения 1,13);
+//   • Ф-2: topups ÷ sessions > 2,0 — стоп (все парки; максимум факта 1,26).
 
 export const REPORT_PARK_IDS = ['ohta', 'piterland', 'iyun']
 
@@ -91,9 +98,52 @@ export function toInt(v) {
   return Number.isSafeInteger(n) ? n : null
 }
 
+// ── v2.4 (NET-152): пороги отношений ──
+// Замер контура B 21.09.2026 по всей истории, где заполнены оба поля. Пороги записаны
+// в ДЕСЯТЫХ, и сравнение идёт в целых числах (receipts*10 против topups*11), чтобы
+// граница не зависела от того, как округлится деление: 110 чеков на 100 пополнений —
+// ровно 1,10, внутри коридора, а не «чуть меньше» из-за двоичной дроби.
+//
+// Ф-1 · «Чеков за день» ÷ «Пополнений за день» — только парки с полем receipts.
+// Факт 161 дня Охты и Питерленда: 1,13…1,49, медиана 1,32. Жёсткий коридор 1,0–3,0 не
+// задевает ни одного настоящего дня; мягкий 1,10–1,60 лишь чуть шире факта.
+export const RECEIPTS_HARD_TENTHS = [10, 30] // 1,0 … 3,0 — вне него стоп
+export const RECEIPTS_SOFT_TENTHS = [11, 16] // 1,10 … 1,60 — вне него жёлтая строка
+// Ф-2 · «Пополнений» ÷ «Чеков с пополнением» — все парки. Факт 220 дней: 1,00…1,26.
+// Порог 2,0 принят владельцем 21.09 (в разборе 17.09 обсуждалось 3,0).
+export const SESSIONS_HARD_MAX_TENTHS = 20 // больше 2,0 — стоп
+
+// K для текстов Ф-1: отношение, округлённое до десятых (778 ÷ 85 = 9,15 → 9,2).
+export function ratioTenths(a, b) {
+  return b > 0 ? Math.round((a / b) * 10) / 10 : null
+}
+
+// Ф-1: жёсткая проверка «Чеков за день». null — всё в порядке или считать не из чего.
+// Пополнений ноль — отношения нет, проверку не делаем (делить не на что, а K = ∞ в
+// тексте для человека бессмысленно).
+export function receiptsRatioError(park, receipts, topups) {
+  if (park !== 'ohta' && park !== 'piterland') return null
+  if (receipts == null || topups == null || topups <= 0) return null
+  const [min, max] = RECEIPTS_HARD_TENTHS
+  if (receipts * 10 < topups * min) return { kind: 'low', receipts, topups }
+  if (receipts * 10 > topups * max) return { kind: 'high', receipts, topups, k: ratioTenths(receipts, topups) }
+  return null
+}
+
+// Ф-2: жёсткая проверка «Чеков с пополнением». Сессий ноль при ненулевых пополнениях —
+// тоже стоп: каждое пополнение пробито в каком-то чеке, «ноль таких чеков» — это число
+// не из той строки, ровно класс ошибки 15.09.
+export function sessionsRatioError(topups, sessions) {
+  if (topups == null || sessions == null || topups <= 0) return null
+  if (topups * 10 > sessions * SESSIONS_HARD_MAX_TENTHS) return { topups, sessions }
+  return null
+}
+
 // Валидация формы. Возвращает:
-//   { ok, missing:[key], errors:{sum?, visitors?, sessions?, date_future?},
-//     sum:{sum,revenue}|null, notYesterday }
+//   { ok, missing:[key], errors:{sum?, visitors?, sessions?, date_future?,
+//     receipts_ratio?, sessions_ratio?}, sum:{sum,revenue}|null, notYesterday }
+// errors.receipts_ratio = { kind:'low'|'high', receipts, topups, k? } (v2.4 Ф-1);
+// errors.sessions_ratio = { topups, sessions } (v2.4 Ф-2).
 // ok === true ⇔ отправка разрешена (все обязательные + ни одной ошибки).
 // notYesterday — НЕ блокирует (жёлтая плашка «проверьте дату»).
 export function validate(form, now = new Date()) {
@@ -131,10 +181,17 @@ export function validate(form, now = new Date()) {
   if (nums.visitors_total != null && nums.visitors_new != null &&
       nums.visitors_new > nums.visitors_total) errors.visitors = true
 
-  // sessions ≤ topups — у всех, у кого оба поля (ТЗ v2 §3).
-  // topups ≤ receipts НЕ проверяем: пакеты дают «Кол-во» без чеков.
+  // sessions ≤ topups — у всех, у кого оба поля (ТЗ v2 §3). Без изменений в v2.4.
   if (nums.topups != null && nums.sessions != null &&
       nums.sessions > nums.topups) errors.sessions = true
+
+  // v2.4 Ф-1: чеки ÷ пополнения вне 1,0–3,0 (Охта/Питер).
+  const rr = receiptsRatioError(form.park, nums.receipts, nums.topups)
+  if (rr) errors.receipts_ratio = rr
+  // v2.4 Ф-2: пополнения ÷ сессии больше 2,0 (все парки). С «сессии > пополнений»
+  // не пересекается по построению: там отношение меньше 1.
+  const sr = sessionsRatioError(nums.topups, nums.sessions)
+  if (sr) errors.sessions_ratio = sr
 
   const ok = missing.length === 0 && Object.keys(errors).length === 0
   return { ok, missing, errors, sum, notYesterday }
@@ -164,27 +221,71 @@ export function derived(form) {
 // их нет; кнопка «Отправить» на них не смотрит). Появляются при заполненных
 // участвующих полях. Ловят ввод из итоговой строки отчёта «Выручка» (боевой кейс
 // Июня 22.07: ср.пополнение падает до ~482 ₽ при привычных ~600–750). Тексты — i18n.
-export const SOFT_WARN_AVG_MIN = 500
-export const SOFT_WARN_AVG_MAX = 1500
+//
+// v2.4 Ф-5: коридор ср. пополнения — СВОЙ У КАЖДОГО ПАРКА (5-й…95-й процентиль,
+// замер контура B 21.09.2026, 246 дней). Общий 500–1500 ₽ был шире факта любого парка
+// и почти не срабатывал: у Питерленда настоящий верх 1 257 ₽, а строка включалась на 1 500.
+export const AVG_TOPUP_CORRIDOR = {
+  ohta: [940, 1360],
+  piterland: [830, 1190],
+  iyun: [580, 990],
+}
 export const SOFT_WARN_RATIO_MAX = 1.5
 export function softWarnings(form) {
   const out = []
   const revenue = toInt(form.revenue)
   const topups = toInt(form.topups)
   const sessions = toInt(form.sessions)
-  // ср. пополнение = выручка ÷ пополнения; вне коридора 500–1500 ₽ → предупреждение
-  if (revenue != null && topups != null && topups > 0) {
+  const receipts = (form.park === 'ohta' || form.park === 'piterland') ? toInt(form.receipts) : null
+  // ср. пополнение = выручка ÷ пополнения; вне коридора парка → предупреждение
+  const corridor = AVG_TOPUP_CORRIDOR[form.park]
+  if (corridor && revenue != null && topups != null && topups > 0) {
     const avg = revenue / topups
-    if (avg < SOFT_WARN_AVG_MIN || avg > SOFT_WARN_AVG_MAX) {
-      out.push({ key: 'avg_topup', value: Math.round(avg) })
+    const [min, max] = corridor
+    if (avg < min || avg > max) {
+      out.push({ key: 'avg_topup', value: Math.round(avg), min, max })
     }
   }
-  // пополнения ÷ сессии > 1,5 → предупреждение (обычно ~1,1)
+  // v2.4 Ф-1, мягко: чеки ÷ пополнения вне 1,10–1,60 (Охта/Питер). Когда уже сработал
+  // жёсткий стоп (вне 1,0–3,0), жёлтую строку не дублируем: про ту же пару чисел
+  // человек видит красную, две строки подряд читались бы как два разных дефекта.
+  if (receipts != null && topups != null && topups > 0 &&
+      !receiptsRatioError(form.park, receipts, topups) &&
+      (receipts * 10 < topups * RECEIPTS_SOFT_TENTHS[0] || receipts * 10 > topups * RECEIPTS_SOFT_TENTHS[1])) {
+    out.push({ key: 'receipts_ratio', k: ratioTenths(receipts, topups) })
+  }
+  // пополнения ÷ сессии > 1,5 → предупреждение (обычно ~1,1). Порог и текст v2.3 не
+  // менялись; при жёстком стопе Ф-2 (> 2,0) строка не дублируется — по той же причине.
   if (topups != null && sessions != null && sessions > 0 &&
-      topups / sessions > SOFT_WARN_RATIO_MAX) {
+      topups / sessions > SOFT_WARN_RATIO_MAX &&
+      !sessionsRatioError(topups, sessions)) {
     out.push({ key: 'topups_per_session' })
   }
   return out
+}
+
+// ── v2.4 Ф-3: отчёт за эту дату уже есть ──
+// Выручка парка за дату из дневного слоя (payload `?action=daily`, sets[].days[]), или
+// null — если дня в слое нет, выручка пустая/нулевая или слой не загружен. Ключ набора
+// («park:month») не разбираем: ищем по полям park и month самого набора — так функция не
+// зависит от того, как бэк склеивает ключ.
+//
+// Граница, которую надо знать: дневной слой — это КАНОН, туда день попадает после
+// утреннего забора. Отчёт, отправленный сегодня и ещё не внесённый, здесь не виден, и
+// пересдачу по нему форма не заметит. Для случая 16.09 (пересдача прошлого дня легла на
+// уже закрытый день) этого достаточно.
+export function existingRevenue(daily, park, date) {
+  if (!daily || typeof daily !== 'object' || !daily.sets) return null
+  if (!park || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return null
+  const month = date.slice(0, 7)
+  for (const s of Object.values(daily.sets)) {
+    if (!s || s.park !== park || s.month !== month || !Array.isArray(s.days)) continue
+    const d = s.days.find((x) => x && x.date === date)
+    if (!d || d.rev == null || d.rev === '') continue
+    const rev = Number(d.rev)
+    if (Number.isFinite(rev) && rev > 0) return Math.round(rev)
+  }
+  return null
 }
 
 // Тело POST (без гейт-ключа `key` — его добавляет useReport из useAccessKey).

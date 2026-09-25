@@ -2211,10 +2211,14 @@ console.log('\n=== jsdom: компактный заголовок navigation bar
 {
   const navSrc = readFileSync(resolve(root, 'src/components/NavigationBar.vue'), 'utf8')
   check('зажимающего px-[10rem] в компактном заголовке больше нет', !navSrc.includes('px-[10rem]'))
-  check('заголовку отдана центральная колонка grid (боковым — по 44pt минимум)',
-    navSrc.includes('grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)]'))
-  check('подпись слота «Назад» сжимается по многоточию, а не давит заголовок',
-    /truncate text-\[1\.0625rem\] leading-none/.test(navSrc))
+  // 25.09 (правка владельца): прежняя сетка `minmax(2.75rem,1fr) auto minmax(2.75rem,1fr)`
+  // пускала содержимое бокового слота за его колонку — «‹ Контроль Дня» наезжала на
+  // «Отчёт Дня» (замер в Chromium: 9 наложений из 48). Теперь боковые колонки не уже
+  // своего содержимого, заголовок сжимается сам, а слева — только стрелка.
+  check('боковые колонки не уже своего содержимого, заголовок — между ними (25.09)',
+    navSrc.includes('grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)]'))
+  check('старой сетки, при которой слоты наезжали на заголовок, больше нет',
+    !navSrc.includes('grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)]'))
 
   // все разделы, где заголовок резался: «Сводки сети» 121px, «Контроль Дня» 138px.
   // Главной в этом списке больше нет — с D-20 у неё заголовка нет вовсе (см. ниже).
@@ -2230,6 +2234,13 @@ console.log('\n=== jsdom: компактный заголовок navigation bar
       !!compact && compact.textContent.trim() === title, compact && compact.textContent.trim())
     check(`«${title}»: крупный заголовок в потоке на месте`,
       el.querySelector('h1').textContent.trim() === title)
+    // 25.09: слева только стрелка — подписи раздела на экране нет, она в aria-label
+    const back = el.querySelector('[data-test="nav-back"]')
+    check(`«${title}»: «Назад» — только стрелка, без подписи на экране`,
+      !!back && back.textContent.trim() === '' && !!back.querySelector('svg'))
+    check(`«${title}»: куда ведёт «Назад», сказано в aria-label («Назад: ${props.backLabel}»)`,
+      back?.getAttribute('aria-label') === `Назад: ${props.backLabel}`, back?.getAttribute('aria-label'))
+    check(`«${title}»: кнопка «Назад» 44×44 pt`, /\bh-11\b/.test(back?.className || '') && /\bw-11\b/.test(back?.className || ''))
     app.unmount()
   }
 }

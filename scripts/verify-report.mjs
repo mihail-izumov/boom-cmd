@@ -6,6 +6,10 @@
 // v2.3: тултипы Июня операционные без «1 пополнение = 1 чек» (§1); вводная строка
 // и хинты включены Июню (§2); плитка «Ср. пополнение» Июню (§3); мягкие
 // предупреждения о вводе из итоговой строки — синтетика 482/700/1,6/1,1 (§4).
+// v2.4 (NET-152): жёсткие стопы чеки÷пополнения (Ф-1) и пополнения÷сессии (Ф-2),
+// вопрос при пересдаче за уже сданную дату по дневному слою (Ф-3), хинты пополнений
+// с «Очки-Деньги» (Ф-4), коридор ср. пополнения по парку (Ф-5), блок «Как получить
+// отчёт» (Ф-6). Приёмка §8 задания — отдельным блоком «v2.4 · приёмка §8».
 //
 // Двухслойная проверка:
 //   1) ЧИСТАЯ МОДЕЛЬ (reportModel.js, без DOM): все блокировки ТЗ v2 §2–3 —
@@ -26,6 +30,7 @@ import { dirname, resolve } from 'node:path'
 import {
   emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
   yesterdayISO, todayISO, softWarnings,
+  existingRevenue, receiptsRatioError, sessionsRatioError, AVG_TOPUP_CORRIDOR, toISODate,
 } from '../src/composables/reportModel.js'
 // Политика повторов общая для записи и чтения — живёт в netPolicy.js (05.08, вечер).
 import { RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS, isRetriableStatus } from '../src/composables/netPolicy.js'
@@ -33,8 +38,11 @@ import {
   rub, L, FIELD_LABELS, WEATHER_OPTIONS, TIPS, TIPS_IYUN,
   WEEKLY_NOTE, CHECKS_INTRO, CHECKS_INTRO_IYUN, FIELD_HINTS, hintFor,
   checksIntroFor, summaryLabelFor, summaryValue, softWarnMessage,
+  receiptsRatioMessage, sessionsRatioMessage, RESUBMIT, CHECKS_EXCLUDED,
+  HOWTO_TITLE, HOWTO_NOTE, HOWTO_PLAYGROUND, howtoRowsFor,
 } from '../src/i18n/report.js'
 import { NET_HINTS } from '../src/i18n/net.js'
+import { formatInt } from '../src/i18n/analytics.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -110,8 +118,11 @@ check('topups пустой у Питера → блокирует (теперь 
   validate(filled('piterland', { topups: '' }), NOW).missing.includes('topups'))
 check('sessions > topups блокирует у Питера (не только Июнь)',
   validate(filled('piterland', { sessions: '181' }), NOW).errors.sessions === true)
-check('topups > receipts НЕ блокирует (пакеты дают Кол-во без чеков)',
-  validate(filled('piterland', { topups: '300', sessions: '160' }), NOW).ok === true)
+// v2.4 Ф-1: правило v2 «topups > receipts не блокирует» СНЯТО — с D-160 пакеты в
+// пополнения не входят, и чеков меньше, чем пополнений, не было ни разу за 161 день.
+check('topups > receipts теперь блокирует (v2.4 Ф-1: чеки ÷ пополнения < 1,0)',
+  (() => { const v = validate(filled('piterland', { topups: '300', sessions: '290' }), NOW)
+    return v.ok === false && v.errors.receipts_ratio?.kind === 'low' })())
 check('visitors_new > total блокирует',
   validate(filled('piterland', { visitors_new: '301' }), NOW).errors.visitors === true)
 check('visitors_new == total ок',
@@ -202,14 +213,14 @@ console.log('\n=== reportModel: живая сводка derived() §5 ===')
     summaryLabelFor('piterland', 'avg_check') === 'Средний чек')
 }
 
-console.log('\n=== reportModel: мягкие предупреждения §4 (все парки, НЕ блокируют) ===')
+console.log('\n=== reportModel: мягкие предупреждения §4 (все парки, НЕ блокируют; коридор Июня 580–990 — v2.4 Ф-5) ===')
 {
   const warnKeys = (over) => softWarnings(filled('iyun', { ...iyunOver, ...over })).map((w) => w.key)
-  check('ср.пополнение 482 ₽ (<500) → предупреждение',
+  check('Июнь: ср.пополнение 482 ₽ (<580) → предупреждение',
     warnKeys({ revenue: '48200', cashless: '30000', cash: '10000', site: '8200', topups: '100', sessions: '90' }).includes('avg_topup'))
-  check('ср.пополнение 700 ₽ (в коридоре) → без предупреждения',
+  check('Июнь: ср.пополнение 700 ₽ (в коридоре 580–990) → без предупреждения',
     !warnKeys({ revenue: '70000', cashless: '40000', cash: '20000', site: '10000', topups: '100', sessions: '95' }).includes('avg_topup'))
-  check('ср.пополнение 1600 ₽ (>1500) → предупреждение',
+  check('Июнь: ср.пополнение 1600 ₽ (>990) → предупреждение',
     warnKeys({ revenue: '160000', cashless: '100000', cash: '40000', site: '20000', topups: '100', sessions: '95' }).includes('avg_topup'))
   check('попол/сессии 1,6 (>1,5) → предупреждение',
     warnKeys({ revenue: '112000', cashless: '70000', cash: '30000', site: '12000', topups: '160', sessions: '100' }).includes('topups_per_session'))
@@ -219,6 +230,163 @@ console.log('\n=== reportModel: мягкие предупреждения §4 (�
   check('предупреждение НЕ блокирует: validate().ok === true при активном предупреждении',
     validate(warnForm, NOW).ok === true && softWarnings(warnForm).length > 0)
   check('пустая форма → без предупреждений', softWarnings(emptyForm('iyun', NOW)).length === 0)
+}
+
+// ═══════════════ v2.4 · NET-152 — модель (Ф-1 … Ф-6) ═══════════════
+console.log('\n=== NET-152 · модель: Ф-1 чеки ÷ пополнения (Охта/Питер) ===')
+{
+  // Охта, 85 пополнений: выручка 100 000 → ср.пополнение 1 176 ₽ (в коридоре Охты),
+  // сессий 80 → 1,06 (норма). Меняется только число чеков.
+  const ohta = (receipts, topups = 85) => filled('ohta', {
+    revenue: '100000', cashless: '60000', cash: '30000', site: '10000',
+    receipts: String(receipts), topups: String(topups), sessions: '80',
+  })
+  const v778 = validate(ohta(778), NOW)
+  check('778 при 85 → стоп «больше 3,0», K = 9,2 (боевой случай 11.09)',
+    v778.ok === false && v778.errors.receipts_ratio?.kind === 'high' && v778.errors.receipts_ratio.k === 9.2,
+    JSON.stringify(v778.errors.receipts_ratio))
+  check('80 при 85 → стоп «меньше 1,0»', validate(ohta(80), NOW).errors.receipts_ratio?.kind === 'low')
+  check('112 при 85 (1,32) → проходит', validate(ohta(112), NOW).ok === true)
+  check('112 при 85 → ни одного предупреждения', softWarnings(ohta(112)).length === 0,
+    JSON.stringify(softWarnings(ohta(112))))
+  check('150 при 85 (1,76) → проходит (мягкая не блокирует)', validate(ohta(150), NOW).ok === true)
+  const w150 = softWarnings(ohta(150)).find((w) => w.key === 'receipts_ratio')
+  check('150 при 85 → мягкая строка про чеки, K = 1,8', !!w150 && w150.k === 1.8, JSON.stringify(w150))
+  check('граница 3,0 включительно: 255 при 85 — не стоп', receiptsRatioError('ohta', 255, 85) === null)
+  check('256 при 85 (3,01) — стоп', receiptsRatioError('ohta', 256, 85)?.kind === 'high')
+  check('граница 1,0 включительно: 85 при 85 — не стоп (но жёлтая: ниже 1,10)',
+    receiptsRatioError('ohta', 85, 85) === null &&
+    softWarnings(ohta(85)).some((w) => w.key === 'receipts_ratio'))
+  const soft = (r, t) => softWarnings(filled('piterland', {
+    revenue: String(t * 1000), cashless: String(t * 1000), cash: '0', site: '0',
+    receipts: String(r), topups: String(t), sessions: String(t),
+  })).some((w) => w.key === 'receipts_ratio')
+  check('мягкий коридор 1,10–1,60 включительно: 110/100 и 160/100 — без жёлтой',
+    !soft(110, 100) && !soft(160, 100))
+  check('109/100 и 161/100 — жёлтая', soft(109, 100) && soft(161, 100))
+  check('Июнь — проверки чеков нет (поля нет)', receiptsRatioError('iyun', 778, 85) === null)
+  check('пополнений 0 — отношения нет, проверки нет', receiptsRatioError('ohta', 50, 0) === null)
+  check('при стопе жёлтая про чеки не дублирует красную',
+    !softWarnings(ohta(778)).some((w) => w.key === 'receipts_ratio'))
+  check('текст стопа «больше 3,0» — дословно',
+    receiptsRatioMessage(v778.errors.receipts_ratio) ===
+      'Чеков за день (778) в 9,2 раз больше пополнений (85). Обычно их больше в полтора раза. Проверьте число по отчёту.')
+  check('текст стопа «меньше 1,0» — дословно',
+    receiptsRatioMessage(validate(ohta(80), NOW).errors.receipts_ratio) ===
+      'Чеков за день (80) меньше, чем пополнений (85). Так не бывает: каждое пополнение — это чек. Проверьте оба числа по отчёту.')
+  check('текст жёлтой строки про чеки — дословно',
+    softWarnMessage(w150) === 'Проверьте чеки: на 10 пополнений у вас обычно от 11 до 16 чеков, сейчас 1,8.')
+}
+
+console.log('\n=== NET-152 · модель: Ф-2 пополнения ÷ сессии > 2,0 (все парки) ===')
+{
+  // Июнь, 88 пополнений, выручка 66 000 → 750 ₽ (в коридоре Июня 580–990).
+  const iyun = (sessions, topups = 88) => filled('iyun', {
+    ...iyunOver, revenue: '66000', cashless: '40000', cash: '20000', site: '6000',
+    topups: String(topups), sessions: String(sessions),
+  })
+  const v2 = validate(iyun(2), NOW)
+  check('Июнь 2 при 88 → стоп (боевой случай 15.09)', v2.ok === false && !!v2.errors.sessions_ratio)
+  check('Июнь 87 при 88 → проходит без предупреждений',
+    validate(iyun(87), NOW).ok === true && softWarnings(iyun(87)).length === 0,
+    JSON.stringify(softWarnings(iyun(87))))
+  check('граница 2,0 включительно: 44 при 88 — не стоп, но мягкая v2.3 (> 1,5) есть',
+    validate(iyun(44), NOW).ok === true && softWarnings(iyun(44)).some((w) => w.key === 'topups_per_session'))
+  check('43 при 88 (2,05) — стоп', !!validate(iyun(43), NOW).errors.sessions_ratio)
+  check('сессий 0 при 88 пополнениях — стоп', sessionsRatioError(88, 0) !== null)
+  check('пополнений 0 — проверки нет', sessionsRatioError(0, 0) === null)
+  check('Охта и Питер — та же проверка (все парки)',
+    !!validate(filled('ohta', { sessions: '80', topups: '180' }), NOW).errors.sessions_ratio &&
+    !!validate(filled('piterland', { sessions: '80', topups: '180' }), NOW).errors.sessions_ratio)
+  check('при стопе мягкая v2.3 про сессии не дублирует красную',
+    !softWarnings(iyun(2)).some((w) => w.key === 'topups_per_session'))
+  check('«сессии ≤ пополнения» — без изменений', validate(iyun(89), NOW).errors.sessions === true)
+  check('текст стопа — дословно',
+    sessionsRatioMessage(v2.errors.sessions_ratio) ===
+      'Чеков с пополнением (2) намного меньше пополнений (88). Обычно эти числа почти равны. Проверьте по отчёту: считаются только строки „Очки-Деньги“ с операцией „Покупка очков“.')
+}
+
+console.log('\n=== NET-152 · модель: Ф-5 коридор ср. пополнения по парку ===')
+{
+  check('коридоры — замер контура B 21.09 (Охта 940–1360, Питер 830–1190, Июнь 580–990)',
+    JSON.stringify(AVG_TOPUP_CORRIDOR) === JSON.stringify({ ohta: [940, 1360], piterland: [830, 1190], iyun: [580, 990] }))
+  const avgWarn = (park, perTopup, topups = 100) => softWarnings(filled(park, {
+    revenue: String(perTopup * topups), cashless: String(perTopup * topups), cash: '0', site: '0',
+    receipts: String(Math.round(topups * 1.3)), topups: String(topups), sessions: String(topups),
+  })).find((w) => w.key === 'avg_topup')
+  check('Питер 1 200 ₽ → предупреждение (общий 500–1500 тут молчал)', !!avgWarn('piterland', 1200))
+  check('Питер 830 и 1 190 (границы) → без; 829 и 1 191 → есть',
+    !avgWarn('piterland', 830) && !avgWarn('piterland', 1190) &&
+    !!avgWarn('piterland', 829) && !!avgWarn('piterland', 1191))
+  check('Охта 940 и 1 360 → без; 939 и 1 361 → есть',
+    !avgWarn('ohta', 940) && !avgWarn('ohta', 1360) && !!avgWarn('ohta', 939) && !!avgWarn('ohta', 1361))
+  check('Июнь 580 и 990 → без; 579 и 991 → есть',
+    !avgWarn('iyun', 580) && !avgWarn('iyun', 990) && !!avgWarn('iyun', 579) && !!avgWarn('iyun', 991))
+  const w = avgWarn('piterland', 1200)
+  check('в предупреждении — границы именно этого парка', w && w.value === 1200 && w.min === 830 && w.max === 1190,
+    JSON.stringify(w))
+  check('текст жёлтой строки — дословно, с границами парка',
+    softWarnMessage(w) === `Проверьте пополнения: выручка ÷ пополнения = ${rub(1200)}, обычно у вас от 830 до ${formatInt(1190)}.`,
+    softWarnMessage(w))
+  check('парк не выбран → строки нет', softWarnings(filled('', { revenue: '1000', topups: '100' })).length === 0)
+}
+
+console.log('\n=== NET-152 · модель: Ф-3 выручка за дату в дневном слое ===')
+{
+  const daily = { sets: {
+    'piterland:2026-09': { park: 'piterland', month: '2026-09', days: [
+      { date: '2026-09-15', rev: 207249, status: 'full' },
+      { date: '2026-09-16', rev: null, status: '' },
+      { date: '2026-09-17', rev: 0, status: 'full' },
+    ] },
+    'ohta:2026-09': { park: 'ohta', month: '2026-09', days: [{ date: '2026-09-15', rev: 150000, status: 'full' }] },
+  } }
+  check('Питер 15.09 → 207 249', existingRevenue(daily, 'piterland', '2026-09-15') === 207249)
+  check('Охта 15.09 → своя выручка, не питерская', existingRevenue(daily, 'ohta', '2026-09-15') === 150000)
+  check('Июнь 15.09 (набора нет) → null', existingRevenue(daily, 'iyun', '2026-09-15') === null)
+  check('дня в наборе нет → null', existingRevenue(daily, 'piterland', '2026-09-14') === null)
+  check('rev null → null (Number(null) = 0 выручкой не считаем)', existingRevenue(daily, 'piterland', '2026-09-16') === null)
+  check('rev 0 → null', existingRevenue(daily, 'piterland', '2026-09-17') === null)
+  check('другой месяц → null', existingRevenue(daily, 'piterland', '2026-08-15') === null)
+  check('слой пуст или не загружен → null',
+    existingRevenue({ updated: null, sets: {} }, 'piterland', '2026-09-15') === null &&
+    existingRevenue(null, 'piterland', '2026-09-15') === null)
+  check('ключ набора не разбирается — ищем по полям park/month',
+    existingRevenue({ sets: { any: { park: 'piterland', month: '2026-09', days: [{ date: '2026-09-15', rev: '1000' }] } } },
+      'piterland', '2026-09-15') === 1000)
+  check('кривая дата → null', existingRevenue(daily, 'piterland', '15.09.2026') === null)
+  check('текст подтверждения и кнопки — дословно',
+    RESUBMIT.text(207249) === `За эту дату отчёт уже есть: выручка ${rub(207249)}. Отправить новый вместо него?` &&
+    RESUBMIT.yes === 'Да, пересдаю' && RESUBMIT.cancel === 'Отмена')
+}
+
+console.log('\n=== NET-152 · тексты: Ф-4 и Ф-6 ===')
+{
+  check('Ф-4: предложение про пакеты и ЛК — дословно',
+    CHECKS_EXCLUDED === 'Пакеты и пополнения через личный кабинет сюда не входят — деньги за них учитываются отдельно.')
+  check('Ф-4: в обеих вводных оно стоит последним предложением',
+    CHECKS_INTRO.endsWith(` ${CHECKS_EXCLUDED}`) && CHECKS_INTRO_IYUN.endsWith(` ${CHECKS_EXCLUDED}`))
+  check('Ф-4: в хинтах старой формулировки «по строкам „Покупка очков“» нет',
+    Object.values(FIELD_HINTS).every((h) => !h.includes('по строкам „Покупка очков“')))
+  check('Ф-6: заголовок «Как получить отчёт»', HOWTO_TITLE === 'Как получить отчёт')
+  check('Ф-6: игротеки по парку — из СТАНДАРТ-отчёта-дня §1',
+    HOWTO_PLAYGROUND.ohta === 'Бумбастик Охта Молл' && HOWTO_PLAYGROUND.piterland === 'БУМБАСТИК' &&
+    HOWTO_PLAYGROUND.iyun === 'Бумбастик ТРК Июнь')
+  check('Ф-6: пять строк у каждого парка, в порядке задания',
+    ['ohta', 'piterland', 'iyun'].every((p) => howtoRowsFor(p).map((r) => r.label).join('|') ===
+      'Отчёт|Дата С и Дата ПО|Игротека|Группировки 1–4|Воронки над столбцами'))
+  const rows = Object.fromEntries(howtoRowsFor('ohta').map((r) => [r.label, r.value]))
+  check('Ф-6: значения строк — по задаче',
+    rows['Отчёт'] === '„[Финансовые] Выручка“' &&
+    rows['Дата С и Дата ПО'] === 'тот день, за который отчёт' &&
+    rows['Игротека'] === 'Бумбастик Охта Молл' &&
+    rows['Группировки 1–4'] === 'Наименование · Операция · Тип оплаты · Источник транзакции' &&
+    rows['Воронки над столбцами'] === 'все светлые; тёмная значит, что строки скрыты и суммы неверные')
+  check('Ф-6: строка про «Статистику посещений» — дословно',
+    HOWTO_NOTE === 'Игроков всего и Из них новых — из отчёта „Статистика посещений“ за тот же день.')
+  check('Ф-6: примеров чисел в блоке нет (цифры только в подписи «Группировки 1–4»)',
+    ['ohta', 'piterland', 'iyun'].every((p) => howtoRowsFor(p).every((r) => !/\d/.test(r.value))) && !/\d/.test(HOWTO_NOTE))
+  check('Ф-6: без парка блока нет', howtoRowsFor('').length === 0)
 }
 
 console.log('\n=== useReport: политика повторов (v2.4) ===')
@@ -254,11 +422,11 @@ console.log('\n=== i18n: тексты v2.2 §1–2 (дословно из ТЗ) 
 check('строка недельной сверки — без «владельца», с именем выгрузки (v2.2 §1)',
   WEEKLY_NOTE === 'Раз в неделю присылайте выгрузку „[Финансовые] Выручка“ за неделю — контрольная сверка.')
 check('в строке сверки нет слова «владельц…»', !/владельц/i.test(WEEKLY_NOTE))
-check('вводная строка карты «Чеки» — дословно (v2.2 §2)',
-  CHECKS_INTRO === 'Все три числа — из выгрузки „[Финансовые] Выручка“ за день, ничего не считаем вручную.')
-check('хинт receipts — дословно', FIELD_HINTS.receipts === '= итоговое „Кол-во чеков“ дня в выгрузке')
-check('хинт topups — дословно', FIELD_HINTS.topups === '= Σ „Кол-во“ по строкам „Покупка очков“')
-check('хинт sessions — дословно', FIELD_HINTS.sessions === '= Σ „Кол-во чеков“ по строкам „Покупка очков“')
+check('вводная строка карты «Чеки» — v2.2 §2 + предложение v2.4 Ф-4, дословно',
+  CHECKS_INTRO === 'Все три числа — из выгрузки „[Финансовые] Выручка“ за день, ничего не считаем вручную. Пакеты и пополнения через личный кабинет сюда не входят — деньги за них учитываются отдельно.')
+check('хинт receipts — дословно (v2.4 его не трогает, ждёт PIT-48)', FIELD_HINTS.receipts === '= итоговое „Кол-во чеков“ дня в выгрузке')
+check('хинт topups — дословно (v2.4 Ф-4)', FIELD_HINTS.topups === '= Σ „Кол-во“ по строкам „Очки-Деньги“ с операцией „Покупка очков“')
+check('хинт sessions — дословно (v2.4 Ф-4)', FIELD_HINTS.sessions === '= Σ „Кол-во чеков“ по тем же строкам „Очки-Деньги“')
 check('hintFor: Охта/Питер отдают хинты receipts/topups/sessions',
   hintFor('ohta', 'receipts') === FIELD_HINTS.receipts &&
   hintFor('piterland', 'sessions') === FIELD_HINTS.sessions)
@@ -276,14 +444,14 @@ check('тултип сессий Июня начинается со «Столб
   TIPS_IYUN.sessions.startsWith('Столбец „Кол-во чеков“ по тем же строкам „Покупка очков“ (сложить). '))
 check('хвост сессий Июня («1 чек — 2 пополнения») сохранён (§1)',
   TIPS_IYUN.sessions.includes('Если в одном чеке два пополнения — это 1 чек и 2 пополнения. Всегда ≤ „Пополнений за день“.'))
-check('вводная карты «Чеки» Июня — дословно (§2)',
-  CHECKS_INTRO_IYUN === 'Оба числа — из отчёта „Выручка“, строки „Покупка очков“. Итоговую строку отчёта не используем.')
+check('вводная карты «Чеки» Июня — v2.3 §2 + предложение v2.4 Ф-4, дословно',
+  CHECKS_INTRO_IYUN === 'Оба числа — из отчёта „Выручка“, строки „Покупка очков“. Итоговую строку отчёта не используем. Пакеты и пополнения через личный кабинет сюда не входят — деньги за них учитываются отдельно.')
 check('checksIntroFor: Июнь → своя вводная; Охта/Питер → общая; пусто → «»',
   checksIntroFor('iyun') === CHECKS_INTRO_IYUN &&
   checksIntroFor('ohta') === CHECKS_INTRO && checksIntroFor('') === '')
-check('текст предупреждения ср.пополнения — дословно (§4)',
-  softWarnMessage({ key: 'avg_topup', value: 482 }) ===
-    `Проверьте пополнения: выручка ÷ пополнения = ${rub(482)} — похоже на число из итоговой строки отчёта. Нужны только строки „Покупка очков“.`)
+check('текст предупреждения ср.пополнения — дословно (v2.4 Ф-5: коридор парка)',
+  softWarnMessage({ key: 'avg_topup', value: 482, min: 580, max: 990 }) ===
+    `Проверьте пополнения: выручка ÷ пополнения = ${rub(482)}, обычно у вас от 580 до 990.`)
 check('текст предупреждения сессий — дословно (§4)',
   softWarnMessage({ key: 'topups_per_session' }) ===
     'Проверьте сессии: пополнений обычно лишь немного больше, чем чеков с пополнением (~1,1).')
@@ -327,6 +495,8 @@ await build({
     // фиктивные URL: реальных нет и не должно быть (красный флаг ТЗ §8)
     'import.meta.env.VITE_REPORT_API': JSON.stringify('https://mock.invalid/report'),
     'import.meta.env.VITE_PROJECTS_API': JSON.stringify('https://mock.invalid/gate'),
+    // NET-152 Ф-3: форма читает дневной слой, чтобы спросить про пересдачу
+    'import.meta.env.VITE_DAILY_API': JSON.stringify('https://mock.invalid/daily'),
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
   build: {
@@ -339,8 +509,14 @@ await build({
 })
 console.log('✓  lib-сборка готова')
 
-// мок fetch: GET → гейт «ок», POST → сценарий из postMode
+// мок fetch: GET → гейт «ок» или дневной слой (?action=daily), POST → сценарий из postMode
 let postMode = 'ok' // 'ok' | 'reject' | 'neterror' | 'flaky'
+// NET-152 Ф-3: дневной слой для формы. По умолчанию пуст — старые сценарии идут без
+// вопроса о пересдаче. 'fail' — осознанный 404 (не повторяемый), чтобы проверить, что
+// сбой ЧТЕНИЯ не мешает отправке, и не ждать пауз политики повторов.
+let dailyPayload = { updated: null, sets: {} }
+let dailyMode = 'ok' // 'ok' | 'fail'
+const getUrls = []
 // v2.4: сколько первых POST-ов режим 'flaky' завалит сетевой ошибкой, прежде чем
 // ответить успехом. Так воспроизводится утро 05.08: связь подвела, повтор прошёл.
 let postFailsLeft = 0
@@ -364,6 +540,14 @@ global.fetch = async (url, opts = {}) => {
       submitted_msk: '2026-08-07 06:42:13',
     })
   }
+  const u = String(url)
+  getUrls.push(u)
+  if (u.includes('action=daily')) {
+    if (dailyMode === 'fail') return { ok: false, status: 404, json: async () => ({}) }
+    return json(dailyPayload)
+  }
+  // NET-152: фраза репортёра (D-12 §9-A) — гейт отвечает ролью, данных не даёт
+  if (u.includes('key=reporter-phrase')) return json({ ok: true, role: 'reporter' })
   return json({}) // гейт: 200 без error → фраза ок, роль owner
 }
 
@@ -404,6 +588,8 @@ async function setInput(root, id, value) {
 const submitBtn = (root) => root.querySelector('button[type="submit"]')
 // v2: «Отправить» тапабельна всегда (скролл к проблеме), блокировка — aria-disabled
 const btnBlocked = (root) => submitBtn(root).getAttribute('aria-disabled') === 'true'
+// 25.09: в поле число видно с разделителем тысяч («100 000»), в модели — только цифры.
+const digitsOf = (s) => String(s ?? '').replace(/\D+/g, '')
 
 console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) ===')
 {
@@ -439,10 +625,10 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
     el.textContent.includes('Все три числа — из выгрузки „[Финансовые] Выручка“ за день, ничего не считаем вручную.'))
   check('хинт под «Чеков за день» виден без тултипа',
     el.textContent.includes('= итоговое „Кол-во чеков“ дня в выгрузке'))
-  check('хинт под «Пополнений за день» виден без тултипа',
-    el.textContent.includes('= Σ „Кол-во“ по строкам „Покупка очков“'))
-  check('хинт под «Чеков с пополнением (сессии)» виден без тултипа',
-    el.textContent.includes('= Σ „Кол-во чеков“ по строкам „Покупка очков“'))
+  check('хинт под «Пополнений за день» виден без тултипа (текст v2.4 Ф-4)',
+    el.textContent.includes('= Σ „Кол-во“ по строкам „Очки-Деньги“ с операцией „Покупка очков“'))
+  check('хинт под «Чеков с пополнением (сессии)» виден без тултипа (текст v2.4 Ф-4)',
+    el.textContent.includes('= Σ „Кол-во чеков“ по тем же строкам „Очки-Деньги“'))
   check('хинты именно под полями карты «Чеки» — ровно 3 штуки',
     [...el.querySelectorAll('form p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 3)
   check('числовые инпуты: inputmode=numeric, type=text (без спиннеров)',
@@ -536,10 +722,11 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
     el.textContent.includes('Чеков с пополнением не может быть больше'))
   await setInput(el, 'rep-sessions', '160')
 
-  // topups > receipts НЕ блокирует
+  // topups > receipts — с v2.4 (Ф-1) блокирует: чеков меньше, чем пополнений, не бывает
   await setInput(el, 'rep-topups', '300')
   await setInput(el, 'rep-sessions', '290')
-  check('topups > receipts НЕ блокирует', !btnBlocked(el))
+  check('topups > receipts блокирует (v2.4 Ф-1) + текст «меньше, чем пополнений»',
+    btnBlocked(el) && el.textContent.includes('Чеков за день (265) меньше, чем пополнений (300).'))
   await setInput(el, 'rep-topups', '180')
   await setInput(el, 'rep-sessions', '160')
 
@@ -644,8 +831,8 @@ console.log('\n=== jsdom: ошибка бэка — данные не теряю
   await new Promise((r) => setTimeout(r, 20))
   await nextTick()
   check('красная плашка дословно', el.textContent.includes('Не отправилось — попробуйте ещё раз или пришлите отчёт как обычно'))
-  check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' &&
-    el.querySelector('#rep-site').value === '10000' && el.querySelector('#rep-park').value === 'ohta')
+  check('данные формы НЕ потеряны', digitsOf(el.querySelector('#rep-revenue').value) === '100000' &&
+    digitsOf(el.querySelector('#rep-site').value) === '10000' && el.querySelector('#rep-park').value === 'ohta')
   check('успеха нет', !el.textContent.includes('принят'))
   // v2.4: осознанный отказ бэка повторять бессмысленно — тело запроса валиднее
   // не станет. Ровно тот же список причин, по которым очередь сигналов ставит dead.
@@ -715,8 +902,8 @@ console.log('\n=== jsdom: v2.4 — связь легла совсем: три п
   // v2.5: транспортная осечка → подсказка про VPN прямо в плашке.
   const hint = el.querySelector('[data-test="report-send-hint"]')
   check('подсказка про VPN в плашке, дословно', !!hint && hint.textContent.includes(NET_HINTS.vpn))
-  check('данные формы НЕ потеряны', el.querySelector('#rep-revenue').value === '100000' &&
-    el.querySelector('#rep-site').value === '10000')
+  check('данные формы НЕ потеряны', digitsOf(el.querySelector('#rep-revenue').value) === '100000' &&
+    digitsOf(el.querySelector('#rep-site').value) === '10000')
   check('кнопка вернулась в «Отправить» (не залипла в «Отправляем…»)',
     submitBtn(el).textContent.includes(L.submit) && !submitBtn(el).textContent.includes(L.sending))
   check('успеха нет', !el.textContent.includes('принят'))
@@ -739,8 +926,8 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
     el.textContent.includes('Оба числа — из отчёта „Выручка“, строки „Покупка очков“. Итоговую строку отчёта не используем.') &&
     !el.textContent.includes('Все три числа — из выгрузки'))
   check('у Июня — хинты topups/sessions «= Σ …» (v2.3 §2), receipts-хинта нет',
-    el.textContent.includes('= Σ „Кол-во“ по строкам „Покупка очков“') &&
-    el.textContent.includes('= Σ „Кол-во чеков“ по строкам „Покупка очков“') &&
+    el.textContent.includes(FIELD_HINTS.topups) &&
+    el.textContent.includes(FIELD_HINTS.sessions) &&
     !el.textContent.includes('= итоговое „Кол-во чеков“ дня в выгрузке'))
   check('у Июня ровно 2 хинта под полями карты «Чеки» (v2.3 §2)',
     [...el.querySelectorAll('form p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 2)
@@ -783,9 +970,9 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
   // §4 мягкое предупреждение: ввод из итоговой строки (ср.пополнение <500 ₽)
   await setInput(el, 'rep-topups', '260')
   await setInput(el, 'rep-sessions', '200')
-  check('Июнь: ср.пополнение <500 ₽ → жёлтое предупреждение видно (§4)',
+  check('Июнь: ср.пополнение <580 ₽ → жёлтое предупреждение видно (§4, коридор Июня v2.4 Ф-5)',
     el.textContent.includes('Проверьте пополнения: выручка ÷ пополнения =') &&
-    el.textContent.includes('похоже на число из итоговой строки отчёта'))
+    el.textContent.includes('обычно у вас от 580 до 990.'))
   check('§4: предупреждение НЕ блокирует кнопку (aria-disabled=false)', !btnBlocked(el))
   await setInput(el, 'rep-topups', '120')
   await setInput(el, 'rep-sessions', '110')
@@ -800,6 +987,351 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
   check('Июнь: тело §6 — site есть, receipts нет',
     body.park === 'iyun' && body.site === 10000 && !('receipts' in body) &&
     body.topups === 120 && body.sessions === 110)
+  app.unmount()
+}
+
+// ═══════════════ v2.4 · NET-152 — приёмка §8 живым рендером ═══════════════
+// Заполнение формы валидными числами парка. Охта/Питер: 85 пополнений, выручка 100 000
+// (1 176 ₽ — внутри коридоров Охты и Питера), чеков 112 (1,32), сессий 80 (1,06).
+// Июнь: 88 пополнений, выручка 66 000 (750 ₽ — внутри коридора Июня), сессий 87.
+async function fillPark(el, park, over = {}) {
+  const base = park === 'iyun'
+    ? { revenue: '66000', cashless: '40000', cash: '20000', site: '6000',
+        visitors_total: '150', visitors_new: '10', topups: '88', sessions: '87' }
+    : { revenue: '100000', cashless: '60000', cash: '30000', site: '10000',
+        visitors_total: '150', visitors_new: '10', receipts: '112', topups: '85', sessions: '80' }
+  await setInput(el, 'rep-park', park)
+  for (const [k, v] of Object.entries({ ...base, ...over })) await setInput(el, `rep-${k}`, v)
+  await setInput(el, 'rep-weather', 'sunny')
+}
+const settle = async (ms = 30) => { await new Promise((r) => setTimeout(r, ms)); await nextTick() }
+const submitForm = async (el) => { await fire(el.querySelector('form'), 'submit'); await settle() }
+const warnText = (el) => el.querySelector('[role="status"]')?.textContent || ''
+const redBorder = (el, id) => el.querySelector(`#${id}`).className.includes('--negative')
+const dialog = () => document.querySelector('[data-test="report-resubmit"]')
+// Дата «пересдачи»: три дня назад — не вчера (форма подставляет вчера сама), не будущее.
+const RESUB_DATE = (() => { const d = new Date(); d.setDate(d.getDate() - 3); return toISODate(d) })()
+
+console.log('\n=== NET-152 · §8 п.1–4: Охта, чеки ÷ пополнения (Ф-1) ===')
+{
+  dailyPayload = { updated: null, sets: {} }
+  postMode = 'ok'
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  await fillPark(el, 'ohta', { receipts: '778' })
+  check('п.1 Охта 778 при 85 — отправка заблокирована', btnBlocked(el))
+  check('п.1 текст §2 («больше 3,0») — дословно',
+    el.textContent.includes('Чеков за день (778) в 9,2 раз больше пополнений (85). Обычно их больше в полтора раза. Проверьте число по отчёту.'))
+  check('п.1 подсвечены оба числа пары', redBorder(el, 'rep-receipts') && redBorder(el, 'rep-topups'))
+  check('п.1 жёлтая строка про чеки не дублирует красную', !warnText(el).includes('Проверьте чеки'))
+  postedBodies.length = 0
+  await submitForm(el)
+  check('п.1 тап «Отправить» — POST не ушёл', postedBodies.length === 0)
+
+  await setInput(el, 'rep-receipts', '80')
+  check('п.2 Охта 80 при 85 — заблокирована', btnBlocked(el))
+  check('п.2 текст §2 («меньше 1,0») — дословно',
+    el.textContent.includes('Чеков за день (80) меньше, чем пополнений (85). Так не бывает: каждое пополнение — это чек. Проверьте оба числа по отчёту.'))
+
+  await setInput(el, 'rep-receipts', '112')
+  check('п.3 Охта 112 при 85 — кнопка активна', !btnBlocked(el))
+  check('п.3 без предупреждений (жёлтой строки нет)', !el.querySelector('[role="status"]'), warnText(el))
+  check('п.3 красной плашки нет', !el.textContent.includes('Чеков за день ('))
+  check('п.3 подсветки нет', !redBorder(el, 'rep-receipts') && !redBorder(el, 'rep-topups'))
+
+  await setInput(el, 'rep-receipts', '150')
+  check('п.4 Охта 150 при 85 — проходит', !btnBlocked(el))
+  check('п.4 жёлтая строка §2 — дословно, K = 1,8',
+    warnText(el).includes('Проверьте чеки: на 10 пополнений у вас обычно от 11 до 16 чеков, сейчас 1,8.'), warnText(el))
+  postedBodies.length = 0
+  await submitForm(el)
+  check('п.4 отправка уходит (жёлтая не блокирует), вопроса о пересдаче нет — дня в слое нет',
+    postedBodies.length === 1 && !dialog() && el.textContent.includes('принят'))
+  check('п.4 в теле POST чеки и пополнения как введены', (() => {
+    const b = JSON.parse(postedBodies[0] || '{}')
+    return b.receipts === 150 && b.topups === 85 && b.sessions === 80
+  })())
+  app.unmount()
+}
+
+console.log('\n=== NET-152 · §8 п.5–6: ТЦ Июнь, пополнения ÷ сессии (Ф-2) ===')
+{
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  await fillPark(el, 'iyun', { sessions: '2' })
+  check('п.5 Июнь 2 сессии при 88 — заблокирована', btnBlocked(el))
+  check('п.5 текст §3 — дословно',
+    el.textContent.includes('Чеков с пополнением (2) намного меньше пополнений (88). Обычно эти числа почти равны. Проверьте по отчёту: считаются только строки „Очки-Деньги“ с операцией „Покупка очков“.'))
+  check('п.5 подсвечены оба числа пары', redBorder(el, 'rep-topups') && redBorder(el, 'rep-sessions'))
+  check('п.5 мягкая строка v2.3 про сессии не дублирует красную', !el.textContent.includes('Проверьте сессии'))
+  postedBodies.length = 0
+  await submitForm(el)
+  check('п.5 тап «Отправить» — POST не ушёл', postedBodies.length === 0)
+  await setInput(el, 'rep-sessions', '87')
+  check('п.6 Июнь 87 при 88 — проходит', !btnBlocked(el))
+  check('п.6 без предупреждений', !el.querySelector('[role="status"]'), warnText(el))
+  check('п.6 красной плашки нет', !el.textContent.includes('намного меньше пополнений'))
+  app.unmount()
+}
+
+console.log('\n=== NET-152 · §8 п.7: дата, за которую в дневном слое есть выручка (Ф-3) ===')
+{
+  dailyPayload = { updated: null, sets: {
+    [`piterland:${RESUB_DATE.slice(0, 7)}`]: {
+      park: 'piterland', month: RESUB_DATE.slice(0, 7),
+      days: [{ date: RESUB_DATE, rev: 207249, status: 'full' }],
+    },
+  } }
+  postMode = 'ok'
+  const dailyBefore = getUrls.filter((u) => u.includes('action=daily')).length
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  check('форма запросила дневной слой (owner)',
+    getUrls.filter((u) => u.includes('action=daily')).length === dailyBefore + 1)
+  await fillPark(el, 'piterland')
+  await setInput(el, 'rep-date', RESUB_DATE)
+  postedBodies.length = 0
+  await submitForm(el)
+  let d = dialog()
+  check('п.7 подтверждение показано', !!d)
+  check('п.7 текст — дословно, с выручкой из слоя',
+    !!d && d.textContent.includes(`За эту дату отчёт уже есть: выручка ${rub(207249)}. Отправить новый вместо него?`),
+    d?.textContent)
+  const yes = document.querySelector('[data-test="report-resubmit-yes"]')
+  const cancel = document.querySelector('[data-test="report-resubmit-cancel"]')
+  check('п.7 кнопки «Да, пересдаю» и «Отмена»',
+    yes?.textContent.trim() === 'Да, пересдаю' && cancel?.textContent.trim() === 'Отмена')
+  check('п.7 у диалога роль alertdialog и aria-modal', d?.getAttribute('role') === 'alertdialog' && d?.getAttribute('aria-modal') === 'true')
+  check('п.7 кнопки ≥ 44pt (min-h-[48px])', yes?.className.includes('min-h-[48px]') && cancel?.className.includes('min-h-[48px]'))
+  check('п.7 фокус на «Отмене»: случайный Enter день не перезапишет', document.activeElement === cancel)
+  check('п.7 пока вопрос открыт, POST не ушёл', postedBodies.length === 0)
+
+  await fire(cancel, 'click')
+  await settle()
+  check('п.7 «Отмена» закрывает вопрос', !dialog())
+  check('п.7 «Отмена» возвращает в форму: POST нет, поля и дата на месте, успеха нет',
+    postedBodies.length === 0 && digitsOf(el.querySelector('#rep-revenue').value) === '100000' &&
+    el.querySelector('#rep-date').value === RESUB_DATE && el.querySelector('#rep-park').value === 'piterland' &&
+    !el.textContent.includes('принят'))
+
+  // Escape и тап по фону — тоже «Отмена»
+  await submitForm(el)
+  check('повторный тап «Отправить» — вопрос снова', !!dialog())
+  document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await settle()
+  check('Escape = «Отмена»: вопрос закрыт, POST нет', !dialog() && postedBodies.length === 0)
+  await submitForm(el)
+  const scrim = dialog()?.parentElement
+  scrim?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  await settle()
+  check('тап по фону = «Отмена»: вопрос закрыт, POST нет', !dialog() && postedBodies.length === 0)
+
+  // Другая дата того же парка — дня в слое нет → без вопроса (проверим ниже отдельно);
+  // здесь — «Да, пересдаю»
+  await submitForm(el)
+  await fire(document.querySelector('[data-test="report-resubmit-yes"]'), 'click')
+  await settle()
+  check('«Да, пересдаю» → POST ушёл ровно один', postedBodies.length === 1, postedBodies.length)
+  const body = JSON.parse(postedBodies[0] || '{}')
+  check('в теле — выбранная дата пересдачи и числа формы',
+    body.date === RESUB_DATE && body.park === 'piterland' && body.revenue === 100000 && body.receipts === 112)
+  check('после «Да, пересдаю» — экран успеха, вопрос закрыт', el.textContent.includes('принят') && !dialog())
+  app.unmount()
+}
+
+console.log('\n=== NET-152 · §8 п.8: дата без данных — подтверждения нет ===')
+{
+  // слой тот же (Питер, RESUB_DATE с выручкой)
+  postMode = 'ok'
+  {
+    const { el, app } = mount(bundle.DailyReportScreen)
+    await settle()
+    await fillPark(el, 'piterland') // дата по умолчанию — вчера, в слое её нет
+    postedBodies.length = 0
+    await submitForm(el)
+    check('п.8 вчера (в слое нет) → без вопроса, POST ушёл', !dialog() && postedBodies.length === 1)
+    app.unmount()
+  }
+  {
+    const { el, app } = mount(bundle.DailyReportScreen)
+    await settle()
+    await fillPark(el, 'ohta')
+    await setInput(el, 'rep-date', RESUB_DATE)
+    postedBodies.length = 0
+    await submitForm(el)
+    check('п.8 та же дата, но другой парк → без вопроса (чужой день не мешает)', !dialog() && postedBodies.length === 1)
+    app.unmount()
+  }
+  {
+    // слой не загрузился — отправка без вопроса: сбой ЧТЕНИЯ не должен мешать отчёту
+    dailyMode = 'fail'
+    const { el, app } = mount(bundle.DailyReportScreen)
+    await settle()
+    await fillPark(el, 'piterland')
+    await setInput(el, 'rep-date', RESUB_DATE)
+    postedBodies.length = 0
+    await submitForm(el)
+    check('слой не загрузился → без вопроса, POST ушёл', !dialog() && postedBodies.length === 1)
+    check('ошибка чтения слоя в форме не показывается (не её забота)',
+      !el.textContent.includes('Источник недоступен'))
+    app.unmount()
+    dailyMode = 'ok'
+  }
+}
+
+console.log('\n=== NET-152 · режим репортёра: дневной слой не читается вовсе (D-12 §9-A) ===')
+{
+  await ak.submitKey('reporter-phrase')
+  check('фраза репортёра → role = reporter', ak.role.value === 'reporter')
+  const dailyBefore = getUrls.filter((u) => u.includes('action=daily')).length
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  check('у репортёра запроса дневного слоя НЕТ',
+    getUrls.filter((u) => u.includes('action=daily')).length === dailyBefore)
+  await fillPark(el, 'piterland')
+  await setInput(el, 'rep-date', RESUB_DATE)
+  postedBodies.length = 0
+  await submitForm(el)
+  check('у репортёра вопроса нет, отчёт уходит', !dialog() && postedBodies.length === 1)
+  check('репортёра не выкинуло на вход (logout не случился)', ak.authed.value === true)
+  app.unmount()
+  await ak.submitKey('test-phrase')
+  check('обратно фраза владельца → role = owner', ak.role.value === 'owner')
+}
+
+console.log('\n=== NET-152 · §8 п.9: хинты Ф-4 без тултипов во всех трёх парках ===')
+for (const park of ['ohta', 'piterland', 'iyun']) {
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  await setInput(el, 'rep-park', park)
+  check(`${park}: хинт «Пополнений за день» — дословно, виден сразу`,
+    el.textContent.includes('= Σ „Кол-во“ по строкам „Очки-Деньги“ с операцией „Покупка очков“'))
+  check(`${park}: хинт «Чеков с пополнением» — дословно, виден сразу`,
+    el.textContent.includes('= Σ „Кол-во чеков“ по тем же строкам „Очки-Деньги“'))
+  check(`${park}: во вводной карты «Чеки» — предложение про пакеты и ЛК`,
+    el.textContent.includes('Пакеты и пополнения через личный кабинет сюда не входят — деньги за них учитываются отдельно.'))
+  check(`${park}: старой формулировки «по строкам „Покупка очков“» на экране нет`,
+    !el.textContent.includes('по строкам „Покупка очков“'))
+  check(`${park}: тултипы при этом закрыты (проверяем видимое, а не спрятанное)`,
+    [...el.querySelectorAll('button[aria-expanded]')].filter((b) => b.getAttribute('aria-label')?.startsWith('Пояснение'))
+      .every((b) => b.getAttribute('aria-expanded') === 'false'))
+  app.unmount()
+}
+
+console.log('\n=== NET-152 · Ф-5 живьём: коридор Питерленда ===')
+{
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  await fillPark(el, 'piterland', { revenue: '102000', cashless: '62000' }) // 1 200 ₽
+  check('Питер 1 200 ₽ → жёлтая строка с границами парка',
+    warnText(el).includes(`Проверьте пополнения: выручка ÷ пополнения = ${rub(1200)}, обычно у вас от 830 до ${formatInt(1190)}.`),
+    warnText(el))
+  check('жёлтая строка не блокирует', !btnBlocked(el))
+  app.unmount()
+}
+
+console.log('\n=== NET-152 · Ф-6: блок «Как получить отчёт» ===')
+{
+  try { window.localStorage.removeItem('bc:report:howto_open') } catch { /* нет хранилища */ }
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  check('до выбора парка блока нет', !el.querySelector('[data-test="report-howto"]'))
+  await setInput(el, 'rep-park', 'piterland')
+  const howto = el.querySelector('[data-test="report-howto"]')
+  const toggle = el.querySelector('[data-test="report-howto-toggle"]')
+  check('блок есть, заголовок «Как получить отчёт»', !!howto && toggle?.textContent.includes('Как получить отчёт'))
+  check('стоит прямо над картой «Чеки»',
+    howto?.nextElementSibling?.querySelector('h2')?.textContent.trim() === 'Чеки')
+  check('по умолчанию свёрнут', toggle?.getAttribute('aria-expanded') === 'false' &&
+    !el.querySelector('[data-test="report-howto-body"]'))
+  check('строка — тач-таргет ≥ 44pt', toggle?.className.includes('min-h-[44px]'))
+  await fire(toggle, 'click')
+  const body = el.querySelector('[data-test="report-howto-body"]')
+  check('по нажатию раскрывается', toggle.getAttribute('aria-expanded') === 'true' && !!body)
+  check('внутри пять строк', body?.querySelectorAll('dt').length === 5 && body?.querySelectorAll('dd').length === 5)
+  check('игротека Питерленда — «БУМБАСТИК»', body?.textContent.includes('БУМБАСТИК'))
+  check('группировки и воронки — по задаче',
+    body?.textContent.includes('Наименование · Операция · Тип оплаты · Источник транзакции') &&
+    body?.textContent.includes('все светлые; тёмная значит, что строки скрыты и суммы неверные'))
+  check('строка про «Статистику посещений» — под списком',
+    body?.textContent.includes('Игроков всего и Из них новых — из отчёта „Статистика посещений“ за тот же день.'))
+  check('примеров чисел и рублей в блоке нет', !/₽/.test(body?.textContent || '') &&
+    !/\d{2,}/.test(body?.textContent || ''))
+  check('раскрытие запомнено на устройстве', window.localStorage.getItem('bc:report:howto_open') === '1')
+  await setInput(el, 'rep-park', 'iyun')
+  check('смена парка → игротека «Бумбастик ТРК Июнь»',
+    el.querySelector('[data-test="report-howto-body"]')?.textContent.includes('Бумбастик ТРК Июнь'))
+  app.unmount()
+
+  const m2 = mount(bundle.DailyReportScreen)
+  await settle()
+  await setInput(m2.el, 'rep-park', 'ohta')
+  check('после перезахода блок открыт (состояние запомнено), игротека Охты',
+    m2.el.querySelector('[data-test="report-howto-toggle"]')?.getAttribute('aria-expanded') === 'true' &&
+    m2.el.querySelector('[data-test="report-howto-body"]')?.textContent.includes('Бумбастик Охта Молл'))
+  await fire(m2.el.querySelector('[data-test="report-howto-toggle"]'), 'click')
+  check('повторное нажатие сворачивает и запоминает', !m2.el.querySelector('[data-test="report-howto-body"]') &&
+    window.localStorage.getItem('bc:report:howto_open') === '0')
+  m2.app.unmount()
+  try { window.localStorage.removeItem('bc:report:howto_open') } catch { /* нет хранилища */ }
+}
+
+
+console.log('\n=== Ввод чисел: разделение на тысячи (25.09) ===')
+{
+  const NB = ' '
+  postMode = 'ok'
+  dailyPayload = { updated: null, sets: {} }
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await settle()
+  await setInput(el, 'rep-park', 'piterland')
+  const rev = el.querySelector('#rep-revenue')
+  await setInput(el, 'rep-revenue', '207249')
+  check('ввели 207249 → в поле «207 249»', rev.value === `207${NB}249`, JSON.stringify(rev.value))
+  await setInput(el, 'rep-revenue', '1234567')
+  check('миллионы → «1 234 567»', rev.value === `1${NB}234${NB}567`, JSON.stringify(rev.value))
+  await setInput(el, 'rep-revenue', '1 234 567 ₽')
+  check('вставка «1 234 567 ₽» → только цифры, сгруппированы заново', rev.value === `1${NB}234${NB}567`)
+  await setInput(el, 'rep-topups', '85')
+  check('до тысячи — без пробела («85»)', el.querySelector('#rep-topups').value === '85')
+  check('разделитель — неразрывный пробел, как в остальных числах приложения', rev.value.includes(NB) && !rev.value.includes(' '))
+  check('атрибута pattern="[0-9]*" нет — с пробелами поле не числится :invalid', !rev.hasAttribute('pattern'))
+  check('клавиатура по-прежнему цифровая (inputmode=numeric)', rev.getAttribute('inputmode') === 'numeric')
+
+  // правка в середине числа: каретка остаётся за вставленной цифрой, а не прыгает в конец
+  rev.value = `1${NB}2394${NB}567`
+  rev.setSelectionRange(5, 5)
+  await fire(rev, 'input')
+  check('вставили 9 в середину «1 234 567» → «12 394 567»', rev.value === `12${NB}394${NB}567`, JSON.stringify(rev.value))
+  check('каретка сразу за вставленной цифрой', rev.selectionStart === 5, rev.selectionStart)
+
+  // Backspace по самому пробелу стирает цифру перед ним
+  await setInput(el, 'rep-revenue', '207249')
+  rev.value = '207249'
+  rev.setSelectionRange(3, 3)
+  rev.dispatchEvent(new dom.window.InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }))
+  await nextTick()
+  check('Backspace по пробелу в «207 249» → «20 249»', rev.value === `20${NB}249`, JSON.stringify(rev.value))
+  check('каретка после Backspace — сразу за «20»', rev.selectionStart === 2, rev.selectionStart)
+  // Delete по пробелу стирает цифру после него
+  await setInput(el, 'rep-revenue', '207249')
+  rev.value = '207249'
+  rev.setSelectionRange(3, 3)
+  rev.dispatchEvent(new dom.window.InputEvent('input', { bubbles: true, inputType: 'deleteContentForward' }))
+  await nextTick()
+  check('Delete по пробелу в «207 249» → «20 749»', rev.value === `20${NB}749`, JSON.stringify(rev.value))
+
+  // в модель, в проверки и в отправку идут только цифры
+  await fillPark(el, 'piterland', { revenue: '207249', cashless: '147834', cash: '44415', site: '15000',
+    visitors_total: '300', visitors_new: '40', receipts: '265', topups: '180', sessions: '160' })
+  check('в полях денег — разделители', el.querySelector('#rep-cashless').value === `147${NB}834` &&
+    el.querySelector('#rep-cash').value === `44${NB}415` && el.querySelector('#rep-site').value === `15${NB}000`)
+  check('проверка «безнал + нал + кабинет = выручка» считает по цифрам — кнопка активна', !btnBlocked(el))
+  postedBodies.length = 0
+  await submitForm(el)
+  const body = JSON.parse(postedBodies[0] || '{}')
+  check('в отправку ушли числа без пробелов', body.revenue === 207249 && body.cashless === 147834 &&
+    body.cash === 44415 && body.site === 15000, postedBodies[0])
   app.unmount()
 }
 

@@ -81,28 +81,41 @@ async function hardReload() {
       : 'bg-transparent border-b border-transparent'"
   >
     <!-- Три колонки: слот «Назад» · заголовок · пилюля.
-         Заголовок — колонка `auto`: занимает СВОЮ ширину и остаётся ровно по
-         центру, потому что боковые колонки `minmax(2.75rem, 1fr)` делят остаток
-         поровну. Так компактный заголовок не обрезается ни на одном разделе
-         (прежние боковые отступы по 10rem зажимали его в ~73px при нужных 121–138px).
-         Узко (375px) — сжимается и обрезается по многоточию подпись «Назад»,
-         а не заголовок; 2.75rem = 44pt тач-таргета боковым слотам гарантированы. -->
-    <div class="grid h-11 w-full grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)] items-center">
+         25.09 (правка владельца): боковые слоты НЕ заходят на заголовок ни на одном
+         экране. Раньше боковые колонки были `minmax(2.75rem, 1fr)`, а содержимое
+         слота стояло `justify-self-start/end` — и вылезало за свою колонку, когда
+         было шире её: подпись «‹ Контроль Дня» наезжала на «Отчёт Дня» и «Драйверы
+         роста», пилюля «Вся сеть» — на «Драйверы роста» на узком экране (замер в
+         Chromium: 9 наложений на 48 комбинаций экран × ширина).
+         Теперь:
+           • боковые колонки `minmax(max-content, 1fr)` — не уже своего содержимого,
+             а свободное место делят поровну, пока его хватает (заголовок ровно по
+             центру); не хватает — узкая сторона уступает, заголовок чуть смещается,
+             но не перекрывается;
+           • колонка заголовка `minmax(0, auto)` — своей ширины, пока есть место, и
+             многоточие, когда места нет совсем;
+           • слева только стрелка — подпись «Назад» убрана (решение владельца):
+             куда ведёт кнопка, говорит aria-label. -->
+    <div class="grid h-11 w-full grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center">
       <!-- Левый угол: back, иначе чип бизнеса (Главная).
            Правка 28.07: чип переехал СЮДА, в липкую полосу, — он не должен уезжать
            при скролле, это постоянный контекст экрана. Кнопка перезагрузки ушла
            в правый угол: на Главной правый слот свободен (нет ни парк-фильтра,
            ни селектора месяца), а слева теперь живёт контекст, а не служебное
            действие. -->
-      <div class="flex min-w-0 items-center justify-self-start pl-1">
+      <div class="flex items-center justify-self-start pl-1">
+        <!-- Только стрелка, 44×44 pt. Подпись раздела, куда ведёт «Назад», — в
+             aria-label и title (VoiceOver и подсказка при наведении на ПК). -->
         <button
           v-if="showBack"
           type="button"
-          class="flex min-h-[44px] min-w-0 items-center gap-0.5 rounded-lg px-1 text-[var(--text)] active:bg-[var(--surface-2)]"
+          data-test="nav-back"
+          class="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--text)] active:bg-[var(--surface-2)]"
+          :aria-label="backLabel ? `Назад: ${backLabel}` : 'Назад'"
+          :title="backLabel ? `Назад: ${backLabel}` : 'Назад'"
           @click="$emit('back')"
         >
-          <ChevronLeft class="h-6 w-6 shrink-0" :stroke-width="2.25" />
-          <span v-if="backLabel" class="truncate text-[1.0625rem] leading-none">{{ backLabel }}</span>
+          <ChevronLeft class="h-6 w-6 shrink-0" :stroke-width="2.25" aria-hidden="true" />
         </button>
         <div v-else-if="eyebrow" class="pl-2">
           <BusinessChip :label="eyebrow" />
@@ -126,7 +139,7 @@ async function hardReload() {
       <!-- Правый угол: либо управляемый слот раздела (селектор месяца в «Сводках»),
            либо компактная пилюля парк-фильтра (виден при collapsed && parkFilter).
            Слот виден всегда: у раздела с ним нет второй копии контрола в потоке. -->
-      <div class="flex min-w-0 items-center justify-self-end gap-1 pr-1">
+      <div class="flex items-center justify-self-end gap-1 pr-1">
         <div v-if="trailing" data-test="nav-trailing" class="flex min-w-0 items-center">
           <component :is="trailing.component" v-bind="trailing.props" />
         </div>
