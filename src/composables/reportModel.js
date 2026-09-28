@@ -21,6 +21,16 @@
 //     очков», бонусные пакеты в них не входят, и чеков дня меньше, чем пополнений,
 //     не было ни разу за 161 день (минимум отношения 1,13);
 //   • Ф-2: topups ÷ sessions > 2,0 — стоп (все парки; максимум факта 1,26).
+//
+// v2.5 (NET-91, решение владельца 28.09.2026) — карта «Дни рождения», все три парка:
+//   • bd_sum «Дни рождения: сумма, ₽» и bd_cards «Дни рождения: карт» — из того же отчёта
+//     «Выручка», строки праздничного пакета; bd_parties «Сколько было праздников» — со слов смены;
+//   • ВСЕ ТРИ НЕОБЯЗАТЕЛЬНЫЕ и НИ ОДНОЙ жёсткой проверки: «эту цифру даёт команда и может не
+//     дать, и тогда отправка отчёта не должна встать из-за этой цифры». Только жёлтые строки
+//     (softWarnings). Праздников больше, чем карт, — тоже жёлтая, не стоп: пакет могли
+//     оплатить в другой день, в кассе дата чека, а не праздника;
+//   • пустое поле НЕ уходит в payload (ключа нет), ноль уходит нулём: «не заполнили» ≠
+//     «праздников не было». Бэк (Apps Script v3.22) страхует то же самое со своей стороны.
 
 export const REPORT_PARK_IDS = ['ohta', 'piterland', 'iyun']
 
@@ -50,12 +60,20 @@ export function fieldGroupsFor(park) {
       { key: 'rev_vk', required: false },
     )
   }
+  // v2.5 (NET-91): дни рождения — у всех трёх парков, все необязательные
+  const birthdays = BD_FIELDS.map((key) => ({ key, required: false }))
   return [
     { section: 'money', fields: money },
     { section: 'players', fields: players },
     { section: 'checks', fields: checks },
+    { section: 'birthdays', fields: birthdays },
   ]
 }
+
+// v2.5 (NET-91): ключи payload карты «Дни рождения» и цена карты праздничного пакета.
+// Во всех 70 днях кассы июнь–август сумма ДР ровно равна картам × 1 000 ₽ (замер контура B).
+export const BD_FIELDS = ['bd_sum', 'bd_cards', 'bd_parties']
+export const BD_CARD_RUB = 1000
 
 // Плоский список числовых полей парка (порядок = порядок рендера).
 export function numericFieldsFor(park) {
@@ -85,6 +103,7 @@ export function emptyForm(park = '', now = new Date()) {
     revenue: '', cashless: '', cash: '', site: '',
     visitors_total: '', visitors_new: '',
     receipts: '', topups: '', sessions: '', promo: '', rev_y: '', rev_vk: '',
+    bd_sum: '', bd_cards: '', bd_parties: '',
     weather: '',
     comment: '',
   }
@@ -261,6 +280,21 @@ export function softWarnings(form) {
       !sessionsRatioError(topups, sessions)) {
     out.push({ key: 'topups_per_session' })
   }
+  // v2.5 (NET-91): дни рождения — ТОЛЬКО мягко, отправку не держит ни одна из строк.
+  const bdSum = toInt(form.bd_sum)
+  const bdCards = toInt(form.bd_cards)
+  const bdParties = toInt(form.bd_parties)
+  if ((bdSum == null) !== (bdCards == null)) {
+    out.push({ key: 'bd_pair' })                      // сумма и карты — из одних и тех же строк
+  } else if (bdSum != null && bdCards != null && bdSum !== bdCards * BD_CARD_RUB) {
+    out.push({ key: 'bd_sum_cards', sum: bdSum, cards: bdCards })
+  }
+  if (bdParties != null && bdCards != null && bdParties > bdCards) {
+    out.push({ key: 'bd_parties', parties: bdParties, cards: bdCards })
+  }
+  if (bdSum != null && revenue != null && bdSum > revenue) {
+    out.push({ key: 'bd_over_revenue', sum: bdSum, revenue })
+  }
   return out
 }
 
@@ -291,6 +325,7 @@ export function existingRevenue(daily, park, date) {
 // Тело POST (без гейт-ключа `key` — его добавляет useReport из useAccessKey).
 // Контракт §6: site — все парки; receipts — только Охта/Питер; topups/sessions —
 // у всех; promo/rev_y/rev_vk — Июнь, необязательные (пустые не отправляются).
+// v2.5 (NET-91): bd_sum/bd_cards/bd_parties — все парки, необязательные, пустые не отправляются.
 export function buildPayload(form) {
   const p = {
     park: form.park,
@@ -313,6 +348,10 @@ export function buildPayload(form) {
       const n = toInt(form[k])
       if (n != null) p[k] = n
     }
+  }
+  for (const k of BD_FIELDS) {
+    const n = toInt(form[k])
+    if (n != null) p[k] = n
   }
   const c = String(form.comment ?? '').trim()
   if (c) p.comment = c

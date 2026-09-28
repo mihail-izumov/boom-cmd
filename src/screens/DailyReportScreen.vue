@@ -13,7 +13,7 @@ import {
 } from '../composables/reportModel.js'
 import { PARKS_BY_ID } from '../data/parks.js'
 import {
-  L, FIELD_LABELS, SECTION_TITLES, WEATHER_OPTIONS, WEEKLY_NOTE,
+  L, FIELD_LABELS, SECTION_TITLES, WEATHER_OPTIONS, WEEKLY_NOTE, BIRTHDAYS_INTRO,
   checksIntroFor, hintFor, tipFor, summaryValue, summaryLabelFor, softWarnMessage,
   sumMismatch, dateHuman, acceptedTime, receiptsRatioMessage, sessionsRatioMessage,
 } from '../i18n/report.js'
@@ -23,7 +23,8 @@ import {
 // читается (v2.4 Ф-3) только дневной слой — узнать, есть ли уже выручка за выбранную
 // дату, и спросить перед пересдачей. Дата по умолчанию — ВЧЕРА; будущие запрещены; не-вчера —
 // жёлтая плашка (не блокирует). Форма — смысловые карты (ТЗ v2 §1): Деньги /
-// Игроки / Чеки / День + живая сводка «Проверь себя» (§5, в payload не уходит).
+// Игроки / Чеки / Дни рождения (v2.5, NET-91) / День + живая сводка «Проверь себя»
+// (§5, в payload не уходит).
 // Валидация §2–3 блокирует отправку; тап «Отправить» с ошибками — плавный
 // скролл к первому проблемному полю (визарда нет — один экран для рутины).
 // Ошибка сети — красная плашка, данные формы НЕ теряются.
@@ -241,6 +242,11 @@ function more() {
               v-if="g.section === 'checks' && checksIntro"
               class="mt-1 text-[0.8125rem] leading-snug text-[var(--text-secondary)]"
             >{{ checksIntro }}</p>
+            <!-- v2.5 (NET-91): вводная строка карты «Дни рождения» — все парки; поля необязательные -->
+            <p
+              v-if="g.section === 'birthdays'"
+              class="mt-1 text-[0.8125rem] leading-snug text-[var(--text-secondary)]"
+            >{{ BIRTHDAYS_INTRO }}</p>
             <ReportField
               v-for="f in g.fields"
               :id="`rep-${f.key}`"

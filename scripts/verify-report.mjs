@@ -10,6 +10,8 @@
 // вопрос при пересдаче за уже сданную дату по дневному слою (Ф-3), хинты пополнений
 // с «Очки-Деньги» (Ф-4), коридор ср. пополнения по парку (Ф-5), блок «Как получить
 // отчёт» (Ф-6). Приёмка §8 задания — отдельным блоком «v2.4 · приёмка §8».
+// v2.5 (NET-91, 28.09.2026): карта «Дни рождения» — три необязательных поля, только жёлтые
+// строки, пустое не уходит в тело POST. Блоки «NET-91 · модель» и «NET-91 · jsdom».
 //
 // Двухслойная проверка:
 //   1) ЧИСТАЯ МОДЕЛЬ (reportModel.js, без DOM): все блокировки ТЗ v2 §2–3 —
@@ -31,6 +33,7 @@ import {
   emptyForm, validate, buildPayload, derived, numericFieldsFor, toInt,
   yesterdayISO, todayISO, softWarnings,
   existingRevenue, receiptsRatioError, sessionsRatioError, AVG_TOPUP_CORRIDOR, toISODate,
+  BD_FIELDS, BD_CARD_RUB,
 } from '../src/composables/reportModel.js'
 // Политика повторов общая для записи и чтения — живёт в netPolicy.js (05.08, вечер).
 import { RETRY_DELAYS_MS, ATTEMPT_TIMEOUT_MS, isRetriableStatus } from '../src/composables/netPolicy.js'
@@ -40,6 +43,7 @@ import {
   checksIntroFor, summaryLabelFor, summaryValue, softWarnMessage,
   receiptsRatioMessage, sessionsRatioMessage, RESUBMIT, CHECKS_EXCLUDED,
   HOWTO_TITLE, HOWTO_NOTE, HOWTO_PLAYGROUND, howtoRowsFor,
+  BIRTHDAYS_INTRO, SECTION_TITLES,
 } from '../src/i18n/report.js'
 import { NET_HINTS } from '../src/i18n/net.js'
 import { formatInt } from '../src/i18n/analytics.js'
@@ -389,6 +393,53 @@ console.log('\n=== NET-152 · тексты: Ф-4 и Ф-6 ===')
   check('Ф-6: без парка блока нет', howtoRowsFor('').length === 0)
 }
 
+console.log('\n=== NET-91 · модель: дни рождения (v2.5, все поля необязательные) ===')
+{
+  const keys = (park) => numericFieldsFor(park).map((f) => f.key)
+  check('три поля ДР у всех трёх парков',
+    ['ohta', 'piterland', 'iyun'].every((p) => BD_FIELDS.every((k) => keys(p).includes(k))))
+  check('все три необязательные',
+    ['ohta', 'piterland', 'iyun'].every((p) => numericFieldsFor(p).filter((f) => BD_FIELDS.includes(f.key)).every((f) => f.required === false)))
+  check('цена карты — 1 000 ₽', BD_CARD_RUB === 1000)
+  check('пустая форма: поля ДР — пустые строки', BD_FIELDS.every((k) => emptyForm('ohta', NOW)[k] === ''))
+  check('без полей ДР отчёт валиден (отправку не держат)', validate(filled('piterland'), NOW).ok === true)
+  check('праздников больше, чем карт, — всё равно валиден (не стоп)',
+    validate(filled('piterland', { bd_sum: '6000', bd_cards: '6', bd_parties: '9' }), NOW).ok === true)
+  check('сумма ≠ карты × 1 000 — всё равно валиден',
+    validate(filled('ohta', { bd_sum: '7000', bd_cards: '6' }), NOW).ok === true)
+  const p0 = buildPayload(filled('piterland'))
+  check('пустые поля ДР в тело НЕ уходят (ключей нет)', BD_FIELDS.every((k) => !(k in p0)))
+  const pE = buildPayload(filled('piterland', { bd_sum: '', bd_cards: '', bd_parties: '' }))
+  check("'' — тоже не уходит (не превращается в 0)", BD_FIELDS.every((k) => !(k in pE)))
+  const pZ = buildPayload(filled('iyun', { ...iyunOver, bd_sum: '0', bd_cards: '0' }))
+  check('ноль уходит нулём, пустое праздников — нет', pZ.bd_sum === 0 && pZ.bd_cards === 0 && !('bd_parties' in pZ))
+  const pV = buildPayload(filled('ohta', { bd_sum: '12000', bd_cards: '12', bd_parties: '2' }))
+  check('значения — числами', pV.bd_sum === 12000 && pV.bd_cards === 12 && pV.bd_parties === 2)
+  const wk = (over, park = 'piterland') => softWarnings(filled(park, over)).map((w) => w.key).filter((k) => k.startsWith('bd_'))
+  check('согласованные числа — жёлтых строк ДР нет', wk({ bd_sum: '12000', bd_cards: '12', bd_parties: '2' }).length === 0)
+  check('нули — жёлтых строк ДР нет', wk({ bd_sum: '0', bd_cards: '0' }).length === 0)
+  check('только праздники без кассы — жёлтых строк нет (смена сказала, касса пуста)', wk({ bd_parties: '1' }).length === 0)
+  check('одна сумма без карт → «bd_pair»', wk({ bd_sum: '6000' }).join() === 'bd_pair')
+  check('одни карты без суммы → «bd_pair»', wk({ bd_cards: '6' }).join() === 'bd_pair')
+  check('сумма ≠ карты × 1 000 → «bd_sum_cards»', wk({ bd_sum: '7000', bd_cards: '6' }).join() === 'bd_sum_cards')
+  check('праздников больше карт → «bd_parties»', wk({ bd_sum: '6000', bd_cards: '6', bd_parties: '7' }).join() === 'bd_parties')
+  check('сумма больше выручки → «bd_over_revenue»',
+    wk({ bd_sum: '300000', bd_cards: '300' }).includes('bd_over_revenue'))
+  const msgs = [{ key: 'bd_pair' }, { key: 'bd_sum_cards', sum: 7000, cards: 6 },
+    { key: 'bd_parties', parties: 7, cards: 6 }, { key: 'bd_over_revenue', sum: 300000, revenue: 207249 }].map(softWarnMessage)
+  check('тексты жёлтых строк ДР на месте, без NaN/undefined', msgs.every((m) => m && !/NaN|undefined/.test(m)), msgs.length)
+  check('праздники > карт: текст объясняет законный случай и разрешает отправить',
+    msgs[2].includes('оплатили в другой день') && msgs[2].includes('отправляйте'))
+  check('подписи полей дословно (ТЗ §00)',
+    FIELD_LABELS.bd_sum === 'Дни рождения: сумма, ₽' && FIELD_LABELS.bd_cards === 'Дни рождения: карт' &&
+    FIELD_LABELS.bd_parties === 'Сколько было праздников')
+  check('заголовок карты — «Дни рождения»', SECTION_TITLES.birthdays === 'Дни рождения')
+  check('вводная строка говорит, что отчёт уйдёт и без этих чисел', BIRTHDAYS_INTRO.includes('Отчёт отправится и без этих чисел'))
+  check('хинты ДР для всех трёх парков', ['ohta', 'piterland', 'iyun'].every((p) => BD_FIELDS.every((k) => hintFor(p, k))))
+  check('D-106: в текстах ДР нет наших слов', ![BIRTHDAYS_INTRO, ...msgs, TIPS.bd_sum, TIPS.bd_cards, TIPS.bd_parties]
+    .some((t) => /конверси|метрик|поток|рычаг|докупк|сесси/i.test(t)))
+}
+
 console.log('\n=== useReport: политика повторов (v2.4) ===')
 check('две повторные попытки, всего три', RETRY_DELAYS_MS.length === 2, RETRY_DELAYS_MS.join('/'))
 check('паузы растут и не нулевые',
@@ -629,8 +680,10 @@ console.log('\n=== jsdom: DailyReportScreen — happy path (Питерленд) 
     el.textContent.includes('= Σ „Кол-во“ по строкам „Очки-Деньги“ с операцией „Покупка очков“'))
   check('хинт под «Чеков с пополнением (сессии)» виден без тултипа (текст v2.4 Ф-4)',
     el.textContent.includes('= Σ „Кол-во чеков“ по тем же строкам „Очки-Деньги“'))
+  // v2.5: хинты «= …» есть и в карте «Дни рождения» — считаем внутри карты «Чеки»
+  const checksCard = [...el.querySelectorAll('form section')].find((sec) => sec.querySelector('h2')?.textContent.trim() === 'Чеки')
   check('хинты именно под полями карты «Чеки» — ровно 3 штуки',
-    [...el.querySelectorAll('form p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 3)
+    !!checksCard && [...checksCard.querySelectorAll('p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 3)
   check('числовые инпуты: inputmode=numeric, type=text (без спиннеров)',
     el.querySelector('#rep-site').getAttribute('inputmode') === 'numeric' &&
     el.querySelector('#rep-site').getAttribute('type') === 'text')
@@ -929,8 +982,10 @@ console.log('\n=== jsdom: Июнь — свои поля, receipts нет ===')
     el.textContent.includes(FIELD_HINTS.topups) &&
     el.textContent.includes(FIELD_HINTS.sessions) &&
     !el.textContent.includes('= итоговое „Кол-во чеков“ дня в выгрузке'))
+  // v2.5: хинты «= …» есть и в карте «Дни рождения» — считаем внутри карты «Чеки»
+  const checksCardIyun = [...el.querySelectorAll('form section')].find((sec) => sec.querySelector('h2')?.textContent.trim() === 'Чеки')
   check('у Июня ровно 2 хинта под полями карты «Чеки» (v2.3 §2)',
-    [...el.querySelectorAll('form p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 2)
+    !!checksCardIyun && [...checksCardIyun.querySelectorAll('p')].filter((p) => p.textContent.trim().startsWith('= ')).length === 2)
   // тултипы topups/sessions у Июня — v1 («как раньше», §1)
   const tipBtn = el.querySelector('button[aria-label="Пояснение: Пополнений за день"]')
   await fire(tipBtn, 'click')
@@ -1332,6 +1387,56 @@ console.log('\n=== Ввод чисел: разделение на тысячи (
   const body = JSON.parse(postedBodies[0] || '{}')
   check('в отправку ушли числа без пробелов', body.revenue === 207249 && body.cashless === 147834 &&
     body.cash === 44415 && body.site === 15000, postedBodies[0])
+  app.unmount()
+}
+
+console.log('\n=== NET-91 · jsdom: карта «Дни рождения» (Охта) ===')
+{
+  postMode = 'ok'
+  const { el, app } = mount(bundle.DailyReportScreen)
+  await nextTick()
+  await setInput(el, 'rep-park', 'ohta')
+  const h2 = [...el.querySelectorAll('h2')].map((h) => h.textContent.trim())
+  check('карта «Дни рождения» есть и стоит между «Чеки» и «День»',
+    h2.indexOf('Дни рождения') > h2.indexOf('Чеки') && h2.indexOf('Дни рождения') < h2.indexOf('День'), h2.join(' · '))
+  check('вводная строка на месте', el.textContent.includes(BIRTHDAYS_INTRO))
+  check('три поля на месте', BD_FIELDS.every((k) => !!el.querySelector(`#rep-${k}`)))
+  const bdCard = [...el.querySelectorAll('form section')].find((sec) => sec.querySelector('h2')?.textContent.trim() === 'Дни рождения')
+  check('все три помечены «необязательно»', !!bdCard && (bdCard.textContent.match(/необязательно/g) || []).length === 3)
+  const fillBase = async () => {
+    for (const [id, v] of [['rep-revenue', '207249'], ['rep-cashless', '147834'], ['rep-cash', '44415'], ['rep-site', '15000'],
+      ['rep-visitors_total', '300'], ['rep-visitors_new', '40'], ['rep-receipts', '265'], ['rep-topups', '180'],
+      ['rep-sessions', '160'], ['rep-weather', 'rain_all']]) await setInput(el, id, v)
+  }
+  await fillBase()
+  check('без полей ДР кнопка активна', !btnBlocked(el))
+  await setInput(el, 'rep-bd_cards', '6')
+  check('одни карты → жёлтая строка про пару, кнопка активна',
+    el.textContent.includes('сумма и карты берутся из одних и тех же строк') && !btnBlocked(el))
+  await setInput(el, 'rep-bd_sum', '6000')
+  check('сумма дописана → строка про пару ушла', !el.textContent.includes('сумма и карты берутся из одних и тех же строк'))
+  await setInput(el, 'rep-bd_parties', '7')
+  check('праздников больше карт → жёлтая строка, кнопка активна',
+    el.textContent.includes('Праздников (7) больше, чем карт (6)') && !btnBlocked(el))
+  postedBodies.length = 0
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, 20))
+  await nextTick()
+  const body = JSON.parse(postedBodies[0] || '{}')
+  check('POST ушёл, поля ДР в теле числами', postedBodies.length === 1 &&
+    body.bd_sum === 6000 && body.bd_cards === 6 && body.bd_parties === 7,
+    JSON.stringify({ s: body.bd_sum, c: body.bd_cards, p: body.bd_parties }))
+  // «Внести ещё» → те же числа без ДР: ключей в теле нет вовсе
+  const more = [...el.querySelectorAll('button')].find((b) => b.textContent.includes('Внести ещё'))
+  if (more) await fire(more, 'click')
+  await fillBase()
+  check('после «Внести ещё» поля ДР пустые', BD_FIELDS.every((k) => digitsOf(el.querySelector(`#rep-${k}`)?.value) === ''))
+  postedBodies.length = 0
+  await fire(el.querySelector('form'), 'submit')
+  await new Promise((r) => setTimeout(r, 20))
+  const body2 = JSON.parse(postedBodies[0] || '{}')
+  check('пустые поля ДР в тело не ушли (ключей нет)', postedBodies.length === 1 && BD_FIELDS.every((k) => !(k in body2)))
+  check('без NaN/undefined/Infinity', !BAD.test(el.textContent))
   app.unmount()
 }
 
