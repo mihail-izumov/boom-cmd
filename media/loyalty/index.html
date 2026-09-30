@@ -24,7 +24,7 @@
      Подписи — сверху по центру, предметы — в центре. Карта (реальный макет
      «Новая игровая карта», вариант 1) и телефон кабинета меняются местами по
      кругу, переходя между слоями вперёд-назад с тенью и объёмом:
-       карта волной собирается из слоёв самого макета → слои улетают
+       элементы макета по одному ложатся на карту → улетают
        в телефон, предметы меняются местами, молния бьёт прямо в
        телефон → кабинет по очереди крупно выдвигает баланс, пополнение,
        прогресс до приза, статус (плотная заливка, рамка, бегущие по часовой
@@ -175,38 +175,41 @@
   @keyframes cap7{0%,76%{opacity:0;transform:scale(.94)}77%,99.2%{opacity:1;transform:none}100%{opacity:0}}
 
   /* ── КАРТА — РЕАЛЬНЫЙ МАКЕТ «Новая игровая карта», вариант 1 (лайм),
-     лицевая сторона один в один: boom-cmd/public/materials/new-game-card_v2.jpg,
-     вырезка → img/card-front.webp (подключает loyalty.js, --card-img).
-     Карта собирается ВОЛНОЙ из 7 горизонтальных слоёв самого макета: слой за
-     слоем ложится поверх основы. При передаче слои волной улетают в телефон,
-     остаётся пустая основа того же цвета; на обратном ходе — возвращаются.
-     Центр — (30, 38): 27em × 43em (пропорция макета 0,628). */
+     лицевая сторона один в один: boom-cmd/public/materials/new-game-card_v2.jpg.
+     Карта = однотонная основа (#3b4470, цвет фона макета) + 8 ОТДЕЛЬНЫХ
+     элементов макета, вырезанных с прозрачным фоном (img/card-*.webp):
+     «Играть», БУМБАСТИК, табло B00M.FUN, БООМ!, «Это умная карта», номер,
+     «Копит заряды», «Начисляет бонусы». Координаты — из макета 486×775 px,
+     переведены в em карты (27em = 486px). Элементы по очереди ложатся на
+     основу, при передаче по очереди улетают в телефон, потом возвращаются.
+     ⚠ Не резать макет полосами: полоса несёт кусок фона и режет элементы
+     пополам — на панели это читалось как рваные прямоугольники (v5.1). */
   .card{
     position:absolute;left:16.5em;top:16.5em;width:27em;height:43em;border-radius:2.8em;
-    background:#3b4371;border:.2em solid rgba(140,160,255,.45);
+    background:#3b4470;
     animation:card-orb 30s ease-in-out infinite;
   }
-  .card .sl{position:absolute;left:-.2em;margin-top:-.2em;width:27em;height:6.1429em;background-image:var(--card-img);
-    background-size:27em 43em;background-repeat:no-repeat;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
-  .card .sl:first-child{border-radius:2.8em 2.8em 0 0}
-  .card .sl:last-child{border-radius:0 0 2.8em 2.8em}
-  .card .sl:nth-child(1){top:0.0000em;background-position:0 0.0000em;animation-name:sl0}
-  .card .sl:nth-child(2){top:6.1429em;background-position:0 -6.1429em;animation-name:sl1}
-  .card .sl:nth-child(3){top:12.2857em;background-position:0 -12.2857em;animation-name:sl2}
-  .card .sl:nth-child(4){top:18.4286em;background-position:0 -18.4286em;animation-name:sl3}
-  .card .sl:nth-child(5){top:24.5714em;background-position:0 -24.5714em;animation-name:sl4}
-  .card .sl:nth-child(6){top:30.7143em;background-position:0 -30.7143em;animation-name:sl5}
-  .card .sl:nth-child(7){top:36.8571em;background-position:0 -36.8571em;animation-name:sl6}
-  @keyframes sl0{0%,1.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}2.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}3.40%,10.40%{opacity:1;transform:none}12.20%,71.80%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}73.30%{opacity:1;transform:translateX(-4%) rotate(2deg)}74.10%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
-  @keyframes sl1{0%,1.50%{opacity:0;transform:translateX(-120%) rotate(-9deg)}3.10%{opacity:1;transform:translateX(5%) rotate(-2deg)}3.90%,10.70%{opacity:1;transform:none}12.50%,72.25%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}73.75%{opacity:1;transform:translateX(-4%) rotate(2deg)}74.55%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
-  @keyframes sl2{0%,2.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}3.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}4.40%,11.00%{opacity:1;transform:none}12.80%,72.70%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}74.20%{opacity:1;transform:translateX(-4%) rotate(2deg)}75.00%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
-  @keyframes sl3{0%,2.50%{opacity:0;transform:translateX(-120%) rotate(-9deg)}4.10%{opacity:1;transform:translateX(5%) rotate(-2deg)}4.90%,11.30%{opacity:1;transform:none}13.10%,73.15%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}74.65%{opacity:1;transform:translateX(-4%) rotate(2deg)}75.45%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
-  @keyframes sl4{0%,3.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}4.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}5.40%,11.60%{opacity:1;transform:none}13.40%,73.60%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}75.10%{opacity:1;transform:translateX(-4%) rotate(2deg)}75.90%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
-  @keyframes sl5{0%,3.50%{opacity:0;transform:translateX(-120%) rotate(-9deg)}5.10%{opacity:1;transform:translateX(5%) rotate(-2deg)}5.90%,11.90%{opacity:1;transform:none}13.70%,74.05%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}75.55%{opacity:1;transform:translateX(-4%) rotate(2deg)}76.35%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
-  @keyframes sl6{0%,4.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}5.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}6.40%,12.20%{opacity:1;transform:none}14.00%,74.50%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}76.00%{opacity:1;transform:translateX(-4%) rotate(2deg)}76.80%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  .card::after{content:'';position:absolute;inset:0;border-radius:inherit;border:.25em solid rgba(150,170,255,.55);pointer-events:none}
+  .card .el{position:absolute;display:block;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
+  .card .e-tab{left:7.500em;top:0.000em;width:12.111em;height:5.389em;animation-name:el0}
+  .card .e-name{left:1.333em;top:6.333em;width:24.333em;height:4.167em;animation-name:el1}
+  .card .e-site{left:1.389em;top:11.056em;width:24.556em;height:5.611em;animation-name:el2}
+  .card .e-boom{left:1.500em;top:16.889em;width:24.333em;height:7.278em;animation-name:el3}
+  .card .e-smart{left:1.389em;top:24.889em;width:24.389em;height:3.778em;animation-name:el4}
+  .card .e-num{left:2.833em;top:29.278em;width:3.000em;height:11.167em;animation-name:el5}
+  .card .e-f1{left:7.222em;top:29.278em;width:18.778em;height:5.833em;animation-name:el6}
+  .card .e-f2{left:7.222em;top:35.000em;width:18.778em;height:5.444em;animation-name:el7}
+  @keyframes el0{0%,0.80%{opacity:0;transform:translateY(-2.5em) scale(1.25)}2.20%{opacity:1;transform:translateY(.2em) scale(.97)}2.80%,10.60%{opacity:1;transform:none}12.40%,72.00%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}73.60%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}74.30%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el1{0%,1.35%{opacity:0;transform:translateY(-2.5em) scale(1.25)}2.75%{opacity:1;transform:translateY(.2em) scale(.97)}3.35%,10.85%{opacity:1;transform:none}12.65%,72.30%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}73.90%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}74.60%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el2{0%,1.90%{opacity:0;transform:translateY(-2.5em) scale(1.25)}3.30%{opacity:1;transform:translateY(.2em) scale(.97)}3.90%,11.10%{opacity:1;transform:none}12.90%,72.60%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}74.20%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}74.90%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el3{0%,2.45%{opacity:0;transform:translateY(-2.5em) scale(1.25)}3.85%{opacity:1;transform:translateY(.2em) scale(.97)}4.45%,11.35%{opacity:1;transform:none}13.15%,72.90%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}74.50%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}75.20%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el4{0%,3.00%{opacity:0;transform:translateY(-2.5em) scale(1.25)}4.40%{opacity:1;transform:translateY(.2em) scale(.97)}5.00%,11.60%{opacity:1;transform:none}13.40%,73.20%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}74.80%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}75.50%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el5{0%,3.55%{opacity:0;transform:translateY(-2.5em) scale(1.25)}4.95%{opacity:1;transform:translateY(.2em) scale(.97)}5.55%,11.85%{opacity:1;transform:none}13.65%,73.50%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}75.10%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}75.80%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el6{0%,4.10%{opacity:0;transform:translateY(-2.5em) scale(1.25)}5.50%{opacity:1;transform:translateY(.2em) scale(.97)}6.10%,12.10%{opacity:1;transform:none}13.90%,73.80%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}75.40%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}76.10%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
+  @keyframes el7{0%,4.65%{opacity:0;transform:translateY(-2.5em) scale(1.25)}6.05%{opacity:1;transform:translateY(.2em) scale(.97)}6.65%,12.35%{opacity:1;transform:none}14.15%,74.10%{opacity:0;transform:translate(16em,-8em) scale(.4) rotate(8deg)}75.70%{opacity:1;transform:translate(-.4em,.2em) scale(1.03)}76.40%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
   .card .glint{position:absolute;inset:0;overflow:hidden;border-radius:2.8em;pointer-events:none}
-  .card .glint::after{content:'';position:absolute;top:-30%;bottom:-30%;width:9em;left:-14em;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:rotate(18deg);animation:glint 30s ease-in-out infinite}
-  @keyframes glint{0%,5%{left:-14em}9%{left:40em}9.1%,75%{left:-14em}79%{left:40em}79.1%,100%{left:-14em}}
+  .card .glint::after{content:'';position:absolute;top:-30%;bottom:-30%;width:9em;left:-14em;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);transform:rotate(18deg);animation:glint 30s ease-in-out infinite}
+  @keyframes glint{0%,5.5%{left:-14em}9.5%{left:40em}9.6%,76%{left:-14em}80%{left:40em}80.1%,100%{left:-14em}}
 
   /* Орбита. Спереди: none; сзади: сдвиг ±14em вбок, −4em вверх, ×0.7,
      притушен. Середина пути: ±18em вбок, +1em вниз, ×0.86. */
@@ -473,9 +476,9 @@
 
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
-    .card,.card .sl,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
+    .card,.card .el,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
     .step,.alt span,.lvl-max .pct,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
-    .card .sl{opacity:1;transform:none}
+    .card .el{opacity:1;transform:none}
     .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
     .cap.c7{opacity:1}
     .fz{opacity:1}
@@ -529,15 +532,16 @@
           <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
           <div class="cap c7"><div class="t">Заряжай <b>онлайн</b></div><div class="s"><i>—</i> не стой в очереди</div></div>
         </div>
-        <!-- Карта гостя — реальный макет, собирается волной из слоёв -->
+        <!-- Карта гостя — реальный макет: основа + 8 отдельных элементов -->
         <div class="card" aria-hidden="true">
-          <i class="sl"></i>
-          <i class="sl"></i>
-          <i class="sl"></i>
-          <i class="sl"></i>
-          <i class="sl"></i>
-          <i class="sl"></i>
-          <i class="sl"></i>
+          <img class="el e-tab" src="./img/card-tab.webp" alt="">
+          <img class="el e-name" src="./img/card-name.webp" alt="">
+          <img class="el e-site" src="./img/card-site.webp" alt="">
+          <img class="el e-boom" src="./img/card-boom.webp" alt="">
+          <img class="el e-smart" src="./img/card-smart.webp" alt="">
+          <img class="el e-num" src="./img/card-num.webp" alt="">
+          <img class="el e-f1" src="./img/card-f1.webp" alt="">
+          <img class="el e-f2" src="./img/card-f2.webp" alt="">
           <span class="glint"></span>
         </div>
         <span class="strike" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L3 14 h9 l-1 8 10-12 h-9 l1-8 z"/></svg></span>
