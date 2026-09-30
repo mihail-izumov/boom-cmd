@@ -64,6 +64,7 @@ export default defineConfig({
   // MPA: два независимых входа.
   //   app   — Vue-приложение «Мастерплан» (/)
   //   turbo — носитель для ТВ-панелей у кассы (/media/turbo/), DRV-10
+  //   loyalty — ТВ-экран «Твоя карта» для постоянных гостей (/media/loyalty/)
   //
   // Почему вход, а не файл в public/: только внутри сборки работает подстановка
   // import.meta.env, через которую URL Apps Script приходит из repo Variable.
@@ -78,6 +79,8 @@ export default defineConfig({
       input: {
         app: resolve(root, 'index.html'),
         turbo: resolve(root, 'media/turbo/index.html'),
+        // ТВ-экран «Твоя карта» (/media/loyalty/) — статичный, без API
+        loyalty: resolve(root, 'media/loyalty/index.html'),
       },
     },
   },
