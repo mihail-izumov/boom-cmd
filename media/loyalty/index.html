@@ -4,380 +4,456 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#0b0c20">
+<meta name="theme-color" content="#0d0a2e">
 <title>Твоя карта // Бумбастик</title>
 <!--
   ═══════════════════════════════════════════════════════════════════════════
-   b00m-cmd · /media/loyalty/ · ТВ-экран «Твоя карта» для постоянных гостей
+   b00m-cmd · /media/loyalty/ · ТВ-экран «Твоя карта» — статусы и карта гостя
   ═══════════════════════════════════════════════════════════════════════════
-  Отдельный контур `media/` — носители для парков, как /media/turbo/. К
-  Vue-приложению «Мастерплан» отношения не имеет: свой Vite-вход, свой
-  дизайн, БЕЗ гейта доступа.
+  Отдельный контур `media/` — носители для парков, как /media/turbo/. Свой
+  Vite-вход, БЕЗ гейта доступа, без API.
 
   ⚠ DESIGN-STANDARD-boom-cmd.md на эту страницу НЕ распространяется — это
-    носитель для гостя, а не экран приложения (то же исключение, что в
-    шапке media/turbo/index.html).
+    носитель для гостя (то же исключение, что в шапке media/turbo/index.html).
 
-  ЗАДАЧА ЭКРАНА — не «прочитай про программу», а «достань телефон и
-  посмотри свою карту». Поэтому весь экран сходится к одному QR.
+  ─── v2.0 · разбор владельца 30.09 ─────────────────────────────────────────
+  1. ШАПКА И ПОДВАЛ — ОДИН В ОДИН С ТУРБО. Экраны будут чередоваться на одной
+     панели (автопереключение раз в 30 с, пауза внутри парка), и шапка с
+     подвалом не должны «прыгать» при смене. Поэтому совпадает всё: сетка
+     страницы (padding 20, gap 16, ряды 76px и 46px), палитра, классы и CSS
+     .head/.brand/.parks/.fineband/.svc/.stamp/.powered — скопированы из
+     turbo/index.html без изменений. Правишь там — поправь и здесь.
+     Парк запоминается в том же ключе localStorage, что у турбо
+     (boom-turbo-park): переключатель одного экрана действует на оба.
+  2. СОДЕРЖАНИЕ /rewards СЖАТО В ЯЧЕЙКИ. Тексты и цифры — только те, что уже
+     опубликованы на b00m.fun/rewards (BoomRewards.vue). Отзывы, калькулятор и
+     кнопки не переносим: экран — витрина, к нему не прикоснуться.
+     Пороги и скидки владелец подтвердил 30.09 («цифры верны»).
+  3. ДВА ОТДЕЛЬНЫХ ПОСЫЛА: «+500 бонусов за регистрацию» (флаг по парку,
+     Питерленд — скрыт) и «до +60% бонусами при пополнении онлайн».
+  4. КАЖДАЯ ЯЧЕЙКА С ДВИЖЕНИЕМ — как блок «День рождения» у турбо, но только
+     CSS: ступени загораются по очереди, молния искрит, тикет выезжает,
+     батарея заряжается, плашка +500 покачивается.
 
-  КАНВА — механизм турбо-страницы, не свой (он уже пережил разбор «с
-  расстояния не читается» и «поля обрезаются», см. шапку turbo/index.html):
-  эталон кегля 1920×1080, k = min(vw/1920, vh/1080), логический размер
-  канвы = vw/k × vh/k, кегли крупных слов подбираются замером (fitCount).
-  Отличие одно: у этого носителя есть и ВЕРТИКАЛЬНАЯ раскладка. В портрете
-  эталон поворачивается — 1080×1920, k = min(vw/1080, vh/1920) — и сетка
-  перестраивается в одну колонку. Турбо в портрете показывает заглушку;
-  здесь портрет — рабочий режим.
-
-  БЛОКИ
-    1. Оффер: «Твоя карта — это счёт».
-    2. «Что у тебя уже накоплено» — Заряды · Тикеты · Статус. Каждое крупное
-       слово — с подписью, что это. Цифр НЕТ намеренно: макет «1300 зарядов»
-       гости однажды прочли наоборот, как цену.
-    3. Лестница статусов — за флагом SHOW_LEVELS (loyalty.js), сейчас false:
-       пороги и скидки не сверены с кассовой системой. Цвета — из
-       boom-fun/.vitepress/components/BoomRewards.vue.
-    4. QR на b00m.fun/karta/<парк>?from=loyalty-tv — loyalty-qr.js.
-    5. «+500 бонусов за первую регистрацию» — флагом по парку (loyalty.js).
-
-  ⚠ НИЧЕГО НЕ ОБЕЩАТЬ сверх написанного: ни скидок, ни сгорания или
-    несгорания, ни розыгрышей. Страница статичная, без API.
+  КАНВА — механизм турбо: эталон 1920×1080, k = min(vw/1920, vh/1080),
+  кегли крупных слов — замером (fitCount). Вертикаль: эталон 1080×1920.
 
   ПАРАМЕТРЫ URL (те же, что у турбо)
-    ?park=ohta|piterland|iyun  — парк панели (обязателен: без него QR неизвестен)
+    ?park=ohta|piterland|iyun  — жёстко фиксирует парк, переключатель скрыт
     &tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
-    &demo=1                    — песочница: переключатель парков и предпросмотр
-                                 лестницы статусов (в бой не идёт)
+    &demo=1                    — песочница: переключатель «цифры статусов»
   ═══════════════════════════════════════════════════════════════════════════
 -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Веса — ровно те, что у media/turbo/index.html. Другое подмножество дало
-     бы два визуально разных «одинаковых» шрифта на соседних экранах. -->
+<!-- Веса — ровно те, что у media/turbo/index.html. -->
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0b0c20;
-    --tile:#15173a;
-    --tile2:#1d2050;
-    --line:rgba(255,255,255,.10);
+    /* Палитра — та же, что у турбо: экраны чередуются на одной панели */
+    --bg:#0d0a2e;
+    --tile:#171243;
+    --tile2:#1e1856;
+    --blue:#2d6bff;
+    --green:#3fe06c;
+    --lime:#c6f52e;
+    --yellow:#ffd530;
+    --pink:#ff3d68;
     --white:#ffffff;
-    --muted:#aab0d6;          /* 8,6:1 на --tile */
-    --dark:#0b0c20;
-    --lime:#C5F946;           /* лайм сайта b00m.fun (boom-styles.css) */
-    --yellow:#FFD60A;
-    --cyan:#00D4FF;
-    --radius:28px;
+    --muted:#9b94d0;
+    --soft:#b3ade0;           /* подписи на плитках: 5,8:1 на --tile */
+    --dark:#0d0a2e;
+    --radius:26px;
     /* Цвета уровней — ровно из BoomRewards.vue (b00m.fun/rewards) */
     --lv-standard:#6B6B7C;
     --lv-silver:#00D4FF;
     --lv-gold:#FFD60A;
     --lv-platinum:#FF0080;
-    /* Цвет парка — подставляет loyalty.js из PARKS */
-    --pk:#FF0080;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{
-    background:#05060f;
+    background:#07051c;
     color:var(--white);
     font-family:'Inter',system-ui,sans-serif;
     overflow:hidden;
   }
 
-  /* ══ КАНВА ══ механика — из turbo, см. шапку и fitStage в loyalty.js ══ */
+  /* ══ КАНВА ══ механика турбо, см. fitStage в loyalty.js ══ */
   .viewport{
     position:fixed;inset:0;
     display:flex;align-items:center;justify-content:center;
-    background:#05060f;overflow:hidden;
+    background:#07051c;overflow:hidden;
   }
-  .stage{flex:none;transform-origin:center center;background:var(--bg);position:relative;overflow:hidden}
-  /* Фон: два размытых пятна — цвет парка и лайм. Статичные: фон, который
-     шевелится, на панели в зале читается как «сломался экран». */
-  .stage::before{
-    content:'';position:absolute;inset:0;pointer-events:none;
-    background:
-      radial-gradient(40% 55% at 12% 18%, color-mix(in srgb, var(--pk) 26%, transparent) 0%, transparent 70%),
-      radial-gradient(38% 50% at 88% 92%, rgba(197,249,70,.14) 0%, transparent 70%);
-  }
+  .stage{flex:none;transform-origin:center center;background:var(--bg);position:relative}
 
   .page{
-    position:relative;
     width:100%;height:100%;
     display:grid;
-    gap:18px;
-    padding:24px;
-    /* ГОРИЗОНТАЛЬ: слева рассказ, справа QR во всю высоту — всё сходится к нему */
-    grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);
-    grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 64px;
+    /* Колонки и ряды — те же доли, что у турбо: ячейки двух экранов стоят
+       на одних и тех же местах, смена читается как смена содержания. */
+    grid-template-columns:1.05fr 1.5fr 1.05fr;
+    grid-template-rows:76px minmax(0,1.9fr) minmax(0,1fr) 46px;
     grid-template-areas:
-      "offer qr"
-      "tiles qr"
-      "foot  foot";
+      "head   head   head"
+      "card   ladder qr"
+      "bottom bottom bottom"
+      "fine   fine   fine";
+    gap:16px;
+    padding:20px;
   }
-  body.has-levels .page{
-    grid-template-rows:minmax(0,1fr) minmax(0,.95fr) minmax(0,.62fr) 64px;
-    grid-template-areas:
-      "offer  qr"
-      "tiles  qr"
-      "levels levels"
-      "foot   foot";
-  }
-  /* ВЕРТИКАЛЬ: одна колонка, QR внизу крупно — ближе к руке */
   body.portrait .page{
-    grid-template-columns:minmax(0,1fr);
-    grid-template-rows:minmax(0,1fr) minmax(0,.78fr) minmax(0,1.35fr) 64px;
-    grid-template-areas:"offer" "tiles" "qr" "foot";
+    grid-template-columns:1fr 1fr;
+    grid-template-rows:76px minmax(0,1.05fr) minmax(0,1fr) minmax(0,1.3fr) 46px;
+    grid-template-areas:
+      "head   head"
+      "card   qr"
+      "ladder ladder"
+      "bottom bottom"
+      "fine   fine";
   }
-  body.portrait.has-levels .page{
-    grid-template-rows:minmax(0,.9fr) minmax(0,.7fr) minmax(0,1.2fr) minmax(0,.62fr) 64px;
-    grid-template-areas:"offer" "tiles" "qr" "levels" "foot";
-  }
-
   .tile{
     background:var(--tile);
     border-radius:var(--radius);
-    border:1px solid var(--line);
+    padding:26px 30px;
     position:relative;
     overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
     min-height:0;min-width:0;
   }
+  .tile[hidden]{display:none}
 
-  /* ── 1. ОФФЕР ─────────────────────────────────────────────────────────── */
-  .offer{
-    grid-area:offer;
-    background:linear-gradient(150deg, var(--tile2) 0%, var(--tile) 70%);
-    padding:34px 44px 38px;
-    display:flex;flex-direction:column;justify-content:space-between;
+  /* ══ ШАПКА — КОПИЯ turbo/index.html, не править отдельно ══════════════ */
+  .head{
+    grid-area:head;background:var(--tile);border-radius:var(--radius);
+    display:flex;align-items:center;justify-content:center;position:relative;
   }
-  .brand{display:flex;align-items:center;gap:14px}
-  .brand-icon{width:46px;height:auto;flex:none;color:var(--white)}
+  .head .slogan{font-family:'Unbounded';font-weight:700;font-size:30px;color:var(--white);letter-spacing:.5px}
+  .head .slogan b{color:var(--lime)}
+  .brand{position:absolute;left:22px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:14px}
+  .brand-icon{width:44px;height:auto;flex:none;color:var(--white)}
   .brand-badge{
     display:inline-flex;align-items:center;gap:9px;
-    font-family:'Unbounded';font-weight:700;font-size:17px;letter-spacing:.6px;
-    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
-    border-radius:12px;padding:8px 15px;white-space:nowrap;
+    font-family:'Unbounded';font-weight:700;font-size:16px;letter-spacing:.6px;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
-  .brand-badge .sep{color:var(--pk)}
-  /* Текстовая часть занимает место слева от карты; ширину ей задаёт
-     правый отступ под карту, а кегль подбирает fitCount. */
-  .offer-copy{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;padding-right:250px}
-  .offer-title-box{width:100%}
-  /* inline-block — ширина по тексту, иначе замер не отличит «влезло» от
-     «не влезло» (те же грабли, что у #t-num турбо, см. fitCount). */
+  .brand-badge .sep{color:var(--lime)}
+  .parks{
+    position:absolute;right:18px;top:50%;transform:translateY(-50%);
+    display:flex;gap:5px;background:rgba(255,255,255,.06);border-radius:14px;padding:5px;
+  }
+  .parks button{
+    background:transparent;border:none;color:var(--muted);
+    font-family:'Inter';font-weight:700;font-size:15px;
+    padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;
+  }
+  .parks button.on{background:var(--blue);color:#fff}
+  .parks[hidden]{display:none}
+  /* Вертикаль: на 1080 бренд, слоган и переключатель в ряд не встают.
+     Слоган уходит вправо; при видимом переключателе — прячется. */
+  body.portrait .head .slogan{position:absolute;right:26px;font-size:24px}
+  body.portrait.has-parks .head .slogan{display:none}
+
+  /* ── 1. КАРТА: оффер ────────────────────────────────────────────────── */
+  .card-tile{
+    grid-area:card;justify-content:space-between;gap:18px;
+    background:
+      radial-gradient(80% 60% at 50% 55%, rgba(255,0,128,.22) 0%, rgba(255,0,128,0) 70%),
+      linear-gradient(170deg,#241d66 0%, var(--tile) 75%);
+    box-shadow:0 0 0 4px var(--lv-platinum), 0 22px 60px rgba(255,0,128,.22);
+  }
+  .fit-box{width:100%}
+  /* inline-block: ширина по тексту, иначе замер не отличит «влезло» от
+     «не влезло» (грабли #t-num турбо, см. fitCount). */
   .offer-title{
-    display:inline-block;
-    font-family:'Unbounded';font-weight:900;font-size:124px;line-height:1.14;
-    letter-spacing:-1px;text-transform:uppercase;white-space:nowrap;
+    display:inline-block;white-space:nowrap;
+    font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1.12;letter-spacing:-.5px;
+    text-transform:uppercase;
   }
   .offer-title .l2{display:block}
-  .offer-title .dash{color:var(--pk)}
-  .offer-sub{
-    margin-top:26px;
-    font-family:'Inter';font-weight:700;font-size:34px;line-height:1.3;color:var(--muted);
-    max-width:900px;
-  }
-  .offer-sub b{color:var(--white);font-weight:800;white-space:nowrap}
-  /* С лестницей оффер получает меньше высоты — подзаголовок в одну строку,
-     чтобы место досталось заголовку. */
-  body.has-levels:not(.portrait) .offer-sub{font-size:27px;margin-top:18px}
-  body.has-levels:not(.portrait) .acc .ico{width:60px;height:60px;border-radius:16px}
-  body.has-levels:not(.portrait) .acc .ico svg{width:32px;height:32px}
+  .offer-title .dash{color:var(--lv-platinum)}
+  .offer-sub{font-size:22px;font-weight:700;line-height:1.35;color:var(--soft)}
+  .offer-sub b{color:var(--white);font-weight:800}
 
-  /* Карта-«пластик»: предмет, о котором речь, виден раньше слов. */
-  .card{
-    position:absolute;right:-34px;top:54%;
-    width:300px;height:189px;border-radius:22px;
-    background:linear-gradient(135deg, var(--pk) 0%, #2a1d6e 82%);
-    border:1px solid rgba(255,255,255,.22);
-    box-shadow:0 30px 70px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.03);
+  /* Карта-«пластик»: на ней «заряжаются» ячейки — счёт живёт на карте. */
+  .plastic-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  .plastic{
+    position:relative;width:340px;height:214px;flex:none;border-radius:22px;
+    background:linear-gradient(135deg, #ff0080 0%, #6a2bd8 58%, #2a1d6e 100%);
+    border:1px solid rgba(255,255,255,.25);
+    box-shadow:0 26px 60px rgba(0,0,0,.55);
     animation:card-float 6s ease-in-out infinite;
   }
-  @keyframes card-float{
-    0%,100%{transform:translateY(-50%) rotate(-7deg)}
-    50%{transform:translateY(-54%) rotate(-5deg)}
+  @keyframes card-float{0%,100%{transform:rotate(-7deg) translateY(0)}50%{transform:rotate(-4deg) translateY(-10px)}}
+  .plastic .chip{position:absolute;left:28px;top:70px;width:50px;height:38px;border-radius:9px;background:var(--yellow)}
+  .plastic .logo{position:absolute;right:24px;top:20px;font-family:'Unbounded';font-weight:900;font-size:28px;letter-spacing:1px}
+  .plastic .cells{position:absolute;left:28px;bottom:26px;display:flex;gap:8px}
+  .plastic .cells i{
+    width:30px;height:14px;border-radius:4px;background:rgba(255,255,255,.22);
+    animation:cell 3.6s ease-in-out infinite;
   }
-  .card .chip{position:absolute;left:28px;top:66px;width:46px;height:35px;border-radius:9px;background:var(--yellow);opacity:.9}
-  .card .logo{position:absolute;right:26px;top:22px;font-family:'Unbounded';font-weight:900;font-size:28px;letter-spacing:1px}
-  .card .stripe{position:absolute;left:28px;right:28px;bottom:30px;height:10px;border-radius:5px;background:rgba(255,255,255,.4)}
-  .card .glint{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
-  .card .glint::after{
+  .plastic .cells i:nth-child(2){animation-delay:.25s}
+  .plastic .cells i:nth-child(3){animation-delay:.5s}
+  .plastic .cells i:nth-child(4){animation-delay:.75s}
+  .plastic .cells i:nth-child(5){animation-delay:1s}
+  .plastic .cells i:nth-child(6){animation-delay:1.25s}
+  @keyframes cell{0%,8%{background:rgba(255,255,255,.22)}18%,80%{background:var(--lime);box-shadow:0 0 12px rgba(198,245,46,.7)}92%,100%{background:rgba(255,255,255,.22)}}
+  .plastic .glint{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
+  .plastic .glint::after{
     content:'';position:absolute;top:-40%;bottom:-40%;width:70px;left:-120px;
-    background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
     transform:rotate(18deg);animation:glint 6s ease-in-out infinite;
   }
-  @keyframes glint{0%,62%{left:-120px}82%,100%{left:420px}}
+  @keyframes glint{0%,60%{left:-120px}80%,100%{left:440px}}
 
-  /* ── 2. ЧТО НАКОПЛЕНО ─────────────────────────────────────────────────── */
-  .tiles{grid-area:tiles;display:flex;flex-direction:column;gap:14px;min-height:0}
-  .tiles-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 6px}
-  .tiles-head h2{font-family:'Unbounded';font-weight:700;font-size:30px;letter-spacing:.3px}
-  /* Связка к QR: стрелка смотрит туда, где код (в горизонтали — вправо,
-     в вертикали — вниз). Лайм — цвет рамки QR. */
+  /* ── 2. ЛЕСТНИЦА СТАТУСОВ: центральный «герой» ──────────────────────── */
+  .ladder-tile{
+    grid-area:ladder;justify-content:space-between;gap:14px;padding:26px 30px 28px;
+    background:
+      radial-gradient(90% 70% at 50% 25%, rgba(45,107,255,.42) 0%, rgba(45,107,255,0) 70%),
+      linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
+  }
+  .lad-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px}
+  .lad-kicker{
+    display:inline-block;font-family:'Unbounded';font-weight:900;font-size:22px;letter-spacing:6px;text-indent:6px;
+    background:var(--lime);color:var(--dark);padding:6px 16px;border-radius:12px;transform:rotate(-2deg);
+    box-shadow:0 8px 24px rgba(198,245,46,.3);
+  }
+  .lad-title{font-family:'Unbounded';font-weight:900;font-size:40px;line-height:1.1;margin-top:14px}
+  .lad-title small{display:block;font-family:'Inter';font-weight:700;font-size:21px;color:var(--soft);margin-top:8px;letter-spacing:0}
+  /* «−50%» — самое крупное на экране: максимум выгоды читается первым. */
+  .lad-max{flex:none;text-align:right;line-height:1}
+  .lad-max[hidden]{display:none}
+  .lad-max .pct{
+    display:inline-block;white-space:nowrap;
+    font-family:'Unbounded';font-weight:900;font-size:120px;color:var(--lv-platinum);
+    text-shadow:0 0 34px rgba(255,0,128,.55);animation:pct-glow 2.8s ease-in-out infinite;
+  }
+  @keyframes pct-glow{0%,100%{text-shadow:0 0 22px rgba(255,0,128,.35)}50%{text-shadow:0 0 52px rgba(255,0,128,.85)}}
+  .lad-max .cap{display:block;font-size:19px;font-weight:800;color:var(--soft);margin-top:6px;letter-spacing:.4px}
+
+  .ladder{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+  .step{
+    --c:#fff;
+    position:relative;border-radius:18px;padding:14px 16px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--c) 16%, transparent) 0%, rgba(255,255,255,.03) 100%);
+    border:2px solid var(--c);
+    display:flex;flex-direction:column;justify-content:flex-end;gap:5px;min-height:max-content;
+    animation:lit 8s ease-in-out infinite;
+  }
+  .step:nth-child(1){height:58%;animation-delay:0s}
+  .step:nth-child(2){height:72%;animation-delay:2s}
+  .step:nth-child(3){height:86%;animation-delay:4s}
+  .step:nth-child(4){height:100%;animation-delay:6s}
+  /* Ступени загораются по очереди снизу вверх — «уровень растёт». */
+  @keyframes lit{
+    0%,3%{transform:translateY(0);box-shadow:none}
+    8%,22%{transform:translateY(-8px);box-shadow:0 0 0 3px var(--c), 0 14px 40px color-mix(in srgb, var(--c) 55%, transparent)}
+    28%,100%{transform:translateY(0);box-shadow:none}
+  }
+  .step .s-ico{width:38px;height:38px;color:var(--c)}
+  .step .s-name,.step .s-disc{width:100%}
+  /* Имя и скидка — inline-block: кегль подбирает fitSteps, единый на все
+     четыре ступени (в узкой ступени «Стандарт» и «−30%» иначе не влезали). */
+  .step .fs-name{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:22px;color:var(--c)}
+  .step[data-id="standard"] .fs-name{color:#b4b4c4}   /* #6B6B7C текстом не читается */
+  .step .fs-disc{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:44px;line-height:1}
+  .step .s-lbl{font-size:15px;font-weight:800;color:var(--soft);letter-spacing:.4px;text-transform:uppercase;margin-top:-2px}
+  .step .s-base{font-family:'Unbounded';font-weight:700;font-size:22px;color:var(--soft);line-height:1.1}
+  .step .s-thr{font-size:16px;font-weight:700;color:var(--soft);line-height:1.3}
+  .step .s-thr b{color:var(--white)}
+  .step .s-games{font-size:15px;font-weight:700;color:var(--soft);line-height:1.3}
+  .step .s-games b{color:var(--c)}
+  .step:nth-child(1) .s-games b{color:#b4b4c4}
+
+  /* ── 3. QR: белая плитка на месте «Пакетов» турбо ─────────────────── */
+  .qr-tile{
+    grid-area:qr;background:var(--white);color:var(--dark);
+    align-items:center;text-align:center;gap:16px;padding:24px 26px;
+    box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
+  }
+  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:30px;line-height:1.15}
+  .qr-lead b{color:#1d4fd0}
+  .qr-frame{position:relative;flex:none;width:var(--qr,380px);height:var(--qr,380px);padding:16px}
+  .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
+  /* Уголки — СНАРУЖИ кода: всё, что шевелится поверх модулей, мешает камере. */
+  .qr-frame .cn{position:absolute;width:48px;height:48px;border:6px solid var(--blue);animation:aim 2.4s ease-in-out infinite}
+  .qr-frame .c1{left:0;top:0;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
+  .qr-frame .c2{right:0;top:0;border-left:none;border-bottom:none;border-radius:0 16px 0 0}
+  .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
+  .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 16px 0}
+  @keyframes aim{0%,100%{opacity:1}50%{opacity:.45}}
+  .qr-cap{font-size:20px;font-weight:800;line-height:1.3;color:#3a3760}
+  .qr-cap small{display:block;font-size:16px;font-weight:700;color:#6a6790;margin-top:4px}
+
+  /* ── 4. НИЖНИЙ РЯД — доли как у ряда «День рождения» турбо ─────────── */
+  .bottom{grid-area:bottom;display:grid;grid-template-columns:1.7fr .85fr 1.05fr;gap:16px;min-height:0}
+  body.portrait .bottom{grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1.1fr) minmax(0,1fr);grid-template-areas:"stats stats" "p500 p60"}
+  body.portrait .stats{grid-area:stats}
+  body.portrait .p500{grid-area:p500}
+  body.portrait .p60{grid-area:p60}
+
+  /* Что у тебя уже накоплено: три слова, каждое с подписью «что это».
+     Цифр нет намеренно: «1300 зарядов» гости однажды прочли как цену. */
+  .stats{justify-content:space-between;gap:14px;padding:22px 26px}
+  .stats-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .stats-head h2{font-family:'Unbounded';font-weight:700;font-size:26px;white-space:nowrap}
   .to-qr{
-    display:inline-flex;align-items:center;gap:12px;flex:none;
-    background:var(--lime);color:var(--dark);
-    font-family:'Inter';font-weight:900;font-size:22px;letter-spacing:.4px;
-    border-radius:14px;padding:9px 18px;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:10px;flex:none;
+    background:var(--lime);color:var(--dark);font-weight:900;font-size:17px;letter-spacing:.3px;
+    border-radius:11px;padding:7px 14px;white-space:nowrap;
   }
-  .to-qr svg{width:26px;height:26px;animation:nudge-x 1.8s ease-in-out infinite}
-  body.portrait .to-qr svg{transform:rotate(90deg);animation-name:nudge-y}
-  @keyframes nudge-x{0%,100%{transform:translateX(0)}50%{transform:translateX(7px)}}
-  @keyframes nudge-y{0%,100%{transform:rotate(90deg) translateX(0)}50%{transform:rotate(90deg) translateX(7px)}}
-
-  .tiles-row{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  .to-qr svg{width:20px;height:20px;animation:nudge 1.8s ease-in-out infinite}
+  @keyframes nudge{0%,100%{transform:translate(0,0)}50%{transform:translate(4px,-4px)}}
+  .acc-row{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
   .acc{
-    padding:26px 28px 50px;
-    display:flex;flex-direction:column;justify-content:center;gap:14px;
-    border-top:6px solid var(--c);
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:18px;
+    padding:16px 20px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:10px;min-width:0;
+    border-top:5px solid var(--c);
   }
-  .acc .ico{
-    width:74px;height:74px;border-radius:20px;flex:none;
-    display:grid;place-items:center;
-    background:color-mix(in srgb, var(--c) 16%, transparent);
-    border:2px solid var(--c);color:var(--c);
-  }
-  .acc .ico svg{width:40px;height:40px}
-  .acc .word-box{width:100%}
-  /* Крупное слово — ЧТО это; подпись под ним — что именно видно в
-     кабинете. Слово без подписи — ровно та беда, что с «1300 зарядов». */
+  .acc .ico{position:relative;width:58px;height:58px;flex:none;color:var(--c)}
+  .acc .ico > svg{position:absolute;inset:0;width:100%;height:100%}
+  .acc .txt{min-width:0;width:100%}
   .acc .word{
     display:inline-block;white-space:nowrap;
-    font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1;color:var(--white);
+    font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.05;
   }
-  .acc .cap{font-size:25px;font-weight:700;line-height:1.3;color:var(--muted)}
-  /* Статус: четыре сегмента в цветах уровней — язык лояльности без
-     порогов и скидок (они за флагом SHOW_LEVELS). */
-  /* Прижата к низу плитки абсолютом: в потоке она сдвигала «Статус»
-     выше соседних слов, и ряд читался неровным. */
-  .lvbar{position:absolute;left:28px;right:28px;bottom:26px;display:flex;gap:6px;height:12px}
-  .lvbar i{flex:1;border-radius:6px}
+  .acc .cap{font-size:17px;font-weight:700;line-height:1.25;color:var(--soft);margin-top:4px}
 
-  /* ── 3. ЛЕСТНИЦА СТАТУСОВ (SHOW_LEVELS) ──────────────────────────────── */
-  .levels{grid-area:levels;padding:22px 30px;display:flex;align-items:stretch;gap:30px}
-  .levels[hidden]{display:none}
-  .levels-title{flex:none;display:flex;flex-direction:column;justify-content:center;width:300px}
-  .levels-title h2{font-family:'Unbounded';font-weight:900;font-size:32px;line-height:1.15}
-  .levels-title p{margin-top:10px;font-size:20px;font-weight:700;color:var(--muted)}
-  .ladder{flex:1;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:end}
-  .step{
-    border-radius:18px;padding:16px 18px;
-    background:linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, transparent) 0%, rgba(255,255,255,.03) 100%);
-    border:2px solid var(--c);
-    display:flex;flex-direction:column;justify-content:flex-end;gap:6px;min-height:0;
-  }
-  /* Ступени растут слева направо; нижняя граница высоты — содержимое
-     (min-height), иначе низкая ступень срезала бы имя уровня. */
-  .step:nth-child(1){height:64%}
-  .step:nth-child(2){height:76%}
-  .step:nth-child(3){height:88%}
-  .step:nth-child(4){height:100%}
-  .step{min-height:max-content}
-  /* Серый «Стандарт» (#6B6B7C) текстом на тёмном не читается — имя
-     светлее, рамка остаётся цвета уровня. */
-  .step[data-id="standard"] .s-name{color:#b4b4c4}
-  body.portrait .levels{flex-direction:column;gap:14px}
-  body.portrait .levels-title{width:auto;flex-direction:row;align-items:baseline;gap:18px}
-  body.portrait .levels-title p{margin-top:0}
-  body.portrait .ladder{flex:1;min-height:0;gap:10px}
-  body.portrait .step{padding:12px 14px}
-  body.portrait .step .s-name{font-size:21px}
-  body.portrait .step .s-meta{font-size:16px;white-space:normal}
-  .step .s-ico{width:40px;height:40px;color:var(--c)}
-  .step .s-name{font-family:'Unbounded';font-weight:900;font-size:26px;color:var(--c);white-space:nowrap}
-  .step .s-meta{font-size:18px;font-weight:700;color:var(--muted);white-space:nowrap}
-  .step .s-meta b{color:var(--white)}
-  /* Предпросмотр в песочнице — с водяным знаком, чтобы скриншот не ушёл
-     в парк как готовый макет. */
-  .levels .draft{
-    position:absolute;right:18px;top:12px;
-    font-family:'Inter';font-weight:900;font-size:15px;letter-spacing:1px;
-    background:#ff3d68;color:#fff;border-radius:8px;padding:4px 10px;
-  }
+  /* Молния — тот же «электрический» приём, что у турбо (boltwrap) */
+  .bolt .core{animation:bolt-pulse 1.7s ease-in-out infinite;transform-origin:center}
+  .bolt .halo{filter:blur(7px);animation:bolt-halo 1.7s ease-in-out infinite}
+  @keyframes bolt-pulse{0%,100%{transform:scale(1)}42%{transform:scale(1.14)}50%{transform:scale(1.04)}58%{transform:scale(1.16)}}
+  @keyframes bolt-halo{0%,100%{opacity:.2}42%{opacity:.85}50%{opacity:.35}58%{opacity:1}}
+  .bolt .sp{position:absolute;width:10px;height:10px;color:#eaffb0}
+  .bolt .sp svg{width:100%;height:100%;display:block}
+  .bolt .sp1{top:-4px;right:0;animation:spark 1.3s ease-in-out infinite}
+  .bolt .sp2{bottom:2px;left:-6px;animation:spark 1.7s ease-in-out .4s infinite}
+  .bolt .sp3{top:16px;right:-8px;animation:spark 2.3s ease-in-out .9s infinite}
+  @keyframes spark{0%,72%,100%{opacity:0;transform:scale(.4)}80%{opacity:1;transform:scale(1.25)}88%{opacity:.2;transform:scale(.7)}}
+  /* Тикет — выезжает из автомата, как лента на выдаче */
+  .tix .t2{animation:tix-out 2.6s ease-in-out infinite}
+  @keyframes tix-out{0%{transform:translateY(16px);opacity:0}30%,70%{transform:translateY(-8px);opacity:1}100%{transform:translateY(-22px);opacity:0}}
+  /* Корона — перебирает цвета уровней */
+  .crown svg{animation:crown-c 8s steps(1) infinite}
+  @keyframes crown-c{0%{color:#b4b4c4}25%{color:#00D4FF}50%{color:#FFD60A}75%{color:#FF0080}}
 
-  /* ── 4. QR ────────────────────────────────────────────────────────────── */
-  .qr-tile{
-    grid-area:qr;
-    background:
-      radial-gradient(70% 60% at 50% 45%, rgba(197,249,70,.16) 0%, rgba(197,249,70,0) 70%),
-      linear-gradient(170deg, var(--tile2) 0%, var(--tile) 80%);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:30px 32px;gap:26px;text-align:center;
+  /* +500 — та же плашка-«киллер», что «+50 турбо-игр» в ДР турбо */
+  .p500{
+    align-items:center;text-align:center;gap:12px;padding:20px 18px;
+    background:radial-gradient(70% 80% at 50% 40%, rgba(198,245,46,.18) 0%, rgba(198,245,46,0) 70%), linear-gradient(160deg,#241d66 0%, var(--tile) 62%);
   }
-  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:44px;line-height:1.12}
-  .qr-lead b{color:var(--lime)}
-  /* Размер кода — от свободного места (fitQr в loyalty.js), а не константой:
-     в горизонтали он упирается в ширину колонки, в вертикали — в высоту ряда. */
-  .qr-frame{position:relative;flex:none;width:var(--qr,520px);height:var(--qr,520px);padding:22px}
-  .qr-plate{width:100%;height:100%;background:var(--white);border-radius:24px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-  .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
-  /* Уголки-«видоискатель» — СНАРУЖИ кода: всё, что шевелится поверх
-     модулей, мешает камере. Анимация — только прозрачность и масштаб. */
-  .qr-frame .cn{position:absolute;width:64px;height:64px;border:7px solid var(--lime);animation:aim 2.4s ease-in-out infinite}
-  .qr-frame .c1{left:0;top:0;border-right:none;border-bottom:none;border-radius:22px 0 0 0}
-  .qr-frame .c2{right:0;top:0;border-left:none;border-bottom:none;border-radius:0 22px 0 0}
-  .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 22px}
-  .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 22px 0}
-  @keyframes aim{0%,100%{opacity:1}50%{opacity:.45}}
-  .qr-cap{font-size:30px;font-weight:800;line-height:1.3}
-  .qr-cap small{display:block;font-size:22px;font-weight:700;color:var(--muted);margin-top:6px}
+  .plate{
+    position:relative;background:var(--lime);color:var(--dark);
+    border-radius:18px;padding:12px 22px 10px;
+    box-shadow:0 14px 40px rgba(198,245,46,.35);
+    animation:plate-rock 5.6s ease-in-out infinite;
+  }
+  @keyframes plate-rock{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(-2deg) translateY(-4px)}}
+  .plate::after{content:'';position:absolute;inset:-6px;border-radius:22px;box-shadow:0 0 40px 8px rgba(198,245,46,.5);opacity:0;animation:breathe 3.4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:0}50%{opacity:1}}
+  .plate .big{font-family:'Unbounded';font-weight:900;font-size:58px;line-height:.95}
+  .plate .word{font-family:'Unbounded';font-weight:900;font-size:17px;letter-spacing:3px;text-indent:3px;margin-top:4px}
+  .p500 .cap{font-size:18px;font-weight:800;line-height:1.3}
+  /* Парк без +500 (Питерленд): «уровень навсегда» — это FAQ /rewards */
+  .p500 .inf{width:92px;height:56px;color:var(--lv-gold);animation:inf-glow 3s ease-in-out infinite}
+  @keyframes inf-glow{0%,100%{filter:drop-shadow(0 0 4px rgba(255,214,10,.3))}50%{filter:drop-shadow(0 0 16px rgba(255,214,10,.9))}}
+  .p500 .ttl{font-family:'Unbounded';font-weight:900;font-size:26px;line-height:1.15}
+  .p500.alt .cap{color:var(--soft);font-weight:700}
 
-  /* ── 5. НИЖНЯЯ СТРОКА ─────────────────────────────────────────────────── */
-  .foot{
-    grid-area:foot;display:flex;align-items:center;justify-content:space-between;gap:18px;
-    background:rgba(255,255,255,.04);border-radius:18px;padding:0 12px 0 12px;
+  /* +60% при пополнении онлайн — батарея заряжается */
+  .p60{
+    flex-direction:row;align-items:center;gap:20px;padding:20px 24px;
+    background:linear-gradient(150deg,#233b8f 0%,var(--tile) 80%);
   }
-  .bonus{
-    display:inline-flex;align-items:center;gap:14px;
-    font-size:24px;font-weight:800;white-space:nowrap;
+  .batt{position:relative;flex:none;width:86px;height:150px}
+  .batt .body{position:absolute;inset:14px 0 0 0;border:5px solid var(--white);border-radius:16px;overflow:hidden}
+  .batt .nub{position:absolute;left:28px;right:28px;top:0;height:14px;background:var(--white);border-radius:6px 6px 0 0}
+  .batt .fill{position:absolute;left:5px;right:5px;bottom:5px;border-radius:9px;background:linear-gradient(0deg,var(--green),var(--lime));animation:charge 3.2s ease-in-out infinite}
+  @keyframes charge{0%{height:6%}70%,88%{height:calc(100% - 10px)}100%{height:6%}}
+  .batt .bolt-in{position:absolute;inset:14px 0 0 0;display:grid;place-items:center;color:var(--dark)}
+  .batt .bolt-in svg{width:40px;height:40px}
+  .p60 .txt{min-width:0;flex:1}
+  .p60 .pct-box{width:100%;padding-right:10%}   /* запас под «хлопок» scale(1.1) */
+  .p60 .kick{font-family:'Unbounded';font-weight:900;font-size:21px;letter-spacing:.5px}
+  .p60 .pct{
+    display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:62px;line-height:1;margin-top:6px;
+    color:var(--lime);animation:pop 3.2s ease-in-out infinite;transform-origin:left center;
   }
-  .bonus .amt{
-    font-family:'Unbounded';font-weight:900;font-size:24px;
-    background:var(--lime);color:var(--dark);border-radius:11px;padding:6px 14px;
+  @keyframes pop{0%,62%{transform:scale(1)}72%{transform:scale(1.1)}82%,100%{transform:scale(1)}}
+  .p60 .cap{font-size:17px;font-weight:700;line-height:1.35;color:#c5c0ea;margin-top:8px}
+  .p60 .cap b{color:var(--white)}
+
+  /* ══ ПОДВАЛ — КОПИЯ turbo/index.html, не править отдельно ══════════════ */
+  .fineband{
+    grid-area:fine;background:rgba(255,255,255,.04);border-radius:16px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    font-size:17px;color:var(--muted);font-weight:600;padding:0 22px 0 10px;text-align:right;
+    position:relative;
   }
-  .bonus[hidden]{display:none}
+  .fineband .terms{min-width:0}
+  .svc{display:flex;align-items:stretch;gap:8px;flex:none}
+  .svc > *{height:36px}
   .stamp{
-    margin-left:auto;flex:none;display:flex;align-items:center;gap:10px;
+    flex:none;display:flex;align-items:center;gap:11px;
     background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
-    color:#cfcae8;border-radius:11px;padding:7px 13px;
-    font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap;
+    color:#cfcae8;border-radius:11px;padding:0 6px 0 13px;
+    font-family:'Inter';font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap;cursor:pointer;
   }
+  .stamp .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
   .stamp .ver{color:#8f88bd}
+  .stamp .rl{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none;background:rgba(255,255,255,.07);border:none;border-radius:8px;color:#cfcae8;cursor:pointer;padding:0}
+  .stamp .rl:hover{background:rgba(255,255,255,.14)}
+  .stamp .rl svg{width:17px;height:17px}
+  .stamp .rl.spin svg{animation:bc-spin .8s linear infinite}
+  @keyframes bc-spin{to{transform:rotate(360deg)}}
+  .powered{
+    flex:none;display:inline-flex;align-items:center;background:var(--blue);color:var(--white);
+    border-radius:11px;padding:0 15px;font-family:'Inter';font-weight:800;font-size:15px;
+    letter-spacing:.3px;white-space:nowrap;text-decoration:none;
+  }
+  .powered:hover{filter:brightness(1.1)}
+  .hint{
+    position:absolute;left:150px;bottom:calc(100% + 8px);max-width:min(620px,70vw);
+    background:var(--tile2);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;padding:12px 15px;font-size:15px;font-weight:600;color:var(--white);line-height:1.4;
+    box-shadow:0 12px 30px rgba(0,0,0,.45);display:none;z-index:20;text-align:left;white-space:normal;
+  }
+  .hint.on{display:block}
+  .hint b{color:var(--lime)}
+  body.portrait .fineband .terms{font-size:13px}
 
-  /* ── Запрошенный парк не найден ─────────────────────────────────────────
-     Статичная страница не знает парк иначе как из адреса. Показать QR
-     «какого-нибудь» парка хуже пустого экрана: гость уйдёт в чужой кабинет. */
+  /* ── Запрошенный парк не найден (как у турбо) ── */
   .parkerr{
-    position:fixed;inset:0;z-index:60;background:rgba(5,6,15,.9);
+    position:fixed;inset:0;z-index:60;background:rgba(6,4,26,.86);backdrop-filter:blur(3px);
     display:none;align-items:center;justify-content:center;padding:24px;
   }
   .parkerr.on{display:flex}
-  .parkerr .box{max-width:min(680px,90vw);text-align:center;background:var(--tile2);border:2px solid #ff3d68;border-radius:var(--radius);padding:28px 32px}
-  .parkerr h2{font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.25;color:#ff3d68;margin-bottom:10px}
-  .parkerr p{font-size:14.5px;font-weight:600;line-height:1.5}
+  .parkerr .box{max-width:min(680px,90vw);text-align:center;background:var(--tile2);border:2px solid var(--pink);border-radius:var(--radius);padding:28px 32px}
+  .parkerr h2{font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.25;color:var(--pink);margin-bottom:10px}
+  .parkerr p{font-size:14.5px;font-weight:600;color:var(--white);line-height:1.5}
   .parkerr code{display:inline-block;background:rgba(255,255,255,.1);border-radius:7px;padding:2px 8px;font-family:ui-monospace,monospace}
   .parkerr .list{margin-top:14px;font-size:13.5px;color:var(--muted);line-height:1.7}
 
   /* ── песочница (?demo=1) ── */
   .demo{
     position:fixed;right:12px;bottom:8px;display:none;gap:6px;align-items:center;
-    background:rgba(0,0,0,.6);border-radius:10px;padding:6px 8px;z-index:9;
+    background:rgba(0,0,0,.55);border-radius:10px;padding:6px 8px;z-index:9;
   }
   .demo.on{display:flex}
   .demo span{font-size:10px;color:#8f88bd;font-weight:700;text-transform:uppercase;letter-spacing:1px}
   .demo button{background:#2a2360;color:#cfc9ff;border:none;border-radius:7px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
-  .demo button.on{background:#2d6bff;color:#fff}
+  .demo button.on{background:var(--blue);color:#fff}
 
-  /* ── режим ТВ: указатель прячется по бездействию (как у турбо) ── */
   body.tv.idle, body.tv.idle *{cursor:none !important}
 
-  /* Слишком маленькое окно — честная заглушка. Портрет здесь НЕ заглушка:
-     у этого носителя вертикальная раскладка рабочая. */
   .toosmall{
     display:none;position:fixed;inset:0;z-index:70;
-    background:linear-gradient(160deg,#2d6bff 0%,#1b3fa8 100%);
+    background:linear-gradient(160deg,#2d6bff 0%,#1b3fa8 100%);color:var(--white);
     align-items:center;justify-content:center;text-align:center;padding:28px;
   }
   .toosmall .in{max-width:440px}
@@ -390,9 +466,13 @@
   }
 
   @media (prefers-reduced-motion: reduce){
-    .card,.card .glint::after,.qr-frame .cn,.to-qr svg{animation:none}
-    .card{transform:translateY(-50%) rotate(-6deg)}
-    body.portrait .to-qr svg{transform:rotate(90deg)}
+    .plastic,.plastic .cells i,.plastic .glint::after,.step,.lad-max .pct,.qr-frame .cn,.to-qr svg,
+    .bolt .core,.bolt .halo,.bolt .sp,.tix .t2,.crown svg,.plate,.plate::after,
+    .p500 .inf,.batt .fill,.p60 .pct,.stamp .rl.spin svg{animation:none}
+    .plastic{transform:rotate(-6deg)}
+    .plastic .cells i{background:var(--lime)}
+    .batt .fill{height:calc(100% - 10px)}
+    .plate{transform:rotate(-4deg)}
   }
 </style>
 </head>
@@ -402,9 +482,8 @@
 <div class="stage" id="stage">
 <div class="page">
 
-  <!-- 1. ОФФЕР -->
-  <section class="tile offer">
-    <!-- Иконка shark-eyes — тот же инлайн, что в шапке турбо-страницы. -->
+  <!-- ШАПКА — разметка как у турбо -->
+  <header class="head">
     <div class="brand">
       <svg class="brand-icon" viewBox="0 0 180 114" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
            style="fill-rule:evenodd;clip-rule:evenodd" aria-label="БумБастик">
@@ -425,75 +504,122 @@
         <span id="brand-park"></span>
       </span>
     </div>
+    <div class="slogan">Играй больше — <b>плати меньше</b></div>
+    <div class="parks" id="parks" hidden></div>
+  </header>
 
-    <div class="offer-copy">
-      <div class="offer-title-box">
-        <h1 class="offer-title" id="offer-title">Твоя карта<span class="l2"><span class="dash">—</span> это счёт</span></h1>
+  <!-- 1. КАРТА -->
+  <section class="tile card-tile">
+    <div class="fit-box"><h1 class="offer-title" id="offer-title">Твоя карта<span class="l2"><span class="dash">—</span> это счёт</span></h1></div>
+    <div class="plastic-wrap">
+      <div class="plastic" aria-hidden="true">
+        <span class="glint"></span>
+        <span class="chip"></span>
+        <span class="logo">B00M</span>
+        <span class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></span>
       </div>
-      <p class="offer-sub">Заряды, тикеты и твой статус — <b>в личном кабинете</b></p>
     </div>
-
-    <div class="card" aria-hidden="true">
-      <span class="glint"></span>
-      <span class="chip"></span>
-      <span class="logo">B00M</span>
-      <span class="stripe"></span>
-    </div>
+    <p class="offer-sub">Не выкидывай карту после игры — <b>на ней остаются заряды, тикеты и твой статус</b></p>
   </section>
 
-  <!-- 2. ЧТО У ТЕБЯ УЖЕ НАКОПЛЕНО -->
-  <section class="tiles">
-    <div class="tiles-head">
-      <h2>Что у тебя уже накоплено</h2>
-      <span class="to-qr">смотри по QR
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-      </span>
+  <!-- 2. ЛЕСТНИЦА СТАТУСОВ — ступени рисует loyalty.js из LEVELS -->
+  <section class="tile ladder-tile">
+    <div class="lad-head">
+      <div>
+        <span class="lad-kicker">СТАТУСЫ</span>
+        <div class="lad-title">Повышай уровень<small id="lad-sub">и экономь на каждой игре</small></div>
+      </div>
+      <div class="lad-max" id="lad-max"><span class="pct" id="lad-pct">−50%</span><span class="cap">скидка на Платине</span></div>
     </div>
-    <div class="tiles-row">
-      <div class="tile acc" style="--c:var(--lime)">
-        <!-- lucide zap — молния, валютный знак зарядов (как на турбо) -->
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
-        <div class="word-box"><span class="word fit-word">Заряды</span></div>
-        <div class="cap">остаток на твоей карте</div>
-      </div>
-      <div class="tile acc" style="--c:var(--yellow)">
-        <!-- lucide ticket -->
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg></span>
-        <div class="word-box"><span class="word fit-word">Тикеты</span></div>
-        <div class="cap">сколько уже выиграно</div>
-      </div>
-      <div class="tile acc" style="--c:var(--cyan)">
-        <!-- Корона — иконка высшего уровня из BoomRewards -->
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg></span>
-        <div class="word-box"><span class="word fit-word">Статус</span></div>
-        <div class="cap">твой уровень игрока</div>
-        <div class="lvbar" aria-hidden="true">
-          <i style="background:var(--lv-standard)"></i><i style="background:var(--lv-silver)"></i><i style="background:var(--lv-gold)"></i><i style="background:var(--lv-platinum)"></i>
-        </div>
-      </div>
-    </div>
+    <div class="ladder" id="ladder"></div>
   </section>
 
-  <!-- 3. ЛЕСТНИЦА СТАТУСОВ — рисует loyalty.js, только при SHOW_LEVELS -->
-  <section class="tile levels" id="levels" hidden></section>
-
-  <!-- 4. QR. Путь подставляет loyalty.js из loyalty-qr.js по ?park=:
-       до этого пусто — чужой QR на экране хуже пустого места. -->
+  <!-- 3. QR. Путь подставляет loyalty.js по парку: до этого пусто —
+       чужой QR на экране хуже пустого места. -->
   <section class="tile qr-tile" id="qr-tile">
-    <div class="qr-lead">Достань телефон —<br><b>проверь свою карту</b></div>
+    <div class="qr-lead">Наведи камеру —<br><b>увидишь свою карту</b></div>
     <div class="qr-frame" id="qr-frame">
       <i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i>
-      <div class="qr-plate">
-        <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: твоя карта в личном кабинете"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
-      </div>
+      <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: твоя карта в личном кабинете"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
     </div>
-    <div class="qr-cap">Наведи камеру — увидишь свою карту<small>Вход по номеру телефона</small></div>
+    <div class="qr-cap">Заряды, тикеты и твой статус — в личном кабинете<small>Вход по номеру телефона</small></div>
   </section>
 
-  <!-- 5. НИЖНЯЯ СТРОКА -->
-  <div class="foot">
-    <span class="bonus" id="bonus" hidden><span class="amt">+500</span> бонусов за первую регистрацию в кабинете</span>
-    <span class="stamp">Твоя карта <span class="ver" id="ver">v—</span></span>
+  <!-- 4. НИЖНИЙ РЯД -->
+  <div class="bottom">
+
+    <section class="tile stats">
+      <div class="stats-head">
+        <h2>Что у тебя уже накоплено</h2>
+        <span class="to-qr">смотри по QR
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+        </span>
+      </div>
+      <div class="acc-row">
+        <div class="acc" style="--c:var(--lime)">
+          <span class="ico bolt">
+            <svg class="halo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
+            <svg class="core" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
+            <span class="sp sp1"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></span>
+            <span class="sp sp2"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></span>
+            <span class="sp sp3"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></span>
+          </span>
+          <div class="txt"><div class="fit-box"><span class="word fit-word">Заряды</span></div><div class="cap">остаток на карте</div></div>
+        </div>
+        <div class="acc" style="--c:var(--yellow)">
+          <span class="ico tix">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:.4"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+            <svg class="t2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+          </span>
+          <div class="txt"><div class="fit-box"><span class="word fit-word">Тикеты</span></div><div class="cap">сколько выиграно</div></div>
+        </div>
+        <div class="acc" style="--c:var(--lv-silver)">
+          <span class="ico crown">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>
+          </span>
+          <div class="txt"><div class="fit-box"><span class="word fit-word">Статус</span></div><div class="cap">твой уровень</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- +500 за регистрацию; у парка с bonus:false loyalty.js заменяет
+         содержимое на «уровень навсегда» -->
+    <section class="tile p500" id="p500"></section>
+
+    <section class="tile p60" id="p60">
+      <div class="batt" aria-hidden="true">
+        <span class="nub"></span>
+        <span class="body"><span class="fill"></span></span>
+        <span class="bolt-in"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg></span>
+      </div>
+      <div class="txt">
+        <div class="kick">ЗАРЯЖАЙ ОНЛАЙН</div>
+        <div class="pct-box"><span class="pct" id="p60-pct">до +60%</span></div>
+        <div class="cap"><b>бонусами</b> при пополнении карты от&nbsp;500&nbsp;₽ — без очереди на кассе</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ПОДВАЛ — разметка как у турбо -->
+  <div class="fineband">
+    <div class="hint" id="hint"></div>
+    <div class="svc">
+      <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
+      <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
+        <i class="dot"></i>
+        <span class="when" id="stamp-when">—</span>
+        <span class="ver" id="stamp-ver">v—</span>
+        <button class="rl" id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+          </svg>
+        </button>
+      </span>
+    </div>
+    <span class="terms">Уровень растёт автоматически и не понижается · скидка действует на все игры во всех парках</span>
   </div>
 
 </div>
@@ -520,12 +646,9 @@
 
 <!-- песочница: только ?demo=1 -->
 <div class="demo" id="demo">
-  <span>Парк:</span>
-  <button data-park="ohta">Охта</button>
-  <button data-park="piterland">Питерлэнд</button>
-  <button data-park="iyun">Июнь</button>
-  <span>Лестница:</span>
-  <button data-levels="1">Предпросмотр</button>
+  <span>Статусы:</span>
+  <button data-nums="1">С цифрами</button>
+  <button data-nums="0">Без цифр</button>
 </div>
 
 <script type="module" src="./loyalty.js"></script>
