@@ -21,11 +21,11 @@
   метров. Свободного места почти нет, в моменте информации мало, но она всё
   время сменяется.
   1. ЛЕВАЯ ПОЛОВИНА — СЦЕНА «КАРТА ↔ КАБИНЕТ», одна CSS-анимация, цикл 30 с.
-     Подписи — сверху, предметы — в центре. Карта (вертикальная, в стиле
-     наклейки «Бонус на старт») и телефон кабинета меняются местами по
+     Подписи — сверху по центру, предметы — в центре. Карта (реальный макет
+     «Новая игровая карта», вариант 1) и телефон кабинета меняются местами по
      кругу, переходя между слоями вперёд-назад с тенью и объёмом:
-       на карту волной ложатся слои «Заряды · Тикеты · Статус» → слои
-       улетают в телефон, предметы меняются местами, молния бьёт прямо в
+       карта волной собирается из слоёв самого макета → слои улетают
+       в телефон, предметы меняются местами, молния бьёт прямо в
        телефон → кабинет по очереди крупно выдвигает баланс, пополнение,
        прогресс до приза, статус (плотная заливка, рамка, бегущие по часовой
        полоски) → обратная смена, молния в карту, слои возвращаются → итог:
@@ -156,7 +156,7 @@
   .board-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
   .board{position:relative;width:60em;height:64em;font-size:12px;flex:none}
   .caps{position:absolute;left:0;top:0;width:60em;height:14em}
-  .cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-start;opacity:0;animation:30s linear infinite}
+  .cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;opacity:0;animation:30s linear infinite}
   .cap .t{font-family:'Unbounded';font-weight:900;font-size:4.2em;line-height:1.06}
   .cap .t b{color:var(--lime)}
   .cap .s{font-size:2em;font-weight:700;color:var(--soft);margin-top:.4em;line-height:1.3}
@@ -174,36 +174,39 @@
   @keyframes cap6{0%,67%{opacity:0;transform:translateY(14px)}67.8%,75.2%{opacity:1;transform:none}76%,100%{opacity:0}}
   @keyframes cap7{0%,76%{opacity:0;transform:scale(.94)}77%,99.2%{opacity:1;transform:none}100%{opacity:0}}
 
-  /* ── КАРТА — вертикальная, в стиле макета «Бонус на старт» (наклейка
-     bonus500): фиолетовые диагональные полосы, «БУМ / БАС / ТИК», лайм.
-     Центр — (30, 38): left = 30 − 27/2, top = 38 − 42/2. */
+  /* ── КАРТА — РЕАЛЬНЫЙ МАКЕТ «Новая игровая карта», вариант 1 (лайм),
+     лицевая сторона один в один: boom-cmd/public/materials/new-game-card_v2.jpg,
+     вырезка → img/card-front.webp (подключает loyalty.js, --card-img).
+     Карта собирается ВОЛНОЙ из 7 горизонтальных слоёв самого макета: слой за
+     слоем ложится поверх основы. При передаче слои волной улетают в телефон,
+     остаётся пустая основа того же цвета; на обратном ходе — возвращаются.
+     Центр — (30, 38): 27em × 43em (пропорция макета 0,628). */
   .card{
-    position:absolute;left:16.5em;top:17em;width:27em;height:42em;border-radius:2.2em;overflow:hidden;
-    background:repeating-linear-gradient(135deg,#3a2fb2 0 3.2em,#4538c8 3.2em 6.4em);
-    border:.15em solid rgba(255,255,255,.3);
+    position:absolute;left:16.5em;top:16.5em;width:27em;height:43em;border-radius:2.8em;
+    background:#3b4371;border:.2em solid rgba(140,160,255,.45);
     animation:card-orb 30s ease-in-out infinite;
   }
-  /* Отступы у текстовых узлов карты — в их собственных em: left .4em при
-     кегле 5.4em ≈ 2.2em карты. */
-  .card .logo{position:absolute;left:.4em;top:.42em;font-family:'Unbounded';font-weight:900;font-size:5.4em;line-height:.88;letter-spacing:-.02em;color:#fff;text-shadow:0 .08em 0 rgba(0,0,0,.25)}
-  .card .tag{position:absolute;right:1.4em;bottom:1.1em;background:var(--lime);color:var(--dark);font-family:'Unbounded';font-weight:900;font-size:1.3em;padding:.35em .7em;border-radius:.6em;transform:rotate(4deg)}
-  .card .site{position:absolute;left:1.8em;bottom:1.4em;font-family:'Unbounded';font-weight:700;font-size:1.25em;color:rgba(255,255,255,.75);letter-spacing:.06em}
-  .card .site b{color:var(--lime)}
-  /* Слои: волной ложатся на карту, при передаче улетают в телефон,
-     на обратном ходе возвращаются. */
-  .card .layers{position:absolute;left:2em;right:2em;bottom:4.8em;display:flex;flex-direction:column;gap:.8em}
-  .lay{display:flex;align-items:center;gap:.7em;padding:.7em 1em;border-radius:1em;color:var(--dark);
-       font-family:'Unbounded';font-weight:900;font-size:2.1em;box-shadow:0 .5em 1.2em rgba(0,0,0,.35);opacity:0;animation:30s ease-out infinite}
-  .lay svg{width:1.1em;height:1.1em;flex:none}
-  .lay.l0{background:var(--lime);animation-name:lay0}
-  .lay.l1{background:var(--yellow);animation-name:lay1}
-  .lay.l2{background:var(--cyan);animation-name:lay2}
-  @keyframes lay0{0%,1.5%{opacity:0;transform:translateX(-130%) rotate(-14deg)}3.0%{opacity:1;transform:translateX(6%) rotate(-6deg)}4.0%,10.5%{opacity:1;transform:rotate(-3deg)}12.5%,72.0%{opacity:0;transform:translate(150%,-40%) rotate(10deg)}73.8%{opacity:1;transform:translateX(-5%) rotate(-5deg)}74.8%,99%{opacity:1;transform:rotate(-3deg)}100%{opacity:0;transform:translateX(-130%) rotate(-14deg)}}
-  @keyframes lay1{0%,2.3%{opacity:0;transform:translateX(-130%) rotate(-14deg)}3.8%{opacity:1;transform:translateX(6%) rotate(-6deg)}4.8%,10.9%{opacity:1;transform:rotate(-3deg)}12.9%,72.6%{opacity:0;transform:translate(150%,-40%) rotate(10deg)}74.4%{opacity:1;transform:translateX(-5%) rotate(-5deg)}75.4%,99%{opacity:1;transform:rotate(-3deg)}100%{opacity:0;transform:translateX(-130%) rotate(-14deg)}}
-  @keyframes lay2{0%,3.1%{opacity:0;transform:translateX(-130%) rotate(-14deg)}4.6%{opacity:1;transform:translateX(6%) rotate(-6deg)}5.6%,11.3%{opacity:1;transform:rotate(-3deg)}13.3%,73.2%{opacity:0;transform:translate(150%,-40%) rotate(10deg)}75.0%{opacity:1;transform:translateX(-5%) rotate(-5deg)}76.0%,99%{opacity:1;transform:rotate(-3deg)}100%{opacity:0;transform:translateX(-130%) rotate(-14deg)}}
-  .card .glint{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .card .sl{position:absolute;left:-.2em;margin-top:-.2em;width:27em;height:6.1429em;background-image:var(--card-img);
+    background-size:27em 43em;background-repeat:no-repeat;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
+  .card .sl:first-child{border-radius:2.8em 2.8em 0 0}
+  .card .sl:last-child{border-radius:0 0 2.8em 2.8em}
+  .card .sl:nth-child(1){top:0.0000em;background-position:0 0.0000em;animation-name:sl0}
+  .card .sl:nth-child(2){top:6.1429em;background-position:0 -6.1429em;animation-name:sl1}
+  .card .sl:nth-child(3){top:12.2857em;background-position:0 -12.2857em;animation-name:sl2}
+  .card .sl:nth-child(4){top:18.4286em;background-position:0 -18.4286em;animation-name:sl3}
+  .card .sl:nth-child(5){top:24.5714em;background-position:0 -24.5714em;animation-name:sl4}
+  .card .sl:nth-child(6){top:30.7143em;background-position:0 -30.7143em;animation-name:sl5}
+  .card .sl:nth-child(7){top:36.8571em;background-position:0 -36.8571em;animation-name:sl6}
+  @keyframes sl0{0%,1.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}2.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}3.40%,10.40%{opacity:1;transform:none}12.20%,71.80%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}73.30%{opacity:1;transform:translateX(-4%) rotate(2deg)}74.10%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  @keyframes sl1{0%,1.50%{opacity:0;transform:translateX(-120%) rotate(-9deg)}3.10%{opacity:1;transform:translateX(5%) rotate(-2deg)}3.90%,10.70%{opacity:1;transform:none}12.50%,72.25%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}73.75%{opacity:1;transform:translateX(-4%) rotate(2deg)}74.55%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  @keyframes sl2{0%,2.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}3.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}4.40%,11.00%{opacity:1;transform:none}12.80%,72.70%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}74.20%{opacity:1;transform:translateX(-4%) rotate(2deg)}75.00%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  @keyframes sl3{0%,2.50%{opacity:0;transform:translateX(-120%) rotate(-9deg)}4.10%{opacity:1;transform:translateX(5%) rotate(-2deg)}4.90%,11.30%{opacity:1;transform:none}13.10%,73.15%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}74.65%{opacity:1;transform:translateX(-4%) rotate(2deg)}75.45%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  @keyframes sl4{0%,3.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}4.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}5.40%,11.60%{opacity:1;transform:none}13.40%,73.60%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}75.10%{opacity:1;transform:translateX(-4%) rotate(2deg)}75.90%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  @keyframes sl5{0%,3.50%{opacity:0;transform:translateX(-120%) rotate(-9deg)}5.10%{opacity:1;transform:translateX(5%) rotate(-2deg)}5.90%,11.90%{opacity:1;transform:none}13.70%,74.05%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}75.55%{opacity:1;transform:translateX(-4%) rotate(2deg)}76.35%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  @keyframes sl6{0%,4.00%{opacity:0;transform:translateX(-120%) rotate(-9deg)}5.60%{opacity:1;transform:translateX(5%) rotate(-2deg)}6.40%,12.20%{opacity:1;transform:none}14.00%,74.50%{opacity:0;transform:translate(130%,-25%) rotate(9deg)}76.00%{opacity:1;transform:translateX(-4%) rotate(2deg)}76.80%,99.2%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-120%) rotate(-9deg)}}
+  .card .glint{position:absolute;inset:0;overflow:hidden;border-radius:2.8em;pointer-events:none}
   .card .glint::after{content:'';position:absolute;top:-30%;bottom:-30%;width:9em;left:-14em;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:rotate(18deg);animation:glint 30s ease-in-out infinite}
-  @keyframes glint{0%,4%{left:-14em}8%{left:40em}8.1%,74%{left:-14em}78%{left:40em}78.1%,100%{left:-14em}}
+  @keyframes glint{0%,5%{left:-14em}9%{left:40em}9.1%,75%{left:-14em}79%{left:40em}79.1%,100%{left:-14em}}
 
   /* Орбита. Спереди: none; сзади: сдвиг ±14em вбок, −4em вверх, ×0.7,
      притушен. Середина пути: ±18em вбок, +1em вниз, ×0.86. */
@@ -470,9 +473,9 @@
 
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
-    .card,.lay,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
+    .card,.card .sl,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
     .step,.alt span,.lvl-max .pct,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
-    .lay{opacity:1;transform:rotate(-3deg)}
+    .card .sl{opacity:1;transform:none}
     .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
     .cap.c7{opacity:1}
     .fz{opacity:1}
@@ -526,16 +529,15 @@
           <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
           <div class="cap c7"><div class="t">Заряжай <b>онлайн</b></div><div class="s"><i>—</i> не стой в очереди</div></div>
         </div>
-        <!-- Карта гостя — в стиле наклейки «Бонус на старт» -->
+        <!-- Карта гостя — реальный макет, собирается волной из слоёв -->
         <div class="card" aria-hidden="true">
-          <span class="logo">БУМ<br>БАС<br>ТИК</span>
-          <span class="tag">КАРТА</span>
-          <div class="layers">
-            <div class="lay l0"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>Заряды</div>
-            <div class="lay l1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>Тикеты</div>
-            <div class="lay l2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>Статус</div>
-          </div>
-          <span class="site"><b>B00M</b>.FUN</span>
+          <i class="sl"></i>
+          <i class="sl"></i>
+          <i class="sl"></i>
+          <i class="sl"></i>
+          <i class="sl"></i>
+          <i class="sl"></i>
+          <i class="sl"></i>
           <span class="glint"></span>
         </div>
         <span class="strike" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L3 14 h9 l-1 8 10-12 h-9 l1-8 z"/></svg></span>
