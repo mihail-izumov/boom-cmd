@@ -19,16 +19,17 @@ import { LOYALTY_QR } from './loyalty-qr.js'
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v4.0'
+const PAGE_VERSION = 'v5.0'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
 
    host — адрес кабинета ЭТОГО парка в шапке телефона сцены (те же адреса,
      что у кнопки на b00m.fun/karta и в data/parks.js сайта).
-   bonus — строка подвала «+500 бонусов за первую регистрацию в кабинете».
+   bonus — второй путь в плитке QR: «Новый гость? +500 зарядов — регайся и
+     забирай» (нарратив наклейки «Бонус на старт», b00m.fun/bonus500).
    ⚠ Питерленд — false по решению владельца. Не «выравнивать» по соседям.
-     Там в подвале — правило статусов (FAQ b00m.fun/rewards). */
+     Там в плитке QR остаётся один путь — «есть карта → кабинет». */
 const PARKS = {
   ohta:      { name: 'Охта Молл', host: 'LK.B00M.FUN',  bonus: true },
   piterland: { name: 'Питерленд', host: 'PTL.B00M.FUN', bonus: false },
@@ -122,12 +123,17 @@ function renderLevels() {
   }).join('')
 }
 
-/* Подвал справа: «+500» для парков с бонусом, иначе — правило статусов.
-   Структура подвала та же, что у турбо: меняется только текст. */
-function renderTerms(p) {
-  document.getElementById('terms').innerHTML = p.bonus
-    ? '<span class="amt">+500</span><b>бонусов</b> за первую регистрацию в кабинете'
-    : 'Уровень растёт автоматически и не понижается · работает во всех парках'
+/* Подвал справа — правило статусов (FAQ b00m.fun/rewards), у всех парков
+   одинаковое. «+500» переехал в плитку QR вторым путём. */
+function renderTerms() {
+  document.getElementById('terms').textContent =
+    'Уровень растёт автоматически и не понижается · работает во всех парках'
+}
+
+/* Второй путь «+500 на старт» — только у парков с бонусом */
+function renderPaths(p) {
+  document.getElementById('path-new').hidden = !p.bonus
+  document.body.classList.toggle('no-bonus', !p.bonus)
 }
 
 /** Переключатель парков — как у турбо: при ?park= скрыт. */
@@ -158,7 +164,8 @@ function renderPark() {
   }
   document.getElementById('brand-park').textContent = p.name
   document.getElementById('ph-host').textContent = p.host
-  renderTerms(p)
+  renderTerms()
+  renderPaths(p)
 
   const q = LOYALTY_QR[park]
   const svg = document.getElementById('qr-svg')
@@ -238,12 +245,12 @@ function fitUniform(sel, max, min) {
   els.forEach((e) => { e.style.fontSize = `${size}px` })
 }
 
-/* Сцена — «доска» 58em × 52em (раскладка — в CSS у .board). Подбираем em
+/* Сцена — «доска» 60em × 64em (раскладка — в CSS у .board). Подбираем em
    так, чтобы доска заняла всю плитку: это и есть кегль всей сцены. */
 function fitScene() {
   const wrap = document.getElementById('board-wrap')
   const board = document.getElementById('board')
-  const em = Math.floor(Math.min(wrap.clientWidth / 58, wrap.clientHeight / 52) * 10) / 10
+  const em = Math.floor(Math.min(wrap.clientWidth / 60, wrap.clientHeight / 64) * 10) / 10
   board.style.fontSize = `${Math.max(em, 6)}px`
 }
 
@@ -256,9 +263,9 @@ function fitQr() {
   const frame = document.getElementById('qr-frame')
   const cs = getComputedStyle(tile)
   const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-  /* Плитка горизонтальная: квадрат во всю высоту, но не больше 55% ширины —
-     справа должен остаться посыл. */
-  let side = Math.floor(Math.min(tile.clientHeight - padV, tile.clientWidth * 0.55, 560))
+  /* Плитка горизонтальная: квадрат во всю высоту, но не больше 42% ширины —
+     справа должны встать оба пути (карта / +500). */
+  let side = Math.floor(Math.min(tile.clientHeight - padV, tile.clientWidth * 0.42, 560))
   side = Math.max(side, 160)
   const q = LOYALTY_QR[park]
   if (q && stageScale) {
@@ -291,8 +298,6 @@ function fitStage() {
   fitUniform('.fs-name', 24, 12)
   fitUniform('.fs-disc', 72, 28)
   fitQr()
-  const lead = document.getElementById('qr-lead')
-  fitCount(lead, 48, 22, Math.round(document.getElementById('qr-tile').clientHeight * 0.45))
 }
 
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStage)

@@ -16,23 +16,24 @@
   ⚠ DESIGN-STANDARD-boom-cmd.md на эту страницу НЕ распространяется — это
     носитель для гостя (то же исключение, что в шапке media/turbo/index.html).
 
-  ─── v4.0 · разбор владельца 30.09 (третий) ────────────────────────────────
+  ─── v5.0 · разбор владельца 30.09 (четвёртый) ─────────────────────────────
   Задача экрана: гость у кассы «зависает» на 30–60 секунд и читает с двух
-  метров. Поэтому: свободного места почти нет, в моменте информации мало,
-  но она всё время сменяется.
-  1. ЛЕВАЯ ПОЛОВИНА — СЦЕНА «КАРТА ↔ КАБИНЕТ», одна CSS-анимация, цикл 30 с:
-       карта заряжается → молния бьёт в телефон, взрыв → кабинет по очереди
-       крупно выдвигает баланс, пополнение, прогресс до приза, статус →
-       молния бьёт обратно в карту, взрыв → итог трёх посылов крупно:
-       «ЗАРЯЖАЙ ОНЛАЙН — НЕ СТОЙ В ОЧЕРЕДИ».
-     Выделенный блок кабинета — с плотной заливкой (ничего не просвечивает),
-     зелёной рамкой и бегущими по часовой полосками, как у полосы прогресса
-     приза. Таблица окон цикла — у .scene в CSS.
-  2. ПРАВАЯ ПОЛОВИНА: сверху B00M! СТАТУСЫ — горизонтальная лестница, строки
-     под скидкой чередуются («от 5 000 ₽ на игры» ↔ «≈25 игр за 1 500 ₽»);
-     снизу QR в кабинет.
-  3. «+500 за регистрацию» — строкой в подвале (посыл для новых).
-  4. ШАПКА И ПОДВАЛ — ОДИН В ОДИН С ТУРБО (сетка, CSS, переключатель, бейдж):
+  метров. Свободного места почти нет, в моменте информации мало, но она всё
+  время сменяется.
+  1. ЛЕВАЯ ПОЛОВИНА — СЦЕНА «КАРТА ↔ КАБИНЕТ», одна CSS-анимация, цикл 30 с.
+     Подписи — сверху, предметы — в центре. Карта (вертикальная, в стиле
+     наклейки «Бонус на старт») и телефон кабинета меняются местами по
+     кругу, переходя между слоями вперёд-назад с тенью и объёмом:
+       на карту волной ложатся слои «Заряды · Тикеты · Статус» → слои
+       улетают в телефон, предметы меняются местами, молния бьёт прямо в
+       телефон → кабинет по очереди крупно выдвигает баланс, пополнение,
+       прогресс до приза, статус (плотная заливка, рамка, бегущие по часовой
+       полоски) → обратная смена, молния в карту, слои возвращаются → итог:
+       «ЗАРЯЖАЙ ОНЛАЙН — НЕ СТОЙ В ОЧЕРЕДИ». Таблица окон — у .scene в CSS.
+  2. ПРАВАЯ ПОЛОВИНА: сверху B00M! СТАТУСЫ — лестница со сменной строкой
+     (порог ↔ «≈ игр за 1 500 ₽»); снизу QR с ВЫБОРОМ ПУТИ: «есть карта →
+     кабинет» или «новый гость → +500 зарядов на старт» (у парков с бонусом).
+  3. ШАПКА И ПОДВАЛ — ОДИН В ОДИН С ТУРБО (сетка, CSS, переключатель, бейдж):
      экраны будут чередоваться на одной панели. Правишь там — поправь здесь.
 
   КАНВА — механизм турбо: эталон 1920×1080, k = min(vw/1920, vh/1080),
@@ -127,13 +128,13 @@
 
   /* ══ 1. СЦЕНА «КАРТА ↔ КАБИНЕТ» ══════════════════════════════════════
      Окна цикла 30 с (проценты — одни и те же во всех @keyframes ниже):
-        0–10    карта заряжается                 c0 «Твоя карта — это счёт»
-       10–17    молния карта → телефон, взрыв    c1
+        0–10    слои ложатся на карту            c0 «Твоя карта — это счёт»
+       10–17    смена мест, молния в телефон     c1
        17–31    фокус: баланс                    c2
        31–43    фокус: пополнить                 c3
        43–55    фокус: прогресс до приза         c4
        55–67    фокус: статус                    c5
-       67–76    молния телефон → карта, взрыв    c6
+       67–76    смена мест, молния в карту       c6
        76–100   итог: «ЗАРЯЖАЙ ОНЛАЙН — …»       c7
      Подписи гаснут полностью ДО того, как проявится следующая (зазор
      0,8%): при наложении двух строк экран читался как каша. */
@@ -144,22 +145,23 @@
       radial-gradient(90% 60% at 40% 15%, rgba(45,107,255,.35) 0%, rgba(45,107,255,0) 70%),
       linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
   }
-  /* ДОСКА СЦЕНЫ — всё в em, размер задаёт fitScene: 58em × 52em.
-       подпись  — слева сверху (0..32em × 0..31em)
-       карта    — слева снизу  (2..26em × 34..49.2em), центр (14, 41.6)
-       телефон  — справа       (32..56em × 3..49em),   центр (44, 26)
-     Вектор карта → телефон: (30em, −15.6em), длина 33.8em, угол −27.5°.
-     Справа 2em запаса — под «выезд» выделенного блока за край телефона. */
+  /* ДОСКА СЦЕНЫ — всё в em, размер задаёт fitScene: 60em × 64em.
+       подписи — сверху во всю ширину        (0..60em × 0..14em)
+       сцена   — ниже, центр предметов x=30em, y=38em
+     Карта и телефон стоят в одной точке и МЕНЯЮТСЯ МЕСТАМИ ПО КРУГУ: кто
+     впереди — крупный, яркий, с глубокой тенью; кто сзади — сдвинут в
+     сторону и вверх, уменьшен и притушен. Смена — два полукруга навстречу
+     (карта уходит влево-назад, телефон выходит справа-вперёд), слои
+     меняются в середине пути. */
   .board-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
-  .board{position:relative;width:58em;height:52em;font-size:12px;flex:none}
-  .caps{position:absolute;left:0;top:0;width:32em;height:31em}
+  .board{position:relative;width:60em;height:64em;font-size:12px;flex:none}
+  .caps{position:absolute;left:0;top:0;width:60em;height:14em}
   .cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-start;opacity:0;animation:30s linear infinite}
-  .cap .t{font-family:'Unbounded';font-weight:900;font-size:3.9em;line-height:1.08}
+  .cap .t{font-family:'Unbounded';font-weight:900;font-size:4.2em;line-height:1.06}
   .cap .t b{color:var(--lime)}
-  .cap .s{font-size:1.9em;font-weight:700;color:var(--soft);margin-top:.5em;line-height:1.3}
-  .cap.c7 .t{font-size:4.7em;text-transform:uppercase;line-height:1.02}
-  .cap.c7 .t b{display:block}
-  .cap.c7 .s{font-family:'Unbounded';font-weight:900;font-size:2.4em;color:var(--white);text-transform:uppercase;line-height:1.15}
+  .cap .s{font-size:2em;font-weight:700;color:var(--soft);margin-top:.4em;line-height:1.3}
+  .cap.c7 .t{font-size:4.8em;text-transform:uppercase;line-height:1}
+  .cap.c7 .s{font-family:'Unbounded';font-weight:900;font-size:2.6em;color:var(--white);text-transform:uppercase;line-height:1.15;margin-top:.3em}
   .cap.c7 .s i{font-style:normal;color:var(--lime)}
   .cap.c0{animation-name:cap0}.cap.c1{animation-name:cap1}.cap.c2{animation-name:cap2}.cap.c3{animation-name:cap3}
   .cap.c4{animation-name:cap4}.cap.c5{animation-name:cap5}.cap.c6{animation-name:cap6}.cap.c7{animation-name:cap7}
@@ -172,83 +174,78 @@
   @keyframes cap6{0%,67%{opacity:0;transform:translateY(14px)}67.8%,75.2%{opacity:1;transform:none}76%,100%{opacity:0}}
   @keyframes cap7{0%,76%{opacity:0;transform:scale(.94)}77%,99.2%{opacity:1;transform:none}100%{opacity:0}}
 
+  /* ── КАРТА — вертикальная, в стиле макета «Бонус на старт» (наклейка
+     bonus500): фиолетовые диагональные полосы, «БУМ / БАС / ТИК», лайм.
+     Центр — (30, 38): left = 30 − 27/2, top = 38 − 42/2. */
   .card{
-    position:absolute;left:2em;top:34em;width:24em;height:15.2em;border-radius:1.7em;
-    background:linear-gradient(135deg,#ff0080 0%,#6a2bd8 58%,#2a1d6e 100%);
-    border:.1em solid rgba(255,255,255,.28);box-shadow:0 2em 5em rgba(0,0,0,.55);
-    animation:card-go 30s ease-in-out infinite;z-index:3;
+    position:absolute;left:16.5em;top:17em;width:27em;height:42em;border-radius:2.2em;overflow:hidden;
+    background:repeating-linear-gradient(135deg,#3a2fb2 0 3.2em,#4538c8 3.2em 6.4em);
+    border:.15em solid rgba(255,255,255,.3);
+    animation:card-orb 30s ease-in-out infinite;
   }
-  /* Карта не исчезает: молния «выкачивает» её заряд в телефон — карта
-     гаснет и отступает; обратная молния заливает заряд назад. Так передача
-     читается, а левый низ сцены не пустеет, пока работает кабинет. */
-  @keyframes card-go{
-    0%,12.5%{transform:rotate(-7deg);opacity:1;filter:none}
-    15.5%,71.5%{transform:rotate(-4deg) scale(.88) translate(-1em,1em);opacity:.55;filter:saturate(.5)}
-    74.5%,100%{transform:rotate(-7deg);opacity:1;filter:none}
-  }
-  .card .chip{position:absolute;left:2.2em;top:4.8em;width:4em;height:3em;border-radius:.7em;background:var(--yellow)}
-  .card .logo{position:absolute;right:2em;top:1.6em;font-family:'Unbounded';font-weight:900;font-size:2.2em;letter-spacing:.05em}
-  .card .cells{position:absolute;left:2.2em;bottom:2.2em;display:flex;gap:.7em}
-  .card .cells i{width:2.6em;height:1.2em;border-radius:.35em;background:rgba(255,255,255,.22);animation:30s linear infinite}
-  .card .cells i:nth-child(1){animation-name:cell1}.card .cells i:nth-child(2){animation-name:cell2}
-  .card .cells i:nth-child(3){animation-name:cell3}.card .cells i:nth-child(4){animation-name:cell4}
-  .card .cells i:nth-child(5){animation-name:cell5}.card .cells i:nth-child(6){animation-name:cell6}
-  @keyframes cell1{0%,1%{background:rgba(255,255,255,.22);box-shadow:none}2%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}14.15%,72%{background:rgba(255,255,255,.22);box-shadow:none}72.6%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell2{0%,2.2%{background:rgba(255,255,255,.22);box-shadow:none}3.2%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}13.8%,72%{background:rgba(255,255,255,.22);box-shadow:none}72.9%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell3{0%,3.4%{background:rgba(255,255,255,.22);box-shadow:none}4.4%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}13.45%,72%{background:rgba(255,255,255,.22);box-shadow:none}73.2%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell4{0%,4.6%{background:rgba(255,255,255,.22);box-shadow:none}5.6%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}13.1%,72%{background:rgba(255,255,255,.22);box-shadow:none}73.5%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell5{0%,5.8%{background:rgba(255,255,255,.22);box-shadow:none}6.8%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}12.75%,72%{background:rgba(255,255,255,.22);box-shadow:none}73.8%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell6{0%,7%{background:rgba(255,255,255,.22);box-shadow:none}8%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}12.4%,72%{background:rgba(255,255,255,.22);box-shadow:none}74.1%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
+  /* Отступы у текстовых узлов карты — в их собственных em: left .4em при
+     кегле 5.4em ≈ 2.2em карты. */
+  .card .logo{position:absolute;left:.4em;top:.42em;font-family:'Unbounded';font-weight:900;font-size:5.4em;line-height:.88;letter-spacing:-.02em;color:#fff;text-shadow:0 .08em 0 rgba(0,0,0,.25)}
+  .card .tag{position:absolute;right:1.4em;bottom:1.1em;background:var(--lime);color:var(--dark);font-family:'Unbounded';font-weight:900;font-size:1.3em;padding:.35em .7em;border-radius:.6em;transform:rotate(4deg)}
+  .card .site{position:absolute;left:1.8em;bottom:1.4em;font-family:'Unbounded';font-weight:700;font-size:1.25em;color:rgba(255,255,255,.75);letter-spacing:.06em}
+  .card .site b{color:var(--lime)}
+  /* Слои: волной ложатся на карту, при передаче улетают в телефон,
+     на обратном ходе возвращаются. */
+  .card .layers{position:absolute;left:2em;right:2em;bottom:4.8em;display:flex;flex-direction:column;gap:.8em}
+  .lay{display:flex;align-items:center;gap:.7em;padding:.7em 1em;border-radius:1em;color:var(--dark);
+       font-family:'Unbounded';font-weight:900;font-size:2.1em;box-shadow:0 .5em 1.2em rgba(0,0,0,.35);opacity:0;animation:30s ease-out infinite}
+  .lay svg{width:1.1em;height:1.1em;flex:none}
+  .lay.l0{background:var(--lime);animation-name:lay0}
+  .lay.l1{background:var(--yellow);animation-name:lay1}
+  .lay.l2{background:var(--cyan);animation-name:lay2}
+  @keyframes lay0{0%,1.5%{opacity:0;transform:translateX(-130%) rotate(-14deg)}3.0%{opacity:1;transform:translateX(6%) rotate(-6deg)}4.0%,10.5%{opacity:1;transform:rotate(-3deg)}12.5%,72.0%{opacity:0;transform:translate(150%,-40%) rotate(10deg)}73.8%{opacity:1;transform:translateX(-5%) rotate(-5deg)}74.8%,99%{opacity:1;transform:rotate(-3deg)}100%{opacity:0;transform:translateX(-130%) rotate(-14deg)}}
+  @keyframes lay1{0%,2.3%{opacity:0;transform:translateX(-130%) rotate(-14deg)}3.8%{opacity:1;transform:translateX(6%) rotate(-6deg)}4.8%,10.9%{opacity:1;transform:rotate(-3deg)}12.9%,72.6%{opacity:0;transform:translate(150%,-40%) rotate(10deg)}74.4%{opacity:1;transform:translateX(-5%) rotate(-5deg)}75.4%,99%{opacity:1;transform:rotate(-3deg)}100%{opacity:0;transform:translateX(-130%) rotate(-14deg)}}
+  @keyframes lay2{0%,3.1%{opacity:0;transform:translateX(-130%) rotate(-14deg)}4.6%{opacity:1;transform:translateX(6%) rotate(-6deg)}5.6%,11.3%{opacity:1;transform:rotate(-3deg)}13.3%,73.2%{opacity:0;transform:translate(150%,-40%) rotate(10deg)}75.0%{opacity:1;transform:translateX(-5%) rotate(-5deg)}76.0%,99%{opacity:1;transform:rotate(-3deg)}100%{opacity:0;transform:translateX(-130%) rotate(-14deg)}}
+  .card .glint{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .card .glint::after{content:'';position:absolute;top:-30%;bottom:-30%;width:9em;left:-14em;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:rotate(18deg);animation:glint 30s ease-in-out infinite}
+  @keyframes glint{0%,4%{left:-14em}8%{left:40em}8.1%,74%{left:-14em}78%{left:40em}78.1%,100%{left:-14em}}
 
-  /* МОЛНИЯ — большая, во весь зазор. Две: карта→телефон (растёт слева)
-     и телефон→карта (растёт справа). Мерцает, пока бьёт. */
-  .zapline{position:absolute;left:14em;top:41.6em;width:33.8em;height:14em;margin-top:-7em;z-index:1;transform-origin:0 50%;transform:rotate(-27.5deg)}
-  .zap{
-    position:absolute;inset:0;
-    color:var(--lime);opacity:0;filter:drop-shadow(0 0 1.2em rgba(198,245,46,.95)) drop-shadow(0 0 3em rgba(198,245,46,.6));
+  /* Орбита. Спереди: none; сзади: сдвиг ±14em вбок, −4em вверх, ×0.7,
+     притушен. Середина пути: ±18em вбок, +1em вниз, ×0.86. */
+  @keyframes card-orb{
+    0%,12.5%{transform:none;z-index:3;filter:none;box-shadow:0 3em 6em rgba(0,0,0,.6)}
+    14.5%{transform:translate(-18em,1em) scale(.86);z-index:3;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
+    16.5%,67.5%{transform:translate(-14em,-4em) scale(.7);z-index:1;filter:brightness(.5) saturate(.7);box-shadow:0 1em 2em rgba(0,0,0,.4)}
+    69.5%{transform:translate(-18em,1em) scale(.86);z-index:3;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
+    71.8%{transform:none;z-index:3;filter:brightness(1.7);box-shadow:0 0 0 .6em rgba(198,245,46,.9),0 0 6em rgba(198,245,46,.7)}
+    74.5%,100%{transform:none;z-index:3;filter:none;box-shadow:0 3em 6em rgba(0,0,0,.6)}
   }
-  .zap svg{width:100%;height:100%;display:block}
-  .zap.a{transform-origin:0 50%;animation:zap-a 30s linear infinite}
-  .zap.b{transform-origin:100% 50%;animation:zap-b 30s linear infinite}
-  @keyframes zap-a{0%,10.5%{opacity:0;transform:scaleX(0)}11.5%{opacity:1;transform:scaleX(1)}12.1%{opacity:.35}12.7%{opacity:1}13.3%{opacity:.5}13.9%{opacity:1}15%,100%{opacity:0;transform:scaleX(1)}}
-  @keyframes zap-b{0%,70.5%{opacity:0;transform:scaleX(0)}71.5%{opacity:1;transform:scaleX(1)}72.1%{opacity:.35}72.7%{opacity:1}73.3%{opacity:.5}73.9%{opacity:1}75%,100%{opacity:0;transform:scaleX(1)}}
+  @keyframes phone-orb{
+    0%,12.5%{transform:translate(14em,-4em) scale(.7);z-index:1;filter:brightness(.5) saturate(.7);box-shadow:0 1em 2em rgba(0,0,0,.4)}
+    14.5%{transform:translate(18em,1em) scale(.86);z-index:1;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
+    16.2%{transform:none;z-index:3;filter:brightness(1.6);box-shadow:0 0 0 .6em rgba(198,245,46,.9),0 0 6em rgba(198,245,46,.7)}
+    18.8%,67.5%{transform:none;z-index:3;filter:none;box-shadow:0 3em 7em rgba(255,0,128,.35)}
+    69.5%{transform:translate(18em,1em) scale(.86);z-index:1;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
+    71.5%,100%{transform:translate(14em,-4em) scale(.7);z-index:1;filter:brightness(.5) saturate(.7);box-shadow:0 1em 2em rgba(0,0,0,.4)}
+  }
 
-  /* ВЗРЫВ — вспышка + ударная волна + 8 искр-лучей. Один узел на каждую
-     сторону: у телефона (прилёт карты) и у карты (возвращение). */
-  .boom{position:absolute;width:26em;height:26em;margin:-13em 0 0 -13em;z-index:6;pointer-events:none;opacity:0}
-  .boom.p{left:44em;top:26em;animation:boom-p 30s ease-out infinite}
-  .boom.c{left:14em;top:41.6em;animation:boom-c 30s ease-out infinite}
-  .boom .flash{position:absolute;inset:25%;border-radius:50%;background:radial-gradient(circle,#fff 0%,rgba(236,255,170,.95) 25%,rgba(198,245,46,.6) 50%,rgba(198,245,46,0) 72%)}
-  .boom .wave{position:absolute;inset:0;border-radius:50%;border:.6em solid rgba(198,245,46,.8)}
-  .boom .ray{position:absolute;left:50%;top:50%;width:.6em;height:6em;margin:-3em 0 0 -.3em;border-radius:.3em;background:linear-gradient(0deg,rgba(198,245,46,0),#fff)}
-  .boom .ray:nth-child(3){transform:rotate(0deg) translateY(-8em)}
-  .boom .ray:nth-child(4){transform:rotate(45deg) translateY(-8em)}
-  .boom .ray:nth-child(5){transform:rotate(90deg) translateY(-8em)}
-  .boom .ray:nth-child(6){transform:rotate(135deg) translateY(-8em)}
-  .boom .ray:nth-child(7){transform:rotate(180deg) translateY(-8em)}
-  .boom .ray:nth-child(8){transform:rotate(225deg) translateY(-8em)}
-  .boom .ray:nth-child(9){transform:rotate(270deg) translateY(-8em)}
-  .boom .ray:nth-child(10){transform:rotate(315deg) translateY(-8em)}
-  @keyframes boom-p{0%,13.6%{opacity:0;transform:scale(.15)}14.3%{opacity:1;transform:scale(.7)}16.8%{opacity:0;transform:scale(1.5)}100%{opacity:0;transform:scale(1.5)}}
-  @keyframes boom-c{0%,73.6%{opacity:0;transform:scale(.15)}74.3%{opacity:1;transform:scale(.7)}76.8%{opacity:0;transform:scale(1.5)}100%{opacity:0;transform:scale(1.5)}}
+  /* МОЛНИЯ — прямо поверх того, кто вышел вперёд: в телефон (карта его
+     зарядила), на обратном ходе — в карту. Взрывов-кругов нет. */
+  .strike{position:absolute;left:18em;top:20em;width:24em;height:36em;z-index:8;pointer-events:none;opacity:0;color:var(--lime);
+          filter:drop-shadow(0 0 1em #fff) drop-shadow(0 0 3em rgba(198,245,46,.95));animation:strike 30s linear infinite}
+  .strike svg{width:100%;height:100%;display:block}
+  @keyframes strike{
+    0%,15.6%{opacity:0;transform:translateY(-8em) scale(.5)}
+    16.2%{opacity:1;transform:none}16.7%{opacity:.25}17.2%{opacity:1}17.7%{opacity:.4}18.2%{opacity:.9}
+    19%,71.2%{opacity:0;transform:translateY(-8em) scale(.5)}
+    71.8%{opacity:1;transform:none}72.3%{opacity:.25}72.8%{opacity:1}73.3%{opacity:.4}73.8%{opacity:.9}
+    74.6%,100%{opacity:0;transform:translateY(-8em) scale(.5)}
+  }
 
   /* ── Телефон — макет кабинета с главной b00m.fun (Cabinet.vue), в em ── */
   .phone{
-    position:absolute;left:32em;top:3em;width:24em;height:46em;border-radius:2.4em;
+    position:absolute;left:18em;top:15em;width:24em;height:46em;border-radius:2.4em;
     background:linear-gradient(165deg,#1a1840,#0D1421);
     border:.25em solid rgba(255,0,128,.45);
     display:flex;flex-direction:column;
-    animation:phone-wake 30s linear infinite;z-index:2;
+    animation:phone-orb 30s ease-in-out infinite;z-index:1;
   }
-  @keyframes phone-wake{
-    0%,13.8%{transform:none;box-shadow:0 2em 6em rgba(0,0,0,.5)}
-    14.5%{transform:scale(1.06);box-shadow:0 0 0 .6em rgba(198,245,46,.95), 0 0 6em rgba(198,245,46,.7)}
-    19%,67%{transform:scale(1.06);box-shadow:0 2em 6em rgba(255,0,128,.3)}
-    71.5%{transform:scale(1.02);box-shadow:0 0 0 .6em rgba(198,245,46,.95), 0 0 6em rgba(198,245,46,.7)}
-    74%,100%{transform:none;box-shadow:0 2em 6em rgba(0,0,0,.5)}
-  }
-  .ph-screen{flex:1;display:flex;flex-direction:column;animation:screen 30s linear infinite}
-  @keyframes screen{0%,13.8%{opacity:.5}14.8%,100%{opacity:1}}
+  .ph-screen{flex:1;display:flex;flex-direction:column}
   .ph-top{height:3em;flex:none}
   .ph-host{display:flex;align-items:center;gap:.8em;padding:.4em 1.6em .6em;opacity:.85}
   .ph-host svg{width:2.2em;height:1.4em}
@@ -366,9 +363,12 @@
   @keyframes alt1{0%,46%{opacity:1;transform:none}50%,96%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:none}}
   @keyframes alt2{0%,46%{opacity:0;transform:translateY(8px)}50%,96%{opacity:1;transform:none}100%{opacity:0;transform:translateY(8px)}}
 
-  /* ══ 3. QR — горизонтальная белая плитка: код слева, посыл справа ══════ */
+  /* ══ 3. QR — выбор: «есть карта → кабинет» или «новый → +500 на старт».
+     Нарратив второго пути — с наклейки «Бонус на старт» (bonus500):
+     «+500 зарядов», «Регайся и забирай». У парка с bonus:false второй путь
+     скрыт (loyalty.js), первый занимает всё место. ══════════════════════ */
   .qr-tile{
-    grid-area:qr;background:var(--white);color:var(--dark);flex-direction:row;align-items:center;gap:26px;padding:20px 30px 20px 20px;
+    grid-area:qr;background:var(--white);color:var(--dark);flex-direction:row;align-items:center;gap:24px;padding:18px 26px 18px 18px;
     box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
   }
   .qr-frame{position:relative;flex:none;width:var(--qr,380px);height:var(--qr,380px);padding:16px}
@@ -379,11 +379,31 @@
   .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
   .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 16px 0}
   @keyframes aim{0%,100%{opacity:1}50%{opacity:.45}}
-  .qr-text{flex:1;min-width:0}
-  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:44px;line-height:1.1}
-  .qr-lead b{color:#1d4fd0;display:block}
-  .qr-cap{font-size:25px;font-weight:800;line-height:1.3;color:#3a3760;margin-top:16px}
-  .qr-cap small{display:block;font-size:19px;font-weight:700;color:#6a6790;margin-top:6px}
+  .qr-text{flex:1;min-width:0;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:14px}
+  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.05}
+  .path{display:flex;align-items:center;gap:16px;border-radius:18px;padding:14px 16px}
+  .path.have{background:#eef1ff;border:2px solid #c9d3ff}
+  .path .q{font-size:17px;font-weight:800;color:#6a6790;text-transform:uppercase;letter-spacing:.5px}
+  .path .a{font-family:'Unbounded';font-weight:900;font-size:26px;line-height:1.1;color:#1d4fd0}
+  .path .ic{flex:none;width:56px;height:56px;border-radius:14px;display:grid;place-items:center;background:#1d4fd0;color:#fff}
+  .path .ic svg{width:32px;height:32px}
+  /* +500 — билет с вырезами, как на наклейке */
+  .path.new{background:var(--dark);color:#fff;padding:14px 16px 14px 14px}
+  .ticket{
+    flex:none;position:relative;background:var(--lime);color:var(--dark);border-radius:12px;padding:8px 18px 6px;
+    transform:rotate(-4deg);text-align:center;animation:tk-rock 4s ease-in-out infinite;
+    -webkit-mask:radial-gradient(circle 9px at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 9px at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat;
+            mask:radial-gradient(circle 9px at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 9px at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat;
+  }
+  @keyframes tk-rock{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(-1deg) scale(1.05)}}
+  .ticket b{display:block;font-family:'Unbounded';font-weight:900;font-size:44px;line-height:1}
+  .ticket small{display:block;font-family:'Unbounded';font-weight:900;font-size:15px;letter-spacing:.5px}
+  .path.new .q{color:#b3ade0}
+  .path.new .a{color:#fff;font-size:24px}
+  .path.new .a i{font-style:normal;color:var(--lime)}
+  .path[hidden]{display:none}
+  body.no-bonus .path.have{padding:22px 20px}
+  body.no-bonus .path.have .a{font-size:32px}
 
   /* ══ ПОДВАЛ — КОПИЯ turbo/index.html, не править отдельно ══════════════ */
   .fineband{
@@ -450,10 +470,10 @@
 
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
-    .card,.card .cells i,.zap,.boom,.phone,.ph-screen,.fz,.fz::before,.cap,.ph-fill::after,
-    .step,.alt span,.lvl-max .pct,.qr-frame .cn,.stamp .rl.spin svg{animation:none}
-    .card{transform:rotate(-7deg)}
-    .card .cells i{background:var(--lime)}
+    .card,.lay,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
+    .step,.alt span,.lvl-max .pct,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
+    .lay{opacity:1;transform:rotate(-3deg)}
+    .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
     .cap.c7{opacity:1}
     .fz{opacity:1}
     .alt .a2{opacity:0}
@@ -506,17 +526,19 @@
           <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
           <div class="cap c7"><div class="t">Заряжай <b>онлайн</b></div><div class="s"><i>—</i> не стой в очереди</div></div>
         </div>
+        <!-- Карта гостя — в стиле наклейки «Бонус на старт» -->
         <div class="card" aria-hidden="true">
-          <span class="chip"></span>
-          <span class="logo">B00M</span>
-          <span class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="logo">БУМ<br>БАС<br>ТИК</span>
+          <span class="tag">КАРТА</span>
+          <div class="layers">
+            <div class="lay l0"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>Заряды</div>
+            <div class="lay l1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>Тикеты</div>
+            <div class="lay l2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>Статус</div>
+          </div>
+          <span class="site"><b>B00M</b>.FUN</span>
+          <span class="glint"></span>
         </div>
-        <!-- Молнии: карта → телефон и обратно -->
-        <span class="zapline" aria-hidden="true"><span class="zap a"><svg viewBox="0 0 200 60" preserveAspectRatio="none" fill="currentColor"><path d="M0 20 L84 4 L72 24 L150 8 L136 30 L200 24 L200 36 L118 54 L132 34 L54 50 L66 32 L0 40 Z"/></svg></span>
-        <span class="zap b"><svg viewBox="0 0 200 60" preserveAspectRatio="none" fill="currentColor"><path d="M200 20 L116 4 L128 24 L50 8 L64 30 L0 24 L0 36 L82 54 L68 34 L146 50 L134 32 L200 40 Z"/></svg></span></span>
-        <!-- Взрывы: у телефона и у карты -->
-        <span class="boom p" aria-hidden="true"><i class="flash"></i><i class="wave"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i></span>
-        <span class="boom c" aria-hidden="true"><i class="flash"></i><i class="wave"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i></span>
+        <span class="strike" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L3 14 h9 l-1 8 10-12 h-9 l1-8 z"/></svg></span>
         <!-- Макет кабинета — с главной b00m.fun (Cabinet.vue): те же имя,
              статус, цифры и приз. Хост в шапке — кабинет ЭТОГО парка. -->
         <div class="phone" aria-hidden="true">
@@ -565,15 +587,22 @@
     <div class="ladder" id="ladder"></div>
   </section>
 
-  <!-- 3. QR. Путь подставляет loyalty.js по парку -->
+  <!-- 3. QR — выбор пути. Путь кода подставляет loyalty.js по парку -->
   <section class="tile qr-tile" id="qr-tile">
     <div class="qr-frame" id="qr-frame">
       <i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i>
       <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: личный кабинет"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
     </div>
-    <div class="qr-text">
-      <div class="qr-lead" id="qr-lead">Наведи камеру&nbsp;—<b>открой личный кабинет</b></div>
-      <div class="qr-cap">Баланс, тикеты, статус — в телефоне<small>Вход по номеру телефона</small></div>
+    <div class="qr-text" id="qr-text">
+      <div class="qr-lead">Наведи камеру</div>
+      <div class="path have">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg></span>
+        <div><div class="q">Есть карта?</div><div class="a">Открой личный кабинет</div></div>
+      </div>
+      <div class="path new" id="path-new">
+        <span class="ticket"><b>+500</b><small>ЗАРЯДОВ</small></span>
+        <div><div class="q">Новый гость?</div><div class="a">Регайся и <i>забирай</i> — бонус на старт</div></div>
+      </div>
     </div>
   </section>
 
