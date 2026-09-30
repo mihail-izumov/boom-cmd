@@ -4,6 +4,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *  Отдельный Vite-вход, как /media/turbo/. Ни одного импорта из src/.
  *  Страница СТАТИЧНАЯ: без API. Всё, что меняется по парку, — в конфиге ниже.
+ *  Анимация сцены «карта ↔ кабинет» — целиком в CSS (index.html), здесь
+ *  только размер: fitScene.
  *
  *  Механика канвы, подгона кеглей, шапки и подвала — из media/turbo/turbo.js
  *  (fitStage, fitCount, renderParks, стамп, перезагрузка, режим ТВ). Экраны
@@ -17,38 +19,36 @@ import { LOYALTY_QR } from './loyalty-qr.js'
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v2.0'
+const PAGE_VERSION = 'v3.0'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
 
-   bonus — ячейка «+500 бонусов за первую регистрацию в кабинете».
+   host — адрес кабинета ЭТОГО парка в шапке телефона сцены (те же адреса,
+     что у кнопки на b00m.fun/karta и в data/parks.js сайта).
+   bonus — строка подвала «+500 бонусов за первую регистрацию в кабинете».
    ⚠ Питерленд — false по решению владельца. Не «выравнивать» по соседям.
-     Вместо +500 там ячейка «уровень навсегда» (FAQ b00m.fun/rewards).
-   charge — ячейка «до +60% бонусами при пополнении онлайн от 500 ₽»
-     (b00m.fun/rewards). Флаг заведён на случай, если в каком-то парке
-     онлайн-пополнение работает иначе. */
+     Там в подвале — правило статусов (FAQ b00m.fun/rewards). */
 const PARKS = {
-  ohta:      { name: 'Охта Молл', bonus: true,  charge: true },
-  piterland: { name: 'Питерленд', bonus: false, charge: true },
-  iyun:      { name: 'ТЦ Июнь',   bonus: true,  charge: true },
+  ohta:      { name: 'Охта Молл', host: 'LK.B00M.FUN',  bonus: true },
+  piterland: { name: 'Питерленд', host: 'PTL.B00M.FUN', bonus: false },
+  iyun:      { name: 'ТЦ Июнь',   host: 'JUN.B00M.FUN', bonus: true },
 }
 const PARK_ORDER = ['ohta', 'piterland', 'iyun']
 
-/* Лестница статусов. Пороги, скидки, «≈ игр за 1 500 ₽» и цвета — ровно из
-   BoomRewards.vue (b00m.fun/rewards), по возрастанию. Владелец подтвердил
-   30.09: «цифры верны». Поменялись на кассе — править здесь И на /rewards,
-   иначе экран и сайт разойдутся.
+/* Статусы. Пороги, скидки, «≈ игр за 1 500 ₽» и цвета — ровно из
+   BoomRewards.vue (b00m.fun/rewards). Владелец подтвердил 30.09: «цифры
+   верны». Поменялись на кассе — править здесь И на /rewards.
+   Порядок — как в таблице /rewards: сверху Платина.
 
-   SHOW_LEVEL_NUMBERS = false — ступени без ₽ и %: только имена и цвета.
-   Выключатель на случай, если цифры снова окажутся под вопросом, — ячейка
-   при этом не пустеет. */
+   SHOW_LEVEL_NUMBERS = false — строки без ₽ и %: только имена и цвета.
+   Выключатель на случай, если цифры снова окажутся под вопросом. */
 const SHOW_LEVEL_NUMBERS = true
 const LEVELS = [
-  { id: 'standard', name: 'Стандарт', threshold: 0,     discount: 0,  games: 21, color: '#6B6B7C', icon: 'bow' },
-  { id: 'silver',   name: 'Серебро',  threshold: 5000,  discount: 15, games: 25, color: '#00D4FF', icon: 'swords' },
-  { id: 'gold',     name: 'Золото',   threshold: 10500, discount: 30, games: 30, color: '#FFD60A', icon: 'medal' },
   { id: 'platinum', name: 'Платина',  threshold: 45000, discount: 50, games: 42, color: '#FF0080', icon: 'crown' },
+  { id: 'gold',     name: 'Золото',   threshold: 10500, discount: 30, games: 30, color: '#FFD60A', icon: 'medal' },
+  { id: 'silver',   name: 'Серебро',  threshold: 5000,  discount: 15, games: 25, color: '#00D4FF', icon: 'swords' },
+  { id: 'standard', name: 'Стандарт', threshold: 0,     discount: 0,  games: 21, color: '#6B6B7C', icon: 'bow' },
 ]
 
 /* ── 1. Параметры запуска — те же, что у турбо ───────────────────────────── */
@@ -85,7 +85,7 @@ if (TV) {
 
 /* ── 2. Отрисовка ────────────────────────────────────────────────────────── */
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')   // неразрывный: «10 500» не рвётся
+const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')   // неразрывный: «10 500» не рвётся
 
 const LEVEL_ICONS = {
   crown: '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>',
@@ -95,46 +95,41 @@ const LEVEL_ICONS = {
 }
 
 /**
- * Лестница. Каждая цифра — с подписью, что это: «−15% скидка», «от 5 000 ₽
- * на игры», «≈25 игр за 1 500 ₽». Цифра без подписи — ровно та беда, что с
- * макетом «1300 зарядов», который прочли как цену.
+ * Таблица статусов. Каждая цифра — с подписью, что это: «−15% скидка»,
+ * «от 5 000 ₽ на игры», полоса «≈ игр за 1 500 ₽». Цифра без подписи —
+ * ровно та беда, что с макетом «1300 зарядов», который прочли как цену.
+ * Строки загораются по очереди снизу вверх: задержки — по индексу.
  */
 function renderLevels() {
-  const box = document.getElementById('ladder')
-  const top = LEVELS[LEVELS.length - 1]
-  document.getElementById('lad-max').hidden = !showNumbers
-  document.getElementById('lad-pct').textContent = `−${top.discount}%`
-  document.getElementById('lad-sub').textContent = showNumbers
-    ? 'и экономь на каждой игре'
-    : 'чем больше играешь — тем выше статус'
-  box.innerHTML = LEVELS.map((l) => {
-    const body = !showNumbers
-      ? ''
-      : l.discount
-        ? `<div class="s-disc"><span class="fs-disc">−${l.discount}%</span></div>
-           <div class="s-lbl">скидка</div>
-           <div class="s-thr">от <b>${fmt(l.threshold)}\u00a0₽</b> на игры</div>
-           <div class="s-games"><b>≈${l.games}\u00a0игр</b> за 1\u00a0500\u00a0₽</div>`
-        : `<div class="s-base">базовый</div>
-           <div class="s-games"><b>≈${l.games}\u00a0игр</b> за 1\u00a0500\u00a0₽</div>`
+  const box = document.getElementById('rows')
+  const maxGames = Math.max(...LEVELS.map((l) => l.games))
+  document.getElementById('lvl-max').hidden = !showNumbers
+  document.getElementById('lvl-pct').textContent = `до −${Math.max(...LEVELS.map((l) => l.discount))}%`
+  const n = LEVELS.length
+  box.innerHTML = LEVELS.map((l, i) => {
+    const delay = ((n - 1 - i) * 2).toFixed(1)   // Стандарт первым, Платина последней
+    const th = !showNumbers ? '' : l.threshold
+      ? `<div class="th">от <b>${fmt(l.threshold)} ₽</b> на игры · ≈${l.games} игр за 1 500 ₽</div>`
+      : `<div class="th">базовый · ≈${l.games} игр за 1 500 ₽</div>`
+    const dc = !showNumbers ? '' : l.discount
+      ? `<div class="dc">−${l.discount}%<small>скидка</small></div>`
+      : '<div class="dc" style="color:#b4b4c4">—</div>'
+    const bar = !showNumbers ? '' : `<div class="bar"><i style="width:${Math.round((l.games / maxGames) * 100)}%"></i></div>`
     return `
-      <div class="step" data-id="${l.id}" style="--c:${l.color}">
-        <svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LEVEL_ICONS[l.icon] || ''}</svg>
-        <div class="s-name"><span class="fs-name">${esc(l.name)}</span></div>
-        ${body}
+      <div class="row-l" data-id="${l.id}" style="--c:${l.color};animation-delay:${delay}s">
+        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LEVEL_ICONS[l.icon] || ''}</svg></span>
+        <div><div class="nm">${esc(l.name)}</div>${th}</div>
+        ${dc}${bar}
       </div>`
   }).join('')
 }
 
-const INF_SVG = '<svg class="inf" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 12c-3 0-5-2.2-5-5s2-5 5-5c4.5 0 7.5 10 12 10 3 0 5-2.2 5-5s-2-5-5-5C13.5 2 10.5 12 6 12Z"/></svg>'
-
-function renderPromos(p) {
-  const el = document.getElementById('p500')
-  el.classList.toggle('alt', !p.bonus)
-  el.innerHTML = p.bonus
-    ? '<div class="plate"><div class="big">+500</div><div class="word">БОНУСОВ</div></div><div class="cap">за первую регистрацию в кабинете</div>'
-    : `${INF_SVG}<div class="ttl">Уровень навсегда</div><div class="cap">не понижается и работает во всех парках</div>`
-  document.getElementById('p60').hidden = !p.charge
+/* Подвал справа: «+500» для парков с бонусом, иначе — правило статусов.
+   Структура подвала та же, что у турбо: меняется только текст. */
+function renderTerms(p) {
+  document.getElementById('terms').innerHTML = p.bonus
+    ? '<span class="amt">+500</span><b>бонусов</b> за первую регистрацию в кабинете'
+    : 'Уровень растёт автоматически и не понижается · работает во всех парках'
 }
 
 /** Переключатель парков — как у турбо: при ?park= скрыт. */
@@ -164,7 +159,8 @@ function renderPark() {
     return false
   }
   document.getElementById('brand-park').textContent = p.name
-  renderPromos(p)
+  document.getElementById('ph-host').textContent = p.host
+  renderTerms(p)
 
   const q = LOYALTY_QR[park]
   const svg = document.getElementById('qr-svg')
@@ -236,45 +232,23 @@ function fitCount(node, max, min, maxH) {
   return size
 }
 
-/* Три слова «накоплено» — ОДНИМ кеглем: разные размеры читались бы как
-   разная важность. */
-function fitWords() {
-  const words = [...document.querySelectorAll('.fit-word')]
-  let size = 999
-  words.forEach((w) => { size = Math.min(size, fitCount(w, 48, 20)) })
-  words.forEach((w) => { w.style.fontSize = `${size}px` })
+/* Главный посыл: «ЗАРЯЖАЙ ОНЛАЙН» — самым крупным, что влезет по ширине и
+   не съест больше половины плитки; «— НЕ СТОЙ В ОЧЕРЕДИ» — по ширине. */
+function fitMsg() {
+  const t = document.getElementById('msg-title')
+  const tile = t.closest('.msg')
+  fitCount(t, 150, 40, Math.round(tile.clientHeight * 0.52))
+  fitCount(document.getElementById('msg-sub'), 60, 20)
 }
 
-/* Ступени: имена и скидки — единым кеглем по самой узкой ступени. */
-function fitUniform(sel, max, min) {
-  const els = [...document.querySelectorAll(sel)]
-  let size = 999
-  els.forEach((e) => { size = Math.min(size, fitCount(e, max, min)) })
-  els.forEach((e) => { e.style.fontSize = `${size}px` })
-}
-function fitSteps() {
-  fitUniform('.fs-name', 22, 12)
-  fitUniform('.fs-disc', 46, 22)
-}
-
-/* Заголовок карты: по ширине плитки и не выше трети её высоты. */
-function fitTitle() {
-  const t = document.getElementById('offer-title')
-  const tile = t.closest('.card-tile')
-  fitCount(t, 80, 34, Math.round(tile.clientHeight * 0.34))
-}
-
-/* «−50%» — по месту, которое осталось справа от заголовка лестницы. */
-function fitPct() {
-  const pct = document.getElementById('lad-pct')
-  const wrap = document.getElementById('lad-max')
-  if (wrap.hidden) return
-  const head = wrap.parentElement
-  const left = head.firstElementChild
-  const room = head.clientWidth - left.offsetWidth - 20
-  wrap.style.width = `${Math.max(room, 120)}px`
-  fitCount(pct, 130, 60)
-  wrap.style.width = ''
+/* Сцена: карта 24em + зазор 5em + телефон 24em = 53em ширины, телефон 46em
+   высоты. Подбираем em так, чтобы дуэт занял всё свободное место — плюс
+   запас на «выезд» фокусного блока (scale 1.4) за края телефона. */
+function fitScene() {
+  const wrap = document.getElementById('duo-wrap')
+  const duo = document.getElementById('duo')
+  const em = Math.floor(Math.min(wrap.clientWidth / 56, wrap.clientHeight / 50) * 10) / 10
+  duo.style.fontSize = `${Math.max(em, 6)}px`
 }
 
 /* QR — самый крупный квадрат, что помещается в плитку рядом с подписями,
@@ -318,11 +292,9 @@ function fitStage() {
   stageEl.style.height = `${Math.round(vh / k)}px`
   stageEl.style.transform = `scale(${k})`
   stageScale = k
-  fitTitle()
-  fitPct()
-  fitSteps()
-  fitWords()
-  fitCount(document.getElementById('p60-pct'), 64, 30)
+  fitMsg()
+  fitCount(document.getElementById('lvl-pct'), 50, 22)
+  fitScene()
   fitQr()
 }
 
