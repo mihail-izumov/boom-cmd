@@ -19,7 +19,7 @@ import { LOYALTY_QR } from './loyalty-qr.js'
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v3.0'
+const PAGE_VERSION = 'v4.0'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -39,16 +39,16 @@ const PARK_ORDER = ['ohta', 'piterland', 'iyun']
 /* Статусы. Пороги, скидки, «≈ игр за 1 500 ₽» и цвета — ровно из
    BoomRewards.vue (b00m.fun/rewards). Владелец подтвердил 30.09: «цифры
    верны». Поменялись на кассе — править здесь И на /rewards.
-   Порядок — как в таблице /rewards: сверху Платина.
+   Порядок — лестница слева направо: от Стандарта к Платине.
 
    SHOW_LEVEL_NUMBERS = false — строки без ₽ и %: только имена и цвета.
    Выключатель на случай, если цифры снова окажутся под вопросом. */
 const SHOW_LEVEL_NUMBERS = true
 const LEVELS = [
-  { id: 'platinum', name: 'Платина',  threshold: 45000, discount: 50, games: 42, color: '#FF0080', icon: 'crown' },
-  { id: 'gold',     name: 'Золото',   threshold: 10500, discount: 30, games: 30, color: '#FFD60A', icon: 'medal' },
-  { id: 'silver',   name: 'Серебро',  threshold: 5000,  discount: 15, games: 25, color: '#00D4FF', icon: 'swords' },
   { id: 'standard', name: 'Стандарт', threshold: 0,     discount: 0,  games: 21, color: '#6B6B7C', icon: 'bow' },
+  { id: 'silver',   name: 'Серебро',  threshold: 5000,  discount: 15, games: 25, color: '#00D4FF', icon: 'swords' },
+  { id: 'gold',     name: 'Золото',   threshold: 10500, discount: 30, games: 30, color: '#FFD60A', icon: 'medal' },
+  { id: 'platinum', name: 'Платина',  threshold: 45000, discount: 50, games: 42, color: '#FF0080', icon: 'crown' },
 ]
 
 /* ── 1. Параметры запуска — те же, что у турбо ───────────────────────────── */
@@ -95,31 +95,29 @@ const LEVEL_ICONS = {
 }
 
 /**
- * Таблица статусов. Каждая цифра — с подписью, что это: «−15% скидка»,
- * «от 5 000 ₽ на игры», полоса «≈ игр за 1 500 ₽». Цифра без подписи —
- * ровно та беда, что с макетом «1300 зарядов», который прочли как цену.
- * Строки загораются по очереди снизу вверх: задержки — по индексу.
+ * Лестница статусов. Под скидкой — сменная строка: порог ↔ «≈ игр за
+ * 1 500 ₽» (CSS .alt, 16 с). Каждая цифра — с подписью, что это: цифра без
+ * подписи — ровно та беда, что с макетом «1300 зарядов», прочитанным как цена.
  */
 function renderLevels() {
-  const box = document.getElementById('rows')
-  const maxGames = Math.max(...LEVELS.map((l) => l.games))
+  const box = document.getElementById('ladder')
   document.getElementById('lvl-max').hidden = !showNumbers
   document.getElementById('lvl-pct').textContent = `до −${Math.max(...LEVELS.map((l) => l.discount))}%`
-  const n = LEVELS.length
-  box.innerHTML = LEVELS.map((l, i) => {
-    const delay = ((n - 1 - i) * 2).toFixed(1)   // Стандарт первым, Платина последней
-    const th = !showNumbers ? '' : l.threshold
-      ? `<div class="th">от <b>${fmt(l.threshold)} ₽</b> на игры · ≈${l.games} игр за 1 500 ₽</div>`
-      : `<div class="th">базовый · ≈${l.games} игр за 1 500 ₽</div>`
-    const dc = !showNumbers ? '' : l.discount
-      ? `<div class="dc">−${l.discount}%<small>скидка</small></div>`
-      : '<div class="dc" style="color:#b4b4c4">—</div>'
-    const bar = !showNumbers ? '' : `<div class="bar"><i style="width:${Math.round((l.games / maxGames) * 100)}%"></i></div>`
+  box.innerHTML = LEVELS.map((l) => {
+    const games = `<b>≈${l.games}\u00a0игр</b> за 1\u00a0500\u00a0₽`
+    const body = !showNumbers
+      ? ''
+      : `<div class="s-disc"><span class="fs-disc">${l.discount ? `−${l.discount}%` : '0%'}</span></div>
+         <div class="s-lbl">${l.discount ? 'скидка' : 'базовый'}</div>
+         <div class="alt">
+           <span class="a1">${l.threshold ? `от <b>${fmt(l.threshold)}\u00a0₽</b> на игры` : 'с первой игры'}</span>
+           <span class="a2">${games}</span>
+         </div>`
     return `
-      <div class="row-l" data-id="${l.id}" style="--c:${l.color};animation-delay:${delay}s">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LEVEL_ICONS[l.icon] || ''}</svg></span>
-        <div><div class="nm">${esc(l.name)}</div>${th}</div>
-        ${dc}${bar}
+      <div class="step" data-id="${l.id}" style="--c:${l.color}">
+        <svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LEVEL_ICONS[l.icon] || ''}</svg>
+        <div class="s-name"><span class="fs-name">${esc(l.name)}</span></div>
+        ${body}
       </div>`
   }).join('')
 }
@@ -232,23 +230,21 @@ function fitCount(node, max, min, maxH) {
   return size
 }
 
-/* Главный посыл: «ЗАРЯЖАЙ ОНЛАЙН» — самым крупным, что влезет по ширине и
-   не съест больше половины плитки; «— НЕ СТОЙ В ОЧЕРЕДИ» — по ширине. */
-function fitMsg() {
-  const t = document.getElementById('msg-title')
-  const tile = t.closest('.msg')
-  fitCount(t, 150, 40, Math.round(tile.clientHeight * 0.52))
-  fitCount(document.getElementById('msg-sub'), 60, 20)
+/* Ступени: имена и скидки — единым кеглем по самой узкой ступени. */
+function fitUniform(sel, max, min) {
+  const els = [...document.querySelectorAll(sel)]
+  let size = 999
+  els.forEach((e) => { size = Math.min(size, fitCount(e, max, min)) })
+  els.forEach((e) => { e.style.fontSize = `${size}px` })
 }
 
-/* Сцена: карта 24em + зазор 5em + телефон 24em = 53em ширины, телефон 46em
-   высоты. Подбираем em так, чтобы дуэт занял всё свободное место — плюс
-   запас на «выезд» фокусного блока (scale 1.4) за края телефона. */
+/* Сцена — «доска» 58em × 52em (раскладка — в CSS у .board). Подбираем em
+   так, чтобы доска заняла всю плитку: это и есть кегль всей сцены. */
 function fitScene() {
-  const wrap = document.getElementById('duo-wrap')
-  const duo = document.getElementById('duo')
-  const em = Math.floor(Math.min(wrap.clientWidth / 56, wrap.clientHeight / 50) * 10) / 10
-  duo.style.fontSize = `${Math.max(em, 6)}px`
+  const wrap = document.getElementById('board-wrap')
+  const board = document.getElementById('board')
+  const em = Math.floor(Math.min(wrap.clientWidth / 58, wrap.clientHeight / 52) * 10) / 10
+  board.style.fontSize = `${Math.max(em, 6)}px`
 }
 
 /* QR — самый крупный квадрат, что помещается в плитку рядом с подписями,
@@ -260,11 +256,9 @@ function fitQr() {
   const frame = document.getElementById('qr-frame')
   const cs = getComputedStyle(tile)
   const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-  const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
-  const gap = parseFloat(cs.rowGap) || 0
-  let other = 0
-  for (const kid of tile.children) if (kid !== frame) other += kid.offsetHeight + gap
-  let side = Math.floor(Math.min(tile.clientHeight - padV - other, tile.clientWidth - padH, 560))
+  /* Плитка горизонтальная: квадрат во всю высоту, но не больше 55% ширины —
+     справа должен остаться посыл. */
+  let side = Math.floor(Math.min(tile.clientHeight - padV, tile.clientWidth * 0.55, 560))
   side = Math.max(side, 160)
   const q = LOYALTY_QR[park]
   if (q && stageScale) {
@@ -292,10 +286,13 @@ function fitStage() {
   stageEl.style.height = `${Math.round(vh / k)}px`
   stageEl.style.transform = `scale(${k})`
   stageScale = k
-  fitMsg()
-  fitCount(document.getElementById('lvl-pct'), 50, 22)
   fitScene()
+  fitCount(document.getElementById('lvl-pct'), 60, 24)
+  fitUniform('.fs-name', 24, 12)
+  fitUniform('.fs-disc', 72, 28)
   fitQr()
+  const lead = document.getElementById('qr-lead')
+  fitCount(lead, 48, 22, Math.round(document.getElementById('qr-tile').clientHeight * 0.45))
 }
 
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStage)

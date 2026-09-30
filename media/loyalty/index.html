@@ -16,20 +16,22 @@
   ⚠ DESIGN-STANDARD-boom-cmd.md на эту страницу НЕ распространяется — это
     носитель для гостя (то же исключение, что в шапке media/turbo/index.html).
 
-  ─── v3.0 · разбор владельца 30.09 (второй) ────────────────────────────────
-  1. ГЛАВНЫЙ ПОСЫЛ — «ЗАРЯЖАЙ ОНЛАЙН — НЕ СТОЙ В ОЧЕРЕДИ». Экран для
-     постоянных гостей, поэтому «+500 за регистрацию» (для новых) — только
-     строкой в подвале, «до +60%» убрано: лестница −15/−30/−50% достаточна.
-  2. ЦЕНТР — СЦЕНА «КАРТА ↔ КАБИНЕТ». Одна CSS-анимация, цикл 24 с:
-       карта заряжается → по лучу уходит в телефон → кабинет по очереди
-       выдвигает крупно баланс, пополнение, прогресс до приза и статус →
-       карта возвращается из телефона уже заряженной.
-     Телефон — макет кабинета с главной b00m.fun (Cabinet.vue), его тексты
-     («Баланс в кармане», «Прогресс до приза», «Статус растёт») — подписи
-     сцены. Тайминги подписей и фокуса заданы одними процентами — меняешь
-     окно в одном @keyframes, меняй во всех (таблица окон у .scene).
-  3. QR ведёт в кабинет (через b00m.fun/karta), поэтому посыл — «открой
-     личный кабинет», а не «увидишь свою карту».
+  ─── v4.0 · разбор владельца 30.09 (третий) ────────────────────────────────
+  Задача экрана: гость у кассы «зависает» на 30–60 секунд и читает с двух
+  метров. Поэтому: свободного места почти нет, в моменте информации мало,
+  но она всё время сменяется.
+  1. ЛЕВАЯ ПОЛОВИНА — СЦЕНА «КАРТА ↔ КАБИНЕТ», одна CSS-анимация, цикл 30 с:
+       карта заряжается → молния бьёт в телефон, взрыв → кабинет по очереди
+       крупно выдвигает баланс, пополнение, прогресс до приза, статус →
+       молния бьёт обратно в карту, взрыв → итог трёх посылов крупно:
+       «ЗАРЯЖАЙ ОНЛАЙН — НЕ СТОЙ В ОЧЕРЕДИ».
+     Выделенный блок кабинета — с плотной заливкой (ничего не просвечивает),
+     зелёной рамкой и бегущими по часовой полосками, как у полосы прогресса
+     приза. Таблица окон цикла — у .scene в CSS.
+  2. ПРАВАЯ ПОЛОВИНА: сверху B00M! СТАТУСЫ — горизонтальная лестница, строки
+     под скидкой чередуются («от 5 000 ₽ на игры» ↔ «≈25 игр за 1 500 ₽»);
+     снизу QR в кабинет.
+  3. «+500 за регистрацию» — строкой в подвале (посыл для новых).
   4. ШАПКА И ПОДВАЛ — ОДИН В ОДИН С ТУРБО (сетка, CSS, переключатель, бейдж):
      экраны будут чередоваться на одной панели. Правишь там — поправь здесь.
 
@@ -64,13 +66,14 @@
     --dark:#0d0a2e;
     --radius:26px;
     /* Цвета уровней и кабинета — из b00m.fun (BoomRewards.vue, Cabinet.vue) */
-    --lv-standard:#6B6B7C;
-    --lv-silver:#00D4FF;
-    --lv-gold:#FFD60A;
     --lv-platinum:#FF0080;
+    --lv-gold:#FFD60A;
     --cyan:#00D4FF;
     --magenta:#FF0080;
   }
+  /* Угол бегущих полосок вокруг выделения — анимируется по часовой */
+  @property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
+
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{background:#07051c;color:var(--white);font-family:'Inter',system-ui,sans-serif;overflow:hidden}
@@ -81,31 +84,25 @@
 
   .page{
     width:100%;height:100%;display:grid;gap:16px;padding:20px;
-    grid-template-columns:minmax(0,.95fr) minmax(0,1.6fr) minmax(0,.8fr);
-    /* Ряды 76 / основной / 46 — ровно как у турбо: шапка и подвал на месте */
-    grid-template-rows:76px minmax(0,1fr) minmax(0,1fr) 46px;
-    grid-template-areas:
-      "head  head  head"
-      "msg   scene qr"
-      "lvl   scene qr"
-      "fine  fine  fine";
-  }
-  body.portrait .page{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-rows:76px minmax(0,1fr) minmax(0,1.7fr) minmax(0,.95fr) 46px;
+    /* Ряды 76 / основной / 46 — ровно как у турбо: шапка и подвал на месте */
+    grid-template-rows:76px minmax(0,1.05fr) minmax(0,1fr) 46px;
     grid-template-areas:
       "head  head"
-      "msg   qr"
-      "scene scene"
-      "lvl   lvl"
+      "scene lvl"
+      "scene qr"
       "fine  fine";
+  }
+  body.portrait .page{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-rows:76px minmax(0,1.5fr) minmax(0,.82fr) minmax(0,.68fr) 46px;
+    grid-template-areas:"head" "scene" "lvl" "qr" "fine";
   }
   .tile{
     background:var(--tile);border-radius:var(--radius);padding:26px 30px;
     position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
     min-height:0;min-width:0;
   }
-  .tile[hidden]{display:none}
   .fit-box{width:100%}
 
   /* ══ ШАПКА — КОПИЯ turbo/index.html, не править отдельно ══════════════ */
@@ -128,150 +125,163 @@
   body.portrait .head .slogan{position:absolute;right:26px;font-size:24px}
   body.portrait.has-parks .head .slogan{display:none}
 
-  /* ── 1. ГЛАВНЫЙ ПОСЫЛ ───────────────────────────────────────────────── */
-  .msg{
-    grid-area:msg;justify-content:center;gap:22px;
-    background:
-      radial-gradient(80% 70% at 20% 90%, rgba(198,245,46,.18) 0%, rgba(198,245,46,0) 70%),
-      linear-gradient(160deg,#241d66 0%, var(--tile) 70%);
-    box-shadow:0 0 0 4px var(--lime), 0 22px 60px rgba(198,245,46,.18);
-  }
-  .msg-title{
-    display:inline-block;white-space:nowrap;
-    font-family:'Unbounded';font-weight:900;font-size:80px;line-height:1.02;text-transform:uppercase;
-  }
-  .msg-title .l2{display:block;color:var(--lime)}
-  .msg-sub{
-    display:inline-block;white-space:nowrap;
-    font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.1;text-transform:uppercase;
-  }
-  .msg-sub .dash{color:var(--lime)}
-  /* Очередь, которая «рассасывается»: человечки по одному уходят,
-     на их месте загорается молния — пополнил с телефона, стоять не надо. */
-  .queue{display:flex;align-items:center;gap:10px;height:64px}
-  .queue .pp{width:44px;height:58px;color:#6d68a6;animation:leave 5s ease-in-out infinite}
-  .queue .pp:nth-child(2){animation-delay:.35s}
-  .queue .pp:nth-child(3){animation-delay:.7s}
-  .queue .pp:nth-child(4){animation-delay:1.05s}
-  .queue .pp:nth-child(5){animation-delay:1.4s}
-  @keyframes leave{0%,10%{opacity:1;transform:none}30%,80%{opacity:0;transform:translateY(-18px) scale(.8)}95%,100%{opacity:1;transform:none}}
-  .queue .zap{width:58px;height:58px;color:var(--lime);margin-left:6px;animation:zap 5s ease-in-out infinite}
-  @keyframes zap{0%,20%{opacity:.25;transform:scale(.8)}40%,80%{opacity:1;transform:scale(1.15);filter:drop-shadow(0 0 12px rgba(198,245,46,.9))}100%{opacity:.25;transform:scale(.8)}}
-
-  /* ── 2. СЦЕНА «КАРТА ↔ КАБИНЕТ» ──────────────────────────────────────
-     Окна цикла 24 с (проценты — одни и те же во всех @keyframes ниже):
-       0–12    карта заряжается            подпись c0 («Твоя карта — это счёт»)
-       12–20   карта уходит в телефон      c1
-       20–40   фокус: баланс               c2
-       40–55   фокус: пополнить            c3
-       55–70   фокус: прогресс до приза    c4
-       70–85   фокус: статус               c5
-       85–94   карта возвращается          c6
-       94–100  карта на месте, гаснет      c0 */
+  /* ══ 1. СЦЕНА «КАРТА ↔ КАБИНЕТ» ══════════════════════════════════════
+     Окна цикла 30 с (проценты — одни и те же во всех @keyframes ниже):
+        0–10    карта заряжается                 c0 «Твоя карта — это счёт»
+       10–17    молния карта → телефон, взрыв    c1
+       17–31    фокус: баланс                    c2
+       31–43    фокус: пополнить                 c3
+       43–55    фокус: прогресс до приза         c4
+       55–67    фокус: статус                    c5
+       67–76    молния телефон → карта, взрыв    c6
+       76–100   итог: «ЗАРЯЖАЙ ОНЛАЙН — …»       c7
+     Подписи гаснут полностью ДО того, как проявится следующая (зазор
+     0,8%): при наложении двух строк экран читался как каша. */
   .scene{
-    grid-area:scene;padding:28px 30px 24px;gap:14px;justify-content:space-between;
+    grid-area:scene;padding:22px 24px;
     background:
-      radial-gradient(60% 55% at 62% 60%, rgba(255,0,128,.20) 0%, rgba(255,0,128,0) 70%),
-      radial-gradient(90% 70% at 50% 20%, rgba(45,107,255,.35) 0%, rgba(45,107,255,0) 70%),
+      radial-gradient(60% 50% at 60% 62%, rgba(255,0,128,.20) 0%, rgba(255,0,128,0) 70%),
+      radial-gradient(90% 60% at 40% 15%, rgba(45,107,255,.35) 0%, rgba(45,107,255,0) 70%),
       linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
   }
-  .caps{position:relative;height:150px;flex:none}
-  .cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;opacity:0;animation:24s linear infinite}
-  .cap .t{font-family:'Unbounded';font-weight:900;font-size:50px;line-height:1.08}
+  /* ДОСКА СЦЕНЫ — всё в em, размер задаёт fitScene: 58em × 52em.
+       подпись  — слева сверху (0..32em × 0..31em)
+       карта    — слева снизу  (2..26em × 34..49.2em), центр (14, 41.6)
+       телефон  — справа       (32..56em × 3..49em),   центр (44, 26)
+     Вектор карта → телефон: (30em, −15.6em), длина 33.8em, угол −27.5°.
+     Справа 2em запаса — под «выезд» выделенного блока за край телефона. */
+  .board-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  .board{position:relative;width:58em;height:52em;font-size:12px;flex:none}
+  .caps{position:absolute;left:0;top:0;width:32em;height:31em}
+  .cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-start;opacity:0;animation:30s linear infinite}
+  .cap .t{font-family:'Unbounded';font-weight:900;font-size:3.9em;line-height:1.08}
   .cap .t b{color:var(--lime)}
-  .cap .s{font-size:24px;font-weight:700;color:var(--soft);margin-top:10px;line-height:1.3}
-  body.portrait .cap .t{font-size:44px}
+  .cap .s{font-size:1.9em;font-weight:700;color:var(--soft);margin-top:.5em;line-height:1.3}
+  .cap.c7 .t{font-size:4.7em;text-transform:uppercase;line-height:1.02}
+  .cap.c7 .t b{display:block}
+  .cap.c7 .s{font-family:'Unbounded';font-weight:900;font-size:2.4em;color:var(--white);text-transform:uppercase;line-height:1.15}
+  .cap.c7 .s i{font-style:normal;color:var(--lime)}
   .cap.c0{animation-name:cap0}.cap.c1{animation-name:cap1}.cap.c2{animation-name:cap2}.cap.c3{animation-name:cap3}
-  .cap.c4{animation-name:cap4}.cap.c5{animation-name:cap5}.cap.c6{animation-name:cap6}
-  @keyframes cap0{0%,11%{opacity:1;transform:none}12.5%,93%{opacity:0;transform:translateY(12px)}94.5%,100%{opacity:1;transform:none}}
-  @keyframes cap1{0%,11.5%{opacity:0;transform:translateY(12px)}13%,18.5%{opacity:1;transform:none}20%,100%{opacity:0}}
-  @keyframes cap2{0%,19.5%{opacity:0;transform:translateY(12px)}21%,38.5%{opacity:1;transform:none}40%,100%{opacity:0}}
-  @keyframes cap3{0%,39.5%{opacity:0;transform:translateY(12px)}41%,53.5%{opacity:1;transform:none}55%,100%{opacity:0}}
-  @keyframes cap4{0%,54.5%{opacity:0;transform:translateY(12px)}56%,68.5%{opacity:1;transform:none}70%,100%{opacity:0}}
-  @keyframes cap5{0%,69.5%{opacity:0;transform:translateY(12px)}71%,83.5%{opacity:1;transform:none}85%,100%{opacity:0}}
-  @keyframes cap6{0%,84.5%{opacity:0;transform:translateY(12px)}86%,92.5%{opacity:1;transform:none}94%,100%{opacity:0}}
-
-  /* Дуэт в em: размер задаёт fitScene (font-size), всё внутри — в em.
-     Карта 24em + зазор 5em + телефон 24em = 53em ширины, 46em высоты. */
-  .duo-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
-  .duo{position:relative;display:flex;align-items:center;gap:5em;font-size:12px;animation:duo-shift 24s ease-in-out infinite}
-  /* Пока карта «внутри» телефона, сцена съезжает на полкарты влево —
-     телефон встаёт по центру плитки; карта вернулась — разъезжаются. */
-  @keyframes duo-shift{0%,14%{transform:none}22%,84%{transform:translateX(-14.5em)}91%,100%{transform:none}}
+  .cap.c4{animation-name:cap4}.cap.c5{animation-name:cap5}.cap.c6{animation-name:cap6}.cap.c7{animation-name:cap7}
+  @keyframes cap0{0%{opacity:0;transform:translateY(14px)}.8%,9.2%{opacity:1;transform:none}10%,100%{opacity:0;transform:translateY(14px)}}
+  @keyframes cap1{0%,10%{opacity:0;transform:translateY(14px)}10.8%,16.2%{opacity:1;transform:none}17%,100%{opacity:0}}
+  @keyframes cap2{0%,17%{opacity:0;transform:translateY(14px)}17.8%,30.2%{opacity:1;transform:none}31%,100%{opacity:0}}
+  @keyframes cap3{0%,31%{opacity:0;transform:translateY(14px)}31.8%,42.2%{opacity:1;transform:none}43%,100%{opacity:0}}
+  @keyframes cap4{0%,43%{opacity:0;transform:translateY(14px)}43.8%,54.2%{opacity:1;transform:none}55%,100%{opacity:0}}
+  @keyframes cap5{0%,55%{opacity:0;transform:translateY(14px)}55.8%,66.2%{opacity:1;transform:none}67%,100%{opacity:0}}
+  @keyframes cap6{0%,67%{opacity:0;transform:translateY(14px)}67.8%,75.2%{opacity:1;transform:none}76%,100%{opacity:0}}
+  @keyframes cap7{0%,76%{opacity:0;transform:scale(.94)}77%,99.2%{opacity:1;transform:none}100%{opacity:0}}
 
   .card{
-    position:relative;flex:none;width:24em;height:15.2em;border-radius:1.7em;
+    position:absolute;left:2em;top:34em;width:24em;height:15.2em;border-radius:1.7em;
     background:linear-gradient(135deg,#ff0080 0%,#6a2bd8 58%,#2a1d6e 100%);
     border:.1em solid rgba(255,255,255,.28);box-shadow:0 2em 5em rgba(0,0,0,.55);
-    animation:card-go 24s ease-in-out infinite;z-index:3;
+    animation:card-go 30s ease-in-out infinite;z-index:3;
   }
-  /* Центр карты → центр телефона = 12 + 5 + 12 = 29em */
+  /* Карта не исчезает: молния «выкачивает» её заряд в телефон — карта
+     гаснет и отступает; обратная молния заливает заряд назад. Так передача
+     читается, а левый низ сцены не пустеет, пока работает кабинет. */
   @keyframes card-go{
-    0%,12%{transform:rotate(-7deg);opacity:1}
-    19%,86%{transform:translateX(29em) rotate(0) scale(.28);opacity:0}
-    93%,100%{transform:rotate(-7deg);opacity:1}
+    0%,12.5%{transform:rotate(-7deg);opacity:1;filter:none}
+    15.5%,71.5%{transform:rotate(-4deg) scale(.88) translate(-1em,1em);opacity:.55;filter:saturate(.5)}
+    74.5%,100%{transform:rotate(-7deg);opacity:1;filter:none}
   }
   .card .chip{position:absolute;left:2.2em;top:4.8em;width:4em;height:3em;border-radius:.7em;background:var(--yellow)}
   .card .logo{position:absolute;right:2em;top:1.6em;font-family:'Unbounded';font-weight:900;font-size:2.2em;letter-spacing:.05em}
   .card .cells{position:absolute;left:2.2em;bottom:2.2em;display:flex;gap:.7em}
-  .card .cells i{width:2.6em;height:1.2em;border-radius:.35em;background:rgba(255,255,255,.22);animation:24s linear infinite}
-  /* Ячейки заряжаются по одной (1–10%), держатся до ухода карты, а после
-     возвращения карта уже полная — гаснут только в конце цикла. */
+  .card .cells i{width:2.6em;height:1.2em;border-radius:.35em;background:rgba(255,255,255,.22);animation:30s linear infinite}
   .card .cells i:nth-child(1){animation-name:cell1}.card .cells i:nth-child(2){animation-name:cell2}
   .card .cells i:nth-child(3){animation-name:cell3}.card .cells i:nth-child(4){animation-name:cell4}
   .card .cells i:nth-child(5){animation-name:cell5}.card .cells i:nth-child(6){animation-name:cell6}
-  @keyframes cell1{0%,1%{background:rgba(255,255,255,.22);box-shadow:none}2.5%,97%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell2{0%,2.5%{background:rgba(255,255,255,.22);box-shadow:none}4%,97%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell3{0%,4%{background:rgba(255,255,255,.22);box-shadow:none}5.5%,97%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell4{0%,5.5%{background:rgba(255,255,255,.22);box-shadow:none}7%,97%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell5{0%,7%{background:rgba(255,255,255,.22);box-shadow:none}8.5%,97%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  @keyframes cell6{0%,8.5%{background:rgba(255,255,255,.22);box-shadow:none}10%,97%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
-  .card .bolt{position:absolute;right:2em;bottom:1.6em;width:2.8em;height:2.8em;color:var(--lime);animation:card-bolt 24s linear infinite}
-  @keyframes card-bolt{0%,1%{opacity:0;transform:scale(.6)}3%,10%{opacity:1;transform:scale(1.15)}12%,100%{opacity:0;transform:scale(.6)}}
+  @keyframes cell1{0%,1%{background:rgba(255,255,255,.22);box-shadow:none}2%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}14.15%,72%{background:rgba(255,255,255,.22);box-shadow:none}72.6%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
+  @keyframes cell2{0%,2.2%{background:rgba(255,255,255,.22);box-shadow:none}3.2%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}13.8%,72%{background:rgba(255,255,255,.22);box-shadow:none}72.9%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
+  @keyframes cell3{0%,3.4%{background:rgba(255,255,255,.22);box-shadow:none}4.4%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}13.45%,72%{background:rgba(255,255,255,.22);box-shadow:none}73.2%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
+  @keyframes cell4{0%,4.6%{background:rgba(255,255,255,.22);box-shadow:none}5.6%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}13.1%,72%{background:rgba(255,255,255,.22);box-shadow:none}73.5%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
+  @keyframes cell5{0%,5.8%{background:rgba(255,255,255,.22);box-shadow:none}6.8%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}12.75%,72%{background:rgba(255,255,255,.22);box-shadow:none}73.8%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
+  @keyframes cell6{0%,7%{background:rgba(255,255,255,.22);box-shadow:none}8%,12%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}12.4%,72%{background:rgba(255,255,255,.22);box-shadow:none}74.1%,98%{background:var(--lime);box-shadow:0 0 1em rgba(198,245,46,.7)}99.5%,100%{background:rgba(255,255,255,.22);box-shadow:none}}
 
-  /* Луч между картой и телефоном — виден, пока карта в пути */
-  .beam{
-    position:absolute;left:24em;width:5em;top:50%;height:.5em;margin-top:-.25em;z-index:1;
-    background:repeating-linear-gradient(90deg,var(--lime) 0 1em,transparent 1em 2em);
-    background-size:2em 100%;border-radius:.25em;opacity:0;
-    animation:beam 24s linear infinite, beam-run .5s linear infinite;
+  /* МОЛНИЯ — большая, во весь зазор. Две: карта→телефон (растёт слева)
+     и телефон→карта (растёт справа). Мерцает, пока бьёт. */
+  .zapline{position:absolute;left:14em;top:41.6em;width:33.8em;height:14em;margin-top:-7em;z-index:1;transform-origin:0 50%;transform:rotate(-27.5deg)}
+  .zap{
+    position:absolute;inset:0;
+    color:var(--lime);opacity:0;filter:drop-shadow(0 0 1.2em rgba(198,245,46,.95)) drop-shadow(0 0 3em rgba(198,245,46,.6));
   }
-  @keyframes beam{0%,10%{opacity:0}12%,19%{opacity:1}21%,84%{opacity:0}86%,93%{opacity:1}95%,100%{opacity:0}}
-  @keyframes beam-run{to{background-position:2em 0}}
+  .zap svg{width:100%;height:100%;display:block}
+  .zap.a{transform-origin:0 50%;animation:zap-a 30s linear infinite}
+  .zap.b{transform-origin:100% 50%;animation:zap-b 30s linear infinite}
+  @keyframes zap-a{0%,10.5%{opacity:0;transform:scaleX(0)}11.5%{opacity:1;transform:scaleX(1)}12.1%{opacity:.35}12.7%{opacity:1}13.3%{opacity:.5}13.9%{opacity:1}15%,100%{opacity:0;transform:scaleX(1)}}
+  @keyframes zap-b{0%,70.5%{opacity:0;transform:scaleX(0)}71.5%{opacity:1;transform:scaleX(1)}72.1%{opacity:.35}72.7%{opacity:1}73.3%{opacity:.5}73.9%{opacity:1}75%,100%{opacity:0;transform:scaleX(1)}}
+
+  /* ВЗРЫВ — вспышка + ударная волна + 8 искр-лучей. Один узел на каждую
+     сторону: у телефона (прилёт карты) и у карты (возвращение). */
+  .boom{position:absolute;width:26em;height:26em;margin:-13em 0 0 -13em;z-index:6;pointer-events:none;opacity:0}
+  .boom.p{left:44em;top:26em;animation:boom-p 30s ease-out infinite}
+  .boom.c{left:14em;top:41.6em;animation:boom-c 30s ease-out infinite}
+  .boom .flash{position:absolute;inset:25%;border-radius:50%;background:radial-gradient(circle,#fff 0%,rgba(236,255,170,.95) 25%,rgba(198,245,46,.6) 50%,rgba(198,245,46,0) 72%)}
+  .boom .wave{position:absolute;inset:0;border-radius:50%;border:.6em solid rgba(198,245,46,.8)}
+  .boom .ray{position:absolute;left:50%;top:50%;width:.6em;height:6em;margin:-3em 0 0 -.3em;border-radius:.3em;background:linear-gradient(0deg,rgba(198,245,46,0),#fff)}
+  .boom .ray:nth-child(3){transform:rotate(0deg) translateY(-8em)}
+  .boom .ray:nth-child(4){transform:rotate(45deg) translateY(-8em)}
+  .boom .ray:nth-child(5){transform:rotate(90deg) translateY(-8em)}
+  .boom .ray:nth-child(6){transform:rotate(135deg) translateY(-8em)}
+  .boom .ray:nth-child(7){transform:rotate(180deg) translateY(-8em)}
+  .boom .ray:nth-child(8){transform:rotate(225deg) translateY(-8em)}
+  .boom .ray:nth-child(9){transform:rotate(270deg) translateY(-8em)}
+  .boom .ray:nth-child(10){transform:rotate(315deg) translateY(-8em)}
+  @keyframes boom-p{0%,13.6%{opacity:0;transform:scale(.15)}14.3%{opacity:1;transform:scale(.7)}16.8%{opacity:0;transform:scale(1.5)}100%{opacity:0;transform:scale(1.5)}}
+  @keyframes boom-c{0%,73.6%{opacity:0;transform:scale(.15)}74.3%{opacity:1;transform:scale(.7)}76.8%{opacity:0;transform:scale(1.5)}100%{opacity:0;transform:scale(1.5)}}
 
   /* ── Телефон — макет кабинета с главной b00m.fun (Cabinet.vue), в em ── */
   .phone{
-    position:relative;flex:none;width:24em;height:46em;border-radius:2.4em;
+    position:absolute;left:32em;top:3em;width:24em;height:46em;border-radius:2.4em;
     background:linear-gradient(165deg,#1a1840,#0D1421);
     border:.25em solid rgba(255,0,128,.45);
     display:flex;flex-direction:column;
-    animation:phone-wake 24s linear infinite;z-index:2;
+    animation:phone-wake 30s linear infinite;z-index:2;
   }
-  /* Карта «прилетела» — телефон вспыхивает; улетела — снова вспыхивает */
   @keyframes phone-wake{
-    0%,17%{transform:none;box-shadow:0 0 0 0 rgba(198,245,46,0), 0 2em 6em rgba(0,0,0,.5)}
-    20%{transform:scale(1.04);box-shadow:0 0 0 .5em rgba(198,245,46,.9), 0 0 5em rgba(198,245,46,.6)}
-    26%,84%{transform:scale(1.07);box-shadow:0 0 0 0 rgba(198,245,46,0), 0 2em 6em rgba(255,0,128,.25)}
-    87%{transform:scale(1.04);box-shadow:0 0 0 .5em rgba(198,245,46,.9), 0 0 5em rgba(198,245,46,.6)}
-    92%,100%{transform:none;box-shadow:0 0 0 0 rgba(198,245,46,0), 0 2em 6em rgba(0,0,0,.5)}
+    0%,13.8%{transform:none;box-shadow:0 2em 6em rgba(0,0,0,.5)}
+    14.5%{transform:scale(1.06);box-shadow:0 0 0 .6em rgba(198,245,46,.95), 0 0 6em rgba(198,245,46,.7)}
+    19%,67%{transform:scale(1.06);box-shadow:0 2em 6em rgba(255,0,128,.3)}
+    71.5%{transform:scale(1.02);box-shadow:0 0 0 .6em rgba(198,245,46,.95), 0 0 6em rgba(198,245,46,.7)}
+    74%,100%{transform:none;box-shadow:0 2em 6em rgba(0,0,0,.5)}
   }
-  .ph-screen{flex:1;display:flex;flex-direction:column;animation:screen 24s linear infinite}
-  @keyframes screen{0%,17%{opacity:.55}20%,85%{opacity:1}88%,100%{opacity:.55}}
+  .ph-screen{flex:1;display:flex;flex-direction:column;animation:screen 30s linear infinite}
+  @keyframes screen{0%,13.8%{opacity:.5}14.8%,100%{opacity:1}}
   .ph-top{height:3em;flex:none}
-  .ph-host{display:flex;align-items:center;gap:.8em;padding:.4em 1.6em .6em;opacity:.8}
+  .ph-host{display:flex;align-items:center;gap:.8em;padding:.4em 1.6em .6em;opacity:.85}
   .ph-host svg{width:2.2em;height:1.4em}
   .ph-host span{font-family:'Unbounded';font-weight:700;font-size:1em;color:var(--lime);letter-spacing:.06em}
   .ph-card{margin:.6em 1.2em;padding:1.2em;border-radius:1em;background:linear-gradient(135deg,rgba(34,32,80,.85),rgba(28,26,62,.9));border:.1em solid rgba(255,0,128,.15)}
 
-  /* Фокусные блоки: притушены, в своё окно — крупно «выезжают» из экрана */
-  .fz{position:relative;border-radius:.9em;opacity:.45;transition:none;animation:24s ease-in-out infinite;transform-origin:center}
-  .fz.f-bal{animation-name:f-bal}.fz.f-top{animation-name:f-top}.fz.f-prog{animation-name:f-prog}.fz.f-stat{animation-name:f-stat}
-  @keyframes f-bal{0%,19.5%{opacity:.45;transform:none;z-index:1;box-shadow:none}22%,38%{opacity:1;transform:scale(1.34);z-index:5;box-shadow:0 0 0 .22em var(--lime),0 1.4em 3.5em rgba(0,0,0,.6)}40.5%,100%{opacity:.45;transform:none;z-index:1;box-shadow:none}}
-  @keyframes f-top{0%,39.5%{opacity:.45;transform:none;z-index:1;box-shadow:none}42%,53%{opacity:1;transform:scale(1.4);z-index:5;box-shadow:0 0 0 .22em var(--lime),0 1.4em 3.5em rgba(198,245,46,.45)}55.5%,100%{opacity:.45;transform:none;z-index:1;box-shadow:none}}
-  @keyframes f-prog{0%,54.5%{opacity:.45;transform:none;z-index:1;box-shadow:none}57%,68%{opacity:1;transform:scale(1.4);z-index:5;box-shadow:0 0 0 .22em var(--magenta),0 1.4em 3.5em rgba(255,0,128,.45)}70.5%,100%{opacity:.45;transform:none;z-index:1;box-shadow:none}}
-  @keyframes f-stat{0%,69.5%{opacity:.45;transform:none;z-index:1;box-shadow:none}72%,83%{opacity:1;transform:scale(1.4);z-index:5;box-shadow:0 0 0 .22em var(--yellow),0 1.4em 3.5em rgba(255,214,10,.4)}85.5%,100%{opacity:.45;transform:none;z-index:1;box-shadow:none}}
+  /* ФОКУС. Выделенный блок: плотная заливка + размытие под ним (ничего не
+     просвечивает), рамка своего цвета и бегущие по часовой полоски (::before
+     — кольцо conic-градиента, крутится --ang). Остальные притушены. */
+  .fz{position:relative;border-radius:.9em;opacity:.4;animation:30s ease-in-out infinite;transform-origin:center;
+      backdrop-filter:blur(.8em);-webkit-backdrop-filter:blur(.8em)}
+  .fz::before{
+    content:'';position:absolute;inset:-.75em;border-radius:1.4em;padding:.38em;pointer-events:none;
+    background:repeating-conic-gradient(from var(--ang), var(--rc) 0deg 7deg, transparent 7deg 14deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    opacity:0;animation:ring-spin 3s linear infinite, 30s linear infinite;
+  }
+  @keyframes ring-spin{to{--ang:360deg}}
+  .fz.f-bal{--rc:var(--lime);animation-name:f-bal}.fz.f-bal::before{animation-name:ring-spin,r-bal}
+  .fz.f-top{--rc:var(--lime);animation-name:f-top,top-lime;animation-duration:30s,30s}.fz.f-top::before{animation-name:ring-spin,r-top}
+  .fz.f-prog{--rc:var(--magenta);animation-name:f-prog}.fz.f-prog::before{animation-name:ring-spin,r-prog}
+  .fz.f-stat{--rc:var(--lv-gold);animation-name:f-stat}.fz.f-stat::before{animation-name:ring-spin,r-stat}
+  @keyframes f-bal{0%,17.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}18.6%,29.8%{opacity:1;transform:scale(1.4);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lime),0 1.6em 4em rgba(0,0,0,.75)}31.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes f-top{0%,31.2%{opacity:.4;transform:none;z-index:1;box-shadow:none}32.6%,41.8%{opacity:1;transform:scale(1.45);z-index:5;box-shadow:0 0 0 .22em #eaffb0,0 1.6em 4em rgba(0,0,0,.75)}43.2%,77%{opacity:.4;transform:none;z-index:1;box-shadow:none}79%,100%{opacity:1;transform:none;z-index:1;box-shadow:none}}
+  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,53.8%{opacity:1;transform:scale(1.4);z-index:5;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}55.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
+  @keyframes f-stat{0%,55.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}56.6%,65.8%{opacity:1;transform:scale(1.35);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes r-bal{0%,18%{opacity:0}18.8%,29.6%{opacity:1}30.4%,100%{opacity:0}}
+  @keyframes r-top{0%,32%{opacity:0}32.8%,41.6%{opacity:1}42.4%,100%{opacity:0}}
+  @keyframes r-prog{0%,44%{opacity:0}44.8%,53.6%{opacity:1}54.4%,100%{opacity:0}}
+  @keyframes r-stat{0%,56%{opacity:0}56.8%,65.6%{opacity:1}66.4%,100%{opacity:0}}
 
-  .f-stat{display:flex;align-items:center;gap:1em;padding:.4em;background:rgba(13,20,33,.0)}
+  .f-stat{display:flex;align-items:center;gap:1em;padding:.5em .6em;transform-origin:35% 50%}
   .ph-ava{width:3.6em;height:3.6em;border-radius:50%;background:linear-gradient(135deg,#3d47a0,#4a5aad);display:grid;place-items:center;flex:none}
   .ph-ava svg{width:1.8em;height:1.8em;color:#fff}
   .ph-name{font-family:'Unbounded';font-weight:700;font-size:1.3em}
@@ -279,23 +289,24 @@
   .ph-status i{width:.5em;height:.5em;border-radius:50%;background:var(--green)}
   .ph-status b{font-family:'Unbounded';font-weight:700;font-size:.9em;color:var(--lv-gold);letter-spacing:.08em}
 
-  .f-bal{margin-top:1em;padding:.5em;background:rgba(13,20,33,.0)}
+  .f-bal{margin-top:1em;padding:.6em}
   .ph-balance{font-size:1.05em;font-weight:700;margin-bottom:.6em}
   .ph-balance b{font-family:'Unbounded';font-weight:700}
   .ph-stats{display:flex;gap:.8em}
   .ph-stat{flex:1;padding:.7em .8em;border-radius:.7em}
-  .ph-stat.tk{background:rgba(255,0,128,.12);border:.1em solid rgba(255,0,128,.3)}
-  .ph-stat.bn{background:rgba(0,212,255,.1);border:.1em solid rgba(0,212,255,.3)}
-  .ph-stat small{display:block;font-size:.8em;color:#7A8BA8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2em}
+  .ph-stat.tk{background:rgba(255,0,128,.14);border:.1em solid rgba(255,0,128,.35)}
+  .ph-stat.bn{background:rgba(0,212,255,.12);border:.1em solid rgba(0,212,255,.35)}
+  .ph-stat small{display:block;font-size:.8em;color:#9aa8c4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2em}
   .ph-stat b{font-family:'Unbounded';font-weight:900;font-size:1.8em}
   .ph-stat.tk b{color:var(--magenta)}
   .ph-stat.bn b{color:var(--cyan)}
 
-  .f-top{margin-top:1em;padding:.9em;text-align:center;background:rgba(74,90,173,.3);border:.1em solid rgba(74,90,173,.45);font-weight:800;font-size:1.1em;color:rgba(240,244,255,.85)}
-  @keyframes top-lime{0%,39.5%{background:rgba(74,90,173,.3);color:rgba(240,244,255,.85)}42%,53%{background:var(--lime);color:var(--dark)}55.5%,100%{background:rgba(74,90,173,.3);color:rgba(240,244,255,.85)}}
-  .f-top{animation-name:f-top, top-lime;animation-duration:24s;animation-iteration-count:infinite}
+  .f-top{margin-top:1em;padding:.9em;text-align:center;font-weight:800;font-size:1.1em;border:.1em solid rgba(74,90,173,.45)}
+  /* Кнопка: в своё окно и в финале (итог «Заряжай онлайн») — лаймовая.
+     Имена анимаций заданы в .fz.f-top выше — там же, где у остальных. */
+  @keyframes top-lime{0%,31.2%{background:#252b63;color:rgba(240,244,255,.85)}32.6%,41.8%{background:var(--lime);color:var(--dark)}43.2%,77%{background:#252b63;color:rgba(240,244,255,.85)}79%,98%{background:var(--lime);color:var(--dark)}100%{background:#252b63;color:rgba(240,244,255,.85)}}
 
-  .f-prog{margin:.6em 1.2em 0;padding:.9em 1em;background:rgba(255,0,128,.08);border:.1em solid rgba(255,0,128,.2)}
+  .f-prog{margin:.6em 1.2em 0;padding:.9em 1em;border:.1em solid rgba(255,0,128,.2)}
   .f-prog .row{display:flex;justify-content:space-between;margin-bottom:.5em;font-size:.9em;font-weight:700}
   .f-prog .row b{font-family:'Unbounded';color:var(--magenta)}
   .ph-track{height:.55em;border-radius:.3em;background:rgba(255,0,128,.18);overflow:hidden}
@@ -303,65 +314,76 @@
   .ph-fill::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.22) 0 .4em,transparent .4em .8em);background-size:2em 100%;animation:stripes 1.2s linear infinite}
   @keyframes stripes{to{background-position:2em 0}}
 
-  .ph-tabs{display:flex;gap:.6em;margin:.8em 1.2em 0;opacity:.6}
+  .ph-tabs{display:flex;gap:.6em;margin:.8em 1.2em 0;opacity:.55}
   .ph-tab{flex:1;padding:.8em 0;border-radius:.6em;background:rgba(74,90,173,.1);border:.1em solid rgba(74,90,173,.15);display:flex;flex-direction:column;align-items:center;gap:.3em}
   .ph-tab svg{width:1.6em;height:1.6em}
   .ph-tab span{font-size:.8em;color:#7A8BA8;font-weight:700}
   .ph-home{margin-top:auto;padding:.8em 0;display:flex;justify-content:center;border-top:.1em solid rgba(255,0,128,.12)}
   .ph-home i{width:9em;height:.3em;border-radius:.2em;background:rgba(255,0,128,.3)}
 
-  /* ── 3. B00M! СТАТУСЫ — таблица как на /rewards, строки загораются ── */
-  .lvl{grid-area:lvl;justify-content:space-between;gap:12px;padding:22px 26px}
+  /* ══ 2. B00M! СТАТУСЫ — горизонтальная лестница ═══════════════════════
+     Под скидкой — одна строка, которая сменяется: порог ↔ «игр за 1 500 ₽».
+     Меньше слов в моменте, крупнее кегль, а за 16 с читается всё. */
+  .lvl{grid-area:lvl;justify-content:space-between;gap:12px;padding:22px 24px 20px}
   .lvl-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
   .lvl-kicker{
-    display:inline-block;flex:none;font-family:'Unbounded';font-weight:900;font-size:19px;letter-spacing:1.5px;white-space:nowrap;
-    background:var(--lime);color:var(--dark);padding:6px 14px;border-radius:12px;transform:rotate(-2deg);
+    display:inline-block;flex:none;font-family:'Unbounded';font-weight:900;font-size:26px;letter-spacing:1.5px;white-space:nowrap;
+    background:var(--lime);color:var(--dark);padding:7px 16px;border-radius:12px;transform:rotate(-2deg);
     box-shadow:0 8px 24px rgba(198,245,46,.3);
   }
   .lvl-max{flex:1;min-width:0;text-align:right;line-height:1;white-space:nowrap}
-  .lvl-max .pct{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:50px;color:var(--lv-platinum);animation:pct-glow 2.8s ease-in-out infinite}
-  .lvl-max small{display:block;font-size:15px;font-weight:800;color:var(--soft);margin-top:4px}
   .lvl-max[hidden]{display:none}
+  .lvl-max .pct{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:54px;color:var(--lv-platinum);animation:pct-glow 2.8s ease-in-out infinite}
   @keyframes pct-glow{0%,100%{text-shadow:0 0 18px rgba(255,0,128,.35)}50%{text-shadow:0 0 40px rgba(255,0,128,.85)}}
-  .rows{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
-  .row-l{
-    --c:#fff;flex:1;min-height:0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;
-    padding:6px 14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-    animation:row-lit 8s ease-in-out infinite;
+  .ladder{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+  .step{
+    --c:#fff;position:relative;border-radius:18px;padding:14px 16px 14px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--c) 20%, transparent) 0%, rgba(255,255,255,.03) 100%);
+    border:2px solid var(--c);
+    display:flex;flex-direction:column;justify-content:flex-end;gap:6px;min-height:max-content;
+    animation:lit 8s ease-in-out infinite;
   }
-  @keyframes row-lit{0%,3%{background:rgba(255,255,255,.04);transform:none}8%,22%{background:color-mix(in srgb,var(--c) 22%,transparent);transform:translateX(6px)}28%,100%{background:rgba(255,255,255,.04);transform:none}}
-  .row-l .ico{width:40px;height:40px;border-radius:11px;border:2px solid var(--c);display:grid;place-items:center;color:var(--c)}
-  .row-l .ico svg{width:22px;height:22px}
-  .row-l .nm{font-family:'Unbounded';font-weight:900;font-size:20px;color:var(--c);white-space:nowrap}
-  .row-l[data-id="standard"] .nm{color:#b4b4c4}
-  .row-l .th{font-size:14px;font-weight:700;color:var(--soft);white-space:nowrap;margin-top:2px}
-  .row-l .th b{color:var(--white)}
-  .row-l .dc{font-family:'Unbounded';font-weight:900;font-size:30px;white-space:nowrap;text-align:right}
-  .row-l .dc small{display:block;font-family:'Inter';font-size:12px;font-weight:800;color:var(--soft);letter-spacing:.4px;text-transform:uppercase}
-  .bar{grid-column:2 / 4;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:-4px}
-  .bar i{display:block;height:100%;border-radius:3px;background:var(--c)}
+  .step:nth-child(1){height:70%;animation-delay:0s}
+  .step:nth-child(2){height:80%;animation-delay:2s}
+  .step:nth-child(3){height:90%;animation-delay:4s}
+  .step:nth-child(4){height:100%;animation-delay:6s}
+  @keyframes lit{
+    0%,3%{transform:translateY(0);box-shadow:none}
+    8%,22%{transform:translateY(-8px);box-shadow:0 0 0 3px var(--c), 0 14px 40px color-mix(in srgb, var(--c) 55%, transparent)}
+    28%,100%{transform:translateY(0);box-shadow:none}
+  }
+  .step .s-ico{width:42px;height:42px;color:var(--c)}
+  .step .s-name,.step .s-disc{width:100%}
+  .step .fs-name{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:24px;color:var(--c)}
+  .step[data-id="standard"] .fs-name{color:#b4b4c4}
+  .step .fs-disc{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1}
+  .step .s-lbl{font-size:15px;font-weight:800;color:var(--soft);letter-spacing:.5px;text-transform:uppercase}
+  /* Сменная строка: две фразы в одном месте, по 8 с каждая */
+  .alt{position:relative;height:2.6em;font-size:19px;font-weight:700;line-height:1.3;color:var(--soft)}
+  .alt span{position:absolute;inset:0;animation:16s ease-in-out infinite}
+  .alt span b{color:var(--white)}
+  .alt .a1{animation-name:alt1}.alt .a2{animation-name:alt2}
+  @keyframes alt1{0%,46%{opacity:1;transform:none}50%,96%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:none}}
+  @keyframes alt2{0%,46%{opacity:0;transform:translateY(8px)}50%,96%{opacity:1;transform:none}100%{opacity:0;transform:translateY(8px)}}
 
-  /* ── 4. QR: белая плитка на месте «Пакетов» турбо ─────────────────── */
+  /* ══ 3. QR — горизонтальная белая плитка: код слева, посыл справа ══════ */
   .qr-tile{
-    grid-area:qr;background:var(--white);color:var(--dark);align-items:center;text-align:center;gap:18px;padding:26px 24px;
+    grid-area:qr;background:var(--white);color:var(--dark);flex-direction:row;align-items:center;gap:26px;padding:20px 30px 20px 20px;
     box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
   }
-  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:32px;line-height:1.15}
-  .qr-lead b{color:#1d4fd0;display:block}
   .qr-frame{position:relative;flex:none;width:var(--qr,380px);height:var(--qr,380px);padding:16px}
   .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
-  .qr-frame .cn{position:absolute;width:48px;height:48px;border:6px solid var(--blue);animation:aim 2.4s ease-in-out infinite}
+  .qr-frame .cn{position:absolute;width:52px;height:52px;border:7px solid var(--blue);animation:aim 2.4s ease-in-out infinite}
   .qr-frame .c1{left:0;top:0;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
   .qr-frame .c2{right:0;top:0;border-left:none;border-bottom:none;border-radius:0 16px 0 0}
   .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
   .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 16px 0}
   @keyframes aim{0%,100%{opacity:1}50%{opacity:.45}}
-  .qr-cap{font-size:22px;font-weight:800;line-height:1.3;color:#3a3760}
-  .qr-cap small{display:block;font-size:16px;font-weight:700;color:#6a6790;margin-top:4px}
-  body.portrait .qr-tile{gap:12px;padding:22px 20px}
-  body.portrait .qr-lead{font-size:25px}
-  body.portrait .qr-cap{font-size:17px}
-  body.portrait .qr-cap small{font-size:14px}
+  .qr-text{flex:1;min-width:0}
+  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:44px;line-height:1.1}
+  .qr-lead b{color:#1d4fd0;display:block}
+  .qr-cap{font-size:25px;font-weight:800;line-height:1.3;color:#3a3760;margin-top:16px}
+  .qr-cap small{display:block;font-size:19px;font-weight:700;color:#6a6790;margin-top:6px}
 
   /* ══ ПОДВАЛ — КОПИЯ turbo/index.html, не править отдельно ══════════════ */
   .fineband{
@@ -370,7 +392,7 @@
     font-size:17px;color:var(--muted);font-weight:600;padding:0 22px 0 10px;text-align:right;position:relative;
   }
   .fineband .terms{min-width:0}
-  /* +500 — строкой, как в v1: посыл для новых гостей, экран — для постоянных */
+  /* +500 — строкой: посыл для новых гостей, экран — для постоянных */
   .fineband .terms .amt{font-family:'Unbounded';font-weight:900;color:var(--dark);background:var(--lime);border-radius:8px;padding:2px 9px;margin-right:6px}
   .fineband .terms b{color:var(--white)}
   .svc{display:flex;align-items:stretch;gap:8px;flex:none}
@@ -426,15 +448,15 @@
     .toosmall{display:flex}
   }
 
-  /* Без движения: карта на месте и заряжена, в кабинете в фокусе баланс,
-     подпись — первая. Смысл сцены читается и без анимации. */
+  /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
-    .queue .pp,.queue .zap,.duo,.card,.card .cells i,.card .bolt,.beam,.phone,.ph-screen,.fz,.cap,.ph-fill::after,
-    .row-l,.lvl-max .pct,.qr-frame .cn,.stamp .rl.spin svg{animation:none}
+    .card,.card .cells i,.zap,.boom,.phone,.ph-screen,.fz,.fz::before,.cap,.ph-fill::after,
+    .step,.alt span,.lvl-max .pct,.qr-frame .cn,.stamp .rl.spin svg{animation:none}
     .card{transform:rotate(-7deg)}
     .card .cells i{background:var(--lime)}
-    .cap.c0{opacity:1}
+    .cap.c7{opacity:1}
     .fz{opacity:1}
+    .alt .a2{opacity:0}
   }
 </style>
 </head>
@@ -470,40 +492,31 @@
     <div class="parks" id="parks" hidden></div>
   </header>
 
-  <!-- 1. ГЛАВНЫЙ ПОСЫЛ -->
-  <section class="tile msg">
-    <div class="fit-box"><h1 class="msg-title" id="msg-title">Заряжай<span class="l2">онлайн</span></h1></div>
-    <div class="fit-box"><div class="msg-sub" id="msg-sub"><span class="dash">—</span> не стой в очереди</div></div>
-    <div class="queue" aria-hidden="true">
-      <svg class="pp" viewBox="0 0 24 32" fill="currentColor"><circle cx="12" cy="7" r="5"/><path d="M3 31v-8a9 9 0 0 1 18 0v8z"/></svg>
-      <svg class="pp" viewBox="0 0 24 32" fill="currentColor"><circle cx="12" cy="7" r="5"/><path d="M3 31v-8a9 9 0 0 1 18 0v8z"/></svg>
-      <svg class="pp" viewBox="0 0 24 32" fill="currentColor"><circle cx="12" cy="7" r="5"/><path d="M3 31v-8a9 9 0 0 1 18 0v8z"/></svg>
-      <svg class="pp" viewBox="0 0 24 32" fill="currentColor"><circle cx="12" cy="7" r="5"/><path d="M3 31v-8a9 9 0 0 1 18 0v8z"/></svg>
-      <svg class="pp" viewBox="0 0 24 32" fill="currentColor"><circle cx="12" cy="7" r="5"/><path d="M3 31v-8a9 9 0 0 1 18 0v8z"/></svg>
-      <svg class="zap" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
-    </div>
-  </section>
-
-  <!-- 2. СЦЕНА «КАРТА ↔ КАБИНЕТ» — окна цикла описаны в CSS у .scene -->
+  <!-- 1. СЦЕНА «КАРТА ↔ КАБИНЕТ» — окна цикла описаны в CSS у .scene -->
   <section class="tile scene">
-    <div class="caps">
-      <div class="cap c0"><div class="t">Твоя карта — <b>это счёт</b></div><div class="s">Заряды, тикеты и статус остаются на ней</div></div>
-      <div class="cap c1"><div class="t">Всё с карты — <b>в телефоне</b></div><div class="s">Личный кабинет показывает твой счёт</div></div>
-      <div class="cap c2"><div class="t">Баланс <b>в кармане</b></div><div class="s">Заряды, бонусы и рубли всегда видны</div></div>
-      <div class="cap c3"><div class="t">Пополняй <b>онлайн</b></div><div class="s">Прямо в кабинете — без очереди на кассе</div></div>
-      <div class="cap c4"><div class="t">Прогресс <b>до приза</b></div><div class="s">Мотивация на виду каждый день</div></div>
-      <div class="cap c5"><div class="t">Статус <b>растёт</b></div><div class="s">Больше играешь — больше привилегий</div></div>
-      <div class="cap c6"><div class="t">И снова <b>на карте</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
-    </div>
-    <div class="duo-wrap" id="duo-wrap">
-      <div class="duo" id="duo">
+    <div class="board-wrap" id="board-wrap">
+      <div class="board" id="board">
+        <div class="caps">
+          <div class="cap c0"><div class="t">Твоя карта — <b>это счёт</b></div><div class="s">Заряды, тикеты и статус остаются на ней</div></div>
+          <div class="cap c1"><div class="t">Карта <b>в кабинете</b></div><div class="s">Всё, что на карте, — у тебя в телефоне</div></div>
+          <div class="cap c2"><div class="t">Баланс <b>в кармане</b></div><div class="s">Заряды, бонусы и рубли всегда видны</div></div>
+          <div class="cap c3"><div class="t">Пополняй <b>онлайн</b></div><div class="s">Прямо в кабинете — с телефона</div></div>
+          <div class="cap c4"><div class="t">Прогресс <b>до приза</b></div><div class="s">Мотивация на виду каждый день</div></div>
+          <div class="cap c5"><div class="t">Статус <b>растёт</b></div><div class="s">Больше играешь — больше привилегий</div></div>
+          <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
+          <div class="cap c7"><div class="t">Заряжай <b>онлайн</b></div><div class="s"><i>—</i> не стой в очереди</div></div>
+        </div>
         <div class="card" aria-hidden="true">
           <span class="chip"></span>
           <span class="logo">B00M</span>
           <span class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></span>
-          <svg class="bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
         </div>
-        <span class="beam" aria-hidden="true"></span>
+        <!-- Молнии: карта → телефон и обратно -->
+        <span class="zapline" aria-hidden="true"><span class="zap a"><svg viewBox="0 0 200 60" preserveAspectRatio="none" fill="currentColor"><path d="M0 20 L84 4 L72 24 L150 8 L136 30 L200 24 L200 36 L118 54 L132 34 L54 50 L66 32 L0 40 Z"/></svg></span>
+        <span class="zap b"><svg viewBox="0 0 200 60" preserveAspectRatio="none" fill="currentColor"><path d="M200 20 L116 4 L128 24 L50 8 L64 30 L0 24 L0 36 L82 54 L68 34 L146 50 L134 32 L200 40 Z"/></svg></span></span>
+        <!-- Взрывы: у телефона и у карты -->
+        <span class="boom p" aria-hidden="true"><i class="flash"></i><i class="wave"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i></span>
+        <span class="boom c" aria-hidden="true"><i class="flash"></i><i class="wave"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i><i class="ray"></i></span>
         <!-- Макет кабинета — с главной b00m.fun (Cabinet.vue): те же имя,
              статус, цифры и приз. Хост в шапке — кабинет ЭТОГО парка. -->
         <div class="phone" aria-hidden="true">
@@ -543,23 +556,25 @@
     </div>
   </section>
 
-  <!-- 3. B00M! СТАТУСЫ — строки рисует loyalty.js из LEVELS -->
+  <!-- 2. B00M! СТАТУСЫ — ступени рисует loyalty.js из LEVELS -->
   <section class="tile lvl">
     <div class="lvl-head">
       <span class="lvl-kicker">B00M! СТАТУСЫ</span>
-      <div class="lvl-max" id="lvl-max"><span class="pct" id="lvl-pct">до −50%</span><small>на каждой игре</small></div>
+      <div class="lvl-max" id="lvl-max"><span class="pct" id="lvl-pct">до −50%</span></div>
     </div>
-    <div class="rows" id="rows"></div>
+    <div class="ladder" id="ladder"></div>
   </section>
 
-  <!-- 4. QR. Путь подставляет loyalty.js по парку -->
+  <!-- 3. QR. Путь подставляет loyalty.js по парку -->
   <section class="tile qr-tile" id="qr-tile">
-    <div class="qr-lead">Наведи камеру —<b>открой личный кабинет</b></div>
     <div class="qr-frame" id="qr-frame">
       <i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i>
       <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: личный кабинет"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
     </div>
-    <div class="qr-cap">Баланс, тикеты, статус — в телефоне<small>Вход по номеру телефона</small></div>
+    <div class="qr-text">
+      <div class="qr-lead" id="qr-lead">Наведи камеру&nbsp;—<b>открой личный кабинет</b></div>
+      <div class="qr-cap">Баланс, тикеты, статус — в телефоне<small>Вход по номеру телефона</small></div>
+    </div>
   </section>
 
   <!-- ПОДВАЛ — разметка как у турбо -->
