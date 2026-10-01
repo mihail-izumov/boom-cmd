@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.7'
+const PAGE_VERSION = 'v1.8'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -124,8 +124,8 @@ function renderOffer() {
  * index.html).
  *
  * Внутри — два СОСУДА, как в играх «перелей воду»: сверху «пополнение
- * 1 500 ₽», снизу «на карте 2 025 ⚡». Верхний наливается и переливается
- * через горлышко посередине, как в песочных часах, в нижний; деньги гостя встают в нижнем, сверху
+ * 1 500 ₽», снизу «на карте 2 025 ⚡». Верхний наливается, чуть
+ * наклоняется и льёт через воронку в нижний; деньги гостя встают в нижнем, сверху
  * доливается бонус (жидкость плавно светлеет кверху), и число «на карте»
  * досчитывается от суммы до итога (cycleCards ниже). Пополнение — в рублях, на карте —
  * заряды, поэтому после числа молния.
@@ -138,10 +138,10 @@ function renderOffer() {
  *
  * Под сосудами — плашка во всю ширину карточки, грани одного бонуса:
  * «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за наличные» (тикеты —
- * только там, где сумма карточки есть в cash_tickets). Плашка тоже
- * «наливается»: копия текста в заливке (.fliq), заливка встаёт снизу, когда
- * «на карте» налито хотя бы наполовину (класс half ниже), — и только в этот
- * момент грань меняется на следующую (nextFace).
+ * только там, где сумма карточки есть в cash_tickets). Слово — в чёрной
+ * плашке в строку с суммой. Плашка тоже «наливается»: копия текста в
+ * заливке (.fliq) встаёт снизу, когда «на карте» налито наполовину (класс
+ * half ниже), и показывает все грани по очереди (showFace).
  *
  * На карте = сумма + подарок, считается здесь, а не пишется в данные: так
  * числа на карточке не могут разойтись.
@@ -157,7 +157,9 @@ function renderCards(p) {
       { kind: 'gift', big: `+${fmt(gift)}`, small: T.face_gift },
     ]
     if (games > 0) faces.push({ kind: 'games', big: `≈\u00a0+${fmt(games)}\u00a0${plural(games, 'игра', 'игры', 'игр')}`, small: T.face_games })
-    if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}\u00a0${plural(tickets, 'тикет', 'тикета', 'тикетов')}`, small: T.face_tickets })
+    /* «тикетов / за наличные» — в чёрной плашке двумя строками: так сумма
+       рядом остаётся крупной (перенос только по \n — white-space:pre в index.html) */
+    if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}`, small: `${plural(tickets, 'тикет', 'тикета', 'тикетов')}\n${T.face_tickets}` })
     const [x, n] = [String(o.label).slice(0, 1), String(o.label).slice(1)]
     const tone = TONES.includes(o.tone) ? o.tone : TONES[i % TONES.length]
     const split = Math.round((o.sum / (o.sum + gift)) * 1000) / 10
@@ -169,7 +171,8 @@ function renderCards(p) {
         <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
         <div class="slider">
           <div class="seg seg-a">${inA}<div class="liq" aria-hidden="true">${inA}</div></div>
-          <i class="neck" aria-hidden="true"></i>
+          <svg class="funnel" aria-hidden="true"><path d=""/></svg>
+          <i class="stream" aria-hidden="true"></i>
           <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div></div>
         </div>
         <div class="faces">${faces.map((f, i) => {
@@ -341,35 +344,63 @@ function cardRoom() {
   return Math.max(0, Math.floor(seg.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - label - gap))
 }
 
-/* Горлышко между сосудами — посередине, как в песочных часах. Горизонталь:
-   верхний над нижним — перемычка от дна верхнего к крышке нижнего.
-   Вертикаль: сосуды рядом — перемычка между стенками, у дна, выше
-   скругления углов. Концы заходят на SEAM px в сосуды: в верхнем — под
-   жидкость (шва нет), в нижнем — в поле окна (20px), где букв нет. */
-const SEAM = 6
-const NECK = 26
-function layoutNecks() {
+/* Воронка и струя между сосудами (решение владельца 01.10: «сделай
+   воронку»; наклон верхнего сосуда вернули).
+   Горизонталь: верхний над нижним. Верхний наклоняется вокруг нижнего
+   правого угла — воронка стоит под этим углом, в зазоре между сосудами,
+   носиком заходит в нижний. Струя из носика бежит вниз у правой стенки
+   нижнего — в правом поле окна (48px), где букв нет.
+   Вертикаль: сосуды рядом. Наклон уводит верхний правый угол левого сосуда
+   в зазор — воронка стоит вверху зазора, струя бежит по зазору вниз, вне
+   обоих сосудов.
+   Форма воронки — путь SVG под её размер: ободок, раструб и носик. */
+const FUNNEL_W = 64        // горизонталь: правый край воронки — по стенке сосудов
+const FUNNEL_W_PORT = 42   // вертикаль: чуть шире зазора, на буквы не заходит
+const STREAM_W = 12
+function funnelPath(w, h) {
+  const cy = Math.round(Math.min(28, h * 0.62))
+  const l = (w - 14) / 2
+  const r = l + 14
+  return `M3,0 H${w - 3} Q${w},0 ${w},3 V5 Q${w},7 ${w - 3},8 L${r},${cy} V${h - 4} Q${r},${h} ${r - 4},${h} H${l + 4} Q${l},${h} ${l},${h - 4} V${cy} L3,8 Q0,7 0,5 V3 Q0,0 3,0 Z`
+}
+function layoutFunnels() {
   const portrait = document.body.classList.contains('portrait')
   document.querySelectorAll('#cards .card').forEach((c) => {
     const a = c.querySelector('.seg-a')
     const b = c.querySelector('.seg-b')
-    if (!a || !b) return
-    let x, y, w, h
+    const svg = c.querySelector('.funnel')
+    if (!a || !b || !svg) return
+    let fx, fy, fw, fh, sx, sy, sh
     if (portrait) {
-      x = a.offsetLeft + a.offsetWidth - SEAM
-      w = b.offsetLeft + SEAM - x
-      h = NECK
-      y = a.offsetTop + a.offsetHeight - 34 - h
+      const gap = b.offsetLeft - (a.offsetLeft + a.offsetWidth)
+      fw = FUNNEL_W_PORT
+      fx = a.offsetLeft + a.offsetWidth + Math.round((gap - fw) / 2)
+      fy = a.offsetTop
+      fh = 38
+      sx = a.offsetLeft + a.offsetWidth + Math.round((gap - STREAM_W) / 2)
+      sy = fy + fh - 4
+      sh = a.offsetTop + a.offsetHeight - 4 - sy
     } else {
-      w = NECK
-      x = a.offsetLeft + Math.round((a.offsetWidth - w) / 2)
-      y = a.offsetTop + a.offsetHeight - SEAM
-      h = b.offsetTop + SEAM - y
+      const gap = b.offsetTop - (a.offsetTop + a.offsetHeight)
+      fw = FUNNEL_W
+      const cx = b.offsetLeft + b.offsetWidth - fw / 2   // ось воронки и струи; правый край — по стенке
+      fx = cx - fw / 2
+      fy = a.offsetTop + a.offsetHeight
+      fh = gap + 8                                    // носик заходит в нижний сосуд
+      sx = cx - STREAM_W / 2
+      sy = b.offsetTop + 4
+      sh = b.offsetTop + b.offsetHeight - 16 - sy
     }
-    c.style.setProperty('--nx', `${x}px`)
-    c.style.setProperty('--ny', `${y}px`)
-    c.style.setProperty('--nw', `${Math.max(0, w)}px`)
-    c.style.setProperty('--nh', `${Math.max(0, h)}px`)
+    svg.setAttribute('viewBox', `0 0 ${fw} ${fh}`)
+    svg.querySelector('path').setAttribute('d', funnelPath(fw, fh))
+    c.style.setProperty('--fx', `${fx}px`)
+    c.style.setProperty('--fy', `${fy}px`)
+    c.style.setProperty('--fw', `${fw}px`)
+    c.style.setProperty('--fh', `${fh}px`)
+    c.style.setProperty('--sx', `${sx}px`)
+    c.style.setProperty('--sy', `${sy}px`)
+    c.style.setProperty('--sw', `${STREAM_W}px`)
+    c.style.setProperty('--sh', `${Math.max(0, sh)}px`)
   })
 }
 
@@ -426,7 +457,9 @@ function fitStage() {
   fitCount(offer, portrait ? 112 : 104, 40)
   fitUniform('.fs-x', 84, 30)
   fitUniform('.fs-sum', 60, 26)
-  fitUniform('.fs-face', 48, 16)
+  /* Грани одного вида — единым кеглем по трём карточкам; длинная строка
+     тикетов не ужимает бонус и игры */
+  ;['gift', 'games', 'tickets'].forEach((k) => fitUniform(`.face[data-kind="${k}"] .fs-face`, 60, 16))
   fitUniform('.fs-card', portrait ? 150 : 150, 44, cardRoom() || 0)
   if (DATA.show_steps) {
     fitCount(document.getElementById('round'), 34, 18)
@@ -435,28 +468,34 @@ function fitStage() {
   }
   fitUniform('.fs-info', 28, 16)
   fitQr()
-  layoutNecks()
+  layoutFunnels()
 }
 
 /* ── 6. Движение: «перелей воду» — 1 500 превращаются в 2 025 ─────────────
-   Карточки по очереди (1 500 → 3 000 → 5 000, по CARD_MS каждая). У активной
+   Карточки по очереди (1 500 → 3 000 → 5 000), ход длится, пока плашка
+   не покажет все грани (cardMs). У активной
    три фазы — классы на карточке:
      p1 — верхний сосуд «пополнение» наливается; нижний в тени, в нём пока
           та же сумма;
-     p2 — верхний переливается через горлышко в нижний: уровень сверху
-          падает, снизу растёт слой денег гостя до --split;
+     p2 — верхний чуть наклоняется и льёт через воронку в нижний: уровень
+          сверху падает, снизу растёт слой денег гостя до --split;
      p3 — сверху доливается бонус, число досчитывается до итога, в тень
           уходит пустой верхний сосуд; досчитало — done (вспышка числа).
    У остальных карточек сосуды спокойные: нижний ровно чуть подкрашен, итог
    на месте — все три числа читаются в любой момент.
-   half — «на карте» налито хотя бы наполовину: плашка бонуса «наливается»
-          и меняет грань на следующую — бонус → игры → тикеты → бонус…
-          Больше она не меняется НИКОГДА: у спокойных карточек плашка стоит
-          (решения владельца 01.10). Момент считается по той же кривой, что
-          у перехода жидкости в index.html (halfAt).
+     done — досчитало: «на карте» красуется — поворот гранями, свет (CSS).
+   half — «на карте» налито наполовину: плашка бонуса «наливается» и
+          показывает ВСЕ свои грани по очереди, по FACE_STEP_MS каждая:
+          бонус → игры → тикеты. Только когда последняя отстояла своё — ход
+          переходит к следующей карточке (длина хода — cardMs). Карточка
+          гаснет — заливка плашки стекает, под ней снова бонус. У спокойных
+          карточек плашка стоит (решения владельца 01.10). Момент half
+          считается по той же кривой, что у перехода жидкости в index.html
+          (halfAt).
    Без движения (prefers-reduced-motion) — спокойные сосуды, итог и первая
    грань стоят. */
-const CARD_MS = 5200
+const FACE_STEP_MS = 1700  // сколько стоит каждая грань плашки
+const BRAG_MS = 1600       // «красуется» (animation brag в index.html)
 const FILL_MS = 1000    // верхний наливается и стоит полный, потом переливается
 const POUR_MS = 900     // переливание в нижний (как transition у .liq в index.html)
 const BONUS_MS = 1000   // долив бонуса (transition-duration у .card.p3 .seg-b .liq)
@@ -495,9 +534,13 @@ function countUp(card) {
   card.classList.remove('done', 'p2', 'p3', 'half')
   card.classList.add('on', 'p1')
   timers.push(setTimeout(() => {
-    card.classList.replace('p1', 'p2')  // канал: деньги перетекают вниз
+    card.classList.replace('p1', 'p2')  // наклон и воронка: деньги перетекают вниз
   }, FILL_MS))
-  timers.push(setTimeout(() => { card.classList.add('half'); nextFace(card) }, halfAt(card)))
+  /* Налито наполовину — плашка «наливается» и идёт по всем граням */
+  const half = halfAt(card)
+  timers.push(setTimeout(() => card.classList.add('half'), half))
+  const n = card.querySelectorAll('.face').length
+  for (let k = 1; k < n; k++) timers.push(setTimeout(() => showFace(card, k), half + k * FACE_STEP_MS))
   timers.push(setTimeout(() => {
     card.classList.replace('p2', 'p3')  // доливается бонус, число растёт
     const t0 = performance.now() + 100
@@ -513,38 +556,59 @@ function countUp(card) {
   }, FILL_MS + POUR_MS))
 }
 
+/* Ход за ходом: следующая карточка — только когда предыдущая показала
+   все грани плашки (cardMs). */
 let active = -1
 function cycleCards() {
   const cards = [...document.querySelectorAll('#cards .card')]
   if (!cards.length) return
   timers.forEach(clearTimeout)
   timers = []
+  if (active >= 0) restFaces(cards[active])
   cards.forEach((c) => {
     c.classList.remove('on', 'p1', 'p2', 'p3', 'half', 'done')
-    c.querySelectorAll('.face').forEach((f) => f.classList.remove('in', 'out'))
     setNum(c, Number(c.dataset.total))
   })
   active = (active + 1) % cards.length
   countUp(cards[active])
+  setTimeout(cycleCards, cardMs(cards[active]))
 }
 
-/* Следующая грань плашки: бонус → игры → тикеты → бонус… Зовётся только из
-   countUp, в момент, когда «на карте» своей карточки налито наполовину.
-   Новая грань приходит заливкой (.in — видна только её .fliq), старая (.out)
-   стоит под ней, пока заливка её не накроет, — потом обе метки снимаются
-   (index.html, «Смена грани»). */
+/* Показать грань k залитой плашки: новая приходит заливкой (.in — видна
+   только её .fliq), старая (.out) стоит под ней, пока заливка её не
+   накроет, — потом метки снимаются (index.html, «Смена грани»). */
 const FACE_FILL_MS = 600   // заливка плашки — transition .5s у .fliq
-function nextFace(card) {
+function showFace(card, k) {
   const fs = [...card.querySelectorAll('.face')]
-  if (fs.length < 2) return
   const cur = fs.findIndex((f) => f.classList.contains('on'))
-  const k = (cur + 1) % fs.length
+  if (k === cur || !fs[k]) return
   fs.forEach((f, i) => {
     f.classList.toggle('on', i === k)
     f.classList.toggle('in', i === k)
     f.classList.toggle('out', i === cur)
   })
   timers.push(setTimeout(() => fs.forEach((f) => f.classList.remove('in', 'out')), FACE_FILL_MS))
+}
+
+/* Карточка гаснет: заливка плашки стекает вниз, под ней сразу стоит бонус
+   (.snap), уходящая грань (.leave) видна одной стекающей заливкой. */
+function restFaces(card) {
+  const fs = [...card.querySelectorAll('.face')]
+  const cur = fs.findIndex((f) => f.classList.contains('on'))
+  fs.forEach((f) => f.classList.remove('in', 'out'))
+  if (cur > 0) {
+    fs[cur].classList.remove('on')
+    fs[cur].classList.add('leave')
+    fs[0].classList.add('on', 'snap')
+    setTimeout(() => fs.forEach((f) => f.classList.remove('leave', 'snap')), FACE_FILL_MS)
+  }
+}
+
+/* Длина хода карточки: пока плашка не покажет все грани и пока «на карте»
+   не докрасуется. */
+function cardMs(card) {
+  const n = card.querySelectorAll('.face').length
+  return Math.round(Math.max(halfAt(card) + n * FACE_STEP_MS, FILL_MS + POUR_MS + 100 + COUNT_MS + BRAG_MS + 300))
 }
 
 /* ── 7. Жизненный цикл ───────────────────────────────────────────────────── */
@@ -557,7 +621,7 @@ window.addEventListener('resize', fitStage)
 if (REDUCED) {
   document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('done'))
 } else if (PARKS[park]) {
-  setTimeout(() => { cycleCards(); setInterval(cycleCards, CARD_MS) }, 700)
+  setTimeout(cycleCards, 700)
 }
 
 /* Суточный самоперезапуск в 05:00 по Москве — как у турбо и «Твоей карты»:

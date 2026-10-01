@@ -191,7 +191,7 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     liqHidden: [...c.querySelectorAll('.liq')].length === 2 && [...c.querySelectorAll('.liq')].every((l) => l.getAttribute('aria-hidden') === 'true'),
     bolt: !!c.querySelector('.seg-b > .fit-box .fs-card svg.bolt'),
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
-      && !!c.querySelector('.slider > .neck') && !c.querySelector('.stream, .wave'),
+      && !!c.querySelector('.slider > svg.funnel path') && !!c.querySelector('.slider > .stream') && !c.querySelector('.neck, .wave'),
     toggle: !!c.querySelector('.toggle'),
     faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector(':scope > .fit-box > .fs-face')
       && sp(f.querySelector('.fliq')?.textContent) === sp(f.querySelector(':scope > .fit-box')?.textContent) && f.querySelector('.fliq').getAttribute('aria-hidden') === 'true'),
@@ -262,8 +262,14 @@ ok('цвета карточек: лайм · голубой · розовый, �
   // перехода выносит жидкость на свой слой и не обрезает её по скруглению
   // сосуда. Жидкость и заливка плашки скруглены сами.
   ok('жидкость скруглена сама (углы не пропадают)', /border-radius:inherit/.test(rule('.liq')) && /border-radius:inherit/.test(rule('.fliq')))
-  ok('углы сосудов при переливе не меняются, сосуд не наклоняется', !/\.p2 \.seg-[ab]\{[^}]*(radius|rotate)/.test(css))
-  ok('слой бонуса без линии раздела — плавный переход', /\.seg-b \.liq\{background:linear-gradient\(0deg, var\(--c\) 0 calc\(var\(--split,70%\) - 8%\), var\(--c2\) calc\(var\(--split,70%\) \+ 8%\)\)\}/.test(css))
+  ok('углы сосудов при переливе не меняются', !/\.p2 \.seg-[ab]\{[^}]*radius/.test(css))
+  ok('верхний сосуд при переливе чуть наклоняется (владелец 01.10)', /\.card\.p2 \.seg-a\{transform:rotate\(3deg\)\}/.test(css))
+  ok('сосуды — пропорции пластиковой карты', /aspect-ratio:1\.586/.test(rule('.seg')))
+  ok('подписи сосудов крупные и цветом карточки', /font-size:26px/.test(rule('.seg .lbl')) && /color:var\(--c2\)/.test(rule('.seg .lbl')))
+  ok('плашка: сумма и слово в чёрной плашке в одну строку',
+     /flex-direction:row/.test(rule('.face .fs-face')) && /background:var\(--dark\)/.test(rule('.face .fs-face small')))
+  ok('плашка берёт остаток высоты карточки', /flex:1 0 auto/.test(rule('.faces')))
+  ok('слой бонуса без линии раздела — плавный переход', /\.seg-b \.liq\{background:linear-gradient\(0deg, var\(--c\) 0 calc\(var\(--split,70%\) - 8%\), var\(--c2\) calc\(var\(--split,70%\) \+ 8%\)\)[^;}]*\}/.test(css))
 }
 {
   // Цвета описаны в стилях страницы — у каждого тона свой --c
@@ -308,7 +314,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
        `${c.x} · ${c.sum} → ${c.card}`)
     ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: ${o.label} — два сосуда и горлышко; ни волн, ни подсветки, ни переключателя`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — два сосуда, воронка и струя; ни волн, ни подсветки, ни переключателя`, c.slider && !c.toggle)
     ok(`${code}: ${o.label} — цвет «${o.tone}»`, c.tone === `tone-${o.tone}`, c.tone)
     ok(`${code}: ${o.label} — «жидкость» с тем же текстом, скрыта от чтения`,
        c.liqHidden && c.liqSum === c.sum && c.liqNum === c.card, `${c.liqSum} / ${c.liqNum}`)
@@ -320,7 +326,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
     const want = [
       { kind: 'gift', big: `+${fmt(o.gift)}`, small: 'бонус' },
       { kind: 'games', big: o.games, small: 'бонус' },
-      ...(t ? [{ kind: 'tickets', big: `+${t} тикетов`, small: 'за наличные' }] : []),
+      ...(t ? [{ kind: 'tickets', big: `+${t}`, small: 'тикетов за наличные' }] : []),
     ]
     const got = c.faces.map(({ kind, big, small }) => ({ kind, big, small }))
     ok(`${code}: ${o.label} — плашка: ${want.map((w) => `${w.big} ${w.small}`).join(' / ')}`,
@@ -350,74 +356,100 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   ok(`${code}: «Парк не найден» не показан`, !r.parkErr)
 }
 
-console.log('\n── Движение: «перелей воду» по очереди, грани плашки ──')
+console.log('\n── Движение: «перелей воду» по очереди, плашка — все грани ──')
 {
   // Тайминг kassa.js: старт через 0,7 с; p1 1 с → p2 0,9 с → p3 + досчёт
-  // 1,1 с; карточка — 5,2 с. «На карте» доходит до половины через ~1,45 с
-  // после старта карточки — тогда плашка наливается и меняет грань.
-  const kinds = (cc) => cc.map((x) => x.faces.find((f) => f.on)?.kind).join()
+  // 1,1 с → «красуется» 1,6 с. «На карте» доходит до половины через ~1,45 с
+  // после старта карточки — плашка наливается и идёт по всем граням, по
+  // 1,7 с каждая; только потом следующая карточка (cardMs):
+  //   X1 0,7–5,7 с (половина 2,14; игры 3,84) · X2 5,7–10,7 (игры 8,88) ·
+  //   X4–6 10,7–17,3 (игры 13,92; тикеты 15,62) · X1 снова с 17,3.
   const r = await run('?park=ohta&tv=1')
   const w = r.window
   const cs = (el) => w.getComputedStyle(el)
+  const kinds = (cc) => cc.map((x) => x.faces.find((f) => f.on)?.kind).join()
+  const faceBg = (cc, i) => (cs(cc[i].el.querySelector('.face.on .fliq')).opacity === '1' ? 'залита' : 'не залита')
+  const lblT = (cc, i, k) => cs(cc[i].el.querySelector(`${k} > .lbl`)).transform || ''
   const cards0 = r.cards()
   ok('до старта все числа — итог, сосуды спокойные',
      cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000' && cards0.every((c) => !c.phase && !c.on))
   ok('у каждой карточки свой цвет', new Set(cards0.map((c) => c.tone)).size === 3, cards0.map((c) => c.tone).join())
-  await wait(1200)   // t≈1,2 с — p1
+
+  await wait(1200)   // t≈1,2 — X1 p1
   let c = r.cards()
   ok('первой — 1 500: наливается «пополнение», внизу пока та же сумма',
      c[0].on && c[0].phase === 'p1' && c[0].card === '1 500' && c[0].liqNum === '1 500' && !c[1].on && !c[2].on, `${c[0].card} ${c[0].phase}`)
   ok('пока наливается — «на карте» в тени', Number(cs(c[0].el.querySelector('.seg-b')).opacity) < 0.5, cs(c[0].el.querySelector('.seg-b')).opacity)
-  // Плашка бонуса «наливается», только когда «на карте» налито хотя бы
-  // наполовину (решение владельца 01.10): заливка .fliq видна (opacity 1).
-  const faceBg = (i) => (cs(c[i].el.querySelector('.face.on .fliq')).opacity === '1' ? 'залита' : 'не залита')
-  ok('пока «на карте» пусто — плашка бонуса не залита', !c[0].el.classList.contains('half') && faceBg(0) === 'не залита', faceBg(0))
-  ok('плашки у всех стоят на бонусе', kinds(c) === 'gift,gift,gift', kinds(c))
-  await wait(700)    // t≈1,9 с — p2
+  ok('подпись «пополнение» выросла, «на карте» — уменьшилась', lblT(c, 0, '.seg-a') === 'scale(1.2)' && lblT(c, 0, '.seg-b') === 'scale(.85)',
+     `${lblT(c, 0, '.seg-a')} / ${lblT(c, 0, '.seg-b')}`)
+  ok('пока «на карте» пусто — плашка не залита, у всех бонус', faceBg(c, 0) === 'не залита' && kinds(c) === 'gift,gift,gift', `${faceBg(c, 0)} ${kinds(c)}`)
+
+  await wait(700)    // t≈1,9 — X1 p2
   c = r.cards()
-  ok('дальше — перелив через горлышко: фаза p2, без наклона, оба сосуда не в тени',
-     c[0].phase === 'p2' && !/rotate/.test(cs(c[0].el.querySelector('.seg-a')).transform || '')
+  ok('перелив: верхний чуть наклонён, воронка цветом карточки, оба сосуда не в тени',
+     c[0].phase === 'p2' && /rotate\(3deg\)/.test(cs(c[0].el.querySelector('.seg-a')).transform || '')
+       && (cs(c[0].el.querySelector('.funnel path')).getPropertyValue('fill') || '').trim() === 'var(--c)'
        && Number(cs(c[0].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1,
      `${c[0].phase} ${cs(c[0].el.querySelector('.seg-a')).transform}`)
-  ok('в начале перелива «на карте» меньше половины — плашка не залита и не сменилась',
-     !c[0].el.classList.contains('half') && faceBg(0) === 'не залита' && kinds(c) === 'gift,gift,gift', `${faceBg(0)} ${kinds(c)}`)
-  await wait(2200)   // t≈4,1 с — досчитано
+  ok('у спокойных воронка едва видна', (cs(c[1].el.querySelector('.funnel path')).getPropertyValue('fill') || '').trim() !== 'var(--c)')
+  ok('в начале перелива «на карте» меньше половины — плашка стоит', !c[0].el.classList.contains('half') && faceBg(c, 0) === 'не залита' && kinds(c) === 'gift,gift,gift')
+
+  await wait(600)    // t≈2,5 — X1 налита наполовину
   c = r.cards()
-  ok('долит бонус, число досчиталось до 2 025 (и в «жидкости» тоже)',
-     c[0].on && c[0].phase === 'p3' && c[0].card === '2 025' && c[0].liqNum === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} ${c[0].phase}`)
-  ok('«на карте» налито — плашка бонуса залита цветом карточки', c[0].el.classList.contains('half') && faceBg(0) === 'залита', faceBg(0))
+  ok('«на карте» за половиной — плашка ожила: залита, первая грань — бонус',
+     c[0].el.classList.contains('half') && faceBg(c, 0) === 'залита' && kinds(c) === 'gift,gift,gift', `${faceBg(c, 0)} ${kinds(c)}`)
   {
-    // 01.10: копия текста в заливке плашки вышла лаймом по лайму — правило
-    // .face .fs-face перебивало .fliq .fs-face. Буквы в заливке — тёмные.
     const fq = c[0].el.querySelector('.face.on .fliq .fs-face')
     const col = (n) => (cs(n).getPropertyValue('color') || '').trim()
-    ok('в залитой плашке буквы тёмные', ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq)) && ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq.querySelector('small'))),
-       `${col(fq)} / ${col(fq.querySelector('small'))}`)
+    ok('в залитой плашке сумма тёмная, слово — в чёрной плашке', ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq.querySelector('b'))),
+       col(fq.querySelector('b')))
   }
-  ok('у спокойных карточек плашка не залита', [1, 2].every((i) => !c[i].el.classList.contains('half') && faceBg(i) === 'не залита'))
+  ok('у спокойных карточек плашка не залита', [1, 2].every((i) => !c[i].el.classList.contains('half') && faceBg(c, i) === 'не залита'))
+
+  await wait(1600)   // t≈4,1 — X1 досчитана, красуется, плашка на играх
+  c = r.cards()
+  ok('досчиталось до 2 025 (и в «жидкости» тоже)',
+     c[0].on && c[0].phase === 'p3' && c[0].card === '2 025' && c[0].liqNum === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} ${c[0].phase}`)
+  ok('«на карте» красуется — поворот гранями и свет', /brag/.test(`${cs(c[0].el.querySelector('.seg-b')).animationName} ${cs(c[0].el.querySelector('.seg-b')).getPropertyValue('animation')}`),
+     cs(c[0].el.querySelector('.seg-b')).getPropertyValue('animation'))
+  ok('подпись «на карте» выросла, «пополнение» — уменьшилась', lblT(c, 0, '.seg-b') === 'scale(1.2)' && lblT(c, 0, '.seg-a') === 'scale(.85)')
+  ok('плашка 1 500 перешла к играм, у спокойных стоит бонус', kinds(c) === 'games,gift,gift', kinds(c))
   ok('пустое «пополнение» — в тени, «на карте» — нет',
      Number(cs(c[0].el.querySelector('.seg-a')).opacity) < 0.5 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1)
-  ok('налилась — плашка 1 500 сменилась на игры, у спокойных стоит бонус', kinds(c) === 'games,gift,gift', kinds(c))
+
+  await wait(1300)   // t≈5,4 — X1 ещё держит ход: обе грани показаны, «красуется» досматривается
+  c = r.cards()
+  ok('пока плашка не показала все грани — ход не переходит', c[0].on && !c[1].on, c.map((x) => x.on).join())
   ok('смена грани закончилась чисто: видна одна грань, меток смены нет',
      c.every((x) => x.faces.filter((f) => f.on).length === 1) && !r.d.querySelector('.face.in, .face.out'))
-  ok('заливка видна только у показанной грани', [...c[0].el.querySelectorAll('.face:not(.on) .fliq')].every((f) => cs(f).opacity !== '1'))
-  await wait(2600)   // t≈6,7 с — вторая карточка, p1
+
+  await wait(600)    // t≈6,0 — X2 p1
   c = r.cards()
-  ok('следом — 3 000, у первой итог на месте, сосуды спокойные',
-     !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && c[0].liqNum === '2 025', c.map((x) => x.phase || '-').join())
-  ok('у погасшей карточки плашка снова не залита, у новой — пока тоже', !c[0].el.classList.contains('half') && !c[1].el.classList.contains('half'))
-  ok('погасшая карточка свою плашку не меняет, новая — пока тоже', kinds(c) === 'games,gift,gift', kinds(c))
+  ok('следом — 3 000; у первой итог на месте, плашка снова на бонусе и не залита',
+     !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && kinds(c) === 'gift,gift,gift' && faceBg(c, 0) === 'не залита',
+     `${c.map((x) => x.phase || '-').join()} ${kinds(c)}`)
   ok('у спокойных карточек оба сосуда читаются', [0, 2].every((i) =>
     Number(cs(c[i].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[i].el.querySelector('.seg-b')).opacity || 1) === 1))
-  await wait(1400)   // t≈8,1 с — «на карте» у 3 000 за половиной
+
+  await wait(3200)   // t≈9,2 — X2 на играх
   c = r.cards()
-  ok('налилась 3 000 — её плашка сменилась на игры, остальные стоят', c[1].el.classList.contains('half') && kinds(c) === 'games,games,gift', kinds(c))
+  ok('3 000: плашка ожила и перешла к играм, остальные стоят', c[1].on && kinds(c) === 'gift,games,gift', kinds(c))
+
+  await wait(6700)   // t≈15,9 — X4–6 на тикетах
+  c = r.cards()
+  ok('5 000: плашка дошла до тикетов («тикетов за наличные»), остальные стоят',
+     c[2].on && kinds(c) === 'gift,gift,tickets' && c[2].faces.find((f) => f.on)?.small === 'тикетов за наличные', kinds(c))
+
+  await wait(1800)   // t≈17,7 — снова X1
+  c = r.cards()
+  ok('показав все три грани, ход вернулся к 1 500; у 5 000 плашка снова на бонусе', c[0].on && !c[2].on && kinds(c) === 'gift,gift,gift', `${c.map((x) => x.on).join()} ${kinds(c)}`)
   r.window.close()
+
   const z = await run('?park=ohta', { reduced: true })
   await wait(900)
   const zc = z.cards()
-  ok('без движения: сосуды спокойные, итоги стоят',
-     zc.every((x) => !x.phase && !x.on) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000')
+  ok('без движения: сосуды спокойные, итоги стоят, плашки на бонусе',
+     zc.every((x) => !x.phase && !x.on) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000' && kinds(zc) === 'gift,gift,gift')
   z.window.close()
 }
 
@@ -429,7 +461,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   ok(`${code}: раскладка без QR (no-online)`, r.body.includes('no-online'))
   ok(`${code}: слов про телефон и камеру на экране нет`, !/телефон|камер/i.test(r.text), r.text.match(/телефон|камер/i)?.[0])
   ok(`${code}: карточки остались`, cards.length === 3 && cards[0].card === '2 025')
-  if (s.tickets) ok(`${code}: тикеты за наличные в карточке 5 000 остались`, cards[2].faces.some((f) => f.big === '+500 тикетов'))
+  if (s.tickets) ok(`${code}: тикеты за наличные в карточке 5 000 остались`, cards[2].faces.some((f) => f.big === '+500' && f.small === 'тикетов за наличные'))
 }
 
 console.log('\n── Песочница и защита от правки адресом ──')
@@ -479,7 +511,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.7 · собрано ДД.ММ»', /^v1\.7 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.8 · собрано ДД.ММ»', /^v1\.8 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
