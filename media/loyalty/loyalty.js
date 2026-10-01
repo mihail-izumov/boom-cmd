@@ -14,13 +14,13 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { LOYALTY_QR } from './loyalty-qr.js'
-import { initScreens, isEmbedded, pauseAnimations, restartAnimations } from '../shared/screens.js'
+import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnimations } from '../shared/screens.js'
 
 /* ── 0. Конфиг ───────────────────────────────────────────────────────────── */
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v7.0'
+const PAGE_VERSION = 'v7.1'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -39,8 +39,8 @@ const PARKS = {
 const PARK_ORDER = ['ohta', 'piterland', 'iyun']
 
 /* Длина круга сцены, мс — ровно длительность @keyframes сцены в index.html
-   (animation: … 42.4s). По ней плеер (media/shared/screens.js) в режиме
-   «цикл» держит экран ровно один круг. Поменяли длительность в CSS —
+   (animation: … 42.4s). По ней плеер (media/shared/screens.js) держит
+   экран ровно один круг. Поменяли длительность в CSS —
    поменяйте и здесь. */
 const SCENE_MS = 42400
 
@@ -311,6 +311,7 @@ if (PARKS[park]) {
     cycleMs: () => SCENE_MS,
     restart: restartAnimations,
     pause: pauseAnimations,
+    resume: resumeAnimations,
   })
 }
 
