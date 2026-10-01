@@ -2,6 +2,37 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<script>
+/* Страховка ТВ-панели (решение владельца 01.10). GitHub Pages разрешает
+   браузеру держать страницу до 10 минут, а при публикации старые файлы
+   скриптов удаляются. Взял браузер страницу из кэша — её скриптов уже нет,
+   и экран стоит сломанным до суточного перезапуска. Поэтому: не загрузился
+   скрипт или стиль страницы — через 3 с перезагрузка в обход кэша (метка
+   ?r=… в адресе). Не больше 3 попыток подряд: при настоящей поломке панель
+   не крутится в перезагрузках. Удачная загрузка счётчик обнуляет.
+   ⚠ Стоит ПЕРВЫМ в <head>, до скриптов, которые вставляет Vite. */
+(function () {
+  var KEY = 'boom-retry:' + location.pathname, failed = false
+  function retry() {
+    if (failed) return
+    failed = true
+    var n = 0
+    try { n = +(sessionStorage.getItem(KEY) || 0); if (n >= 3) return; sessionStorage.setItem(KEY, n + 1) } catch (e) {}
+    setTimeout(function () {
+      var u = new URL(location.href)
+      u.searchParams.set('r', Date.now())
+      location.replace(u.toString())
+    }, 3000)
+  }
+  window.addEventListener('error', function (e) {
+    var t = e.target
+    if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) retry()
+  }, true)
+  window.addEventListener('load', function () {
+    if (!failed) { try { sessionStorage.removeItem(KEY) } catch (e) {} }
+  })
+})()
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0d0a2e">

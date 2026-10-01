@@ -20,7 +20,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v7.3'
+const PAGE_VERSION = 'v7.4'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
