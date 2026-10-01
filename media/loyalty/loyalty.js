@@ -20,7 +20,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v7.1'
+const PAGE_VERSION = 'v7.2'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -43,6 +43,14 @@ const PARK_ORDER = ['ohta', 'piterland', 'iyun']
    экран ровно один круг. Поменяли длительность в CSS —
    поменяйте и здесь. */
 const SCENE_MS = 42400
+
+/* В плеере «Статус» начинается с кадра «Заряжено» (решение владельца 01.10):
+   29,32 с от начала сцены — подпись c6 «Заряжено» уже стоит целиком, карта
+   только начинает выходить вперёд (cap6 и card-orb в index.html). Круг
+   кончается за 0,7 с до этой точки — заставка успевает закрыть экран, пока
+   «Статус растёт» уходит, и «Заряжено» не мелькает в конце. */
+const START_MS = 29320
+const END_EARLY_MS = 700
 
 /* Статусы. Пороги, скидки, «≈ игр за 1 500 ₽» и цвета — ровно из
    BoomRewards.vue (b00m.fun/rewards). Владелец подтвердил 30.09: «цифры
@@ -308,8 +316,8 @@ if (PARKS[park]) {
     park,
     parks: PARKS,
     parkOrder: PARK_ORDER,
-    cycleMs: () => SCENE_MS,
-    restart: restartAnimations,
+    cycleMs: () => SCENE_MS - END_EARLY_MS,
+    restart: () => restartAnimations(START_MS),
     pause: pauseAnimations,
     resume: resumeAnimations,
   })
