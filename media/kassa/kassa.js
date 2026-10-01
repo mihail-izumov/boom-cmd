@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  /media/kassa/ — ТВ-экран у кассы «Пополни карту»
+ *  /media/kassa/ — ТВ-экран у кассы «Заряди карту онлайн»
  * ═══════════════════════════════════════════════════════════════════════════
  *  Отдельный Vite-вход, как /media/turbo/ и /media/loyalty/. Ни одного
  *  импорта из src/. Страница СТАТИЧНАЯ: данные — kassa.data.json рядом,
@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.0'
+const PAGE_VERSION = 'v1.1'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -87,15 +87,30 @@ function giftFor(sum) {
 
 /* ── 3. Отрисовка ────────────────────────────────────────────────────────── */
 
-/* Фигурки людей над карточкой: 1, 2, 4 — сколько пришло играть. */
-function people(n) {
-  const fig = (x) => `<circle cx="${x + 7}" cy="7" r="4.2"/><path d="M${x} 22v-2.5a7 7 0 0 1 14 0V22"/>`
-  let g = ''
-  for (let i = 0; i < n; i++) g += fig(i * 11)
-  const w = (n - 1) * 11 + 14
-  return `<svg class="ppl" viewBox="-1 0 ${w + 2} 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${g}</svg>`
+/** Тикеты за наличные на кассе для суммы — по ступеням парка (0 — акции нет). */
+function cashTicketsFor(p, sum) {
+  let t = 0
+  for (const s of p.cash_tickets || []) if (sum >= s.from) t = s.tickets
+  return t
 }
+
+/** «≈ +7 игр» — подарок / средняя цена игры (game_price), вниз до целого. */
+function gamesFor(gift) {
+  const price = Number(DATA.game_price) || 0
+  return price > 0 ? Math.floor(gift / price) : 0
+}
+/* 1 игра · 2 игры · 7 игр · 21 игра · 42 игры */
+function plural(n, one, few, many) {
+  const a = n % 10
+  const b = n % 100
+  if (a === 1 && b !== 11) return one
+  if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few
+  return many
+}
+
 const STAR = '<span class="star" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg></span>'
+/* Ручка переключателя — молния: «заряди карту» */
+const BOLT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
 
 function renderOffer() {
   document.getElementById('offer').innerHTML =
@@ -103,49 +118,67 @@ function renderOffer() {
 }
 
 /**
- * Три карточки. Каждое крупное число — с подписью, что это: «пополнение»,
- * «на карте», «в подарок». На карте = сумма + подарок, считается здесь, а не
- * пишется в данные: так три числа на карточке не могут разойтись.
+ * Три карточки: «X1 / X2 / X4–6» — сколько пришло играть.
+ *
+ * Каждое крупное число подписано: «пополнение» и «на карте». Между ними —
+ * переключатель: по очереди (1 500 → 3 000 → 5 000) он щёлкает, и число «на
+ * карте» вырастает из суммы пополнения до итога — видно, как пополнение
+ * превращается в сумму на карте (см. cycleCards ниже).
+ *
+ * Под числом — ОДНА плашка с тремя гранями одного бонуса, они сменяют друг
+ * друга: «+525 в подарок» → «≈ +7 игр в подарок» → «+200 тикетов за
+ * наличные». Тикетов нет у парка (Июнь) — граней две.
+ *
+ * На карте = сумма + подарок, считается здесь, а не пишется в данные: так
+ * числа на карточке не могут разойтись.
  */
-function renderCards() {
+function renderCards(p) {
   document.getElementById('cards').innerHTML = DATA.offers.map((o) => {
     const gift = giftFor(o.sum)
+    const games = gamesFor(gift)
+    const tickets = cashTicketsFor(p, o.sum)
+    const faces = [
+      { kind: 'gift', big: `+${fmt(gift)}`, small: T.face_gift },
+    ]
+    if (games > 0) faces.push({ kind: 'games', big: `≈\u00a0+${fmt(games)}\u00a0${plural(games, 'игра', 'игры', 'игр')}`, small: T.face_games })
+    if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}\u00a0${plural(tickets, 'тикет', 'тикета', 'тикетов')}`, small: T.face_tickets })
+    const [x, n] = [String(o.label).slice(0, 1), String(o.label).slice(1)]
     return `
-      <div class="card${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}">
+      <div class="card${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}" data-total="${o.sum + gift}">
         ${o.main ? STAR : ''}
-        <div class="who">${people(o.people)}<div class="fit-box"><span class="fit fs-who">${esc(o.who)}</span></div></div>
+        <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
         <div class="sum"><div class="lbl l-sum">${esc(T.label_sum)}</div><div class="fit-box"><span class="fit fs-sum">${fmt(o.sum)}\u00a0₽</span></div></div>
+        <div class="toggle" aria-hidden="true"><span class="fill"></span><span class="chev">›››</span><span class="knob">${BOLT}</span></div>
         <div class="oncard"><div class="lbl l-card">${esc(T.label_card)}</div><div class="fit-box"><span class="fit fs-card">${fmt(o.sum + gift)}</span></div></div>
-        <div class="gift"><div class="fit-box"><span class="fit fs-gift">+${fmt(gift)} ${esc(T.label_gift)}</span></div></div>
+        <div class="faces">${faces.map((f, i) => `
+          <div class="face${i === 0 ? ' on' : ''}" data-kind="${f.kind}"><span class="fit fs-face"><b>${esc(f.big)}</b><small>${esc(f.small)}</small></span></div>`).join('')}
+        </div>
       </div>`
   }).join('')
 }
 
-/** Полоса ступеней — с суммы steps_from парка. Подписи рядов — слева. */
+/** Полоса ступеней — убрана владельцем 01.10 (show_steps:false), код оставлен:
+    true в данных — и она вернётся, с суммы steps_from парка. */
 function renderSteps(p) {
+  const tile = document.getElementById('steps')
+  tile.hidden = !DATA.show_steps
+  if (!DATA.show_steps) return
   document.getElementById('round').innerHTML = `${esc(T.round)}<i>${esc(nb(T.round_example))}</i>`
   const steps = DATA.steps.filter((s) => s.sum >= p.steps_from)
   const box = document.getElementById('ladder')
   box.style.setProperty('--n', String(steps.length))
-  box.innerHTML =
-    `<div class="legend"><span class="lbl">${esc(T.label_sum)}</span><span class="lbl">${esc(T.label_gift)}</span></div>` +
-    steps.map((s, i) => `
+  box.innerHTML = steps.map((s, i) => `
       <div class="step" data-sum="${s.sum}" style="--i:${i};--lv:${((i + 1) / steps.length).toFixed(2)}">
         <div class="fit-box"><span class="fit fs-ssum">${fmt(s.sum)}\u00a0₽</span></div>
         <div class="fit-box"><span class="fit fs-sgift">+${fmt(s.gift)}</span></div>
       </div>`).join('')
 }
 
-/** Строки «на кассе»: тикеты за наличные и докидка в зале — по парку. */
+/** Строка «на кассе»: «Не хватило — докинем…» — по парку. Тикеты за
+    наличные переехали в карточки (решение владельца 01.10). */
 function renderInfo(p) {
-  const hasTickets = !!(p.tickets && p.tickets.trim())
-  document.getElementById('row-tickets').hidden = !hasTickets
-  document.getElementById('tickets').textContent = hasTickets ? nb(p.tickets) : ''
-  document.getElementById('row-hall').hidden = !p.topup_in_hall
   document.getElementById('hall').textContent = p.topup_in_hall ? T.topup_in_hall : ''
-  const none = !hasTickets && !p.topup_in_hall
-  document.getElementById('info').hidden = none
-  document.body.classList.toggle('no-info', none)
+  document.getElementById('info').hidden = !p.topup_in_hall
 }
 
 /** QR — только при включённом онлайне. Выключен — плитки нет совсем. */
@@ -164,10 +197,11 @@ function renderQr(p) {
   svg.setAttribute('viewBox', q.viewBox)
   path.setAttribute('d', q.d)
   svg.dataset.url = q.url   // для проверки глазами в инспекторе
-  document.getElementById('qr-lead').textContent = T.qr_lead
-  /* «Пополняй с телефона — подарки те же, без очереди»: первая половина
-     тёмным, вторая синим. Тире держится за словом справа — неразрывным
-     пробелом, чтобы не повиснуть отдельной строкой. */
+  /* «Докинуть на карту без очереди» — «без очереди» выделено лаймовой плашкой */
+  document.getElementById('qr-lead').innerHTML = `${esc(T.qr_lead_a)} <mark>${esc(T.qr_lead_b)}</mark>`
+  /* «Баланс, тикеты и статус — в твоём телефоне»: первая половина тёмным,
+     вторая синим. Тире держится за словом справа — неразрывным пробелом,
+     чтобы не повиснуть отдельной строкой. */
   /* Короткие слова («с», «без», «те») держатся за следующим — не висят в конце строки */
   const glue = (x) => x.replace(/(^|\s)([А-Яа-яЁё]{1,3}) /g, '$1$2\u00a0')
   const [a, b] = String(T.qr_caption).split(' — ').map(glue)
@@ -187,14 +221,14 @@ function render() {
 
   document.getElementById('brand-park').textContent = p.name
   renderOffer()
-  renderCards()
+  renderCards(p)
   renderSteps(p)
   renderInfo(p)
   renderQr(p)
   if (DEMO) {
     document.getElementById('demo').classList.add('on')
     document.getElementById('demo-info').textContent =
-      `${park} · онлайн ${p.online ? 'вкл' : 'выкл'} · ступени от ${fmt(p.steps_from)} · тикеты ${p.tickets ? 'да' : 'нет'} · докидка ${p.topup_in_hall ? 'да' : 'нет'}`
+      `${park} · онлайн ${p.online ? 'вкл' : 'выкл'} · тикеты за наличные ${(p.cash_tickets || []).length ? 'да' : 'нет'} · докидка ${p.topup_in_hall ? 'да' : 'нет'} · ступени ${DATA.show_steps ? 'вкл' : 'выкл'}`
   }
   return true
 }
@@ -282,8 +316,8 @@ function cardRoom() {
   const label = oc.querySelector('.lbl').offsetHeight
   let used
   if (document.body.classList.contains('portrait')) {
-    /* Вертикаль: «на карте» занимает правую колонку над подарком */
-    used = c.querySelector('.gift').offsetHeight + gap + label
+    /* Вертикаль: «на карте» занимает правую колонку над плашкой подарка */
+    used = c.querySelector('.faces').offsetHeight + gap + label
   } else {
     const kids = [...c.children].filter((e) => !e.classList.contains('star'))   // звезда — поверх, места не занимает
     used = gap * (kids.length - 1) + parseFloat(ocs.paddingTop) + parseFloat(ocs.borderTopWidth) + label
@@ -342,24 +376,87 @@ function fitStage() {
   stageScale = k
 
   const offer = document.getElementById('offer')
-  fitCount(offer, portrait ? 104 : 88, 40)
-  fitUniform('.fs-who', 32, 18)
+  fitCount(offer, portrait ? 112 : 104, 40)
+  fitUniform('.fs-x', 84, 30)
   fitUniform('.fs-sum', 50, 26)
-  fitUniform('.fs-gift', 32, 16)
+  fitUniform('.fs-face', 48, 16)
   fitUniform('.fs-card', portrait ? 170 : 150, 48, cardRoom() || 0)
-  fitCount(document.getElementById('round'), 34, 18)
-  fitUniform('.fs-ssum', 30, 14)
-  fitUniform('.fs-sgift', 40, 16)
+  if (DATA.show_steps) {
+    fitCount(document.getElementById('round'), 34, 18)
+    fitUniform('.fs-ssum', 30, 14)
+    fitUniform('.fs-sgift', 40, 16)
+  }
   fitUniform('.fs-info', 28, 16)
   fitQr()
 }
 
-/* ── 6. Жизненный цикл ───────────────────────────────────────────────────── */
+/* ── 6. Движение: «пополнение превращается в сумму на карте» ──────────────
+   Карточки по очереди (1 500 → 3 000 → 5 000, по CARD_MS каждая): у активной
+   переключатель щёлкает слева направо, и число «на карте» вырастает из суммы
+   пополнения до итога. У остальных итог стоит на месте — все три числа
+   читаются в любой момент.
+   Плашка под числом раз в FACE_MS меняет грань: подарок → игры → тикеты,
+   у всех карточек одновременно — так грани легко сравнивать.
+   Без движения (prefers-reduced-motion) — все переключатели включены,
+   итог и первая грань стоят. */
+const CARD_MS = 4000
+const FACE_MS = 3000
+const COUNT_MS = 1100
+const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+
+function countUp(card) {
+  const node = card.querySelector('.fs-card')
+  const from = Number(card.dataset.sum)
+  const to = Number(card.dataset.total)
+  const t0 = performance.now() + 450   // сначала щёлкает переключатель
+  node.textContent = fmt(from)
+  card.classList.remove('done')
+  const step = (now) => {
+    if (!card.classList.contains('on')) { node.textContent = fmt(to); return }
+    const k = Math.min(1, Math.max(0, (now - t0) / COUNT_MS))
+    const e = 1 - Math.pow(1 - k, 3)
+    node.textContent = fmt(Math.round((from + (to - from) * e) / 5) * 5)
+    if (k < 1) requestAnimationFrame(step)
+    else { node.textContent = fmt(to); card.classList.add('done') }
+  }
+  requestAnimationFrame(step)
+}
+
+let active = -1
+function cycleCards() {
+  const cards = [...document.querySelectorAll('#cards .card')]
+  if (!cards.length) return
+  cards.forEach((c) => {
+    c.classList.remove('on', 'done')
+    c.querySelector('.fs-card').textContent = fmt(Number(c.dataset.total))
+  })
+  active = (active + 1) % cards.length
+  cards[active].classList.add('on')
+  countUp(cards[active])
+}
+
+let face = 0
+function rotateFaces() {
+  face += 1
+  document.querySelectorAll('#cards .card').forEach((c) => {
+    const fs = [...c.querySelectorAll('.face')]
+    fs.forEach((f, i) => f.classList.toggle('on', i === face % fs.length))
+  })
+}
+
+/* ── 7. Жизненный цикл ───────────────────────────────────────────────────── */
 render()
 fitStage()
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStage)
 setTimeout(fitStage, 1200)
 window.addEventListener('resize', fitStage)
+
+if (REDUCED) {
+  document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('on', 'done'))
+} else if (PARKS[park]) {
+  setTimeout(() => { cycleCards(); setInterval(cycleCards, CARD_MS) }, 700)
+  setInterval(rotateFaces, FACE_MS)
+}
 
 /* Суточный самоперезапуск в 05:00 по Москве — как у турбо и «Твоей карты»:
    забрать новую сборку и не копить утечки. */

@@ -1,18 +1,21 @@
 /**
- * verify-kassa.mjs — приёмка ТВ-экрана у кассы /media/kassa/ («Пополни карту»).
+ * verify-kassa.mjs — приёмка ТВ-экрана у кассы /media/kassa/ («Заряди карту онлайн»).
  *
  * Как verify-turbo.mjs: проверяет СОБРАННЫЙ бандл, а не исходник — именно он
  * поедет на панель. Сценарии гоняются в jsdom.
  *
- * Что держит:
+ * Что держит (v1.1, правки владельца 01.10):
  *   · числа на экране совпадают с kassa.data.json И с таблицей подарков,
  *     подтверждённой ИТ 13.08 (она вписана ниже отдельно — если кто-то
  *     поправит данные, проверка покажет расхождение с подтверждённым);
- *   · переключатели парков: у Охты нет ступени 500, у Июня нет строки про
- *     тикеты, строка докидки — у Питерленда и Июня, при выключенном онлайне
- *     QR пропадает (проверяется настоящей сборкой с online:false);
- *   · запретные слова, проценты и «число игр» на экран не попали;
- *   · ни одного сетевого запроса и ни одного нажимаемого элемента;
+ *   · карточки X1 / X2 / X4–6: пополнение → переключатель → на карте; каждое
+ *     крупное число подписано; переключатели щёлкают по очереди;
+ *   · плашка бонуса — грани одного подарка: «+525 в подарок», «≈ +7 игр в
+ *     подарок» (подарок / 70 ₽, вниз), «+200 тикетов за наличные»;
+ *   · тикеты — только за наличные и только где акция есть (у Июня нет);
+ *   · при выключенном онлайне QR пропадает (настоящая сборка с online:false);
+ *   · запретные слова и проценты на экран не попали;
+ *   · у гостя ничего не нажимается, ни одного сетевого запроса;
  *   · канва на месте (механизм турбо).
  *
  * Запуск:  node scripts/verify-kassa.mjs
@@ -29,6 +32,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // VERIFY_OUT нужен для сред, где удаление внутри рабочего дерева запрещено.
 const OUT = process.env.VERIFY_OUT || resolve(ROOT, '.tmp-verify-kassa')
 const OUT_OFF = OUT + '-offline'
+// Свой мусор убираем и при сбое посреди прогона, а не только в конце.
+process.on('exit', () => { for (const d of [OUT, OUT_OFF]) rmSync(d, { recursive: true, force: true }) })
 
 let failed = 0
 const ok = (name, cond, extra = '') => {
@@ -37,6 +42,7 @@ const ok = (name, cond, extra = '') => {
 }
 const sp = (s) => String(s ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
 const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // ── Подтверждённая таблица (ИТ 13.08, стоит на b00m.fun/charge) ─────────────
 // Здесь — НЕ копия kassa.data.json, а то, с чем данные обязаны совпасть.
@@ -49,43 +55,36 @@ const SPEC_STEPS = [
   { sum: 5000, gift: 3000 },
 ]
 const SPEC_ON_CARD = { 500: 625, 1000: 1300, 1500: 2025, 2000: 2800, 3000: 4500, 5000: 8000 }
+// Игры — подарок / 70 ₽ (средняя цена игры с b00m.fun/rewards), вниз до целого.
 const SPEC_OFFERS = [
-  { who: 'Один', sum: 1500, onCard: 2025, gift: 525, main: true },
-  { who: 'Вдвоём', sum: 3000, onCard: 4500, gift: 1500, main: false },
-  { who: 'Компания 4–6', sum: 5000, onCard: 8000, gift: 3000, main: false },
+  { label: 'X1', sum: 1500, onCard: 2025, gift: 525, games: '≈ +7 игр', main: true },
+  { label: 'X2', sum: 3000, onCard: 4500, gift: 1500, games: '≈ +21 игра', main: false },
+  { label: 'X4–6', sum: 5000, onCard: 8000, gift: 3000, games: '≈ +42 игры', main: false },
 ]
+// Тикеты при оплате наличными (решение владельца 01.10): Охта и Питерленд —
+// 200 от 1 000 ₽ и 500 от 5 000 ₽; у Июня акции нет.
 const SPEC_PARKS = {
-  ohta: {
-    name: 'Охта Молл', stepsFrom: 1000, online: true, hall: false,
-    tickets: '+200 тикетов при оплате наличными от 1 000 ₽',
-    qr: 'https://b00m.fun/popolnit/ohtamall?from=kassa-tv',
-  },
-  piterland: {
-    name: 'Питерленд', stepsFrom: 500, online: true, hall: true,
-    tickets: '200 тикетов за 1 000 ₽ и 500 тикетов за 5 000 ₽ — при оплате наличными',
-    qr: 'https://b00m.fun/popolnit/piterland?from=kassa-tv',
-  },
-  iyun: {
-    name: 'ТЦ Июнь', stepsFrom: 500, online: true, hall: true,
-    tickets: '',
-    qr: 'https://b00m.fun/popolnit/june?from=kassa-tv',
-  },
+  ohta: { name: 'Охта Молл', online: true, hall: false, tickets: [200, 200, 500],
+    qr: 'https://b00m.fun/popolnit/ohtamall?from=kassa-tv' },
+  piterland: { name: 'Питерленд', online: true, hall: true, tickets: [200, 200, 500],
+    qr: 'https://b00m.fun/popolnit/piterland?from=kassa-tv' },
+  iyun: { name: 'ТЦ Июнь', online: true, hall: true, tickets: null,
+    qr: 'https://b00m.fun/popolnit/june?from=kassa-tv' },
 }
 const HALL = 'Не хватило — докинем без очереди: скажите сотруднику в зале'
-const QR_CAPTION = 'Пополняй с телефона — подарки те же, без очереди'
-const OFFER = 'Пополни карту — играй больше'
+const OFFER = 'Заряди карту онлайн'
+const QR_LEAD = 'Докинуть на карту без очереди'
+const QR_CAPTION = 'Баланс, тикеты и статус — в твоём телефоне'
 
-// Слова, которых на экране быть не должно (решение владельца 01.10)
+// Слова, которых на экране быть не должно. «Статус» и «число игр» сняты с
+// запрета владельцем 01.10: подпись QR про статус и «≈ +N игр» он попросил сам.
 const FORBIDDEN = [
   [/пакет/i, '«пакет»'],
   [/выгоднее/i, '«выгоднее»'],
   [/на сколько пополня/i, '«на сколько пополняем»'],
   [/бонусы законч/i, '«когда бонусы закончатся»'],
   [/%/, 'проценты'],
-  // \b в JS не видит границ кириллических слов — граница задана явно
-  [/\d[\d\s]*\+?\s*игр(?![а-яё])|\+\s*\d+\s*игр/i, 'число игр'],
   [/турбо/i, 'турбо'],
-  [/статус/i, 'статусы'],
   [/скидк/i, 'скидки'],
   [/розыгрыш|разыгр/i, 'розыгрыши'],
 ]
@@ -135,14 +134,14 @@ const MAIN = loadBuild(OUT)
 const OFF = loadBuild(OUT_OFF)
 const { html, bundle } = MAIN
 
-/** Текст страницы без скрытых узлов — то, что видит гость. */
-function visibleText(doc, root) {
+/** Текст узла без скрытых потомков — то, что видит гость. */
+function visibleText(root) {
   const c = root.cloneNode(true)
   c.querySelectorAll('[hidden]').forEach((n) => n.remove())
   return sp(c.textContent)
 }
 
-async function run(query, { build = MAIN, view = [1920, 1080], storage = {} } = {}) {
+async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, reduced = false } = {}) {
   const dom = new JSDOM(build.html, {
     url: `https://b00m-cmd.ru/media/kassa/${query}`,
     runScripts: 'outside-only',
@@ -155,6 +154,7 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {} } = 
   window.fetch = async () => { net.fetch++; throw new Error('сети нет') }
   window.XMLHttpRequest = function () { net.xhr++; throw new Error('сети нет') }
   window.navigator.sendBeacon = () => { net.beacon++; return false }
+  window.matchMedia = (q) => ({ matches: reduced && /reduce/.test(q), media: q, addEventListener() {}, removeEventListener() {} })
   // jsdom не считает раскладку: размер окна отдаём только узлу #viewport —
   // этого достаточно, чтобы fitStage посчитал масштаб канвы.
   Object.defineProperty(window.HTMLElement.prototype, 'clientWidth', {
@@ -167,37 +167,46 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {} } = 
   for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0))
   const d = window.document
   const $ = (id) => d.getElementById(id)
-  const cards = [...d.querySelectorAll('#cards .card')].map((c) => ({
+  const cards = () => [...d.querySelectorAll('#cards .card')].map((c) => ({
+    el: c,
     main: c.classList.contains('main'),
+    on: c.classList.contains('on'),
     star: !!c.querySelector('.star'),
-    who: sp(c.querySelector('.fs-who')?.textContent),
+    x: sp(c.querySelector('.fs-x')?.textContent),
+    xLime: sp(c.querySelector('.fs-x i')?.textContent),
     sum: sp(c.querySelector('.fs-sum')?.textContent),
     lblSum: sp(c.querySelector('.l-sum')?.textContent),
     card: sp(c.querySelector('.fs-card')?.textContent),
     lblCard: sp(c.querySelector('.l-card')?.textContent),
-    gift: sp(c.querySelector('.fs-gift')?.textContent),
+    toggle: !!c.querySelector('.toggle .knob') && !!c.querySelector('.toggle .fill'),
+    faces: [...c.querySelectorAll('.face')].map((f) => ({
+      kind: f.dataset.kind,
+      on: f.classList.contains('on'),
+      big: sp(f.querySelector('b')?.textContent),
+      small: sp(f.querySelector('small')?.textContent),
+    })),
   }))
-  const steps = [...d.querySelectorAll('#ladder .step')].map((s) => ({
-    sum: sp(s.querySelector('.fs-ssum')?.textContent),
-    gift: sp(s.querySelector('.fs-sgift')?.textContent),
-  }))
-  const page = d.querySelector('.page')
   return {
-    window, d, net, cards, steps,
+    window, d, net, cards,
     brand: sp($('brand-park').textContent),
     offer: sp($('offer').textContent),
-    round: sp($('round').textContent),
-    legend: [...d.querySelectorAll('#ladder .legend .lbl')].map((e) => sp(e.textContent)).join(' / '),
-    ticketsShown: !$('row-tickets').hidden && !$('info').hidden,
-    tickets: sp($('tickets').textContent),
-    hallShown: !$('row-hall').hidden && !$('info').hidden,
+    offerLime: sp($('offer').querySelector('b')?.textContent),
+    stepsHidden: $('steps').hidden,
+    stepCount: d.querySelectorAll('#ladder .step').length,
+    infoShown: !$('info').hidden,
     hall: sp($('hall').textContent),
+    cashRow: !!$('row-tickets'),
     qrShown: !$('qr-tile').hidden,
     qrD: $('qr-path').getAttribute('d') || '',
     qrUrl: $('qr-svg').dataset.url || '',
     qrText: sp($('qr-tile').textContent),
+    qrLead: sp($('qr-lead').textContent),
+    qrMark: sp($('qr-lead').querySelector('mark')?.textContent),
     qrCap: sp($('qr-cap').textContent),
-    text: visibleText(d, page),
+    viewfinder: !!d.querySelector('#qr-frame .aimbox .cn') && !!d.querySelector('#qr-frame .flash'),
+    text: visibleText(d.querySelector('.page')),
+    leftText: visibleText(d.querySelector('.leftcol') || d.getElementById('cards')),
+    leftcol: !!d.querySelector('.leftcol #cards'),
     body: d.body.className,
     parkErr: $('parkerr').className.includes('on'),
     parkErrAsked: $('parkerr-asked').textContent,
@@ -219,14 +228,16 @@ for (const s of SPEC_STEPS) {
 ok('три суммы кассира: 1 500 / 3 000 / 5 000',
    DATA.offers.map((o) => o.sum).join() === '1500,3000,5000', DATA.offers.map((o) => o.sum).join())
 ok('основная — только 1 500', DATA.offers.filter((o) => o.main).map((o) => o.sum).join() === '1500')
-ok('случаи подписаны: Один · Вдвоём · Компания 4–6',
-   DATA.offers.map((o) => o.who).join(' · ') === 'Один · Вдвоём · Компания 4–6')
+ok('метки X1 · X2 · X4–6', DATA.offers.map((o) => o.label).join(' · ') === 'X1 · X2 · X4–6')
+ok('средняя цена игры — 70 ₽, как на /rewards', DATA.game_price === 70, String(DATA.game_price))
+ok('полоса ступеней выключена (решение владельца 01.10)', DATA.show_steps === false)
 ok('парков ровно три, коды как у турбо', DATA.park_order.join() === 'ohta,piterland,iyun')
 for (const [code, s] of Object.entries(SPEC_PARKS)) {
   const p = DATA.parks[code] || {}
   ok(`${code}: название как у турбо («${s.name}»)`, p.name === s.name, p.name)
-  ok(`${code}: ступени с ${fmt(s.stepsFrom)}`, p.steps_from === s.stepsFrom, String(p.steps_from))
-  ok(`${code}: строка про тикеты`, (p.tickets || '') === s.tickets, JSON.stringify(p.tickets))
+  ok(`${code}: тикеты за наличные ${s.tickets ? '200 от 1 000 ₽ и 500 от 5 000 ₽' : '— акции нет'}`,
+     s.tickets ? JSON.stringify(p.cash_tickets) === '[{"from":1000,"tickets":200},{"from":5000,"tickets":500}]'
+               : Array.isArray(p.cash_tickets) && p.cash_tickets.length === 0, JSON.stringify(p.cash_tickets))
   ok(`${code}: строка докидки ${s.hall ? 'есть' : 'нет'}`, p.topup_in_hall === s.hall)
   ok(`${code}: флаг онлайна заведён`, typeof p.online === 'boolean')
 }
@@ -243,52 +254,85 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
 console.log('\n── Экран по паркам ──')
 for (const [code, s] of Object.entries(SPEC_PARKS)) {
   const r = await run(`?park=${code}&tv=1`)
+  const cards = r.cards()
   console.log(`  · ${code}`)
   ok(`${code}: бейдж «БУМБАСТИК // ${s.name}»`, r.brand === s.name, r.brand)
-  ok(`${code}: оффер`, r.offer === OFFER, r.offer)
-  ok(`${code}: три карточки`, r.cards.length === 3, String(r.cards.length))
+  ok(`${code}: оффер «${OFFER}», «онлайн» лаймом`, r.offer === OFFER && r.offerLime === 'онлайн', `${r.offer} / ${r.offerLime}`)
+  ok(`${code}: три карточки`, cards.length === 3, String(cards.length))
+  ok(`${code}: карточки — в левой колонке .leftcol`, r.leftcol)
   SPEC_OFFERS.forEach((o, i) => {
-    const c = r.cards[i] || {}
-    ok(`${code}: «${o.who}» — ${fmt(o.sum)} ₽ → на карте ${fmt(o.onCard)}, +${fmt(o.gift)} в подарок`,
-       c.who === o.who && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard) &&
-       c.gift === `+${fmt(o.gift)} в подарок`, JSON.stringify(c))
-    ok(`${code}: «${o.who}» — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: «${o.who}» — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
+    const c = cards[i] || { faces: [] }
+    const t = s.tickets ? s.tickets[i] : 0
+    ok(`${code}: ${o.label} — ${fmt(o.sum)} ₽ → на карте ${fmt(o.onCard)}`,
+       c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
+       `${c.x} · ${c.sum} → ${c.card}`)
+    ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
+    ok(`${code}: ${o.label} — переключатель вместо разделителя`, c.toggle)
+    ok(`${code}: ${o.label} — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
+    const want = [
+      { kind: 'gift', big: `+${fmt(o.gift)}`, small: 'в подарок' },
+      { kind: 'games', big: o.games, small: 'в подарок' },
+      ...(t ? [{ kind: 'tickets', big: `+${t} тикетов`, small: 'за наличные' }] : []),
+    ]
+    const got = c.faces.map(({ kind, big, small }) => ({ kind, big, small }))
+    ok(`${code}: ${o.label} — плашка: ${want.map((w) => `${w.big} ${w.small}`).join(' / ')}`,
+       JSON.stringify(got) === JSON.stringify(want), got.map((w) => `${w.big} ${w.small}`).join(' / '))
+    ok(`${code}: ${o.label} — видна одна грань, первая — подарок`, c.faces.filter((f) => f.on).length === 1 && c.faces[0]?.on)
   })
-  const want = SPEC_STEPS.filter((x) => x.sum >= s.stepsFrom)
-  ok(`${code}: полоса ступеней с ${fmt(s.stepsFrom)} ₽`,
-     JSON.stringify(r.steps) === JSON.stringify(want.map((x) => ({ sum: `${fmt(x.sum)} ₽`, gift: `+${fmt(x.gift)}` }))),
-     r.steps.map((x) => `${x.sum}→${x.gift}`).join(' · '))
-  ok(`${code}: ряды ступеней подписаны`, r.legend === 'пополнение / в подарок', r.legend)
-  ok(`${code}: «Круглая сумма — больше подарок» с примером`,
-     r.round === 'Круглая сумма — больше подарок1 400 ₽ дают +300, 1 500 ₽ — уже +525', r.round)
-  if (code === 'ohta') {
-    ok('ohta: ступени 500 на экране нет', !r.steps.some((x) => x.sum === '500 ₽'))
-    ok('ohta: подарка +125 на экране нет', !/\+125\b/.test(r.text))
+  ok(`${code}: полосы ступеней нет`, r.stepsHidden && r.stepCount === 0 && !r.text.includes('Круглая сумма'))
+  ok(`${code}: нижней строки про тикеты нет — тикеты в карточках`, !r.cashRow)
+  if (code === 'ohta') ok('ohta: подарка +125 на экране нет', !/\+125\b/.test(r.text))
+  if (!s.tickets) {
+    ok(`${code}: про тикеты и наличные в карточках ни слова`, !/тикет|налич/i.test(r.leftText), r.leftText.match(/тикет|налич/i)?.[0])
+  } else {
+    ok(`${code}: тикеты — только «за наличные»`, (r.leftText.match(/тикетов/g) || []).length === (r.leftText.match(/за наличные/g) || []).length)
   }
-  ok(`${code}: строка про тикеты ${s.tickets ? 'есть' : 'нет'}`,
-     s.tickets ? r.ticketsShown && r.tickets === s.tickets : !r.ticketsShown && r.tickets === '', r.tickets)
-  if (!s.tickets) ok(`${code}: слова «тикет» на экране нет вовсе`, !/тикет/i.test(r.text))
-  if (s.tickets) ok(`${code}: про тикеты сказано «наличными»`, /наличными/.test(r.tickets))
   ok(`${code}: строка докидки ${s.hall ? 'есть' : 'нет'}`,
-     s.hall ? r.hallShown && r.hall === HALL : !r.hallShown && !r.text.includes('докинем'))
+     s.hall ? r.infoShown && r.hall === HALL : !r.infoShown && !r.text.includes('докинем'))
   ok(`${code}: QR на экране`, r.qrShown && r.qrD === KASSA_QR[code].d && r.qrUrl === s.qr, r.qrUrl)
+  ok(`${code}: над QR «${QR_LEAD}», «без очереди» выделено`, r.qrLead === QR_LEAD && r.qrMark === 'без очереди', r.qrLead)
   ok(`${code}: подпись QR`, r.qrCap === QR_CAPTION, r.qrCap)
-  ok(`${code}: рядом с QR о тикетах ни слова`, !/тикет|налич/i.test(r.qrText), r.qrText)
+  ok(`${code}: видоискатель как у «Твоей карты»`, r.viewfinder)
+  ok(`${code}: рядом с QR о наличных ни слова`, !/налич/i.test(r.qrText), r.qrText)
   for (const [re, what] of FORBIDDEN) ok(`${code}: нет: ${what}`, !re.test(r.text), (r.text.match(re) || [''])[0])
   ok(`${code}: ни одного запроса в сеть`, r.net.fetch + r.net.xhr + r.net.beacon === 0, JSON.stringify(r.net))
   ok(`${code}: режим ТВ включён`, r.body.split(' ').includes('tv'))
   ok(`${code}: «Парк не найден» не показан`, !r.parkErr)
 }
 
+console.log('\n── Движение: переключатели по очереди, грани плашки ──')
+{
+  const r = await run('?park=piterland&tv=1')
+  const cards0 = r.cards()
+  ok('до старта все числа — итог', cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000')
+  await wait(3200)   // старт через 0,7 с, щелчок 0,45 с, досчёт 1,1 с; грань — раз в 3 с
+  let c = r.cards()
+  ok('первой щёлкает 1 500', c[0].on && !c[1].on && !c[2].on, c.map((x) => x.on).join())
+  ok('число «на карте» досчиталось до итога', c[0].card === '2 025' && c[0].el.classList.contains('done'), c[0].card)
+  ok('грань сменилась на игры', c.every((x) => x.faces.find((f) => f.on)?.kind === 'games'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  await wait(3200)
+  c = r.cards()
+  ok('следом щёлкает 3 000, первая выключена', !c[0].on && c[1].on && !c[2].on, c.map((x) => x.on).join())
+  ok('у выключенной стоит итог', c[0].card === '2 025', c[0].card)
+  ok('грань дошла до тикетов', c.every((x) => x.faces.find((f) => f.on)?.kind === 'tickets'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  r.window.close()
+  const z = await run('?park=ohta', { reduced: true })
+  await wait(900)
+  const zc = z.cards()
+  ok('без движения: все переключатели включены, итоги стоят',
+     zc.every((x) => x.on) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000')
+  z.window.close()
+}
+
 console.log('\n── Онлайн выключен — QR пропадает (сборка с online:false) ──')
 for (const [code, s] of Object.entries(SPEC_PARKS)) {
   const r = await run(`?park=${code}`, { build: OFF })
+  const cards = r.cards()
   ok(`${code}: плитки QR нет`, !r.qrShown && r.qrD === '' && r.qrUrl === '')
   ok(`${code}: раскладка без QR (no-online)`, r.body.includes('no-online'))
-  ok(`${code}: слов про телефон и камеру на экране нет`, !/телефон|камеру/i.test(r.text), r.text.match(/телефон|камеру/i)?.[0])
-  ok(`${code}: суммы и ступени остались`, r.cards.length === 3 && r.steps.length > 0)
-  if (s.tickets) ok(`${code}: строка про тикеты осталась`, r.ticketsShown && r.tickets === s.tickets)
+  ok(`${code}: слов про телефон и камеру на экране нет`, !/телефон|камер/i.test(r.text), r.text.match(/телефон|камер/i)?.[0])
+  ok(`${code}: карточки остались`, cards.length === 3 && cards[0].card === '2 025')
+  if (s.tickets) ok(`${code}: тикеты за наличные в карточках остались`, cards[2].faces.some((f) => f.big === '+500 тикетов'))
 }
 
 console.log('\n── Песочница и защита от правки адресом ──')
@@ -296,6 +340,9 @@ console.log('\n── Песочница и защита от правки ад�
   const r = await run('?park=piterland&demo=1&online=0')
   ok('?demo=1&online=0 — QR скрыт для предпросмотра', !r.qrShown && r.body.includes('no-online'))
   ok('песочница видна только в demo', r.d.getElementById('demo').className.includes('on'))
+  const r2 = await run('?park=piterland&online=0')
+  ok('без demo адрес online=0 не действует', r2.qrShown && r2.qrUrl === SPEC_PARKS.piterland.qr)
+  ok('без demo песочницы нет', !r2.d.getElementById('demo').className.includes('on'))
   // 01.10: метка песочницы на <body> совпала с классом плашки .demo
   // (display:none) — в предпросмотре пропадала вся страница. jsdom раскладку
   // не считает, но каскад стилей применяет — этого хватает, чтобы поймать.
@@ -306,9 +353,13 @@ console.log('\n── Песочница и защита от правки ад�
        w.getComputedStyle(x.d.body).display !== 'none' && w.getComputedStyle(x.d.getElementById('viewport')).display !== 'none' &&
        w.getComputedStyle(x.d.querySelector('.page')).display !== 'none')
   }
-  const r2 = await run('?park=piterland&online=0')
-  ok('без demo адрес online=0 не действует', r2.qrShown && r2.qrUrl === SPEC_PARKS.piterland.qr)
-  ok('без demo песочницы нет', !r2.d.getElementById('demo').className.includes('on'))
+  // 01.10: обёртку левой колонки назвали .main — тем же именем, что основная
+  // карточка, и она уехала в чужую область сетки. Классы-«области» сетки не
+  // должны совпадать с классами карточек.
+  const html2 = html.replace(/\/\*[\s\S]*?\*\//g, '')
+  const areaClasses = [...html2.matchAll(/(?:^|[\s}])\.([a-z][\w-]*)\{[^}]*grid-area:\s*([a-z]+)/g)].map((m) => m[1])
+  ok('классы областей сетки не совпадают с классами карточек (.main, .on, .done)',
+     areaClasses.length > 0 && !areaClasses.some((c) => ['main', 'on', 'done', 'card'].includes(c)), areaClasses.join(','))
 }
 
 console.log('\n── Парк в адресе ──')
@@ -331,7 +382,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.0 · собрано ДД.ММ»', /^v\d+\.\d+ · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.1 · собрано ДД.ММ»', /^v1\.1 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
@@ -363,7 +414,7 @@ console.log('\n── У гостя ничего не нажимается, ни
   ok('в коде нет fetch / XHR / sendBeacon', !/\bfetch\(|XMLHttpRequest|sendBeacon/.test(bundle))
   ok('нет адресов Apps Script и Google-таблиц', !/script\.google|googleusercontent|docs\.google/.test(bundle + html))
   ok('нет переменных окружения (VITE_*)', !/VITE_[A-Z_]+/.test(bundle))
-  ok('данные вкомпилированы в бандл', bundle.includes('Компания 4–6') && bundle.includes('kassa-tv'))
+  ok('данные вкомпилированы в бандл', bundle.includes('X4–6') && bundle.includes('kassa-tv'))
 }
 
 console.log('\n── Канва: механизм турбо ──')

@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0d0a2e">
-<title>Пополни карту // Бумбастик</title>
+<title>Заряди карту // Бумбастик</title>
 <!--
   ═══════════════════════════════════════════════════════════════════════════
-   b00m-cmd · /media/kassa/ · ТВ-экран у кассы «Пополни карту»
+   b00m-cmd · /media/kassa/ · ТВ-экран у кассы «Заряди карту онлайн»
   ═══════════════════════════════════════════════════════════════════════════
   Третий экран той же серии, что /media/turbo/ и /media/loyalty/. Свой
   Vite-вход, БЕЗ гейта доступа, без API, без сети: данные — media/kassa/
@@ -24,21 +24,27 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ
-    1. Оффер — во всю ширину, читается через зал.
-    2. Три карточки по случаям: «Один» · «Вдвоём» · «Компания 4–6».
-       КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте» / «в
-       подарок»): однажды гости прочли «1 300 зарядов» наоборот, как цену.
-    3. Полоса ступеней подарка (с какой суммы — по парку) + «Круглая сумма —
-       больше подарок».
-    4–5. Строки «на кассе»: тикеты за наличные и «докинем без очереди» —
-       по парку. Стоят слева, ДАЛЕКО от QR: тикеты дают только за наличные
-       на кассе, онлайн их нет, и рядом с QR о них ни слова.
-    6. QR на страницу b00m.fun/popolnit/<парк>?from=kassa-tv — только если
-       у парка включён онлайн; выключен — плитки QR нет, левая часть
-       занимает всю ширину.
-    7. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v1.0 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+  БЛОКИ (v1.1 — правки владельца 01.10)
+    1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
+    2. Три карточки «X1» · «X2» · «X4–6» (вместо слов и фигурок людей).
+       Пополнение → переключатель → на карте. Переключатели щёлкают по
+       очереди (1 500 → 3 000 → 5 000), и число «на карте» вырастает из суммы
+       пополнения — видно, как пополнение превращается в сумму на карте.
+       КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте»): однажды
+       гости прочли «1 300 зарядов» наоборот, как цену.
+       Под числом — одна плашка, грани одного бонуса сменяют друг друга:
+       «+525 в подарок» → «≈ +7 игр в подарок» → «+200 тикетов за наличные».
+       Игры — подарок / средняя цена игры ~70 ₽ (как на b00m.fun/rewards),
+       вниз до целого. Тикеты — только при оплате наличными на кассе, по
+       ступеням парка; у Июня акции нет — граней две.
+    3. Полоса ступеней — убрана (show_steps:false в данных, код оставлен).
+    4. Строка «Не хватило — докинем без очереди…» — по парку.
+    5. QR, если онлайн у парка включён: «Докинуть на карту без очереди»
+       («без очереди» — лаймовой плашкой), видоискатель как у «Твоей карты»,
+       подпись «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
+       b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
+    6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
+       v1.1 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -96,36 +102,31 @@
   .viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#07051c;overflow:hidden}
   .stage{flex:none;transform-origin:center center;background:var(--bg);position:relative}
 
-  /* Ряды: шапка 76 и подвал 46 — ровно как у турбо и «Твоей карты». */
+  /* Ряды: шапка 76 и подвал 46 — ровно как у турбо и «Твоей карты».
+     Левая часть (.leftcol) — колонка: карточки, [полоса ступеней], строка
+     «на кассе». Скрытые блоки в колонке места и зазоров не занимают.
+     ⚠ Не называть её .main: так помечена основная карточка (1 500), и она
+       встала бы в эту область сетки (поймано 01.10). */
   .page{
     width:100%;height:100%;display:grid;gap:16px;padding:20px;
     grid-template-columns:minmax(0,2.55fr) minmax(0,1fr);
-    grid-template-rows:76px auto minmax(0,1fr) auto auto 46px;
+    grid-template-rows:76px auto minmax(0,1fr) 46px;
     grid-template-areas:
       "head  head"
       "offer offer"
-      "cards qr"
-      "steps qr"
-      "info  qr"
+      "left  qr"
       "fine  fine";
   }
   /* Онлайн выключен — плитки QR нет, левая часть во всю ширину */
-  body.no-online .page{
-    grid-template-columns:minmax(0,1fr);
-    grid-template-areas:"head" "offer" "cards" "steps" "info" "fine";
-  }
-  /* Строк «на кассе» у парка нет — ряд схлопывается */
-  body.no-info .page{grid-template-areas:"head head" "offer offer" "cards qr" "steps qr" "steps qr" "fine fine"}
-  body.no-info.no-online .page{grid-template-areas:"head" "offer" "cards" "steps" "steps" "fine"}
-
+  body.no-online .page{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "offer" "left" "fine"}
   body.portrait .page{
     grid-template-columns:minmax(0,1fr);
-    grid-template-rows:76px auto minmax(0,1.15fr) auto auto minmax(0,.85fr) 46px;
-    grid-template-areas:"head" "offer" "cards" "steps" "info" "qr" "fine";
+    grid-template-rows:76px auto minmax(0,1.5fr) minmax(0,.62fr) 46px;
+    grid-template-areas:"head" "offer" "left" "qr" "fine";
   }
-  body.portrait.no-online .page{grid-template-rows:76px auto minmax(0,1fr) auto auto 46px;grid-template-areas:"head" "offer" "cards" "steps" "info" "fine"}
-  body.portrait.no-info .page{grid-template-rows:76px auto minmax(0,1.15fr) auto minmax(0,.85fr) 46px;grid-template-areas:"head" "offer" "cards" "steps" "qr" "fine"}
-  body.portrait.no-info.no-online .page{grid-template-rows:76px auto minmax(0,1fr) auto 46px;grid-template-areas:"head" "offer" "cards" "steps" "fine"}
+  body.portrait.no-online .page{grid-template-rows:76px auto minmax(0,1fr) 46px;grid-template-areas:"head" "offer" "left" "fine"}
+  .leftcol{grid-area:left;display:flex;flex-direction:column;gap:16px;min-height:0;min-width:0}
+  [hidden]{display:none !important}
 
   .tile{
     background:var(--tile);border-radius:var(--radius);padding:26px 30px;
@@ -161,17 +162,22 @@
       linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
   }
   .offer .fit-box{width:100%;text-align:center}
-  .offer .fs-offer{font-family:'Unbounded';font-weight:900;font-size:88px;line-height:1.08;letter-spacing:-.5px}
+  .offer .fs-offer{font-family:'Unbounded';font-weight:900;font-size:104px;line-height:1.08;letter-spacing:-.5px}
   .offer .fs-offer b{color:var(--lime)}
   body.portrait .offer .fs-offer .ob{display:block}
 
-  /* ══ 2. ТРИ КАРТОЧКИ ═══════════════════════════════════════════════════ */
-  .cards{grid-area:cards;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;min-height:0}
+  /* ══ 2. ТРИ КАРТОЧКИ ═══════════════════════════════════════════════════
+     X1 / X2 / X4–6 → пополнение → переключатель → на карте → плашка бонуса.
+     Активная карточка (.on, по очереди) щёлкает переключателем, число «на
+     карте» вырастает из суммы пополнения (kassa.js, cycleCards). */
+  .cards{flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;min-height:0}
   .card{
-    background:var(--tile);border-radius:var(--radius);padding:22px 22px 24px;min-width:0;min-height:0;
+    background:var(--tile);border-radius:var(--radius);padding:20px 22px 22px;min-width:0;min-height:0;
     display:flex;flex-direction:column;justify-content:space-between;gap:8px;position:relative;
-    border:3px solid rgba(255,255,255,.08);
+    border:3px solid rgba(255,255,255,.08);transition:transform .5s ease, border-color .5s ease;
   }
+  .card.on{transform:translateY(-8px)}
+  .card.on:not(.main){border-color:rgba(198,245,46,.55)}
   /* Основная сумма (1 500) — лаймовая рамка, свечение и звезда */
   .card.main{
     border:4px solid var(--lime);
@@ -182,42 +188,73 @@
     0%,100%{box-shadow:0 0 0 0 rgba(198,245,46,0), 0 18px 50px rgba(198,245,46,.18)}
     50%{box-shadow:0 0 0 6px rgba(198,245,46,.22), 0 22px 70px rgba(198,245,46,.36)}
   }
-  .who{display:flex;align-items:center;gap:14px;min-width:0}
-  .who .ppl{height:38px;width:auto;flex:none;color:var(--soft)}
-  .card.main .who .ppl{color:var(--lime)}
-  .who .fit-box{flex:1;min-width:0}
-  .who .fs-who{font-family:'Unbounded';font-weight:900;font-size:32px;line-height:1.1}
-  body.portrait .cards{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr))}
-  body.portrait .card{
-    display:grid;gap:8px 28px;justify-content:stretch;
-    grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);grid-template-rows:auto minmax(0,1fr) auto;
-    grid-template-areas:"who oncard" "sum oncard" "sum gift";
-  }
-  body.portrait .who{grid-area:who}
-  body.portrait .sum{grid-area:sum;align-self:end}
-  body.portrait .oncard{grid-area:oncard;border-top:none;padding-top:0;padding-left:26px;border-left:2px solid rgba(255,255,255,.1);align-self:stretch;display:flex;flex-direction:column;justify-content:center}
-  body.portrait .gift{grid-area:gift;padding-left:28px}
   .star{position:absolute;top:-4px;right:-4px;width:74px;height:74px;border-radius:0 var(--radius) 0 22px;background:var(--lime);display:grid;place-items:center}
   .star svg{width:42px;height:42px;fill:var(--dark)}
+
+  /* X1 / X2 / X4–6 — сколько пришло играть. «X» лаймом. */
+  .xlabel .fs-x{font-family:'Unbounded';font-weight:900;font-size:84px;line-height:.95;color:var(--white);letter-spacing:-1px}
+  .xlabel .fs-x i{font-style:normal;color:var(--lime);margin-right:.04em}
 
   /* Подписи к числам — одним стилем по всей странице */
   .lbl{font-size:19px;font-weight:800;color:var(--soft);letter-spacing:.6px;text-transform:uppercase;line-height:1.15}
   .sum .fs-sum{font-family:'Unbounded';font-weight:900;font-size:50px;line-height:1.05;color:var(--white)}
-  .oncard{padding-top:10px;border-top:2px solid rgba(255,255,255,.1)}
+
+  /* Переключатель вместо разделителя: дорожка, лаймовая заливка и ручка-
+     молния. Включается у активной карточки — заливка и ручка едут вправо. */
+  .toggle{position:relative;flex:none;height:44px;margin:4px 4px 2px;border-radius:22px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 2px rgba(255,255,255,.14)}
+  .toggle .fill{position:absolute;left:0;top:0;bottom:0;width:44px;border-radius:22px;background:linear-gradient(90deg,rgba(198,245,46,.18),var(--lime));opacity:.35;transition:width .55s cubic-bezier(.6,0,.25,1), opacity .55s}
+  .toggle .chev{position:absolute;inset:0;display:grid;place-items:center;font-family:'Unbounded';font-weight:900;font-size:26px;letter-spacing:6px;color:rgba(255,255,255,.22)}
+  .toggle .knob{position:absolute;top:-5px;left:-4px;width:54px;height:54px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.5);transition:left .55s cubic-bezier(.6,0,.25,1), background .55s, box-shadow .55s}
+  .toggle .knob svg{width:28px;height:28px;fill:var(--dark)}
+  .card.on .toggle .fill{width:100%;opacity:1}
+  .card.on .toggle .chev{color:rgba(13,10,46,.35)}
+  .card.on .toggle .knob{left:calc(100% - 50px);background:var(--lime);box-shadow:0 0 0 5px rgba(198,245,46,.3),0 0 28px rgba(198,245,46,.8)}
+
   .oncard .fit-box{line-height:0}
-  .oncard .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px}
-  .gift .fs-gift{font-family:'Unbounded';font-weight:900;font-size:32px;line-height:1;color:var(--dark);background:var(--lime);border-radius:14px;padding:10px 16px}
-  .card:not(.main) .gift .fs-gift{background:rgba(198,245,46,.16);color:var(--lime);box-shadow:inset 0 0 0 2px rgba(198,245,46,.55)}
+  .oncard .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px;transform-origin:left center}
+  /* Итог досчитан — короткая вспышка числа */
+  .card.done .fs-card{animation:pop .6s ease-out}
+  @keyframes pop{0%{transform:scale(1);text-shadow:none}35%{transform:scale(1.06);text-shadow:0 0 30px rgba(198,245,46,.9)}100%{transform:scale(1);text-shadow:none}}
+
+  /* Плашка бонуса: грани одного подарка сменяют друг друга (kassa.js,
+     rotateFaces): «+525 в подарок» → «≈ +7 игр в подарок» → «+200 тикетов за
+     наличные». Все грани — в одной ячейке, видна одна. */
+  .faces{display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
+  .face{grid-area:1/1;min-width:0;opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease}
+  .face.on{opacity:1;transform:none}
+  .face .fs-face{
+    display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;white-space:nowrap;
+    font-family:'Unbounded';font-weight:900;font-size:48px;line-height:1;color:var(--dark);
+    background:var(--lime);border-radius:16px;padding:10px 16px 11px;
+  }
+  .face .fs-face small{font-family:'Inter';font-weight:800;font-size:.46em;letter-spacing:.3px;line-height:1.1}
+  .card:not(.main) .face .fs-face{background:rgba(198,245,46,.14);color:var(--lime);box-shadow:inset 0 0 0 2px rgba(198,245,46,.55)}
+  .card:not(.main) .face .fs-face small{color:#e6ffb0}
+
+  /* Вертикаль: карточки строками — слева «X + пополнение + переключатель»,
+     справа «на карте» и плашка бонуса. */
+  body.portrait .cards{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr))}
+  body.portrait .card{
+    display:grid;gap:8px 28px;justify-content:stretch;
+    grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"x oncard" "sum oncard" "toggle faces";
+  }
+  body.portrait .card.on{transform:translateX(8px)}
+  body.portrait .xlabel{grid-area:x}
+  body.portrait .sum{grid-area:sum;align-self:end}
+  body.portrait .toggle{grid-area:toggle;align-self:center}
+  body.portrait .oncard{grid-area:oncard;display:flex;flex-direction:column;justify-content:center}
+  body.portrait .faces{grid-area:faces}
+  /* Звезда основной карточки — в правом верхнем углу, над числом «на карте» */
+  body.portrait .card.main .oncard{padding-right:66px}
 
   /* ══ 3. ПОЛОСА СТУПЕНЕЙ ════════════════════════════════════════════════ */
-  .steps{grid-area:steps;padding:16px 24px 18px;gap:10px;justify-content:flex-start}
+  .steps{flex:none;padding:16px 24px 18px;gap:10px;justify-content:flex-start}
   .steps-head{display:flex;align-items:baseline;gap:18px;min-width:0}
   .steps-head .fit-box{flex:1;min-width:0}
   .steps-head .fs-round{font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.1;color:var(--white)}
   .steps-head .fs-round i{font-style:normal;font-family:'Inter';font-weight:700;font-size:.72em;color:var(--soft);margin-left:16px;letter-spacing:0}
-  .ladder{display:grid;grid-template-columns:auto repeat(var(--n,6),minmax(0,1fr));gap:10px;align-items:stretch}
-  .legend{display:grid;grid-template-rows:1fr 1fr;align-items:center;padding-right:6px}
-  .legend .lbl{font-size:19px;white-space:nowrap}
+  .ladder{display:grid;grid-template-columns:repeat(var(--n,6),minmax(0,1fr));gap:10px;align-items:stretch}
   /* Ступени: чем больше сумма — тем гуще лайм. Волна подсветки слева
      направо — «больше сумма — больше подарок» без слов. */
   .step{
@@ -238,14 +275,12 @@
     20%,100%{transform:translateY(0);box-shadow:none}
   }
 
-  /* ══ 4–5. СТРОКИ «НА КАССЕ» ════════════════════════════════════════════ */
-  .info{grid-area:info;padding:12px 24px;gap:8px}
-  .info[hidden]{display:none}
+  /* ══ 4. СТРОКА «НА КАССЕ» — «Не хватило — докинем…» ══════════════════ */
+  .info{flex:none;padding:12px 24px;gap:8px}
   .info-row{display:flex;align-items:center;gap:16px;min-width:0}
   .info-row[hidden]{display:none}
   .info-row .ic{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;border:2px solid currentColor;background:rgba(255,255,255,.04)}
   .info-row .ic svg{width:28px;height:28px}
-  .info-row.cash .ic{color:var(--yellow)}
   .info-row.hall .ic{color:var(--cyan)}
   .info-row .fit-box{flex:1;min-width:0}
   .info-row .fs-info{font-family:'Inter';font-weight:800;font-size:28px;line-height:1.2;color:var(--white)}
@@ -255,16 +290,36 @@
     grid-area:qr;background:var(--white);color:var(--dark);align-items:center;justify-content:space-between;gap:14px;padding:22px 22px 26px;
     box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
   }
-  .qr-tile[hidden]{display:none}
-  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.05;text-align:center}
+  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.12;text-align:center}
+  /* «без очереди» — лаймовая плашка-маркер */
+  .qr-lead mark{background:var(--lime);color:var(--dark);border-radius:.22em;padding:0 .22em;-webkit-box-decoration-break:clone;box-decoration-break:clone;white-space:nowrap}
   .qr-frame{position:relative;flex:none;width:var(--qr,420px);height:var(--qr,420px);padding:16px}
   .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
-  .qr-frame .cn{position:absolute;width:52px;height:52px;border:7px solid var(--blue);animation:aim 2.4s ease-in-out infinite}
+  /* Видоискатель — один в один с loyalty/index.html: раз в 10 с «рука»
+     неровно наводит рамку, она ловит код, защёлкивается по центру — и
+     вспышка, как будто сделан снимок. Двигается только рамка из уголков;
+     сам QR стоит на месте и читается всегда. */
+  .qr-frame .aimbox{position:absolute;inset:0;animation:aim-hand 10s ease-in-out infinite}
+  @keyframes aim-hand{
+    0%{transform:translate(-7%,5%) rotate(-4deg) scale(1.1)}
+    12%{transform:translate(6%,-4%) rotate(3deg) scale(1.06)}
+    24%{transform:translate(-4%,-6%) rotate(-2deg) scale(1.08)}
+    36%{transform:translate(5%,4%) rotate(1.5deg) scale(1.04)}
+    48%{transform:translate(-2%,2%) rotate(-.8deg) scale(1.03)}
+    58%{transform:translate(.8%,-.6%) rotate(.3deg) scale(1.01)}
+    66%{transform:none}
+    70%{transform:scale(.95)}
+    73%,92%{transform:none}
+    100%{transform:translate(-7%,5%) rotate(-4deg) scale(1.1)}
+  }
+  .qr-frame .cn{position:absolute;width:52px;height:52px;border:7px solid var(--blue);animation:lock 10s steps(1) infinite}
+  @keyframes lock{0%,68%{border-color:var(--blue)}69%,92%{border-color:#21c45a}93%,100%{border-color:var(--blue)}}
+  .qr-frame .flash{position:absolute;inset:8px;border-radius:12px;background:#fff;opacity:0;pointer-events:none;animation:flash 10s ease-out infinite}
+  @keyframes flash{0%,73%{opacity:0}74.5%{opacity:.95}84%,100%{opacity:0}}
   .qr-frame .c1{left:0;top:0;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
   .qr-frame .c2{right:0;top:0;border-left:none;border-bottom:none;border-radius:0 16px 0 0}
   .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
   .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 16px 0}
-  @keyframes aim{0%,100%{opacity:1}50%{opacity:.45}}
   .qr-cap{font-family:'Unbounded';font-weight:900;font-size:30px;line-height:1.2;text-align:center;color:#1d4fd0}
   .qr-cap b{color:var(--dark)}
   /* Вертикаль: плитка QR горизонтальная — код слева, слова справа */
@@ -339,7 +394,8 @@
   }
 
   @media (prefers-reduced-motion: reduce){
-    .card.main,.step,.qr-frame .cn,.stamp .rl.spin svg{animation:none}
+    .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg{animation:none}
+    .card,.toggle .fill,.toggle .knob,.face{transition:none}
   }
 </style>
 </head>
@@ -375,37 +431,38 @@
     <div class="slot" id="screens" aria-hidden="true"></div>
   </header>
 
-  <!-- 1. ОФФЕР — текст из kassa.data.json (text.offer_a / offer_b) -->
+  <!-- 1. ОФФЕР — текст из kassa.data.json (text.offer_a / offer_b, второе — лаймом) -->
   <section class="tile offer">
     <div class="fit-box"><span class="fit fs-offer" id="offer"></span></div>
   </section>
 
-  <!-- 2. ТРИ КАРТОЧКИ — рисует kassa.js из offers -->
-  <section class="cards" id="cards"></section>
+  <div class="leftcol">
+    <!-- 2. ТРИ КАРТОЧКИ — рисует kassa.js из offers: X, пополнение,
+         переключатель, на карте, сменная плашка бонуса (подарок / игры /
+         тикеты за наличные) -->
+    <section class="cards" id="cards"></section>
 
-  <!-- 3. ПОЛОСА СТУПЕНЕЙ — рисует kassa.js из steps и steps_from парка -->
-  <section class="tile steps">
-    <div class="steps-head"><div class="fit-box"><span class="fit fs-round" id="round"></span></div></div>
-    <div class="ladder" id="ladder"></div>
-  </section>
+    <!-- 3. ПОЛОСА СТУПЕНЕЙ — убрана владельцем 01.10 (show_steps:false в данных) -->
+    <section class="tile steps" id="steps" hidden>
+      <div class="steps-head"><div class="fit-box"><span class="fit fs-round" id="round"></span></div></div>
+      <div class="ladder" id="ladder"></div>
+    </section>
 
-  <!-- 4–5. НА КАССЕ: тикеты за наличные и докидка — далеко от QR -->
-  <section class="tile info" id="info">
-    <div class="info-row cash" id="row-tickets">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
-      <div class="fit-box"><span class="fit fs-info" id="tickets"></span></div>
-    </div>
-    <div class="info-row hall" id="row-hall">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span>
-      <div class="fit-box"><span class="fit fs-info" id="hall"></span></div>
-    </div>
-  </section>
+    <!-- 4. НА КАССЕ: «Не хватило — докинем без очереди…» — по парку -->
+    <section class="tile info" id="info">
+      <div class="info-row hall" id="row-hall">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span>
+        <div class="fit-box"><span class="fit fs-info" id="hall"></span></div>
+      </div>
+    </section>
+  </div>
 
   <!-- 6. QR — только при включённом онлайне. Путь кода подставляет kassa.js -->
   <section class="tile qr-tile" id="qr-tile">
     <div class="qr-frame" id="qr-frame">
-      <i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i>
+      <span class="aimbox"><i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i></span>
       <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: пополнить карту"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
+      <span class="flash"></span>
     </div>
     <div class="qr-text"><div class="qr-lead" id="qr-lead"></div><div class="qr-cap" id="qr-cap"></div></div>
   </section>
