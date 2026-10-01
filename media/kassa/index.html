@@ -163,8 +163,8 @@
     border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
   .brand-badge .sep{color:var(--lime)}
-  /* Пустой слот под будущий переключатель страниц экрана — на месте
-     переключателя парков турбо. Логики нет; в песочнице виден контуром. */
+  /* Слот плеера экранов (loyalty ⇄ kassa) — на месте переключателя парков
+     турбо. Разметку кладёт media/shared/screens.js. */
   .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%);height:46px;min-width:280px;border-radius:14px}
   body.sandbox .slot{outline:2px dashed rgba(255,255,255,.22);outline-offset:-2px}
   body.sandbox .slot::after{content:'слот: переключатель экранов';position:absolute;inset:0;display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--muted)}
@@ -617,7 +617,7 @@
         <span id="brand-park"></span>
       </span>
     </div>
-    <!-- Пустой слот под будущий переключатель страниц экрана -->
+    <!-- Плеер экранов — заполняет media/shared/screens.js -->
     <div class="slot" id="screens" aria-hidden="true"></div>
   </header>
 

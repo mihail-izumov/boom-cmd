@@ -19,6 +19,7 @@
  */
 import DATA from './kassa.data.json'
 import { KASSA_QR } from './kassa-qr.js'
+import { initScreens, isEmbedded, pauseAnimations, restartAnimations } from '../shared/screens.js'
 
 /* ── 0. Конфиг ───────────────────────────────────────────────────────────── */
 
@@ -44,8 +45,8 @@ const DEMO = Q.get('demo') === '1'
 
 /* Тот же ключ, что у турбо и «Твоей карты»: выбранный на одном экране парк
    держится и на другом — для будущего переключения экранов внутри парка.
-   Своего переключателя у этого экрана нет: без ?park= берём сохранённый
-   соседями парк или первый по списку. */
+   Без ?park= берём сохранённый соседями парк или первый по списку.
+   Выбор парка — список на плашке «БУМБАСТИК // парк» (media/shared/screens.js). */
 const PARK_KEY = 'boom-turbo-park'
 function storedPark() {
   try { return localStorage.getItem(PARK_KEY) || '' } catch { return '' }
@@ -524,6 +525,7 @@ function countUp(card) {
 /* Ход за ходом: следующая карточка — только когда предыдущая показала
    все грани плашки (cardMs). */
 let active = -1
+let cycleTimer = 0   // следующий ход — его снимает пауза плеера экранов
 function cycleCards() {
   const cards = [...document.querySelectorAll('#cards .card')]
   if (!cards.length) return
@@ -538,7 +540,7 @@ function cycleCards() {
   })
   active = (active + 1) % cards.length
   countUp(cards[active])
-  setTimeout(cycleCards, cardMs(cards[active]))
+  cycleTimer = setTimeout(cycleCards, cardMs(cards[active]))
 }
 
 /* Показать грань k залитой плашки — «барабан»: старое значение уезжает
@@ -575,7 +577,36 @@ window.addEventListener('resize', fitStage)
 if (REDUCED) {
   document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('done'))
 } else if (PARKS[park]) {
-  setTimeout(cycleCards, 700)
+  cycleTimer = setTimeout(cycleCards, 700)
+}
+
+/* ── Плеер экранов (loyalty ⇄ kassa) и выбор парка — media/shared/screens.js.
+   Полный круг экрана = все карточки по очереди (cardMs каждой) + стартовая
+   пауза 700 мс. На паузе (экран скрыт) — снимаем ходы и CSS-анимации; при
+   показе — круг с первой карточки. */
+function stopCards() {
+  clearTimeout(cycleTimer)
+  timers.forEach(clearTimeout)
+  timers = []
+}
+if (PARKS[park]) {
+  initScreens({
+    id: 'kassa',
+    park,
+    parks: PARKS,
+    parkOrder: DATA.park_order,
+    cycleMs: () => 700 + [...document.querySelectorAll('#cards .card')].reduce((t, c) => t + cardMs(c), 0),
+    restart: () => {
+      stopCards()
+      active = -1
+      restartAnimations()
+      if (!REDUCED) cycleTimer = setTimeout(cycleCards, 700)
+    },
+    pause: () => {
+      stopCards()
+      pauseAnimations()
+    },
+  })
 }
 
 /* Суточный самоперезапуск в 05:00 по Москве — как у турбо и «Твоей карты»:
@@ -585,7 +616,7 @@ function mskHm(d) {
     return d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
   } catch { return '' }
 }
-if (TV) {
+if (TV && !isEmbedded()) {   // встроенную в плеер перезапускает хозяин
   setInterval(() => {
     if (mskHm(new Date()) === '05:00') location.reload()
   }, 60000)
