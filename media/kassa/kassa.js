@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.9'
+const PAGE_VERSION = 'v2.0'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -125,9 +125,11 @@ function renderOffer() {
  *
  * Внутри — два СОСУДА, как в играх «перелей воду»: сверху «пополнение
  * 1 500 ₽», снизу «на карте 2 025 ⚡». Верхний наливается, чуть
- * наклоняется и льёт через воронку в нижний; деньги гостя встают в нижнем, сверху
- * доливается бонус (жидкость плавно светлеет кверху), и число «на карте»
- * досчитывается от суммы до итога (cycleCards ниже). Пополнение — в рублях, на карте —
+ * наклоняется и переливается в нижний — между окнами ничего нет, перелив
+ * видно по уровням (воронку и струю убрали — решение владельца 01.10).
+ * Деньги гостя встают в нижнем, сверху доливается бонус (жидкость плавно
+ * светлеет кверху), и число «на карте» досчитывается от суммы до итога
+ * (cycleCards ниже). Пополнение — в рублях, на карте —
  * заряды, поэтому после числа молния.
  *
  * Текст в сосуде записан дважды: светлый — сам сосуд, тёмный — в «жидкости»
@@ -141,7 +143,8 @@ function renderOffer() {
  * только там, где сумма карточки есть в cash_tickets). Слово — чёрным
  * бейджем сверху, цифра под ним — крупно, на всю плашку. Плашка тоже «наливается»: копия текста в
  * заливке (.fliq) встаёт снизу, когда «на карте» налито наполовину (класс
- * half ниже), и показывает все грани по очереди (showFace).
+ * half ниже), и показывает все грани по очереди — значение «прокручивается»
+ * вверх, как барабан (showFace). Гаснет — заливка стекает, значение остаётся.
  *
  * На карте = сумма + подарок, считается здесь, а не пишется в данные: так
  * числа на карточке не могут разойтись.
@@ -169,8 +172,6 @@ function renderCards(p) {
         <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
         <div class="slider">
           <div class="seg seg-a">${inA}<div class="liq" aria-hidden="true">${inA}</div></div>
-          <svg class="funnel" aria-hidden="true"><path d=""/></svg>
-          <i class="stream" aria-hidden="true"></i>
           <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div></div>
         </div>
         <div class="faces">${faces.map((f, i) => {
@@ -355,66 +356,6 @@ function cardRoom() {
   return Math.max(0, Math.floor(seg.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - label - gap))
 }
 
-/* Воронка и струя между сосудами (решение владельца 01.10: «сделай
-   воронку»; наклон верхнего сосуда вернули).
-   Горизонталь: верхний над нижним. Верхний наклоняется вокруг нижнего
-   правого угла — воронка стоит под этим углом, в зазоре между сосудами,
-   носиком заходит в нижний. Струя из носика бежит вниз у правой стенки
-   нижнего — в правом поле окна (48px), где букв нет.
-   Вертикаль: сосуды рядом. Наклон уводит верхний правый угол левого сосуда
-   в зазор — воронка стоит вверху зазора, струя бежит по зазору вниз, вне
-   обоих сосудов.
-   Форма воронки — путь SVG под её размер: ободок, раструб и носик. */
-const FUNNEL_W = 64        // горизонталь: правый край воронки — по стенке сосудов
-const FUNNEL_W_PORT = 42   // вертикаль: чуть шире зазора, на буквы не заходит
-const STREAM_W = 12
-function funnelPath(w, h) {
-  const cy = Math.round(Math.min(28, h * 0.62))
-  const l = (w - 14) / 2
-  const r = l + 14
-  return `M3,0 H${w - 3} Q${w},0 ${w},3 V5 Q${w},7 ${w - 3},8 L${r},${cy} V${h - 4} Q${r},${h} ${r - 4},${h} H${l + 4} Q${l},${h} ${l},${h - 4} V${cy} L3,8 Q0,7 0,5 V3 Q0,0 3,0 Z`
-}
-function layoutFunnels() {
-  const portrait = document.body.classList.contains('portrait')
-  document.querySelectorAll('#cards .card').forEach((c) => {
-    const a = c.querySelector('.seg-a')
-    const b = c.querySelector('.seg-b')
-    const svg = c.querySelector('.funnel')
-    if (!a || !b || !svg) return
-    let fx, fy, fw, fh, sx, sy, sh
-    if (portrait) {
-      const gap = b.offsetLeft - (a.offsetLeft + a.offsetWidth)
-      fw = FUNNEL_W_PORT
-      fx = a.offsetLeft + a.offsetWidth + Math.round((gap - fw) / 2)
-      fy = a.offsetTop
-      fh = 38
-      sx = a.offsetLeft + a.offsetWidth + Math.round((gap - STREAM_W) / 2)
-      sy = fy + fh - 4
-      sh = a.offsetTop + a.offsetHeight - 4 - sy
-    } else {
-      const gap = b.offsetTop - (a.offsetTop + a.offsetHeight)
-      fw = FUNNEL_W
-      const cx = b.offsetLeft + b.offsetWidth - fw / 2   // ось воронки и струи; правый край — по стенке
-      fx = cx - fw / 2
-      fy = a.offsetTop + a.offsetHeight
-      fh = gap + 8                                    // носик заходит в нижний сосуд
-      sx = cx - STREAM_W / 2
-      sy = b.offsetTop + 4
-      sh = b.offsetTop + b.offsetHeight - 16 - sy
-    }
-    svg.setAttribute('viewBox', `0 0 ${fw} ${fh}`)
-    svg.querySelector('path').setAttribute('d', funnelPath(fw, fh))
-    c.style.setProperty('--fx', `${fx}px`)
-    c.style.setProperty('--fy', `${fy}px`)
-    c.style.setProperty('--fw', `${fw}px`)
-    c.style.setProperty('--fh', `${fh}px`)
-    c.style.setProperty('--sx', `${sx}px`)
-    c.style.setProperty('--sy', `${sy}px`)
-    c.style.setProperty('--sw', `${STREAM_W}px`)
-    c.style.setProperty('--sh', `${Math.max(0, sh)}px`)
-  })
-}
-
 /* QR — самый крупный квадрат, что помещается в плитку рядом с подписями,
    с модулем в ЦЕЛОЕ число физических пикселей (как у «Твоей карты»): при
    дробном модуле crispEdges рисует соседние модули разной толщины. */
@@ -481,7 +422,6 @@ function fitStage() {
   }
   fitUniform('.fs-info', 28, 16)
   fitQr()
-  layoutFunnels()
 }
 
 /* ── 6. Движение: «перелей воду» — 1 500 превращаются в 2 025 ─────────────
@@ -490,19 +430,20 @@ function fitStage() {
    три фазы — классы на карточке:
      p1 — верхний сосуд «пополнение» наливается; нижний в тени, в нём пока
           та же сумма;
-     p2 — верхний чуть наклоняется и льёт через воронку в нижний: уровень
-          сверху падает, снизу растёт слой денег гостя до --split;
+     p2 — верхний чуть наклоняется и переливается в нижний: уровень сверху
+          падает, снизу растёт слой денег гостя до --split;
      p3 — сверху доливается бонус, число досчитывается до итога, в тень
           уходит пустой верхний сосуд; досчитало — done (вспышка числа).
    У остальных карточек сосуды спокойные: нижний ровно чуть подкрашен, итог
    на месте — все три числа читаются в любой момент.
      done — досчитало: «на карте» красуется — поворот гранями, свет (CSS).
    half — «на карте» налито наполовину: плашка бонуса «наливается» и
-          показывает ВСЕ свои грани по очереди, по FACE_STEP_MS каждая:
-          бонус → игры → тикеты. Только когда последняя отстояла своё — ход
-          переходит к следующей карточке (длина хода — cardMs). Карточка
-          гаснет — заливка плашки стекает, под ней снова бонус. У спокойных
-          карточек плашка стоит (решения владельца 01.10). Момент half
+          показывает ВСЕ свои грани по очереди, по FACE_STEP_MS каждая,
+          начиная с той, что на ней стоит: бонус → игры → тикеты → бонус…
+          Смена — «барабаном» (showFace). Только когда последняя отстояла
+          своё — ход переходит к следующей карточке (длина хода — cardMs).
+          Карточка гаснет — заливка плашки стекает, значение остаётся: у
+          спокойных карточек плашка не меняется (решения владельца 01.10). Момент half
           считается по той же кривой, что у перехода жидкости в index.html
           (halfAt).
    Без движения (prefers-reduced-motion) — спокойные сосуды, итог и первая
@@ -547,13 +488,17 @@ function countUp(card) {
   card.classList.remove('done', 'p2', 'p3', 'half')
   card.classList.add('on', 'p1')
   timers.push(setTimeout(() => {
-    card.classList.replace('p1', 'p2')  // наклон и воронка: деньги перетекают вниз
+    card.classList.replace('p1', 'p2')  // наклон: деньги перетекают вниз
   }, FILL_MS))
-  /* Налито наполовину — плашка «наливается» и идёт по всем граням */
+  /* Налито наполовину — плашка «наливается» тем значением, что на ней
+     стоит, и прокручивает все остальные по кругу */
   const half = halfAt(card)
   timers.push(setTimeout(() => card.classList.add('half'), half))
-  const n = card.querySelectorAll('.face').length
-  for (let k = 1; k < n; k++) timers.push(setTimeout(() => showFace(card, k), half + k * FACE_STEP_MS))
+  const fs = [...card.querySelectorAll('.face')]
+  const start = Math.max(0, fs.findIndex((f) => f.classList.contains('on')))
+  for (let k = 1; k < fs.length; k++) {
+    timers.push(setTimeout(() => showFace(card, (start + k) % fs.length), half + k * FACE_STEP_MS))
+  }
   timers.push(setTimeout(() => {
     card.classList.replace('p2', 'p3')  // доливается бонус, число растёт
     const t0 = performance.now() + 100
@@ -577,9 +522,11 @@ function cycleCards() {
   if (!cards.length) return
   timers.forEach(clearTimeout)
   timers = []
-  if (active >= 0) restFaces(cards[active])
+  /* Гаснущая карточка: заливка плашки стекает (снят half), значение на
+     плашке остаётся — без карточки плашка не меняется (владелец 01.10) */
   cards.forEach((c) => {
     c.classList.remove('on', 'p1', 'p2', 'p3', 'half', 'done')
+    c.querySelectorAll('.face').forEach((f) => f.classList.remove('roll-in', 'roll-out'))
     setNum(c, Number(c.dataset.total))
   })
   active = (active + 1) % cards.length
@@ -587,34 +534,21 @@ function cycleCards() {
   setTimeout(cycleCards, cardMs(cards[active]))
 }
 
-/* Показать грань k залитой плашки: новая приходит заливкой (.in — видна
-   только её .fliq), старая (.out) стоит под ней, пока заливка её не
-   накроет, — потом метки снимаются (index.html, «Смена грани»). */
-const FACE_FILL_MS = 600   // заливка плашки — transition .5s у .fliq
+/* Показать грань k залитой плашки — «барабан»: старое значение уезжает
+   вверх (.roll-out), новое въезжает снизу (.roll-in). Обе грани залиты
+   одним цветом, плашка обрезана по скруглению (index.html) — шва нет,
+   видно, как прокручивается текст. */
+const ROLL_MS = 520   // animation roll-in / roll-out .45s в index.html
 function showFace(card, k) {
   const fs = [...card.querySelectorAll('.face')]
   const cur = fs.findIndex((f) => f.classList.contains('on'))
   if (k === cur || !fs[k]) return
   fs.forEach((f, i) => {
     f.classList.toggle('on', i === k)
-    f.classList.toggle('in', i === k)
-    f.classList.toggle('out', i === cur)
+    f.classList.toggle('roll-in', i === k)
+    f.classList.toggle('roll-out', i === cur)
   })
-  timers.push(setTimeout(() => fs.forEach((f) => f.classList.remove('in', 'out')), FACE_FILL_MS))
-}
-
-/* Карточка гаснет: заливка плашки стекает вниз, под ней сразу стоит бонус
-   (.snap), уходящая грань (.leave) видна одной стекающей заливкой. */
-function restFaces(card) {
-  const fs = [...card.querySelectorAll('.face')]
-  const cur = fs.findIndex((f) => f.classList.contains('on'))
-  fs.forEach((f) => f.classList.remove('in', 'out'))
-  if (cur > 0) {
-    fs[cur].classList.remove('on')
-    fs[cur].classList.add('leave')
-    fs[0].classList.add('on', 'snap')
-    setTimeout(() => fs.forEach((f) => f.classList.remove('leave', 'snap')), FACE_FILL_MS)
-  }
+  timers.push(setTimeout(() => fs.forEach((f) => f.classList.remove('roll-in', 'roll-out')), ROLL_MS))
 }
 
 /* Длина хода карточки: пока плашка не покажет все грани и пока «на карте»

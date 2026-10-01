@@ -191,7 +191,7 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     liqHidden: [...c.querySelectorAll('.liq')].length === 2 && [...c.querySelectorAll('.liq')].every((l) => l.getAttribute('aria-hidden') === 'true'),
     bolt: !!c.querySelector('.seg-b > .fit-box .fs-card svg.bolt'),
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
-      && !!c.querySelector('.slider > svg.funnel path') && !!c.querySelector('.slider > .stream') && !c.querySelector('.neck, .wave'),
+      && !c.querySelector('.funnel, .stream, .neck, .wave'),
     toggle: !!c.querySelector('.toggle'),
     faceFull: [...c.querySelectorAll('.face')].every((f) => {
       const own = sp(`${f.querySelector(':scope > .fbadge')?.textContent} ${f.querySelector(':scope > .fit-box')?.textContent}`)
@@ -265,7 +265,7 @@ ok('цвета карточек: лайм · голубой · розовый, �
   // 01.10: углы сосуда «пропадали» на секунду через раз — Chrome на время
   // перехода выносит жидкость на свой слой и не обрезает её по скруглению
   // сосуда. Жидкость и заливка плашки скруглены сами.
-  ok('жидкость скруглена сама (углы не пропадают)', /border-radius:inherit/.test(rule('.liq')) && /border-radius:inherit/.test(rule('.fliq')))
+  ok('жидкость скруглена сама, плашка — clip-path (углы не пропадают)', /border-radius:inherit/.test(rule('.liq')) && /clip-path:inset\(0 round 18px\)/.test(rule('.faces')))
   ok('углы сосудов при переливе не меняются', !/\.p2 \.seg-[ab]\{[^}]*radius/.test(css))
   ok('верхний сосуд при переливе чуть наклоняется (владелец 01.10)', /\.card\.p2 \.seg-a\{transform:rotate\(3deg\)\}/.test(css))
   ok('сосуды — пропорции пластиковой карты', /aspect-ratio:1\.586/.test(rule('.seg')))
@@ -273,6 +273,8 @@ ok('цвета карточек: лайм · голубой · розовый, �
   ok('плашка: чёрный бейдж сверху, цифра под ним (владелец 01.10)',
      /flex-direction:column/.test(rule('.face')) && /background:var\(--dark\)/.test(rule('.fbadge small')))
   ok('плашка берёт остаток высоты карточки, кегль цифры — под плашку', /flex:1 1 0/.test(rule('.faces')) && /min-height:150px/.test(rule('.faces')))
+  ok('плашка обрезана по скруглению clip-path — «барабан» не вылезает за край', /clip-path:inset\(0 round 18px\)/.test(rule('.faces')) && !/translateY\(12px\)/.test(rule('.face')))
+  ok('между окнами ничего нет — воронки и струи в стилях нет (владелец 01.10)', !/\.funnel|\.stream\{/.test(css))
   ok('слой бонуса без линии раздела — плавный переход', /\.seg-b \.liq\{background:linear-gradient\(0deg, var\(--c\) 0 calc\(var\(--split,70%\) - 8%\), var\(--c2\) calc\(var\(--split,70%\) \+ 8%\)\)[^;}]*\}/.test(css))
 }
 {
@@ -318,7 +320,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
        `${c.x} · ${c.sum} → ${c.card}`)
     ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: ${o.label} — два сосуда, воронка и струя; ни волн, ни подсветки, ни переключателя`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — два сосуда, между ними ничего (ни воронки, ни струи, ни волн)`, c.slider && !c.toggle)
     ok(`${code}: ${o.label} — цвет «${o.tone}»`, c.tone === `tone-${o.tone}`, c.tone)
     ok(`${code}: ${o.label} — «жидкость» с тем же текстом, скрыта от чтения`,
        c.liqHidden && c.liqSum === c.sum && c.liqNum === c.card, `${c.liqSum} / ${c.liqNum}`)
@@ -367,7 +369,9 @@ console.log('\n── Движение: «перелей воду» по оче�
   // после старта карточки — плашка наливается и идёт по всем граням, по
   // 1,7 с каждая; только потом следующая карточка (cardMs):
   //   X1 0,7–5,7 с (половина 2,14; игры 3,84) · X2 5,7–10,7 (игры 8,88) ·
-  //   X4–6 10,7–17,3 (игры 13,92; тикеты 15,62) · X1 снова с 17,3.
+  //   X4–6 10,7–17,3 (игры 13,92; тикеты 15,62) · X1 снова с 17,3
+  //   (стоит на играх → половина 18,76 → «барабан» на бонус 20,46).
+  // Гаснет карточка — заливка стекает, значение плашки остаётся.
   const r = await run('?park=ohta&tv=1')
   const w = r.window
   const cs = (el) => w.getComputedStyle(el)
@@ -390,12 +394,10 @@ console.log('\n── Движение: «перелей воду» по оче�
 
   await wait(700)    // t≈1,9 — X1 p2
   c = r.cards()
-  ok('перелив: верхний чуть наклонён, воронка цветом карточки, оба сосуда не в тени',
+  ok('перелив: верхний чуть наклонён, оба сосуда не в тени',
      c[0].phase === 'p2' && /rotate\(3deg\)/.test(cs(c[0].el.querySelector('.seg-a')).transform || '')
-       && (cs(c[0].el.querySelector('.funnel path')).getPropertyValue('fill') || '').trim() === 'var(--c)'
        && Number(cs(c[0].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1,
      `${c[0].phase} ${cs(c[0].el.querySelector('.seg-a')).transform}`)
-  ok('у спокойных воронка едва видна', (cs(c[1].el.querySelector('.funnel path')).getPropertyValue('fill') || '').trim() !== 'var(--c)')
   ok('в начале перелива «на карте» меньше половины — плашка стоит', !c[0].el.classList.contains('half') && faceBg(c, 0) === 'не залита' && kinds(c) === 'gift,gift,gift')
 
   await wait(600)    // t≈2,5 — X1 налита наполовину
@@ -424,29 +426,32 @@ console.log('\n── Движение: «перелей воду» по оче�
   await wait(1300)   // t≈5,4 — X1 ещё держит ход: обе грани показаны, «красуется» досматривается
   c = r.cards()
   ok('пока плашка не показала все грани — ход не переходит', c[0].on && !c[1].on, c.map((x) => x.on).join())
-  ok('смена грани закончилась чисто: видна одна грань, меток смены нет',
-     c.every((x) => x.faces.filter((f) => f.on).length === 1) && !r.d.querySelector('.face.in, .face.out'))
+  ok('«барабан» закончился чисто: видна одна грань, меток смены нет',
+     c.every((x) => x.faces.filter((f) => f.on).length === 1) && !r.d.querySelector('.face.roll-in, .face.roll-out'))
 
   await wait(600)    // t≈6,0 — X2 p1
   c = r.cards()
-  ok('следом — 3 000; у первой итог на месте, плашка снова на бонусе и не залита',
-     !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && kinds(c) === 'gift,gift,gift' && faceBg(c, 0) === 'не залита',
+  ok('следом — 3 000; у первой итог на месте, заливка плашки стекла, значение осталось (игры)',
+     !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && kinds(c) === 'games,gift,gift' && faceBg(c, 0) === 'не залита',
      `${c.map((x) => x.phase || '-').join()} ${kinds(c)}`)
   ok('у спокойных карточек оба сосуда читаются', [0, 2].every((i) =>
     Number(cs(c[i].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[i].el.querySelector('.seg-b')).opacity || 1) === 1))
 
   await wait(3200)   // t≈9,2 — X2 на играх
   c = r.cards()
-  ok('3 000: плашка ожила и перешла к играм, остальные стоят', c[1].on && kinds(c) === 'gift,games,gift', kinds(c))
+  ok('3 000: плашка ожила и перешла к играм, остальные стоят', c[1].on && kinds(c) === 'games,games,gift', kinds(c))
 
   await wait(6700)   // t≈15,9 — X4–6 на тикетах
   c = r.cards()
   ok('5 000: плашка дошла до тикетов («тикеты за наличные»), остальные стоят',
-     c[2].on && kinds(c) === 'gift,gift,tickets' && c[2].faces.find((f) => f.on)?.small === 'тикеты за наличные', kinds(c))
+     c[2].on && kinds(c) === 'games,games,tickets' && c[2].faces.find((f) => f.on)?.small === 'тикеты за наличные', kinds(c))
 
   await wait(1800)   // t≈17,7 — снова X1
   c = r.cards()
-  ok('показав все три грани, ход вернулся к 1 500; у 5 000 плашка снова на бонусе', c[0].on && !c[2].on && kinds(c) === 'gift,gift,gift', `${c.map((x) => x.on).join()} ${kinds(c)}`)
+  ok('показав все три грани, ход вернулся к 1 500; плашки спокойных стоят на своём', c[0].on && !c[2].on && kinds(c) === 'games,games,tickets', `${c.map((x) => x.on).join()} ${kinds(c)}`)
+  await wait(3300)   // t≈21,0 — у 1 500 второй круг: налилась игрой, «барабан» вернул бонус
+  c = r.cards()
+  ok('второй круг 1 500: начала с того, что стояло (игры), «барабаном» дошла до бонуса', c[0].on && kinds(c) === 'gift,games,tickets', kinds(c))
   r.window.close()
 
   const z = await run('?park=ohta', { reduced: true })
@@ -515,7 +520,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.9 · собрано ДД.ММ»', /^v1\.9 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.0 · собрано ДД.ММ»', /^v2\.0 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))

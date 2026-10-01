@@ -24,15 +24,16 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v1.9 — правки владельца 01.10)
+  БЛОКИ (v2.0 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
     2. Три карточки «X1» · «X2» · «X4–6», у каждой свой цвет (лайм,
        голубой, розовый — offers[].tone в данных). Внутри — два сосуда с
        пропорциями пластиковой карты, как в играх «перелей воду»:
        «пополнение 1 500 ₽» сверху и «на карте 2 025 ⚡» снизу (пополнение —
        рубли, на карте — заряды, отсюда молния). По очереди (1 500 →
-       3 000 → 5 000) верхний наливается, чуть наклоняется и льёт через
-       воронку в нижний; там деньги встают внизу, сверху доливается бонус
+       3 000 → 5 000) верхний наливается, чуть наклоняется и переливается
+       в нижний (между окнами ничего нет); там деньги встают внизу, сверху
+       доливается бонус
        (жидкость светлеет кверху), число досчитывается до итога — видно,
        как 1 500 превращаются в 2 025, — и «на карте» красуется: повернётся
        разными гранями, по нему пробежит свет. Сосуд, который сейчас не
@@ -58,7 +59,7 @@
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v1.9 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v2.0 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -227,12 +228,10 @@
      clip-path — край ровный, буквы темнеют ровно там, где их накрыло.
      Фазы активной карточки (kassa.js, countUp):
        p1 — наливается верхний, нижний пуст и в тени;
-       p2 — верхний чуть наклоняется и льёт через ВОРОНКУ (.funnel) в
-            нижний: сверху уровень падает, из носика воронки струя (.stream)
-            бежит в нижний и растит слой денег до --split. Горизонталь:
-            воронка под правым углом верхнего, струя — у правой стенки
-            нижнего, в поле окна (букв там нет). Вертикаль (сосуды рядом):
-            воронка вверху между сосудами, струя — в зазоре между ними;
+       p2 — верхний чуть наклоняется и переливается в нижний: сверху
+            уровень падает, снизу растёт слой денег до --split. Между
+            окнами НИЧЕГО нет — воронку, струю, каналы убрали (решение
+            владельца 01.10: «артефакты»), перелив видно по уровням;
        p3 — доливается бонус: жидкость плавно светлеет кверху (--c → --c2),
             число досчитывается; пустой верхний — в тени;
        done — «на карте» налито: сосуд красуется — поворачивается в своей
@@ -241,8 +240,8 @@
      Подписи «пополнение» / «на карте» — крупные, цветом карточки; у
      сосуда, который сейчас главный, подпись растёт, у второго — уменьшается.
      Спокойная карточка: верхний пуст, нижний ровно чуть подкрашен
-     (::before), воронка едва видна, оба окна читаются. */
-  .slider{position:relative;flex:0 1 auto;min-height:0;display:flex;flex-direction:column;gap:34px}
+     (::before), оба окна читаются. */
+  .slider{position:relative;flex:0 1 auto;min-height:0;display:flex;flex-direction:column;gap:16px}
   .seg{
     position:relative;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 20px 12px;min-width:0;
     flex:0 1 auto;min-height:0;aspect-ratio:1.586;
@@ -251,8 +250,6 @@
     transform-origin:100% 100%;
     transition:opacity .45s ease, filter .45s ease, transform .45s cubic-bezier(.3,0,.3,1);
   }
-  /* Поле справа у «на карте» — под струю из воронки: буквы до неё не доходят */
-  .seg-b{padding-right:48px}
   .seg > .lbl,.seg > .fit-box{position:relative;z-index:1}
   /* Спокойный нижний сосуд — ровная лёгкая заливка цветом карточки */
   .seg-b::before{content:'';position:absolute;z-index:0;inset:0;pointer-events:none;background:rgba(var(--cr),.11);transition:opacity .45s ease}
@@ -289,26 +286,10 @@
   .liq .fs-sum,.seg-b .liq .fs-card{color:var(--dark)}
   .liq .fs-card .bolt{fill:var(--dark);filter:none}
 
-  /* Наклон верхнего сосуда, пока льёт (вокруг нижнего правого угла — к
-     воронке); тень — у сосуда, который сейчас не главный. */
+  /* Наклон верхнего сосуда, пока льёт (вокруг нижнего правого угла); тень —
+     у сосуда, который сейчас не главный. */
   .card.p2 .seg-a{transform:rotate(3deg)}
   .card.p1 .seg-b,.card.p3 .seg-a{opacity:.28;filter:saturate(.3)}
-
-  /* Воронка и струя. Координаты — layoutFunnels (kassa.js): --fx/--fy/
-     --fw/--fh у воронки (форма — путь SVG под её высоту), --sx/--sy/--sw/
-     --sh у струи. В покое воронка едва видна, при переливе — цветом
-     карточки, струя растёт из носика и уходит под жидкость нижнего. */
-  .funnel{position:absolute;z-index:2;left:0;top:0;width:var(--fw,0px);height:var(--fh,0px);transform:translate(var(--fx,0px),var(--fy,0px));overflow:visible;pointer-events:none}
-  .funnel path{fill:rgba(var(--cr),.18);transition:fill .3s ease}
-  .card.p2 .funnel path{fill:var(--c)}
-  .stream{
-    position:absolute;z-index:2;left:0;top:0;width:var(--sw,0px);height:var(--sh,0px);
-    transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(0);transform-origin:50% 0;
-    border-radius:0 0 6px 6px;pointer-events:none;background:var(--c);
-    transition:transform .3s ease-in;
-  }
-  .card.p2 .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(1);transition-delay:.12s}
-  .card.p3 .stream{transform-origin:50% 100%}
 
   .seg .fit-box{min-width:0}
   .seg-a .fs-sum{font-family:'Unbounded';font-weight:900;font-size:60px;line-height:1.05;color:var(--white)}
@@ -350,33 +331,34 @@
      Оживает, только когда «на карте» своей карточки налито наполовину
      (класс half, kassa.js): «наливается» снизу — копия в заливке (.fliq)
      обрезана по уровню, — и показывает ВСЕ свои грани по очереди: бонус →
-     игры → тикеты. Только когда показана последняя — ход переходит к
-     следующей карточке. Новая грань приходит заливкой поверх старой.
-     Карточка гаснет — заливка стекает вниз, под ней снова бонус. У
-     спокойных карточек плашка стоит. */
-  .faces{flex:1 1 0;min-height:150px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-width:0}
+     игры → тикеты, сменяя их «барабаном». Только когда показана последняя —
+     ход переходит к следующей карточке. Карточка гаснет — заливка стекает
+     вниз, значение на плашке остаётся: у спокойных карточек плашка не
+     меняется (решения владельца 01.10). */
+  /* Скругление — у всей плашки (clip-path), грани внутри прямоугольные: при
+     «барабане» две грани едут впритык, шва и зазубрин на углах нет.
+     clip-path, а не overflow:hidden — его Chrome на анимации не теряет. */
+  .faces{flex:1 1 0;min-height:150px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-width:0;border-radius:18px;clip-path:inset(0 round 18px)}
   .face{
     grid-area:1/1;position:relative;overflow:hidden;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:8px;
-    opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease;
-    background:rgba(var(--cr),.14);border-radius:18px;padding:14px 20px 16px;
+    opacity:0;background:rgba(var(--cr),.14);padding:14px 20px 16px;
   }
-  .face.on{opacity:1;transform:none}
+  .face.on{opacity:1}
   .face > .fit-box,.fliq > .fit-box{min-width:0;line-height:0}
   .fliq{
-    position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:inherit;border-radius:inherit;pointer-events:none;background:var(--c);
+    position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:inherit;pointer-events:none;background:var(--c);
     clip-path:inset(100% 0 0 0);opacity:0;transition:clip-path .45s cubic-bezier(.45,0,.3,1), opacity 0s linear .45s;
   }
-  .card.half .face.on .fliq,.card.half .face.out .fliq{opacity:1;clip-path:inset(0 0 0 0);transition:clip-path .5s cubic-bezier(.45,0,.3,1)}
-  .card.half .face.out .fliq{transition:none}
-  /* Смена грани (kassa.js, showFace / restFaces): новая (.in) видна только
-     своей заливкой, старая (.out) стоит под ней как есть; при угасании
-     уходящая (.leave) стекает вниз, под ней сразу стоит бонус (.snap). */
-  .face.in,.face.out,.face.snap,.face.leave{transition:none}
-  .face.in{z-index:2;background:transparent}
-  .face.in > .fit-box,.face.in > .fbadge,.face.leave > .fit-box,.face.leave > .fbadge{visibility:hidden}
-  .face.out{z-index:1;opacity:1;transform:none}
-  .face.snap{z-index:1}
-  .face.leave{z-index:2;opacity:1;transform:none;background:transparent}
+  /* Налив плашки — только у той грани, что стояла, когда «на карте» дошло
+     до половины; въезжающая и уезжающая при «барабане» — сразу залиты. */
+  .card.half .face.on .fliq,.card.half .face.roll-out .fliq{opacity:1;clip-path:inset(0 0 0 0);transition:clip-path .5s cubic-bezier(.45,0,.3,1)}
+  .card.half .face.roll-in .fliq,.card.half .face.roll-out .fliq{transition:none}
+  /* «Барабан» (kassa.js, showFace): старое значение уезжает вверх, новое
+     въезжает снизу. Без растворения и наложения букв. */
+  .face.roll-out{opacity:1;z-index:1;animation:roll-out .45s cubic-bezier(.5,0,.2,1) both}
+  .face.roll-in{z-index:2;animation:roll-in .45s cubic-bezier(.5,0,.2,1) both}
+  @keyframes roll-out{from{transform:translateY(0)}to{transform:translateY(-100%)}}
+  @keyframes roll-in{from{transform:translateY(100%)}to{transform:translateY(0)}}
   /* Бейдж — чёрная плашка над цифрой */
   .fbadge{line-height:0}
   .fbadge small{
@@ -388,8 +370,8 @@
   /* .face .fliq — сильнее, чем .face .fs-face: иначе цифра лаймом по лайму */
   .face .fliq .fs-face b{color:var(--dark)}
 
-  /* Вертикаль: X слева, сосуды справа рядом — верхний льёт через воронку
-     в соседний; плашка бонуса — во всю ширину карточки внизу. */
+  /* Вертикаль: X слева, сосуды справа рядом — верхний переливается в
+     соседний; плашка бонуса — во всю ширину карточки внизу. */
   body.portrait .cards{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr))}
   body.portrait .card{
     display:grid;gap:12px 22px;
@@ -558,7 +540,8 @@
 
   @media (prefers-reduced-motion: reduce){
     .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg{animation:none}
-    .card,.seg,.lbl,.liq,.stream,.funnel path,.face,.fliq,.fs-card{transition:none}
+    .card,.seg,.lbl,.liq,.face,.fliq,.fs-card{transition:none}
+    .face.roll-in,.face.roll-out{animation:none}
     .card.done .seg-b,.card.done .seg-b::after,.card.done .seg-b .liq{animation:none}
   }
 </style>
