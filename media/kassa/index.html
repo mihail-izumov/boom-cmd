@@ -24,7 +24,7 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v2.6 — правки владельца 01.10)
+  БЛОКИ (v2.7 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом;
        «онлайн» и «сейчас» сменяют друг друга табло-перещёлкиванием.
     2. Три карточки «X1» · «X2» · «X4–6», у каждой свой цвет (лайм,
@@ -55,15 +55,15 @@
        500 — за 5 000 ₽; Охта и Питерленд, у Июня акции нет).
     3. Полоса ступеней — убрана (show_steps:false в данных, код оставлен).
     4. Строка «Не хватило? Докинем без очереди — скажи сотруднику в зале» —
-       во всех парках, крупно, двумя строками; слева счётчик баланса стекает
-       до нуля и «докидывается» снова (решение владельца 01.10).
+       во всех парках, двумя строками; слева компактный счётчик баланса
+       стекает с 1 500 до нуля и «докидывается» снова (решение владельца 01.10).
     5. QR, если онлайн у парка включён: над кодом, по центру свободного поля,
        «Докинуть на карту без очереди» («без очереди» — лаймовой плашкой);
        видоискатель как у «Твоей карты»; под кодом, по центру поля, синим —
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v2.6 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v2.7 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -543,8 +543,8 @@
   }
 
   /* ══ 4. СТРОКА «НА КАССЕ» — «Не хватило? Докинем…» ══════════════════
-     Во всех парках (решение владельца 01.10). Крупно, на сколько позволяет
-     место: слева — счётчик баланса во всю высоту строки, справа — вопрос и
+     Во всех парках (решение владельца 01.10). Слева — счётчик баланса,
+     компактный, чтобы не спорил с числами карточек; справа — вопрос и
      ответ двумя строками (кегли — fitStage). */
   .info{flex:none;padding:14px 24px;gap:8px}
   .info-row{display:flex;align-items:center;gap:28px;min-width:0}
@@ -558,21 +558,21 @@
      до нуля голубым, ноль — розовым с тряской, «докинули» — лаймом. */
   .meter{
     flex:none;display:flex;align-items:center;padding:.14em .26em .14em .3em;border-radius:.24em;
-    font-family:'Unbounded';font-weight:900;font-size:76px;line-height:1;color:var(--cyan);
-    background:rgba(0,212,255,.1);box-shadow:inset 0 0 0 4px rgba(0,212,255,.38);
+    font-family:'Unbounded';font-weight:900;font-size:50px;line-height:1;color:var(--cyan);
+    background:rgba(0,212,255,.1);box-shadow:inset 0 0 0 3px rgba(0,212,255,.38);
     transition:color .2s ease, background-color .2s ease, box-shadow .2s ease;
   }
-  .meter .col{display:inline-block;width:.8em;height:1em;overflow:hidden;transition:opacity .2s ease}
+  .meter .col{display:inline-block;width:var(--dw,.92em);height:1em;overflow:hidden;transition:opacity .2s ease}
   .meter .col.lead{opacity:.16}
   .meter .strip{display:flex;flex-direction:column;transform:translateY(calc(var(--p, 0) * -1em))}
   .meter .strip i{display:block;height:1em;font-style:normal;text-align:center}
   .meter .th{width:.16em}
   .meter .mbolt{width:.5em;height:.6em;margin-left:.12em;fill:currentColor;filter:drop-shadow(0 0 .08em currentColor)}
-  .meter.empty{color:var(--pink);background:rgba(255,61,104,.14);box-shadow:inset 0 0 0 4px rgba(255,61,104,.6);animation:meter-empty .7s steps(1) infinite, meter-shake .35s linear 2}
+  .meter.empty{color:var(--pink);background:rgba(255,61,104,.14);box-shadow:inset 0 0 0 3px rgba(255,61,104,.6);animation:meter-empty .7s steps(1) infinite, meter-shake .35s linear 2}
   .meter.empty .mbolt{opacity:.25;filter:none}
   @keyframes meter-empty{0%,49%{color:var(--pink)}50%,100%{color:rgba(255,61,104,.35)}}
   @keyframes meter-shake{0%,100%{transform:none}20%{transform:translateX(-6px) rotate(-1.5deg)}40%{transform:translateX(5px) rotate(1deg)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
-  .meter.refill{color:var(--lime);background:rgba(198,245,46,.14);box-shadow:inset 0 0 0 4px rgba(198,245,46,.6), 0 0 34px rgba(198,245,46,.35)}
+  .meter.refill{color:var(--lime);background:rgba(198,245,46,.14);box-shadow:inset 0 0 0 3px rgba(198,245,46,.6), 0 0 26px rgba(198,245,46,.3)}
 
   /* ══ 6. QR ═════════════════════════════════════════════════════════════ */
   .qr-tile{

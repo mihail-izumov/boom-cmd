@@ -27,7 +27,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.6'
+const PAGE_VERSION = 'v2.7'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -316,9 +316,10 @@ function renderInfo(p) {
 }
 
 /* Счётчик баланса: механические барабаны цифр, как на счётчике. Сумма —
-   «на карте» основной карточки (2 025 ⚡): стекает до нуля («не хватило»),
-   ноль мигает розовым, потом «докинули» — сумма возвращается (tickMeter). */
-const METER_FROM = (() => { const o = DATA.offers.find((x) => x.main) || DATA.offers[0]; return o.sum + giftFor(o.sum) })()
+   пополнение основной карточки (1 500, решение владельца 01.10): стекает до
+   нуля («не хватило»), ноль мигает розовым, потом «докинули» — сумма
+   возвращается (tickMeter). */
+const METER_FROM = (DATA.offers.find((x) => x.main) || DATA.offers[0]).sum
 const METER_N = String(METER_FROM).length
 const METER_BOLT = '<svg class="mbolt" viewBox="0 0 784.1 926.5"><path d="M491.3,387.2 L735.7,0 L0,578.8 L376.5,558.1 L202,926.5 L784.1,366.6Z"/></svg>'
 function renderMeter() {
@@ -332,6 +333,22 @@ function renderMeter() {
   m.innerHTML = html + METER_BOLT
   setMeter(REDUCED ? 0 : METER_FROM, REDUCED ? 'empty' : '')
 }
+/* Ширина барабана — по самой широкой цифре шрифта (Unbounded: «0», «2»,
+   «5» шире «1»): уже — и соседние цифры режут друг друга. Меряем после
+   загрузки шрифта (fitStage). */
+function sizeMeter() {
+  const m = document.getElementById('meter')
+  if (!m) return
+  const probe = document.createElement('span')
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap'
+  m.appendChild(probe)
+  let max = 0
+  for (const d of '0123456789') { probe.textContent = d; max = Math.max(max, probe.offsetWidth) }
+  probe.remove()
+  const fs = parseFloat(getComputedStyle(m).fontSize) || 0
+  if (max && fs) m.style.setProperty('--dw', `${(max / fs + 0.03).toFixed(3)}em`)
+}
+
 /* Барабан k стоит на цифре floor(v/10^k) и докручивается, когда младшие
    разряды проходят через 9 → 0 — как у механического счётчика. */
 function setMeter(v, state) {
@@ -548,6 +565,7 @@ function fitStage() {
 
   const offer = document.getElementById('offer')
   sizeOffer()
+  sizeMeter()
   fitCount(offer, portrait ? 112 : 104, 40)
   fitUniform('.fs-x', 84, 30)
   fitUniform('.fs-sum', 60, 26)
