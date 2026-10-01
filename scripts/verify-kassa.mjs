@@ -60,9 +60,9 @@ const SPEC_ON_CARD = { 500: 625, 1000: 1300, 1500: 2025, 2000: 2800, 3000: 4500,
 // Игры — подарок / 70 ₽ (средняя цена игры с b00m.fun/rewards), вниз до целого.
 // Цвет «жидкости» у каждой карточки свой (решение владельца 01.10).
 const SPEC_OFFERS = [
-  { label: 'X1', sum: 1500, onCard: 2025, gift: 525, games: '≈ +7 игр', main: true, tone: 'lime' },
-  { label: 'X2', sum: 3000, onCard: 4500, gift: 1500, games: '≈ +21 игра', main: false, tone: 'cyan' },
-  { label: 'X4–6', sum: 5000, onCard: 8000, gift: 3000, games: '≈ +42 игры', main: false, tone: 'pink' },
+  { label: 'X1', sum: 1500, onCard: 2025, gift: 525, games: '≈ +7', main: true, tone: 'lime' },
+  { label: 'X2', sum: 3000, onCard: 4500, gift: 1500, games: '≈ +21', main: false, tone: 'cyan' },
+  { label: 'X4–6', sum: 5000, onCard: 8000, gift: 3000, games: '≈ +42', main: false, tone: 'pink' },
 ]
 const PHASES = ['p1', 'p2', 'p3']
 // Тикеты при оплате наличными (решение владельца 01.10): только за точную
@@ -193,8 +193,12 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
       && !!c.querySelector('.slider > svg.funnel path') && !!c.querySelector('.slider > .stream') && !c.querySelector('.neck, .wave'),
     toggle: !!c.querySelector('.toggle'),
-    faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector(':scope > .fit-box > .fs-face')
-      && sp(f.querySelector('.fliq')?.textContent) === sp(f.querySelector(':scope > .fit-box')?.textContent) && f.querySelector('.fliq').getAttribute('aria-hidden') === 'true'),
+    faceFull: [...c.querySelectorAll('.face')].every((f) => {
+      const own = sp(`${f.querySelector(':scope > .fbadge')?.textContent} ${f.querySelector(':scope > .fit-box')?.textContent}`)
+      const lq = f.querySelector('.fliq')
+      return f.parentElement.classList.contains('faces') && !!f.querySelector(':scope > .fbadge > small') && !!f.querySelector(':scope > .fit-box > .fs-face > b')
+        && !!lq && sp(`${lq.querySelector('.fbadge')?.textContent} ${lq.querySelector('.fit-box')?.textContent}`) === own && lq.getAttribute('aria-hidden') === 'true'
+    }),
     faces: [...c.querySelectorAll('.face')].map((f) => ({
       kind: f.dataset.kind,
       on: f.classList.contains('on'),
@@ -266,9 +270,9 @@ ok('цвета карточек: лайм · голубой · розовый, �
   ok('верхний сосуд при переливе чуть наклоняется (владелец 01.10)', /\.card\.p2 \.seg-a\{transform:rotate\(3deg\)\}/.test(css))
   ok('сосуды — пропорции пластиковой карты', /aspect-ratio:1\.586/.test(rule('.seg')))
   ok('подписи сосудов крупные и цветом карточки', /font-size:26px/.test(rule('.seg .lbl')) && /color:var\(--c2\)/.test(rule('.seg .lbl')))
-  ok('плашка: сумма и слово в чёрной плашке в одну строку',
-     /flex-direction:row/.test(rule('.face .fs-face')) && /background:var\(--dark\)/.test(rule('.face .fs-face small')))
-  ok('плашка берёт остаток высоты карточки', /flex:1 0 auto/.test(rule('.faces')))
+  ok('плашка: чёрный бейдж сверху, цифра под ним (владелец 01.10)',
+     /flex-direction:column/.test(rule('.face')) && /background:var\(--dark\)/.test(rule('.fbadge small')))
+  ok('плашка берёт остаток высоты карточки, кегль цифры — под плашку', /flex:1 1 0/.test(rule('.faces')) && /min-height:150px/.test(rule('.faces')))
   ok('слой бонуса без линии раздела — плавный переход', /\.seg-b \.liq\{background:linear-gradient\(0deg, var\(--c\) 0 calc\(var\(--split,70%\) - 8%\), var\(--c2\) calc\(var\(--split,70%\) \+ 8%\)\)[^;}]*\}/.test(css))
 }
 {
@@ -321,12 +325,12 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
     ok(`${code}: ${o.label} — слой денег ${Math.round((o.sum / o.onCard) * 1000) / 10}% сосуда «на карте»`,
        c.split === `${Math.round((o.sum / o.onCard) * 1000) / 10}%`, c.split)
     ok(`${code}: ${o.label} — после числа «на карте» молния (заряды)`, c.bolt)
-    ok(`${code}: ${o.label} — плашка бонуса во всю ширину карточки`, c.faceFull)
+    ok(`${code}: ${o.label} — плашка во всю ширину: бейдж сверху, цифра под ним, копия в заливке`, c.faceFull)
     ok(`${code}: ${o.label} — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
     const want = [
       { kind: 'gift', big: `+${fmt(o.gift)}`, small: 'бонус' },
-      { kind: 'games', big: o.games, small: 'бонус' },
-      ...(t ? [{ kind: 'tickets', big: `+${t}`, small: 'тикетов за наличные' }] : []),
+      { kind: 'games', big: o.games, small: 'бонус в играх' },
+      ...(t ? [{ kind: 'tickets', big: `+${t}`, small: 'тикеты за наличные' }] : []),
     ]
     const got = c.faces.map(({ kind, big, small }) => ({ kind, big, small }))
     ok(`${code}: ${o.label} — плашка: ${want.map((w) => `${w.big} ${w.small}`).join(' / ')}`,
@@ -339,7 +343,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   if (!s.tickets) {
     ok(`${code}: про тикеты и наличные в карточках ни слова`, !/тикет|налич/i.test(r.leftText), r.leftText.match(/тикет|налич/i)?.[0])
   } else {
-    ok(`${code}: тикеты — только «за наличные»`, (r.leftText.match(/тикетов/g) || []).length === (r.leftText.match(/за наличные/g) || []).length)
+    ok(`${code}: тикеты — только «за наличные»`, (r.leftText.match(/тикет/g) || []).length === (r.leftText.match(/за наличные/g) || []).length)
   }
   ok(`${code}: строка докидки ${s.hall ? 'есть' : 'нет'}`,
      s.hall ? r.infoShown && r.hall === HALL : !r.infoShown && !r.text.includes('докинем'))
@@ -401,7 +405,7 @@ console.log('\n── Движение: «перелей воду» по оче�
   {
     const fq = c[0].el.querySelector('.face.on .fliq .fs-face')
     const col = (n) => (cs(n).getPropertyValue('color') || '').trim()
-    ok('в залитой плашке сумма тёмная, слово — в чёрной плашке', ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq.querySelector('b'))),
+    ok('в залитой плашке цифра тёмная, бейдж — чёрный', ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq.querySelector('b'))),
        col(fq.querySelector('b')))
   }
   ok('у спокойных карточек плашка не залита', [1, 2].every((i) => !c[i].el.classList.contains('half') && faceBg(c, i) === 'не залита'))
@@ -437,8 +441,8 @@ console.log('\n── Движение: «перелей воду» по оче�
 
   await wait(6700)   // t≈15,9 — X4–6 на тикетах
   c = r.cards()
-  ok('5 000: плашка дошла до тикетов («тикетов за наличные»), остальные стоят',
-     c[2].on && kinds(c) === 'gift,gift,tickets' && c[2].faces.find((f) => f.on)?.small === 'тикетов за наличные', kinds(c))
+  ok('5 000: плашка дошла до тикетов («тикеты за наличные»), остальные стоят',
+     c[2].on && kinds(c) === 'gift,gift,tickets' && c[2].faces.find((f) => f.on)?.small === 'тикеты за наличные', kinds(c))
 
   await wait(1800)   // t≈17,7 — снова X1
   c = r.cards()
@@ -461,7 +465,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   ok(`${code}: раскладка без QR (no-online)`, r.body.includes('no-online'))
   ok(`${code}: слов про телефон и камеру на экране нет`, !/телефон|камер/i.test(r.text), r.text.match(/телефон|камер/i)?.[0])
   ok(`${code}: карточки остались`, cards.length === 3 && cards[0].card === '2 025')
-  if (s.tickets) ok(`${code}: тикеты за наличные в карточке 5 000 остались`, cards[2].faces.some((f) => f.big === '+500' && f.small === 'тикетов за наличные'))
+  if (s.tickets) ok(`${code}: тикеты за наличные в карточке 5 000 остались`, cards[2].faces.some((f) => f.big === '+500' && f.small === 'тикеты за наличные'))
 }
 
 console.log('\n── Песочница и защита от правки адресом ──')
@@ -511,7 +515,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.8 · собрано ДД.ММ»', /^v1\.8 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.9 · собрано ДД.ММ»', /^v1\.9 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))

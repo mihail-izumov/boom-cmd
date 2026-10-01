@@ -24,7 +24,7 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v1.8 — правки владельца 01.10)
+  БЛОКИ (v1.9 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
     2. Три карточки «X1» · «X2» · «X4–6», у каждой свой цвет (лайм,
        голубой, розовый — offers[].tone в данных). Внутри — два сосуда с
@@ -40,10 +40,11 @@
        КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте»): однажды
        гости прочли «1 300 зарядов» наоборот, как цену.
        Под сосудами — плашка во всю ширину и на всю оставшуюся высоту
-       карточки: сумма и слово в чёрной плашке в одну строку. У активной
+       карточки: сверху чёрный бейдж («бонус», «бонус в играх», «тикеты за
+       наличные»), под ним цифра — крупно, чтобы читалось издалека. У активной
        карточки она оживает, когда «на карте» налито наполовину, и
-       показывает все грани по очереди: «+525 бонус» → «≈ +7 игр бонус» →
-       «+500 тикетов за наличные»; только потом ход переходит к следующей
+       показывает все грани по очереди: «+525» → «≈ +7» (игры) → «+500»
+       (тикеты); только потом ход переходит к следующей
        карточке. У спокойных карточек плашка стоит на бонусе. Игры — бонус /
        средняя цена игры ~70 ₽ (как на
        b00m.fun/rewards), вниз до целого. Тикеты — только за наличные на
@@ -57,7 +58,7 @@
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v1.8 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v1.9 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -340,27 +341,29 @@
   @keyframes slosh{0%,100%{background-position:0 50%}25%{background-position:0 15%}55%{background-position:0 85%}80%{background-position:0 40%}}
 
   /* Плашка бонуса — во всю ширину карточки, цветом карточки, лёгкой
-     подложкой; берёт всю высоту, что осталась под сосудами. Сумма и
-     чёрная плашка слова («бонус», «тикетов за наличные») — в одну строку
-     (решение владельца 01.10).
+     подложкой; берёт всю высоту, что осталась под сосудами (не меньше
+     150px). Сверху — чёрный бейдж («бонус», «бонус в играх», «тикеты за
+     наличные»), под ним цифра — крупно, на всё оставшееся место, чтобы
+     читалось издалека (решения владельца 01.10). Высоту плашки задаёт
+     сетка карточки, а не текст (flex-basis 0): кегль цифры подгоняется
+     под плашку (faceRoom в kassa.js), а не плашка под кегль.
      Оживает, только когда «на карте» своей карточки налито наполовину
-     (класс half, kassa.js): «наливается» снизу — копия текста в заливке
-     (.fliq) обрезана по уровню, — и показывает ВСЕ свои грани по очереди:
-     «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за наличные». Только
-     когда показана последняя — ход переходит к следующей карточке. Новая
-     грань приходит заливкой поверх старой, старый текст уходит ровно под
-     её край. Карточка гаснет — заливка стекает вниз, под ней снова бонус.
-     У спокойных карточек плашка стоит. */
-  .faces{flex:1 0 auto;min-height:100px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-width:0}
+     (класс half, kassa.js): «наливается» снизу — копия в заливке (.fliq)
+     обрезана по уровню, — и показывает ВСЕ свои грани по очереди: бонус →
+     игры → тикеты. Только когда показана последняя — ход переходит к
+     следующей карточке. Новая грань приходит заливкой поверх старой.
+     Карточка гаснет — заливка стекает вниз, под ней снова бонус. У
+     спокойных карточек плашка стоит. */
+  .faces{flex:1 1 0;min-height:150px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-width:0}
   .face{
-    grid-area:1/1;position:relative;overflow:hidden;min-width:0;display:flex;align-items:center;
+    grid-area:1/1;position:relative;overflow:hidden;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:8px;
     opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease;
-    background:rgba(var(--cr),.14);border-radius:18px;padding:12px 18px 13px;
+    background:rgba(var(--cr),.14);border-radius:18px;padding:14px 20px 16px;
   }
   .face.on{opacity:1;transform:none}
-  .face > .fit-box,.fliq > .fit-box{flex:1;min-width:0}
+  .face > .fit-box,.fliq > .fit-box{min-width:0;line-height:0}
   .fliq{
-    position:absolute;inset:0;display:flex;align-items:center;padding:inherit;border-radius:inherit;pointer-events:none;background:var(--c);
+    position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:inherit;border-radius:inherit;pointer-events:none;background:var(--c);
     clip-path:inset(100% 0 0 0);opacity:0;transition:clip-path .45s cubic-bezier(.45,0,.3,1), opacity 0s linear .45s;
   }
   .card.half .face.on .fliq,.card.half .face.out .fliq{opacity:1;clip-path:inset(0 0 0 0);transition:clip-path .5s cubic-bezier(.45,0,.3,1)}
@@ -370,24 +373,19 @@
      уходящая (.leave) стекает вниз, под ней сразу стоит бонус (.snap). */
   .face.in,.face.out,.face.snap,.face.leave{transition:none}
   .face.in{z-index:2;background:transparent}
-  .face.in > .fit-box,.face.leave > .fit-box{visibility:hidden}
+  .face.in > .fit-box,.face.in > .fbadge,.face.leave > .fit-box,.face.leave > .fbadge{visibility:hidden}
   .face.out{z-index:1;opacity:1;transform:none}
   .face.snap{z-index:1}
   .face.leave{z-index:2;opacity:1;transform:none;background:transparent}
-  .face .fs-face{
-    display:inline-flex;flex-direction:row;align-items:center;gap:.3em;white-space:nowrap;
-    font-family:'Unbounded';font-weight:900;font-size:48px;line-height:1;color:var(--c);
+  /* Бейдж — чёрная плашка над цифрой */
+  .fbadge{line-height:0}
+  .fbadge small{
+    display:inline-block;white-space:nowrap;font-family:'Inter';font-weight:800;font-size:22px;letter-spacing:.6px;text-transform:uppercase;line-height:1;
+    color:var(--c);background:var(--dark);border-radius:999px;padding:7px 14px 8px;
   }
-  /* Слово — в чёрной плашке, в строку с суммой */
-  .face .fs-face small{
-    font-family:'Inter';font-weight:800;font-size:.5em;letter-spacing:.3px;line-height:1;
-    color:var(--c);background:var(--dark);border-radius:999px;padding:.45em .85em .5em;
-    white-space:pre;text-align:left;flex:none;
-  }
-  .face .fs-face b{flex:none}
-  /* Две строки в плашке («тикетов / за наличные») — скругление поменьше */
-  .face[data-kind="tickets"] .fs-face small{border-radius:.9em;line-height:1.1;padding:.4em .8em .45em}
-  /* .face .fliq — сильнее, чем .face .fs-face: иначе сумма лаймом по лайму */
+  /* Цифра — крупно (кегль — fitStage) */
+  .face .fs-face{font-family:'Unbounded';font-weight:900;font-size:60px;line-height:1;color:var(--c);letter-spacing:-1px}
+  /* .face .fliq — сильнее, чем .face .fs-face: иначе цифра лаймом по лайму */
   .face .fliq .fs-face b{color:var(--dark)}
 
   /* Вертикаль: X слева, сосуды справа рядом — верхний льёт через воронку
@@ -404,7 +402,9 @@
   body.portrait .seg{aspect-ratio:auto}
   body.portrait .seg-a{flex:0 0 36%}
   body.portrait .seg-b{flex:1 1 0;min-width:0;padding-right:20px}
-  body.portrait .faces{grid-area:faces;min-height:0}
+  body.portrait .faces{grid-area:faces;flex:none;min-height:0}
+  body.portrait .face{flex-direction:row;align-items:center;justify-content:flex-start;gap:18px}
+  body.portrait .fliq{flex-direction:row;align-items:center;justify-content:flex-start;gap:18px}
   /* Звезда основной карточки — в правом верхнем углу, над сосудами */
   body.portrait .card.main .slider{margin-right:58px}
 

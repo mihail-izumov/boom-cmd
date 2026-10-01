@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.8'
+const PAGE_VERSION = 'v1.9'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -138,8 +138,8 @@ function renderOffer() {
  *
  * Под сосудами — плашка во всю ширину карточки, грани одного бонуса:
  * «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за наличные» (тикеты —
- * только там, где сумма карточки есть в cash_tickets). Слово — в чёрной
- * плашке в строку с суммой. Плашка тоже «наливается»: копия текста в
+ * только там, где сумма карточки есть в cash_tickets). Слово — чёрным
+ * бейджем сверху, цифра под ним — крупно, на всю плашку. Плашка тоже «наливается»: копия текста в
  * заливке (.fliq) встаёт снизу, когда «на карте» налито наполовину (класс
  * half ниже), и показывает все грани по очереди (showFace).
  *
@@ -156,10 +156,8 @@ function renderCards(p) {
     const faces = [
       { kind: 'gift', big: `+${fmt(gift)}`, small: T.face_gift },
     ]
-    if (games > 0) faces.push({ kind: 'games', big: `≈\u00a0+${fmt(games)}\u00a0${plural(games, 'игра', 'игры', 'игр')}`, small: T.face_games })
-    /* «тикетов / за наличные» — в чёрной плашке двумя строками: так сумма
-       рядом остаётся крупной (перенос только по \n — white-space:pre в index.html) */
-    if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}`, small: `${plural(tickets, 'тикет', 'тикета', 'тикетов')}\n${T.face_tickets}` })
+    if (games > 0) faces.push({ kind: 'games', big: `≈\u00a0+${fmt(games)}`, small: T.face_games })
+    if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}`, small: T.face_tickets })
     const [x, n] = [String(o.label).slice(0, 1), String(o.label).slice(1)]
     const tone = TONES.includes(o.tone) ? o.tone : TONES[i % TONES.length]
     const split = Math.round((o.sum / (o.sum + gift)) * 1000) / 10
@@ -176,7 +174,9 @@ function renderCards(p) {
           <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div></div>
         </div>
         <div class="faces">${faces.map((f, i) => {
-          const inF = `<div class="fit-box"><span class="fit fs-face"><b>${esc(f.big)}</b><small>${esc(f.small)}</small></span></div>`
+          /* Бейдж («бонус», «бонус в играх», «тикеты за наличные») — сверху,
+             цифра под ним — крупно, на всю плашку (решение владельца 01.10) */
+          const inF = `<div class="fbadge"><small>${esc(f.small)}</small></div><div class="fit-box"><span class="fit fs-face"><b>${esc(f.big)}</b></span></div>`
           return `
           <div class="face${i === 0 ? ' on' : ''}" data-kind="${f.kind}">${inF}<div class="fliq" aria-hidden="true">${inF}</div></div>`
         }).join('')}
@@ -332,6 +332,17 @@ function fitUniform(sel, max, min, maxH) {
   els.forEach((e) => { e.style.fontSize = `${size}px` })
 }
 
+/* Сколько места по высоте у цифры плашки: высота плашки (её задаёт сетка
+   карточки, не текст — flex-basis 0) минус поля и бейдж. */
+function faceRoom() {
+  const f = document.querySelector('#cards .face')
+  if (!f) return 0
+  const cs = getComputedStyle(f)
+  const badge = f.querySelector('.fbadge')
+  const gap = parseFloat(cs.rowGap) || 0
+  return Math.max(0, Math.floor(f.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - (badge ? badge.offsetHeight : 0) - gap))
+}
+
 /* Сколько места по высоте у числа «на карте»: нижнее окно слайдера растёт
    на всё свободное место карточки (flex:1 1 0), из него вычитаем поля окна
    и подпись. Так число не вытолкнет плашку бонуса за край. */
@@ -457,9 +468,11 @@ function fitStage() {
   fitCount(offer, portrait ? 112 : 104, 40)
   fitUniform('.fs-x', 84, 30)
   fitUniform('.fs-sum', 60, 26)
-  /* Грани одного вида — единым кеглем по трём карточкам; длинная строка
-     тикетов не ужимает бонус и игры */
-  ;['gift', 'games', 'tickets'].forEach((k) => fitUniform(`.face[data-kind="${k}"] .fs-face`, 60, 16))
+  /* Цифра плашки — крупно, на всё место под бейджем; грани одного вида —
+     единым кеглем по трём карточкам. В вертикали плашка по содержимому —
+     кегль ограничен сверху, а не высотой. */
+  const room = portrait ? 0 : faceRoom()
+  ;['gift', 'games', 'tickets'].forEach((k) => fitUniform(`.face[data-kind="${k}"] .fs-face`, portrait ? 84 : 150, 24, room))
   fitUniform('.fs-card', portrait ? 150 : 150, 44, cardRoom() || 0)
   if (DATA.show_steps) {
     fitCount(document.getElementById('round'), 34, 18)
