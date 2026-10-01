@@ -10,8 +10,9 @@
  *     экран, страница перезагружается под ней и открывается, только когда
  *     полностью готова (шрифты, картинки, второй экран плеера).
  *  2. Справа в шапке — плеер: ❚❚/▶ и два экрана; под активным — полоса
- *     времени до смены. Экран стоит ровно один полный круг своей анимации
- *     (у «Твоей карты» — сцена 42,4 с, у кассы — все карточки по очереди).
+ *     времени до смены. После перехода экран 3 с стоит на первом кадре,
+ *     потом играет ровно один полный круг своей анимации (у «Статуса» —
+ *     сцена 42,4 с с кадра «Заряжено», у «Зарядки» — все карточки по очереди).
  *     Пауза замораживает экран вместе с полосой; «▶» продолжает с того же
  *     места. Пауза живёт до перезагрузки: после 05:00 и после смены парка
  *     плеер снова играет (?play=0 в адресе — стартовать на паузе).
@@ -47,6 +48,7 @@ const MIN_DWELL = 8000               // страховка, если стран�
 const IN_MS = 400                    // заставка закрывает экран
 const HOLD_MS = 1300                 // минимум на заставке — фраза успевает прочитаться
 const OUT_MS = 750                   // «выстрел» глаз и проявление экрана
+const FIRST_MS = 3000                // после перехода экран стоит на первом кадре (решение владельца 01.10)
 
 const Q = new URLSearchParams(location.search)
 const EMBED = Q.get('embed') === '1' && window.parent !== window
@@ -65,8 +67,9 @@ export function pauseAnimations() {
 export function resumeAnimations() {
   document.getAnimations().filter(own).forEach((a) => a.play())
 }
-export function restartAnimations() {
-  document.getAnimations().filter(own).forEach((a) => { a.currentTime = 0; a.play() })
+/* offset, мс — с какого места круга начать (у «Статуса» — с кадра «Заряжено») */
+export function restartAnimations(offset = 0) {
+  document.getAnimations().filter(own).forEach((a) => { a.currentTime = offset; a.play() })
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -173,7 +176,7 @@ function curtainOut() {
  *   parks     — { код: { name } }
  *   parkOrder — порядок парков в списке
  *   cycleMs   — () => длина полного круга анимации страницы, мс
- *   restart   — () => начать анимацию с начала (экран показали)
+ *   restart   — () => встать на первый кадр круга (экран показали)
  *   pause     — () => заморозить анимацию (пауза или экран скрыт)
  *   resume    — () => продолжить с того же места
  */
@@ -312,11 +315,9 @@ function becomeHost(o, selfApi) {
      8 с, чтобы панель не висела на заставке), и открываем экран с начала. */
   selfApi.pause()
   Promise.all([pageReady(), Promise.race([H.childReady, wait(8000)]), wait(HOLD_MS)]).then(() => {
-    selfApi.restart()
-    if (!H.playing) selfApi.pause()
-    startDwell()
+    present(selfApi)
     return curtainOut()
-  }).then(() => { H.busy = false })
+  }).then(() => { H.busy = false; afterHold(selfApi) })
 
   setInterval(broadcast, 200)
   broadcast()
@@ -324,6 +325,25 @@ function becomeHost(o, selfApi) {
 
 function apiOf(id) {
   return id === H.selfId ? H.self : H.child
+}
+
+/* Экран показан: встаёт на первый кадр и стоит (FIRST_MS после того,
+   как ушла заставка), потом играет. Полоса времени в это время пустая. */
+function present(api) {
+  clearTimeout(H.timer)
+  api.restart()
+  api.pause()
+  H.holding = true
+  H.dwell = 0
+  H.elapsed = 0
+}
+function afterHold(api) {
+  clearTimeout(H.timer)
+  H.timer = setTimeout(() => {
+    H.holding = false
+    if (H.playing) api.resume()
+    startDwell()
+  }, FIRST_MS)
 }
 
 /* Новый отсчёт для текущего экрана: ровно один его круг. */
@@ -361,16 +381,18 @@ async function switchTo(id) {
   H.current = id
   H.playing = true                     // переход всегда играет
   await wait(HOLD_MS - 300)
-  target.restart()
-  startDwell()
+  present(target)
   broadcast()
   await curtainOut()
   H.busy = false
+  afterHold(target)
 }
 
 function hostAct(action, arg) {
   if (!H) return
-  if (action === 'toggle') {
+  if (action === 'toggle' && H.holding) {
+    H.playing = !H.playing             // экран ещё стоит на первом кадре — запомним, играть ли потом
+  } else if (action === 'toggle') {
     const a = apiOf(H.current)
     if (H.playing) {                   // пауза: замираем вместе с полосой
       H.playing = false
