@@ -1,26 +1,31 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  *  media/shared/screens.js — общий для ТВ-экранов «Твоя карта» (loyalty) и
- *  «Заряди карту» (kassa): выбор парка и плеер, который чередует экраны.
+ *  «Заряди карту» (kassa): выбор парка, плеер, который чередует экраны,
+ *  и заставка между ними.
  * ═══════════════════════════════════════════════════════════════════════════
- *  Что делает:
- *   1. Плашка «БУМБАСТИК // парк» в шапке — выпадающий список парков.
- *      Выбор = ?park=<код> в адресе + тот же ключ в localStorage, что у
- *      турбо (boom-turbo-park), и перезагрузка — обе страницы плеера
- *      переходят на новый парк разом.
- *   2. Справа в шапке — плеер: ▶/❚❚, два экрана (активный — с полосой
- *      времени до смены) и режим смены «цикл» / «30 с».
- *      «цикл» — экран стоит ровно один полный круг своей анимации
- *      (у «Твоей карты» — сцена 42,4 с, у кассы — все карточки по очереди).
+ *  1. Плашка «БУМБАСТИК // парк» в шапке — выпадающий список парков.
+ *     Выбор = ?park=<код> в адресе + тот же ключ в localStorage, что у
+ *     турбо (boom-turbo-park). Смена идёт через заставку: она закрывает
+ *     экран, страница перезагружается под ней и открывается, только когда
+ *     полностью готова (шрифты, картинки, второй экран плеера).
+ *  2. Справа в шапке — плеер: ❚❚/▶ и два экрана; под активным — полоса
+ *     времени до смены. Экран стоит ровно один полный круг своей анимации
+ *     (у «Твоей карты» — сцена 42,4 с, у кассы — все карточки по очереди).
+ *     Пауза замораживает экран вместе с полосой; «▶» продолжает с того же
+ *     места. Пауза живёт до перезагрузки: после 05:00 и после смены парка
+ *     плеер снова играет (?play=0 в адресе — стартовать на паузе).
+ *  3. Заставка — фраза «Играй больше — плати меньше» во всю ширину и
+ *     акульи глаза b00m.fun. Уход: фраза гаснет, глаза «выстреливают» —
+ *     вырастают на весь экран и растворяются, под ними проявляется экран.
  *
  *  Как чередуется без перезагрузки:
  *   Страница, открытая на панели, — «хозяин». Второй экран она один раз
- *   грузит в скрытый слой поверх себя (iframe, тот же адрес парка + embed=1)
- *   и дальше только показывает/прячет его. Смена — через заставку с
- *   акульими глазами (та же, что на b00m.fun). Тот, кого не видно, стоит
- *   на паузе; тот, кого показали, начинает свою анимацию с начала.
- *   Встроенная страница своего плеера не ведёт — она показывает состояние
- *   хозяина и передаёт ему нажатия (window.parent.boomScreens).
+ *   грузит в скрытый слой поверх себя (iframe, тот же парк + embed=1) и
+ *   дальше только показывает/прячет его. Тот, кого не видно, стоит на паузе;
+ *   тот, кого показали, начинает анимацию с начала. Встроенная страница
+ *   своего плеера не ведёт — показывает состояние хозяина и передаёт ему
+ *   нажатия (window.parent.boomScreens).
  *
  *  ⚠ Турбо (media/turbo/) этот модуль НЕ подключает — его шапка не менялась.
  *  ⚠ Новый экран в ротацию: строка в SCREENS ниже + initScreens() в его js
@@ -35,87 +40,128 @@ const SCREENS = [
   { id: 'kassa',   name: 'Заряди карту', path: 'media/kassa/' },
 ]
 
-const PARK_KEY = 'boom-turbo-park'         // тот же ключ, что у турбо и обеих страниц
-const STATE_KEY = 'boom-screens'           // { playing, mode } — помнит выбор на панели
-const FIXED_MS = 30000                     // режим «30 с»
-const FADE_MS = 350                        // заставка проявляется / гаснет
-const HOLD_MS = 900                        // сколько стоят глаза между экранами
+const PARK_KEY = 'boom-turbo-park'   // тот же ключ, что у турбо и обеих страниц
+const MIN_DWELL = 8000               // страховка, если страница не знает свой круг
+const IN_MS = 400                    // заставка закрывает экран
+const HOLD_MS = 1300                 // минимум на заставке — фраза успевает прочитаться
+const OUT_MS = 750                   // «выстрел» глаз и проявление экрана
 
 const Q = new URLSearchParams(location.search)
 const EMBED = Q.get('embed') === '1' && window.parent !== window
-
-/* CSS-анимации страницы: пауза и запуск с начала. Заставку плеера не
-   трогаем — её глаза должны пульсировать, пока страница-хозяин на паузе. */
-const own = (a) => !(a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.sc-curtain'))
-export function pauseAnimations() {
-  document.getAnimations().filter(own).forEach((a) => a.pause())
-}
-export function restartAnimations() {
-  document.getAnimations().filter(own).forEach((a) => { a.currentTime = 0; a.play() })
-}
 
 /** true — страница открыта внутри плеера другого экрана (не хозяин). */
 export function isEmbedded() {
   return EMBED
 }
 
-function readState() {
-  let s = {}
-  try { s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}') || {} } catch { /* приватный режим */ }
-  return {
-    playing: Q.get('play') === '0' ? false : s.playing !== false,   // по умолчанию — играет
-    mode: s.mode === '30' ? '30' : 'cycle',
-  }
+/* CSS-анимации страницы: заморозить, продолжить, начать с начала.
+   Заставку не трогаем — её глаза пульсируют, пока страница на паузе. */
+const own = (a) => !(a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.sc-curtain'))
+export function pauseAnimations() {
+  document.getAnimations().filter(own).forEach((a) => a.pause())
 }
-function saveState(st) {
-  try { localStorage.setItem(STATE_KEY, JSON.stringify({ playing: st.playing, mode: st.mode })) } catch {}
+export function resumeAnimations() {
+  document.getAnimations().filter(own).forEach((a) => a.play())
+}
+export function restartAnimations() {
+  document.getAnimations().filter(own).forEach((a) => { a.currentTime = 0; a.play() })
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/* ── Стили — один раз на страницу. Канва 1920 (как вся шапка), px. ───── */
+/** Страница готова: всё загружено, шрифты на месте, два кадра отрисованы. */
+function pageReady() {
+  const loaded = document.readyState === 'complete' ? Promise.resolve() : new Promise((r) => window.addEventListener('load', r, { once: true }))
+  const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()
+  return Promise.all([loaded, fonts])
+    .then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+}
+
+/* ── Стили. Шапка — канва 1920 px (её масштабирует сама страница);
+   заставка — поверх всего окна, в vw/vh. ─────────────────────────────── */
 const CSS = `
 header.head{z-index:50}   /* список парков — поверх блоков страницы */
+body.has-screens .brand{gap:18px}
+body.has-screens .brand-icon{width:60px}
+body.has-screens .brand-badge{font-size:23px;gap:12px;padding:9px 18px;border-radius:14px}
 .brand-badge.sc-pick{cursor:pointer;position:relative;user-select:none}
-.brand-badge.sc-pick .sc-chev{width:14px;height:14px;margin-left:2px;opacity:.7;transition:transform .2s}
+.brand-badge.sc-pick .sc-chev{width:22px;height:22px;margin-left:2px;opacity:.75;transition:transform .2s}
 .brand-badge.sc-pick.open .sc-chev{transform:rotate(180deg)}
-.sc-menu{position:absolute;left:0;top:calc(100% + 8px);min-width:100%;z-index:60;display:none;
-  background:#16143f;border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:6px;
-  box-shadow:0 18px 40px rgba(0,0,0,.55)}
+.sc-menu{position:absolute;left:0;top:calc(100% + 10px);min-width:100%;z-index:60;display:none;
+  background:#16143f;border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:8px;
+  box-shadow:0 22px 50px rgba(0,0,0,.6)}
 .brand-badge.open .sc-menu{display:block}
-.sc-menu button{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;
-  background:transparent;border:none;border-radius:10px;padding:10px 12px;cursor:pointer;
-  color:#fff;font-family:'Unbounded';font-weight:700;font-size:15px;letter-spacing:.3px;text-align:left;white-space:nowrap}
+.sc-menu button{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%;
+  background:transparent;border:none;border-radius:12px;padding:14px 16px;cursor:pointer;
+  color:#fff;font-family:'Unbounded';font-weight:700;font-size:23px;letter-spacing:.3px;text-align:left;white-space:nowrap}
 .sc-menu button:hover{background:rgba(255,255,255,.08)}
 .sc-menu button.on{color:#c6f52e}
-.sc-menu button.on::after{content:'●';font-size:10px}
+.sc-menu button.on::after{content:'';width:12px;height:12px;border-radius:50%;background:#c6f52e}
 
-.slot.sc-player{display:flex;align-items:center;gap:8px;min-width:0;height:auto;outline:none}
+.slot.sc-player{display:flex;align-items:center;gap:10px;min-width:0;height:auto;outline:none}
 .slot.sc-player::after{content:none !important}
-.sc-btn{flex:none;width:44px;height:44px;border-radius:12px;border:none;cursor:pointer;display:grid;place-items:center;
-  background:rgba(255,255,255,.09);color:#fff}
-.sc-btn svg{width:20px;height:20px}
+.sc-btn{flex:none;width:58px;height:58px;border-radius:15px;border:none;cursor:pointer;display:grid;place-items:center;
+  background:rgba(255,255,255,.1);color:#fff}
+.sc-btn svg{width:26px;height:26px}
 .sc-btn.play{background:#c6f52e;color:#0d0a2e}
-.sc-tabs{display:flex;gap:4px;background:rgba(255,255,255,.06);border-radius:14px;padding:4px}
-.sc-tab{position:relative;overflow:hidden;border:none;cursor:pointer;background:transparent;border-radius:10px;
-  padding:9px 14px;color:rgba(240,244,255,.6);font-family:'Inter';font-weight:700;font-size:15px;white-space:nowrap}
+.sc-tabs{display:flex;gap:5px;background:rgba(255,255,255,.07);border-radius:16px;padding:5px}
+.sc-tab{position:relative;overflow:hidden;border:none;cursor:pointer;background:transparent;border-radius:12px;
+  padding:12px 20px;color:rgba(240,244,255,.62);font-family:'Inter';font-weight:800;font-size:21px;white-space:nowrap}
 .sc-tab.on{background:#2d6bff;color:#fff}
-.sc-tab .sc-bar{position:absolute;left:0;bottom:0;height:3px;width:0;background:#c6f52e}
-.sc-mode{flex:none;border:1px solid rgba(255,255,255,.16);background:transparent;cursor:pointer;border-radius:10px;
-  padding:9px 10px;color:rgba(240,244,255,.75);font-family:'Inter';font-weight:700;font-size:13px;white-space:nowrap}
+.sc-tab .sc-bar{position:absolute;left:0;bottom:0;height:4px;width:0;background:#c6f52e}
 
 .sc-frame{position:fixed;inset:0;width:100%;height:100%;border:0;z-index:9000;visibility:hidden;pointer-events:none;background:#0d0a2e}
 .sc-frame.on{visibility:visible;pointer-events:auto}
-.sc-curtain{position:fixed;inset:0;z-index:9500;background:#1c1a3e;display:flex;align-items:center;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity ${FADE_MS}ms ease}
+
+.sc-curtain{position:fixed;inset:0;z-index:9500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5vh;
+  background:#1c1a3e;opacity:0;pointer-events:none;overflow:hidden;transition:opacity ${IN_MS}ms ease}
 .sc-curtain.on{opacity:1;pointer-events:auto}
-.sc-curtain img{width:120px;height:80px;object-fit:contain;animation:sc-pulse .5s ease-in-out infinite alternate}
-@keyframes sc-pulse{0%{transform:scale(.92);opacity:.7}100%{transform:scale(1.08);opacity:1}}
+.sc-curtain img{height:min(34vh,46vw);width:auto;animation:sc-pulse .5s ease-in-out infinite alternate}
+.sc-curtain .sc-say{margin:0 3vw;text-align:center;white-space:nowrap;color:#fff;
+  font-family:'Unbounded',sans-serif;font-weight:700;font-size:4.3vw;line-height:1.15;letter-spacing:.02em}
+.sc-curtain .sc-say b{color:#c6f52e;font-weight:700}
+@media (orientation:portrait){
+  .sc-curtain .sc-say{font-size:8.2vw;white-space:normal}
+  .sc-curtain .sc-say span{display:block}
+}
+@keyframes sc-pulse{0%{transform:scale(.94);opacity:.8}100%{transform:scale(1.06);opacity:1}}
+/* Уход заставки: фраза гаснет, глаза выстреливают на весь экран, фон тает */
+.sc-curtain.out{opacity:0;transition:opacity ${OUT_MS}ms cubic-bezier(.4,0,.2,1)}
+.sc-curtain.out .sc-say{opacity:0;transform:scale(.96);transition:opacity ${Math.round(OUT_MS * 0.25)}ms ease,transform ${Math.round(OUT_MS * 0.25)}ms ease}
+.sc-curtain.out img{animation:sc-shoot ${OUT_MS}ms cubic-bezier(.5,0,.75,0) forwards}
+@keyframes sc-shoot{0%{transform:scale(1);opacity:1}100%{transform:scale(9);opacity:0}}
 `
 
 const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>'
 const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1"/></svg>'
 const ICON_CHEV = '<svg class="sc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+
+/* ── Заставка хозяина — ставится сразу при загрузке модуля, чтобы новая
+   страница не мелькнула недорисованной. Встроенной странице она не нужна. */
+let curtain = null
+if (!EMBED) {
+  const style = document.createElement('style')
+  style.textContent = CSS
+  document.head.appendChild(style)
+  curtain = document.createElement('div')
+  curtain.className = 'sc-curtain on'
+  curtain.style.transition = 'none'        // первый кадр — сразу закрыто
+  curtain.innerHTML = `<img src="${SHARK}" alt=""><div class="sc-say"><span>Играй больше —</span> <b>плати меньше</b></div>`
+  const put = () => { document.body.appendChild(curtain); requestAnimationFrame(() => { curtain.style.transition = '' }) }
+  if (document.body) put()
+  else document.addEventListener('DOMContentLoaded', put, { once: true })
+}
+
+function curtainIn() {
+  curtain.classList.remove('out')
+  curtain.classList.add('on')
+  return wait(IN_MS)
+}
+function curtainOut() {
+  curtain.classList.add('out')
+  return wait(OUT_MS).then(() => curtain.classList.remove('on', 'out'))
+}
 
 /**
  * Подключить выбор парка и плеер к странице.
@@ -125,21 +171,27 @@ const ICON_CHEV = '<svg class="sc-chev" viewBox="0 0 24 24" fill="none" stroke="
  *   parks     — { код: { name } }
  *   parkOrder — порядок парков в списке
  *   cycleMs   — () => длина полного круга анимации страницы, мс
- *   restart   — () => начать анимацию страницы с начала
- *   pause     — () => остановить анимацию (страницу не видно)
+ *   restart   — () => начать анимацию с начала (экран показали)
+ *   pause     — () => заморозить анимацию (пауза или экран скрыт)
+ *   resume    — () => продолжить с того же места
  */
 export function initScreens(o) {
-  const style = document.createElement('style')
-  style.textContent = CSS
-  document.head.appendChild(style)
-
+  if (EMBED) {
+    const style = document.createElement('style')
+    style.textContent = CSS
+    document.head.appendChild(style)
+  }
   const host = EMBED ? safeParent() : null
-  const api = { id: o.id, cycleMs: o.cycleMs, restart: o.restart, pause: o.pause, update: () => {} }
+  const api = { id: o.id, cycleMs: o.cycleMs, restart: o.restart, pause: o.pause, resume: o.resume, update: () => {} }
 
   setupParkMenu(o, (code) => (host ? host.setPark(code) : setPark(code)))
-  api.update = setupPlayer(o.id, (action, arg) => (host ? host.act(action, arg) : hostAct(action, arg)))
+  api.update = setupPlayer((action, arg) => (host ? host.act(action, arg) : hostAct(action, arg)))
 
-  if (host) { host.register(api); return }
+  if (host) {
+    o.pause()                                  // пока не показали — стоим
+    pageReady().then(() => host.register(api)) // хозяин узнаёт, что экран готов
+    return
+  }
   becomeHost(o, api)
 }
 
@@ -167,17 +219,20 @@ function setupParkMenu(o, choose) {
   document.addEventListener('click', (e) => { if (!badge.contains(e.target)) badge.classList.remove('open') })
 }
 
-/** Новый парк — в адрес и в память, перезагрузка хозяина (iframe поедет следом). */
+/** Новый парк: заставка закрывает экран → перезагрузка под ней. Новая
+    страница стартует с закрытой заставкой и откроется, когда будет готова. */
 function setPark(code) {
   try { localStorage.setItem(PARK_KEY, code) } catch {}
   const u = new URL(location.href)
   u.searchParams.set('park', code)
   u.searchParams.delete('embed')
-  location.replace(u.toString())
+  u.searchParams.delete('play')
+  if (H) { clearTimeout(H.timer); H.busy = true }
+  curtainIn().then(() => location.replace(u.toString()))
 }
 
 /* ── Плеер: разметка в слоте шапки ─────────────────────────────────────── */
-function setupPlayer(selfId, act) {
+function setupPlayer(act) {
   const slot = document.getElementById('screens')
   if (!slot) return () => {}
   slot.removeAttribute('aria-hidden')
@@ -185,50 +240,53 @@ function setupPlayer(selfId, act) {
   document.body.classList.add('has-screens')
   slot.innerHTML =
     `<button class="sc-btn" data-act="toggle" title="Пауза / пуск"></button>` +
-    `<div class="sc-tabs">${SCREENS.map((s) => `<button class="sc-tab" data-act="go" data-id="${s.id}">${esc(s.name)}<i class="sc-bar"></i></button>`).join('')}</div>` +
-    `<button class="sc-mode" data-act="mode" title="Когда менять экран"></button>`
+    `<div class="sc-tabs">${SCREENS.map((s) => `<button class="sc-tab" data-act="go" data-id="${s.id}">${esc(s.name)}<i class="sc-bar"></i></button>`).join('')}</div>`
   slot.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]')
     if (b) act(b.dataset.act, b.dataset.id)
   })
   const btn = slot.querySelector('.sc-btn')
-  const mode = slot.querySelector('.sc-mode')
   const tabs = [...slot.querySelectorAll('.sc-tab')]
 
-  /* Состояние приходит от хозяина: { current, playing, mode, progress 0..1 } */
+  /* Состояние приходит от хозяина: { current, playing, progress 0..1 } */
   return (st) => {
     btn.innerHTML = st.playing ? ICON_PAUSE : ICON_PLAY
     btn.classList.toggle('play', !st.playing)
-    mode.textContent = st.mode === '30' ? '30 с' : 'цикл'
     tabs.forEach((t) => {
       const on = t.dataset.id === st.current
       t.classList.toggle('on', on)
-      t.querySelector('.sc-bar').style.width = on && st.playing ? `${Math.round(st.progress * 1000) / 10}%` : '0'
+      t.querySelector('.sc-bar').style.width = on ? `${Math.round(st.progress * 1000) / 10}%` : '0'
     })
   }
 }
 
 /* ── Хозяин ────────────────────────────────────────────────────────────── */
-let H = null   // состояние хозяина (одно на окно)
+let H = null
 
 function becomeHost(o, selfApi) {
-  const st = readState()
   H = {
     selfId: o.id,
     self: selfApi,
-    child: null,            // api встроенной страницы, когда она загрузится
+    child: null,          // api встроенной страницы — когда она готова
+    childReady: null,     // промис «встроенная готова»
     frame: null,
-    curtain: null,
     current: o.id,
-    playing: st.playing,
-    mode: st.mode,
-    startedAt: performance.now(),
+    playing: Q.get('play') !== '0',
     dwell: 0,
+    elapsed: 0,           // сколько текущий экран уже отыграл до последней паузы
+    startedAt: 0,
     timer: 0,
-    busy: false,
+    busy: true,           // пока открывается первый раз
   }
+  let markChild
+  H.childReady = new Promise((r) => { markChild = r })
   window.boomScreens = {
-    register(api) { H.child = api; if (H.current !== api.id) api.pause(); else api.restart(); broadcast() },
+    register(api) {
+      H.child = api
+      if (H.current !== api.id) api.pause()
+      markChild()
+      broadcast()
+    },
     act: hostAct,
     setPark,
   }
@@ -244,14 +302,21 @@ function becomeHost(o, selfApi) {
     H.frame.title = other.name
     H.frame.src = u.toString()
     document.body.appendChild(H.frame)
+  } else {
+    markChild()
   }
-  H.curtain = document.createElement('div')
-  H.curtain.className = 'sc-curtain'
-  H.curtain.innerHTML = `<img src="${SHARK}" alt="">`
-  document.body.appendChild(H.curtain)
 
-  schedule()
-  setInterval(broadcast, 250)
+  /* Первое открытие: ждём, пока готовы обе страницы (вторую — не дольше
+     8 с, чтобы панель не висела на заставке), и открываем экран с начала. */
+  selfApi.pause()
+  Promise.all([pageReady(), Promise.race([H.childReady, wait(8000)]), wait(HOLD_MS)]).then(() => {
+    selfApi.restart()
+    if (!H.playing) selfApi.pause()
+    startDwell()
+    return curtainOut()
+  }).then(() => { H.busy = false })
+
+  setInterval(broadcast, 200)
   broadcast()
 }
 
@@ -259,10 +324,12 @@ function apiOf(id) {
   return id === H.selfId ? H.self : H.child
 }
 
-function schedule() {
+/* Новый отсчёт для текущего экрана: ровно один его круг. */
+function startDwell() {
   clearTimeout(H.timer)
   const a = apiOf(H.current)
-  H.dwell = H.mode === '30' ? FIXED_MS : Math.max(8000, (a && a.cycleMs()) || FIXED_MS)
+  H.dwell = Math.max(MIN_DWELL, (a && a.cycleMs()) || MIN_DWELL)
+  H.elapsed = 0
   H.startedAt = performance.now()
   if (H.playing) H.timer = setTimeout(() => switchTo(nextId()), H.dwell)
 }
@@ -272,51 +339,58 @@ function nextId() {
   return SCREENS[(i + 1) % SCREENS.length].id
 }
 
-function switchTo(id) {
+async function switchTo(id) {
   if (H.busy || id === H.current) return
+  H.busy = true
+  clearTimeout(H.timer)
+  await curtainIn()
+  /* Встроенная ещё грузится — держим заставку, пока не будет готова */
+  if (!apiOf(id)) await Promise.race([H.childReady, wait(15000)])
   const target = apiOf(id)
-  if (!target) {                       // встроенная ещё грузится — попробуем позже
-    H.timer = setTimeout(() => switchTo(id), 5000)
+  if (!target) {                       // так и не загрузилась — остаёмся где были
+    await curtainOut()
+    H.busy = false
+    startDwell()
     return
   }
-  H.busy = true
-  H.curtain.classList.add('on')
-  setTimeout(() => {
-    const prev = apiOf(H.current)
-    H.frame && H.frame.classList.toggle('on', id !== H.selfId)
-    H.current = id
-    target.restart()
-    if (prev) prev.pause()
-    broadcast()
-    setTimeout(() => {
-      H.curtain.classList.remove('on')
-      H.busy = false
-      schedule()
-    }, HOLD_MS)
-  }, FADE_MS)
+  const prev = apiOf(H.current)
+  if (prev) prev.pause()
+  H.frame && H.frame.classList.toggle('on', id !== H.selfId)
+  H.current = id
+  H.playing = true                     // переход всегда играет
+  await wait(HOLD_MS - 300)
+  target.restart()
+  startDwell()
+  broadcast()
+  await curtainOut()
+  H.busy = false
 }
 
 function hostAct(action, arg) {
   if (!H) return
   if (action === 'toggle') {
-    H.playing = !H.playing
-    saveState(H)
-    if (H.playing) schedule()
-    else clearTimeout(H.timer)
-  } else if (action === 'mode') {
-    H.mode = H.mode === '30' ? 'cycle' : '30'
-    saveState(H)
-    schedule()
+    const a = apiOf(H.current)
+    if (H.playing) {                   // пауза: замираем вместе с полосой
+      H.playing = false
+      clearTimeout(H.timer)
+      H.elapsed += performance.now() - H.startedAt
+      if (a) a.pause()
+    } else {                           // пуск: с того же места
+      H.playing = true
+      H.startedAt = performance.now()
+      if (a) a.resume()
+      if (!H.busy) H.timer = setTimeout(() => switchTo(nextId()), Math.max(0, H.dwell - H.elapsed))
+    }
   } else if (action === 'go') {
-    if (arg && arg !== H.current) { clearTimeout(H.timer); switchTo(arg) }
+    if (arg && arg !== H.current) switchTo(arg)
   }
   broadcast()
 }
 
 function broadcast() {
   if (!H) return
-  const progress = H.playing ? Math.min(1, (performance.now() - H.startedAt) / (H.dwell || 1)) : 0
-  const st = { current: H.current, playing: H.playing, mode: H.mode, progress }
+  const run = H.elapsed + (H.playing && H.startedAt ? performance.now() - H.startedAt : 0)
+  const st = { current: H.current, playing: H.playing, progress: H.dwell ? Math.min(1, run / H.dwell) : 0 }
   H.self.update(st)
   if (H.child) { try { H.child.update(st) } catch { H.child = null } }
 }

@@ -19,7 +19,7 @@
  */
 import DATA from './kassa.data.json'
 import { KASSA_QR } from './kassa-qr.js'
-import { initScreens, isEmbedded, pauseAnimations, restartAnimations } from '../shared/screens.js'
+import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnimations } from '../shared/screens.js'
 
 /* ── 0. Конфиг ───────────────────────────────────────────────────────────── */
 
@@ -488,6 +488,39 @@ function halfAt(card) {
     : FILL_MS + POUR_MS + BONUS_MS * easeTimeFor((0.5 - s) / (1 - s))
 }
 
+/* Часы карточек с паузой. Плеер экранов (media/shared/screens.js) ставит
+   экран на паузу и продолжает С ТОГО ЖЕ МЕСТА — поэтому все ходы карточек
+   идут через later(), а не голый setTimeout: на паузе таймеры снимаются и
+   запоминают остаток, на продолжении — доигрывают его. clockNow() на паузе
+   стоит, поэтому и счёт «на карте» замирает на своём числе. */
+let pausedAt = 0
+let pausedTotal = 0
+let seq = 0
+const pending = new Map()
+const clockNow = () => (pausedAt || performance.now()) - pausedTotal
+function later(fn, ms) {
+  const id = ++seq
+  const t = { due: clockNow() + ms, h: 0, run: () => { pending.delete(id); fn() } }
+  if (!pausedAt) t.h = setTimeout(t.run, ms)
+  pending.set(id, t)
+  return id
+}
+function cancel(id) {
+  const t = pending.get(id)
+  if (t) { clearTimeout(t.h); pending.delete(id) }
+}
+function clockPause() {
+  if (pausedAt) return
+  pausedAt = performance.now()
+  pending.forEach((t) => clearTimeout(t.h))
+}
+function clockResume() {
+  if (!pausedAt) return
+  pausedTotal += performance.now() - pausedAt
+  pausedAt = 0
+  pending.forEach((t) => { t.h = setTimeout(t.run, Math.max(0, t.due - clockNow())) })
+}
+
 let timers = []
 function countUp(card) {
   const from = Number(card.dataset.sum)
@@ -495,24 +528,24 @@ function countUp(card) {
   setNum(card, from)                    // пока наливается «пополнение» — внизу та же сумма, в тени
   card.classList.remove('done', 'p2', 'p3', 'half')
   card.classList.add('on', 'p1')
-  timers.push(setTimeout(() => {
+  timers.push(later(() => {
     card.classList.replace('p1', 'p2')  // наклон: деньги перетекают вниз
   }, FILL_MS))
   /* Налито наполовину — плашка «наливается» тем значением, что на ней
      стоит, и прокручивает все остальные по кругу */
   const half = halfAt(card)
-  timers.push(setTimeout(() => card.classList.add('half'), half))
+  timers.push(later(() => card.classList.add('half'), half))
   const fs = [...card.querySelectorAll('.face')]
   const start = Math.max(0, fs.findIndex((f) => f.classList.contains('on')))
   for (let k = 1; k < fs.length; k++) {
-    timers.push(setTimeout(() => showFace(card, (start + k) % fs.length), half + k * FACE_STEP_MS))
+    timers.push(later(() => showFace(card, (start + k) % fs.length), half + k * FACE_STEP_MS))
   }
-  timers.push(setTimeout(() => {
+  timers.push(later(() => {
     card.classList.replace('p2', 'p3')  // доливается бонус, число растёт
-    const t0 = performance.now() + 100
-    const step = (now) => {
+    const t0 = clockNow() + 100
+    const step = () => {
       if (!card.classList.contains('on')) { setNum(card, to); return }
-      const k = Math.min(1, Math.max(0, (now - t0) / COUNT_MS))
+      const k = Math.min(1, Math.max(0, (clockNow() - t0) / COUNT_MS))
       const e = 1 - Math.pow(1 - k, 3)
       setNum(card, Math.round((from + (to - from) * e) / 5) * 5)
       if (k < 1) requestAnimationFrame(step)
@@ -529,7 +562,7 @@ let cycleTimer = 0   // следующий ход — его снимает па
 function cycleCards() {
   const cards = [...document.querySelectorAll('#cards .card')]
   if (!cards.length) return
-  timers.forEach(clearTimeout)
+  timers.forEach(cancel)
   timers = []
   /* Гаснущая карточка: заливка плашки стекает (снят half), значение на
      плашке остаётся — без карточки плашка не меняется (владелец 01.10) */
@@ -540,7 +573,7 @@ function cycleCards() {
   })
   active = (active + 1) % cards.length
   countUp(cards[active])
-  cycleTimer = setTimeout(cycleCards, cardMs(cards[active]))
+  cycleTimer = later(cycleCards, cardMs(cards[active]))
 }
 
 /* Показать грань k залитой плашки — «барабан»: старое значение уезжает
@@ -557,7 +590,7 @@ function showFace(card, k) {
     f.classList.toggle('roll-in', i === k)
     f.classList.toggle('roll-out', i === cur)
   })
-  timers.push(setTimeout(() => fs.forEach((f) => f.classList.remove('roll-in', 'roll-out')), ROLL_MS))
+  timers.push(later(() => fs.forEach((f) => f.classList.remove('roll-in', 'roll-out')), ROLL_MS))
 }
 
 /* Длина хода карточки: пока плашка не покажет все грани и пока «на карте»
@@ -577,16 +610,16 @@ window.addEventListener('resize', fitStage)
 if (REDUCED) {
   document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('done'))
 } else if (PARKS[park]) {
-  cycleTimer = setTimeout(cycleCards, 700)
+  cycleTimer = later(cycleCards, 700)
 }
 
 /* ── Плеер экранов (loyalty ⇄ kassa) и выбор парка — media/shared/screens.js.
    Полный круг экрана = все карточки по очереди (cardMs каждой) + стартовая
-   пауза 700 мс. На паузе (экран скрыт) — снимаем ходы и CSS-анимации; при
-   показе — круг с первой карточки. */
+   пауза 700 мс. Пауза — часы и CSS-анимации замирают, продолжение — с того
+   же места; показ экрана — круг с первой карточки. */
 function stopCards() {
-  clearTimeout(cycleTimer)
-  timers.forEach(clearTimeout)
+  cancel(cycleTimer)
+  timers.forEach(cancel)
   timers = []
 }
 if (PARKS[park]) {
@@ -598,13 +631,18 @@ if (PARKS[park]) {
     cycleMs: () => 700 + [...document.querySelectorAll('#cards .card')].reduce((t, c) => t + cardMs(c), 0),
     restart: () => {
       stopCards()
+      clockResume()
       active = -1
       restartAnimations()
-      if (!REDUCED) cycleTimer = setTimeout(cycleCards, 700)
+      if (!REDUCED) cycleTimer = later(cycleCards, 700)
     },
     pause: () => {
-      stopCards()
+      clockPause()
       pauseAnimations()
+    },
+    resume: () => {
+      clockResume()
+      resumeAnimations()
     },
   })
 }
