@@ -19,7 +19,7 @@ import { LOYALTY_QR } from './loyalty-qr.js'
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v6.2'
+const PAGE_VERSION = 'v6.3'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -104,7 +104,6 @@ function renderLevels() {
   const box = document.getElementById('ladder')
   const base = LEVELS[0].games
   const plural = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'игра' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'игры' : 'игр')
-  const crack = '<i class="crack"><svg viewBox="0 0 100 30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M50 30 L46 18 L53 12 L48 2"/><path d="M46 18 L34 14 L28 4"/><path d="M53 12 L66 9 L72 1"/><path d="M34 14 L20 16"/><path d="M66 9 L80 13"/></svg></i>'
   box.innerHTML = LEVELS.map((l, i) => {
     const plus = l.games - base
     const body = !showNumbers
@@ -114,7 +113,7 @@ function renderLevels() {
          ${plus > 0 ? `<span class="plus">+${plus} ${plural(plus)}<sup>*</sup></span>` : ''}`
     return `
       <div class="step" data-id="${l.id}" style="--c:${l.color}">
-        ${i === LEVELS.length - 1 ? crack : ''}
+        ${i === LEVELS.length - 1 ? '<i class="charge"></i><i class="burst"></i>' : ''}
         <svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LEVEL_ICONS[l.icon] || ''}</svg>
         <div class="s-name"><span class="fs-name">${esc(l.name)}</span></div>
         ${body}

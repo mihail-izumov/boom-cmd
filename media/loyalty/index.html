@@ -414,7 +414,7 @@
   .lvl-kicker{flex:none;font-family:'Unbounded';font-weight:900;font-size:30px;letter-spacing:1px;white-space:nowrap}
   .lvl-rule{flex:none;white-space:nowrap;background:var(--dark);color:var(--lime);font-family:'Unbounded';font-weight:700;font-size:17px;letter-spacing:.3px;border-radius:999px;padding:8px 16px}
   .ladder{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
-  /* Ступени: волна идёт снизу вверх, по 3 с на ступень (цикл 12 с).
+  /* Ступени: волна идёт снизу вверх, по 3 с на ступень (цикл 14 с, у Платины 5 с).
      В свою очередь ступень приподнимается, иконка сильно вырастает,
      следом — скидка и бейдж «+игры». Платина, поднимаясь, упирается в
      плашку «ИГРОВОЙ СТАТУС», трясётся и даёт трещину — вот-вот пробьёт. */
@@ -423,50 +423,83 @@
     background:linear-gradient(180deg, color-mix(in srgb, var(--c) 20%, transparent) 0%, rgba(255,255,255,.03) 100%);
     border:2px solid var(--c);
     display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:8px;min-height:max-content;
-    animation:lit 12s ease-in-out infinite;
+    animation:lit 14s ease-in-out infinite;
   }
   .step:nth-child(1){height:72%}
   .step:nth-child(2){height:82%}
   .step:nth-child(3){height:91%}
-  .step:nth-child(4){height:100%;animation-name:lit-top;z-index:3}
+  .step:nth-child(4){height:100%;z-index:3;animation-name:lit-boom}
   .step:nth-child(2){--d:3s}.step:nth-child(3){--d:6s}.step:nth-child(4){--d:9s}
   @keyframes lit{
     0%,2%{transform:none;box-shadow:none}
     6%,20%{transform:translateY(-10px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 55%, transparent)}
     26%,100%{transform:none;box-shadow:none}
   }
-  @keyframes lit-top{
-    0%,2%{transform:none;box-shadow:none}
-    6%{transform:translateY(-22px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 60%, transparent)}
-    7%{transform:translateY(-16px) rotate(-1deg)}8%{transform:translateY(-22px) rotate(1deg)}
-    9%{transform:translateY(-17px) rotate(-1.2deg)}10%{transform:translateY(-22px) rotate(.8deg)}
-    11%{transform:translateY(-16px) rotate(-.6deg)}12%{transform:translateY(-22px) rotate(1deg)}
-    13%{transform:translateY(-17px) rotate(-1deg)}14%{transform:translateY(-22px) rotate(.5deg)}
-    16%,20%{transform:translateY(-20px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 60%, transparent)}
-    26%,100%{transform:none;box-shadow:none}
+  /* Платина — «батарейка»: сначала обычная ячейка, затем снизу вверх
+     заливается зарядом её цвета, важное (иконка, −50%, +21) проступает
+     тёмным по заливке, и на пике ячейка «взрывается»: вспышка + кольцо.
+     В момент взрыва рамка блока и верхняя полоса на миг становятся цвета
+     Платины и возвращаются в лайм. Окна в % от 14 с, отсчёт от старта
+     Платины (задержка 9 с): заливка 4–19 %, полная 19–25 %, взрыв 25–27 %. */
+  .step > :not(.charge):not(.burst){position:relative;z-index:1}
+  .step .charge{position:absolute;inset:0;border-radius:16px;z-index:0;pointer-events:none;
+    background:repeating-linear-gradient(-45deg,rgba(255,255,255,.16) 0 12px,transparent 12px 24px),linear-gradient(0deg,var(--c),color-mix(in srgb,var(--c) 70%,#fff));
+    clip-path:inset(100% 0 0 0);animation:charge 14s linear infinite}
+  @keyframes charge{
+    0%,4%{clip-path:inset(100% 0 0 0);opacity:1;filter:none}
+    19%{clip-path:inset(0 0 0 0);opacity:1;filter:none}
+    21%{filter:brightness(1.25)}23%{filter:none}24.5%{filter:brightness(1.35)}
+    25%{clip-path:inset(0 0 0 0);opacity:1;filter:brightness(2.2)}
+    27%,100%{clip-path:inset(0 0 0 0);opacity:0;filter:brightness(2.2)}
   }
-  /* Плашка-«потолок» вздрагивает в такт ударам Платины */
-  .lvl-head{position:relative;z-index:2;animation:ceil-hit 12s linear 9s infinite}
-  @keyframes ceil-hit{0%,5.5%{transform:none}6.5%{transform:translateY(-3px)}8%{transform:translateY(-1px) rotate(.3deg)}9.5%{transform:translateY(-3px) rotate(-.3deg)}11%{transform:translateY(-1px)}12.5%{transform:translateY(-3px) rotate(.2deg)}15%,100%{transform:none}}
-  .step .crack{position:absolute;left:12%;right:12%;top:-34px;height:34px;opacity:0;pointer-events:none;color:#fff;filter:drop-shadow(0 0 6px var(--c));animation:crack 12s steps(1) infinite}
-  .step .crack svg{width:100%;height:100%;display:block}
-  @keyframes crack{0%,6.5%{opacity:0}7%,19%{opacity:1}20%,100%{opacity:0}}
+  .step .burst{position:absolute;left:50%;top:50%;width:120%;aspect-ratio:1;margin:-60% 0 0 -60%;border-radius:50%;z-index:2;pointer-events:none;opacity:0;
+    border:8px solid #fff;box-shadow:0 0 30px 8px var(--c),inset 0 0 30px 8px var(--c);animation:burst 14s ease-out infinite}
+  @keyframes burst{0%,25%{opacity:0;transform:scale(.3)}25.2%{opacity:1;transform:scale(.5)}28.5%,100%{opacity:0;transform:scale(2.6)}}
+  @keyframes lit-boom{
+    0%,2%{transform:none;box-shadow:none}
+    6%,19%{transform:translateY(-10px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 55%, transparent)}
+    21%{transform:translateY(-10px) rotate(-.8deg)}22%{transform:translateY(-10px) rotate(.8deg)}23%{transform:translateY(-10px) rotate(-1deg)}24%{transform:translateY(-10px) rotate(1deg)}
+    25%{transform:translateY(-12px) scale(1.07);box-shadow:0 0 0 4px #fff, 0 0 80px 20px var(--c)}
+    28%{transform:translateY(-10px) scale(.98);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 55%, transparent)}
+    32%,100%{transform:none;box-shadow:none}
+  }
+  /* рамка блока и верхняя полоса в момент взрыва */
+  .lvl{animation:lvl-boom 14s linear 9s infinite}
+  .lvl-head{animation:head-boom 14s linear 9s infinite}
+  .lvl-rule{animation:rule-boom 14s linear 9s infinite}
+  @keyframes lvl-boom{0%,24.8%{box-shadow:inset 0 0 0 4px var(--lime)}25.2%,31%{box-shadow:inset 0 0 0 4px #ff0080,0 0 50px rgba(255,0,128,.55)}34%,100%{box-shadow:inset 0 0 0 4px var(--lime)}}
+  @keyframes head-boom{0%,24.8%{background:var(--lime);color:var(--dark)}25.2%,31%{background:#ff0080;color:#fff}34%,100%{background:var(--lime);color:var(--dark)}}
+  @keyframes rule-boom{0%,24.8%{color:var(--lime)}25.2%,31%{color:#ff0080}34%,100%{color:var(--lime)}}
 
-  .step .s-ico{width:52px;height:52px;color:var(--c);transform-origin:left bottom;animation:pop-ico 12s ease-in-out infinite}
+  .step .s-ico{width:52px;height:52px;color:var(--c);transform-origin:left bottom;animation:pop-ico 14s ease-in-out infinite}
   @keyframes pop-ico{0%,3%{transform:none}8%,18%{transform:scale(1.7)}24%,100%{transform:none}}
   .step .fs-name{font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.1;color:var(--c)}
   .step[data-id="standard"] .fs-name{color:#d0d0de}
   .step .s-disc{width:100%}
-  .step .fs-disc{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1;transform-origin:left center;animation:pop-disc 12s ease-in-out infinite}
+  .step .fs-disc{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1;transform-origin:left center;animation:pop-disc 14s ease-in-out infinite}
   @keyframes pop-disc{0%,6%{transform:none}10%,19%{transform:scale(1.08)}24%,100%{transform:none}}
   .step .s-thr{font-size:19px;font-weight:800;color:var(--soft);white-space:nowrap}
-  .step .plus{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:22px;background:var(--c);color:var(--dark);border-radius:10px;padding:5px 12px;white-space:nowrap;transform-origin:left center;animation:pop-plus 12s ease-in-out infinite}
+  .step .plus{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:22px;background:var(--c);color:var(--dark);border-radius:10px;padding:5px 12px;white-space:nowrap;transform-origin:left center;animation:pop-plus 14s ease-in-out infinite}
   .step .plus sup{font-size:.6em;vertical-align:.6em;margin-left:1px}
   @keyframes pop-plus{0%,9%{transform:none}13%,19%{transform:scale(1.25) rotate(-3deg)}24%,100%{transform:none}}
   /* Сноска к «+игры» — вне ячеек, полупрозрачно */
   /* задержка волны — после всех shorthand-ов animation, иначе они её сбрасывают */
-  .step,.step .s-ico,.step .fs-disc,.step .plus,.step .crack{animation-delay:var(--d,0s)}
-  .lvl-note{font-size:16px;font-weight:700;color:var(--soft);opacity:.55;text-align:right;margin-top:-6px}
+  /* надписи Платины на время заряда — тёмные по заливке */
+  /* задержка 9 с прописана прямо в shorthand — он сбрасывает animation-delay */
+  .step .charge ~ .s-name .fs-name{animation:ink-c 14s linear 9s infinite}
+  .step .charge ~ .s-thr{animation:ink-s 14s linear 9s infinite}
+  .step .charge ~ .s-ico{animation:pop-ico 14s ease-in-out 9s infinite,ink-c 14s linear 9s infinite}
+  .step .charge ~ .s-disc .fs-disc{animation:pop-disc 14s ease-in-out 9s infinite,ink-w 14s linear 9s infinite}
+  .step .charge ~ .plus{animation:pop-plus 14s ease-in-out 9s infinite,ink-p 14s linear 9s infinite}
+  @keyframes ink-c{0%,14%{color:var(--c)}17%,25%{color:var(--dark)}27%,100%{color:var(--c)}}
+  @keyframes ink-s{0%,14%{color:var(--soft)}17%,25%{color:var(--dark)}27%,100%{color:var(--soft)}}
+  @keyframes ink-w{0%,14%{color:#fff}17%,25%{color:var(--dark)}27%,100%{color:#fff}}
+  @keyframes ink-p{0%,14%{background:var(--c);color:var(--dark)}17%,25%{background:var(--dark);color:#fff}27%,100%{background:var(--c);color:var(--dark)}}
+  .step,.step .s-ico,.step .fs-name,.step .s-thr,.step .fs-disc,.step .plus,.step .charge,.step .burst{animation-delay:var(--d,0s)}
+  /* Сноска — в пустом углу над «Новой картой» и «Серебром», в 2 строки */
+  .ladder-box{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+  .ladder-box .ladder{flex:1}
+  .lvl-note{position:absolute;left:4px;top:6px;max-width:48%;font-size:16px;font-weight:700;line-height:1.3;color:var(--soft);opacity:.55;text-align:left}
 
   /* ══ 3. QR — выбор: «есть карта → кабинет» или «новый → +500 на старт».
      Нарратив второго пути — с наклейки «Бонус на старт» (bonus500):
@@ -474,7 +507,7 @@
      скрыт (loyalty.js), первый занимает всё место. ══════════════════════ */
   .qr-tile{
     grid-area:qr;background:var(--white);color:var(--dark);flex-direction:row;align-items:center;gap:24px;padding:18px 26px 18px 18px;
-    box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
+    box-shadow:0 0 0 4px var(--blue), 0 22px 60px rgba(45,107,255,.3);
   }
   .qr-frame{position:relative;flex:none;width:var(--qr,380px);height:var(--qr,380px);padding:16px}
   .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
@@ -512,19 +545,28 @@
   .path .ic{flex:none;width:56px;height:56px;border-radius:14px;display:grid;place-items:center;background:#1d4fd0;color:#fff}
   .path .ic svg{width:32px;height:32px}
   /* +500 — билет с вырезами, как на наклейке */
-  .path.new{background:var(--dark);color:#fff;padding:14px 16px 14px 14px}
+  .path.new{background:var(--dark);color:#fff;padding:14px 18px 14px 22px}
   .ticket{
-    flex:none;position:relative;background:var(--lime);color:var(--dark);border-radius:12px;padding:8px 18px 6px;
+    flex:none;position:relative;z-index:2;background:var(--blue);color:#fff;border-radius:12px;padding:8px 18px 6px;transform-origin:85% 50%;
     transform:rotate(-4deg);text-align:center;animation:tk-rock 4s ease-in-out infinite;
     -webkit-mask:radial-gradient(circle 9px at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 9px at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat;
             mask:radial-gradient(circle 9px at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 9px at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat;
   }
-  @keyframes tk-rock{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(-1deg) scale(1.05)}}
+  /* Билет справа раз в 4 с агрессивно «выпрыгивает»: вылезает за чёрную
+     плашку и наезжает на текст слева от себя. */
+  @keyframes tk-rock{
+    0%,40%{transform:rotate(-4deg)}
+    48%{transform:translate(-6%,-4%) rotate(-10deg) scale(1.55)}
+    53%{transform:translate(-4%,-3%) rotate(-6deg) scale(1.42)}
+    58%,72%{transform:translate(-5%,-4%) rotate(-8deg) scale(1.5)}
+    82%,100%{transform:rotate(-4deg)}
+  }
   .ticket b{display:block;font-family:'Unbounded';font-weight:900;font-size:44px;line-height:1}
   .ticket small{display:block;font-family:'Unbounded';font-weight:900;font-size:15px;letter-spacing:.5px}
-  .path.new .q{color:#b3ade0}
+  .path.new .q{color:#8fb0ff}
   .path.new .a{color:#fff;font-size:24px}
-  .path.new .a i{font-style:normal;color:var(--lime)}
+  .path.new .a i{font-style:normal;color:#5b8cff}
+  .path.new .nt{flex:1;min-width:0}
   .path[hidden]{display:none}
   body.no-bonus .path.have{padding:22px 20px}
   body.no-bonus .path.have .a{font-size:32px}
@@ -595,7 +637,7 @@
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
     .card,.card::after,.card .sparks,.card .sp,.card .el,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.who,.soon,.ph-fill,.ph-fill::after,
-    .step,.step *,.lvl-head,.qr-frame .aimbox,.qr-frame .flash,.ticket,.stamp .rl.spin svg{animation:none}
+    .step,.step *,.lvl,.lvl-head,.lvl-rule,.qr-frame .aimbox,.qr-frame .flash,.ticket,.stamp .rl.spin svg{animation:none}
     .card .el{opacity:1;transform:none}
     .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
     .cap.c7{opacity:1}
@@ -706,8 +748,10 @@
       <span class="lvl-kicker">ИГРОВОЙ СТАТУС</span>
       <span class="lvl-rule">Всегда растёт на твоей карте</span>
     </div>
-    <div class="ladder" id="ladder"></div>
-    <div class="lvl-note">* дополнительные игры при каждом пополнении на 1 500 ₽</div>
+    <div class="ladder-box">
+      <div class="ladder" id="ladder"></div>
+      <div class="lvl-note">* дополнительные игры<br>при каждом пополнении на 1 500 ₽</div>
+    </div>
   </section>
 
   <!-- 3. QR — выбор пути. Путь кода подставляет loyalty.js по парку -->
@@ -724,8 +768,8 @@
         <div><div class="q">Личный кабинет</div><div class="a">Есть карта?</div></div>
       </div>
       <div class="path new" id="path-new">
+        <div class="nt"><div class="q">Бонус на старт</div><div class="a">Регайся и <i>забирай</i></div></div>
         <span class="ticket"><b>+500</b><small>ЗАРЯДОВ</small></span>
-        <div><div class="a">Регайся и <i>забирай</i> — бонус на старт</div></div>
       </div>
     </div>
   </section>
@@ -734,7 +778,7 @@
   <div class="fineband">
     <div class="hint" id="hint"></div>
     <div class="svc">
-      <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
+      <a class="powered" href="https://ultra.runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
       <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
         <i class="dot"></i>
         <span class="when" id="stamp-when">—</span>
