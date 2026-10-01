@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.6'
+const PAGE_VERSION = 'v1.7'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -125,7 +125,7 @@ function renderOffer() {
  *
  * Внутри — два СОСУДА, как в играх «перелей воду»: сверху «пополнение
  * 1 500 ₽», снизу «на карте 2 025 ⚡». Верхний наливается и переливается
- * по ровному каналу из угла в угол в нижний; деньги гостя встают в нижнем, сверху
+ * через горлышко посередине, как в песочных часах, в нижний; деньги гостя встают в нижнем, сверху
  * доливается бонус (жидкость плавно светлеет кверху), и число «на карте»
  * досчитывается от суммы до итога (cycleCards ниже). Пополнение — в рублях, на карте —
  * заряды, поэтому после числа молния.
@@ -136,11 +136,12 @@ function renderOffer() {
  * итоге (1 500 из 2 025 → 74 %). Волн, бликов и линий раздела нет — ни одна
  * линия не ложится на текст (решение владельца 01.10).
  *
- * Под сосудами — плашка во всю ширину карточки, грани одного бонуса
- * сменяют друг друга: «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за
- * наличные» (тикеты — только там, где сумма карточки есть в cash_tickets).
- * Плашка тоже «наливается»: копия текста в заливке (.fliq), заливка встаёт
- * снизу, когда «на карте» налито хотя бы наполовину (класс half ниже).
+ * Под сосудами — плашка во всю ширину карточки, грани одного бонуса:
+ * «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за наличные» (тикеты —
+ * только там, где сумма карточки есть в cash_tickets). Плашка тоже
+ * «наливается»: копия текста в заливке (.fliq), заливка встаёт снизу, когда
+ * «на карте» налито хотя бы наполовину (класс half ниже), — и только в этот
+ * момент грань меняется на следующую (nextFace).
  *
  * На карте = сумма + подарок, считается здесь, а не пишется в данные: так
  * числа на карточке не могут разойтись.
@@ -168,7 +169,7 @@ function renderCards(p) {
         <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
         <div class="slider">
           <div class="seg seg-a">${inA}<div class="liq" aria-hidden="true">${inA}</div></div>
-          <i class="stream" aria-hidden="true"></i>
+          <i class="neck" aria-hidden="true"></i>
           <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div></div>
         </div>
         <div class="faces">${faces.map((f, i) => {
@@ -340,15 +341,14 @@ function cardRoom() {
   return Math.max(0, Math.floor(seg.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - label - gap))
 }
 
-/* Канал между сосудами: по размерам окон считаем, откуда он идёт и куда.
-   Горизонталь: верхний сосуд над нижним — канал выходит из нижнего правого
-   угла верхнего, входит в верхний правый угол нижнего и спускается вдоль
-   стенки. Вертикаль: сосуды рядом — канал идёт по дну, из нижнего правого
-   угла левого в нижний левый угол правого. Концы канала заходят на SEAM px
-   под жидкость сосудов — шва не видно. Канал (10px) стоит в 4px от стенки,
-   а поля окна — 20px: на буквы он не ложится. */
+/* Горлышко между сосудами — посередине, как в песочных часах. Горизонталь:
+   верхний над нижним — перемычка от дна верхнего к крышке нижнего.
+   Вертикаль: сосуды рядом — перемычка между стенками, у дна, выше
+   скругления углов. Концы заходят на SEAM px в сосуды: в верхнем — под
+   жидкость (шва нет), в нижнем — в поле окна (20px), где букв нет. */
 const SEAM = 6
-function layoutStreams() {
+const NECK = 26
+function layoutNecks() {
   const portrait = document.body.classList.contains('portrait')
   document.querySelectorAll('#cards .card').forEach((c) => {
     const a = c.querySelector('.seg-a')
@@ -358,18 +358,18 @@ function layoutStreams() {
     if (portrait) {
       x = a.offsetLeft + a.offsetWidth - SEAM
       w = b.offsetLeft + SEAM - x
-      h = 10
-      y = a.offsetTop + a.offsetHeight - 4 - h
+      h = NECK
+      y = a.offsetTop + a.offsetHeight - 34 - h
     } else {
-      w = 10
-      x = b.offsetLeft + b.offsetWidth - 4 - w
+      w = NECK
+      x = a.offsetLeft + Math.round((a.offsetWidth - w) / 2)
       y = a.offsetTop + a.offsetHeight - SEAM
-      h = b.offsetTop + b.offsetHeight - 14 - y
+      h = b.offsetTop + SEAM - y
     }
-    c.style.setProperty('--sx', `${x}px`)
-    c.style.setProperty('--sy', `${y}px`)
-    c.style.setProperty('--sw', `${Math.max(0, w)}px`)
-    c.style.setProperty('--sh', `${Math.max(0, h)}px`)
+    c.style.setProperty('--nx', `${x}px`)
+    c.style.setProperty('--ny', `${y}px`)
+    c.style.setProperty('--nw', `${Math.max(0, w)}px`)
+    c.style.setProperty('--nh', `${Math.max(0, h)}px`)
   })
 }
 
@@ -435,7 +435,7 @@ function fitStage() {
   }
   fitUniform('.fs-info', 28, 16)
   fitQr()
-  layoutStreams()
+  layoutNecks()
 }
 
 /* ── 6. Движение: «перелей воду» — 1 500 превращаются в 2 025 ─────────────
@@ -443,21 +443,20 @@ function fitStage() {
    три фазы — классы на карточке:
      p1 — верхний сосуд «пополнение» наливается; нижний в тени, в нём пока
           та же сумма;
-     p2 — верхний переливается по каналу в нижний: уровень сверху падает,
-          снизу растёт слой денег гостя до --split;
+     p2 — верхний переливается через горлышко в нижний: уровень сверху
+          падает, снизу растёт слой денег гостя до --split;
      p3 — сверху доливается бонус, число досчитывается до итога, в тень
           уходит пустой верхний сосуд; досчитало — done (вспышка числа).
    У остальных карточек сосуды спокойные: нижний ровно чуть подкрашен, итог
    на месте — все три числа читаются в любой момент.
-   half — «на карте» налито хотя бы наполовину: плашка бонуса заливается
-          целиком (решение владельца 01.10). Момент считается по той же
-          кривой, что у перехода жидкости в index.html (halfAt).
-   Плашка под сосудами раз в FACE_MS меняет грань: бонус → игры → тикеты,
-   у всех карточек одновременно — так грани легко сравнивать.
+   half — «на карте» налито хотя бы наполовину: плашка бонуса «наливается»
+          и меняет грань на следующую — бонус → игры → тикеты → бонус…
+          Больше она не меняется НИКОГДА: у спокойных карточек плашка стоит
+          (решения владельца 01.10). Момент считается по той же кривой, что
+          у перехода жидкости в index.html (halfAt).
    Без движения (prefers-reduced-motion) — спокойные сосуды, итог и первая
    грань стоят. */
 const CARD_MS = 5200
-const FACE_MS = 3000
 const FILL_MS = 1000    // верхний наливается и стоит полный, потом переливается
 const POUR_MS = 900     // переливание в нижний (как transition у .liq в index.html)
 const BONUS_MS = 1000   // долив бонуса (transition-duration у .card.p3 .seg-b .liq)
@@ -498,7 +497,7 @@ function countUp(card) {
   timers.push(setTimeout(() => {
     card.classList.replace('p1', 'p2')  // канал: деньги перетекают вниз
   }, FILL_MS))
-  timers.push(setTimeout(() => card.classList.add('half'), halfAt(card)))
+  timers.push(setTimeout(() => { card.classList.add('half'); nextFace(card) }, halfAt(card)))
   timers.push(setTimeout(() => {
     card.classList.replace('p2', 'p3')  // доливается бонус, число растёт
     const t0 = performance.now() + 100
@@ -522,26 +521,30 @@ function cycleCards() {
   timers = []
   cards.forEach((c) => {
     c.classList.remove('on', 'p1', 'p2', 'p3', 'half', 'done')
+    c.querySelectorAll('.face').forEach((f) => f.classList.remove('in', 'out'))
     setNum(c, Number(c.dataset.total))
   })
   active = (active + 1) % cards.length
   countUp(cards[active])
 }
 
-/* Грани идут в одном порядке у всех карточек: бонус → игры → тикеты. Шаг
-   общий (по самой длинной карточке): у карточки без тикетов в этот шаг
-   снова стоит бонус — так карточки не сбиваются друг с другом. */
-let face = 0
-function rotateFaces() {
-  face += 1
-  const cards = [...document.querySelectorAll('#cards .card')]
-  const n = Math.max(1, ...cards.map((c) => c.querySelectorAll('.face').length))
-  const step = face % n
-  cards.forEach((c) => {
-    const fs = [...c.querySelectorAll('.face')]
-    const show = step < fs.length ? step : 0
-    fs.forEach((f, i) => f.classList.toggle('on', i === show))
+/* Следующая грань плашки: бонус → игры → тикеты → бонус… Зовётся только из
+   countUp, в момент, когда «на карте» своей карточки налито наполовину.
+   Новая грань приходит заливкой (.in — видна только её .fliq), старая (.out)
+   стоит под ней, пока заливка её не накроет, — потом обе метки снимаются
+   (index.html, «Смена грани»). */
+const FACE_FILL_MS = 600   // заливка плашки — transition .5s у .fliq
+function nextFace(card) {
+  const fs = [...card.querySelectorAll('.face')]
+  if (fs.length < 2) return
+  const cur = fs.findIndex((f) => f.classList.contains('on'))
+  const k = (cur + 1) % fs.length
+  fs.forEach((f, i) => {
+    f.classList.toggle('on', i === k)
+    f.classList.toggle('in', i === k)
+    f.classList.toggle('out', i === cur)
   })
+  timers.push(setTimeout(() => fs.forEach((f) => f.classList.remove('in', 'out')), FACE_FILL_MS))
 }
 
 /* ── 7. Жизненный цикл ───────────────────────────────────────────────────── */
@@ -555,7 +558,6 @@ if (REDUCED) {
   document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('done'))
 } else if (PARKS[park]) {
   setTimeout(() => { cycleCards(); setInterval(cycleCards, CARD_MS) }, 700)
-  setInterval(rotateFaces, FACE_MS)
 }
 
 /* Суточный самоперезапуск в 05:00 по Москве — как у турбо и «Твоей карты»:

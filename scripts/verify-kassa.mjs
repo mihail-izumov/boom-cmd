@@ -191,7 +191,7 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     liqHidden: [...c.querySelectorAll('.liq')].length === 2 && [...c.querySelectorAll('.liq')].every((l) => l.getAttribute('aria-hidden') === 'true'),
     bolt: !!c.querySelector('.seg-b > .fit-box .fs-card svg.bolt'),
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
-      && !!c.querySelector('.slider > .stream') && !c.querySelector('.wave'),
+      && !!c.querySelector('.slider > .neck') && !c.querySelector('.stream, .wave'),
     toggle: !!c.querySelector('.toggle'),
     faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector(':scope > .fit-box > .fs-face')
       && sp(f.querySelector('.fliq')?.textContent) === sp(f.querySelector(':scope > .fit-box')?.textContent) && f.querySelector('.fliq').getAttribute('aria-hidden') === 'true'),
@@ -258,6 +258,11 @@ ok('цвета карточек: лайм · голубой · розовый, �
   ok('у сосуда нет рамки, под сосудами нет подложки с обводкой', rule('.seg') && !/border:/.test(rule('.seg')) && !/box-shadow|background/.test(rule('.slider')), rule('.slider'))
   ok('бликов, волн и пузырьков нет', !/\.seg::after|\.wave|@keyframes (fizz|wave-x|flow)/.test(css))
   ok('у плашек бонуса нет обводки', rule('.face') && !/box-shadow/.test(rule('.face')))
+  // 01.10: углы сосуда «пропадали» на секунду через раз — Chrome на время
+  // перехода выносит жидкость на свой слой и не обрезает её по скруглению
+  // сосуда. Жидкость и заливка плашки скруглены сами.
+  ok('жидкость скруглена сама (углы не пропадают)', /border-radius:inherit/.test(rule('.liq')) && /border-radius:inherit/.test(rule('.fliq')))
+  ok('углы сосудов при переливе не меняются, сосуд не наклоняется', !/\.p2 \.seg-[ab]\{[^}]*(radius|rotate)/.test(css))
   ok('слой бонуса без линии раздела — плавный переход', /\.seg-b \.liq\{background:linear-gradient\(0deg, var\(--c\) 0 calc\(var\(--split,70%\) - 8%\), var\(--c2\) calc\(var\(--split,70%\) \+ 8%\)\)\}/.test(css))
 }
 {
@@ -303,7 +308,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
        `${c.x} · ${c.sum} → ${c.card}`)
     ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: ${o.label} — два сосуда и струя; ни волн, ни подсветки, ни переключателя`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — два сосуда и горлышко; ни волн, ни подсветки, ни переключателя`, c.slider && !c.toggle)
     ok(`${code}: ${o.label} — цвет «${o.tone}»`, c.tone === `tone-${o.tone}`, c.tone)
     ok(`${code}: ${o.label} — «жидкость» с тем же текстом, скрыта от чтения`,
        c.liqHidden && c.liqSum === c.sum && c.liqNum === c.card, `${c.liqSum} / ${c.liqNum}`)
@@ -348,7 +353,9 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
 console.log('\n── Движение: «перелей воду» по очереди, грани плашки ──')
 {
   // Тайминг kassa.js: старт через 0,7 с; p1 1 с → p2 0,9 с → p3 + досчёт
-  // 1,1 с; карточка — 5,2 с; грани — раз в 3 с.
+  // 1,1 с; карточка — 5,2 с. «На карте» доходит до половины через ~1,45 с
+  // после старта карточки — тогда плашка наливается и меняет грань.
+  const kinds = (cc) => cc.map((x) => x.faces.find((f) => f.on)?.kind).join()
   const r = await run('?park=ohta&tv=1')
   const w = r.window
   const cs = (el) => w.getComputedStyle(el)
@@ -365,16 +372,15 @@ console.log('\n── Движение: «перелей воду» по оче�
   // наполовину (решение владельца 01.10): заливка .fliq видна (opacity 1).
   const faceBg = (i) => (cs(c[i].el.querySelector('.face.on .fliq')).opacity === '1' ? 'залита' : 'не залита')
   ok('пока «на карте» пусто — плашка бонуса не залита', !c[0].el.classList.contains('half') && faceBg(0) === 'не залита', faceBg(0))
+  ok('плашки у всех стоят на бонусе', kinds(c) === 'gift,gift,gift', kinds(c))
   await wait(700)    // t≈1,9 с — p2
   c = r.cards()
-  ok('дальше — перелив по каналу: фаза p2, без наклона, оба сосуда не в тени',
+  ok('дальше — перелив через горлышко: фаза p2, без наклона, оба сосуда не в тени',
      c[0].phase === 'p2' && !/rotate/.test(cs(c[0].el.querySelector('.seg-a')).transform || '')
        && Number(cs(c[0].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1,
      `${c[0].phase} ${cs(c[0].el.querySelector('.seg-a')).transform}`)
-  ok('стык: углы между сосудами спрямлены под канал',
-     cs(c[0].el.querySelector('.seg-a')).borderBottomRightRadius === '4px' && cs(c[0].el.querySelector('.seg-b')).borderTopRightRadius === '4px',
-     `${cs(c[0].el.querySelector('.seg-a')).borderBottomRightRadius} / ${cs(c[0].el.querySelector('.seg-b')).borderTopRightRadius}`)
-  ok('в начале перелива «на карте» меньше половины — плашка ещё не залита', !c[0].el.classList.contains('half') && faceBg(0) === 'не залита', faceBg(0))
+  ok('в начале перелива «на карте» меньше половины — плашка не залита и не сменилась',
+     !c[0].el.classList.contains('half') && faceBg(0) === 'не залита' && kinds(c) === 'gift,gift,gift', `${faceBg(0)} ${kinds(c)}`)
   await wait(2200)   // t≈4,1 с — досчитано
   c = r.cards()
   ok('долит бонус, число досчиталось до 2 025 (и в «жидкости» тоже)',
@@ -391,17 +397,21 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('у спокойных карточек плашка не залита', [1, 2].every((i) => !c[i].el.classList.contains('half') && faceBg(i) === 'не залита'))
   ok('пустое «пополнение» — в тени, «на карте» — нет',
      Number(cs(c[0].el.querySelector('.seg-a')).opacity) < 0.5 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1)
-  ok('грань сменилась на игры у всех трёх', c.every((x) => x.faces.find((f) => f.on)?.kind === 'games'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  ok('налилась — плашка 1 500 сменилась на игры, у спокойных стоит бонус', kinds(c) === 'games,gift,gift', kinds(c))
+  ok('смена грани закончилась чисто: видна одна грань, меток смены нет',
+     c.every((x) => x.faces.filter((f) => f.on).length === 1) && !r.d.querySelector('.face.in, .face.out'))
+  ok('заливка видна только у показанной грани', [...c[0].el.querySelectorAll('.face:not(.on) .fliq')].every((f) => cs(f).opacity !== '1'))
   await wait(2600)   // t≈6,7 с — вторая карточка, p1
   c = r.cards()
   ok('следом — 3 000, у первой итог на месте, сосуды спокойные',
      !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && c[0].liqNum === '2 025', c.map((x) => x.phase || '-').join())
   ok('у погасшей карточки плашка снова не залита, у новой — пока тоже', !c[0].el.classList.contains('half') && !c[1].el.classList.contains('half'))
-  ok('шаг тикетов: у 5 000 — тикеты, у остальных снова бонус (не сбиваются)',
-     c[2].faces.find((f) => f.on)?.kind === 'tickets' && c[0].faces.find((f) => f.on)?.kind === 'gift' && c[1].faces.find((f) => f.on)?.kind === 'gift',
-     c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  ok('погасшая карточка свою плашку не меняет, новая — пока тоже', kinds(c) === 'games,gift,gift', kinds(c))
   ok('у спокойных карточек оба сосуда читаются', [0, 2].every((i) =>
     Number(cs(c[i].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[i].el.querySelector('.seg-b')).opacity || 1) === 1))
+  await wait(1400)   // t≈8,1 с — «на карте» у 3 000 за половиной
+  c = r.cards()
+  ok('налилась 3 000 — её плашка сменилась на игры, остальные стоят', c[1].el.classList.contains('half') && kinds(c) === 'games,games,gift', kinds(c))
   r.window.close()
   const z = await run('?park=ohta', { reduced: true })
   await wait(900)
@@ -469,7 +479,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.6 · собрано ДД.ММ»', /^v1\.6 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.7 · собрано ДД.ММ»', /^v1\.7 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
