@@ -108,6 +108,8 @@ body.has-screens .brand-badge{font-size:23px;gap:12px;padding:9px 18px;border-ra
 .slot.sc-player::after{content:none !important}
 .sc-btn{flex:none;width:58px;height:58px;border-radius:15px;border:none;cursor:pointer;display:grid;place-items:center;
   background:rgba(255,255,255,.1);color:#fff}
+/* Клики ловит сама кнопка, не её значок: значок меняется при паузе/пуске */
+.sc-btn svg,.sc-tab .sc-bar{pointer-events:none}
 .sc-btn svg{width:26px;height:26px}
 .sc-btn.play{background:#c6f52e;color:#0d0a2e}
 .sc-tabs{display:flex;gap:5px;background:rgba(255,255,255,.07);border-radius:16px;padding:5px}
@@ -253,14 +255,26 @@ function setupPlayer(act) {
   const btn = slot.querySelector('.sc-btn')
   const tabs = [...slot.querySelectorAll('.sc-tab')]
 
-  /* Состояние приходит от хозяина: { current, playing, progress 0..1 } */
+  /* Состояние приходит от хозяина 5 раз в секунду: { current, playing,
+     progress 0..1 }.
+     ⚠ Разметку кнопки трогаем ТОЛЬКО при смене состояния. Раньше значок
+       ❚❚/▶ перерисовывался на каждом тике — нажатие, попавшее на
+       перерисовку, браузер терял (элемент под пальцем исчезал между
+       «нажал» и «отпустил»), и кнопка срабатывала через раз. */
+  let shown = null
   return (st) => {
-    btn.innerHTML = st.playing ? ICON_PAUSE : ICON_PLAY
-    btn.classList.toggle('play', !st.playing)
+    if (shown !== st.playing) {
+      shown = st.playing
+      btn.innerHTML = st.playing ? ICON_PAUSE : ICON_PLAY
+      btn.classList.toggle('play', !st.playing)
+      btn.setAttribute('aria-label', st.playing ? 'Пауза' : 'Пуск')
+    }
     tabs.forEach((t) => {
       const on = t.dataset.id === st.current
       t.classList.toggle('on', on)
-      t.querySelector('.sc-bar').style.width = on ? `${Math.round(st.progress * 1000) / 10}%` : '0'
+      const w = on ? `${Math.round(st.progress * 1000) / 10}%` : '0'
+      const bar = t.querySelector('.sc-bar')
+      if (bar.style.width !== w) bar.style.width = w
     })
   }
 }
@@ -408,7 +422,7 @@ function hostAct(action, arg) {
   } else if (action === 'go') {
     if (arg && arg !== H.current) switchTo(arg)
   }
-  broadcast()
+  broadcast()   // кнопка меняется сразу, не ждёт следующего тика
 }
 
 function broadcast() {

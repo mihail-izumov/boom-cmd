@@ -27,7 +27,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.4'
+const PAGE_VERSION = 'v2.5'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -626,10 +626,18 @@ function countUp(card) {
 /* Ход за ходом: следующая карточка — только когда предыдущая показала
    все грани плашки (cardMs). */
 let active = -1
-let cycleTimer = 0   // следующий ход — его снимает пауза плеера экранов
+let cycleTimer = 0
+/* В плеере экранов касса играет ОДИН круг: все карточки по очереди, потом
+   стоит на последнем кадре TAIL_MS и только тогда плеер уводит на другой
+   экран (решение владельца 01.10). roundLeft — сколько карточек ещё
+   показать в этом круге; вне плеера — бесконечно. */
+const TAIL_MS = 5000
+let roundLeft = Infinity   // следующий ход — его снимает пауза плеера экранов
 function cycleCards() {
   const cards = [...document.querySelectorAll('#cards .card')]
   if (!cards.length) return
+  if (roundLeft <= 0) return          // круг сыгран — последний кадр стоит
+  roundLeft -= 1
   timers.forEach(cancel)
   timers = []
   /* Гаснущая карточка: заливка плашки стекает (снят half), значение на
@@ -696,11 +704,12 @@ if (PARKS[park]) {
     park,
     parks: PARKS,
     parkOrder: DATA.park_order,
-    cycleMs: () => 700 + [...document.querySelectorAll('#cards .card')].reduce((t, c) => t + cardMs(c), 0),
+    cycleMs: () => 700 + [...document.querySelectorAll('#cards .card')].reduce((t, c) => t + cardMs(c), 0) + TAIL_MS,
     restart: () => {
       stopCards()
       clockResume()
       active = -1
+      roundLeft = document.querySelectorAll('#cards .card').length
       restartAnimations()
       if (!REDUCED) cycleTimer = later(cycleCards, 700)
     },
