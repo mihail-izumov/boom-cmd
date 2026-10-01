@@ -189,7 +189,10 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     liqNum: sp(c.querySelector('.seg-b .liq .fs-card .num')?.textContent),
     liqSum: sp(c.querySelector('.seg-a .liq .fs-sum')?.textContent),
     liqHidden: [...c.querySelectorAll('.liq')].length === 2 && [...c.querySelectorAll('.liq')].every((l) => l.getAttribute('aria-hidden') === 'true'),
-    bolt: !!c.querySelector('.seg-b > .fit-box .fs-card svg.bolt'),
+    // Молния владельца (01.10): его путь, обёртка .zap и восемь искр
+    bolt: !!c.querySelector('.seg-b > .fit-box .fs-card .zap > svg.bolt')
+      && (c.querySelector('.seg-b > .fit-box .fs-card svg.bolt path')?.getAttribute('d') || '').startsWith('M491.3,387.2 L735.7,0')
+      && c.querySelectorAll('.seg-b > .fit-box .fs-card .zap > .spark').length === 8,
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
       && !c.querySelector('.funnel, .stream, .neck, .wave'),
     toggle: !!c.querySelector('.toggle'),
@@ -326,7 +329,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.liqHidden && c.liqSum === c.sum && c.liqNum === c.card, `${c.liqSum} / ${c.liqNum}`)
     ok(`${code}: ${o.label} — слой денег ${Math.round((o.sum / o.onCard) * 1000) / 10}% сосуда «на карте»`,
        c.split === `${Math.round((o.sum / o.onCard) * 1000) / 10}%`, c.split)
-    ok(`${code}: ${o.label} — после числа «на карте» молния (заряды)`, c.bolt)
+    ok(`${code}: ${o.label} — после числа «на карте» молния владельца, с искрами для разряда`, c.bolt)
     ok(`${code}: ${o.label} — плашка во всю ширину: бейдж сверху, цифра под ним, копия в заливке`, c.faceFull)
     ok(`${code}: ${o.label} — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
     const want = [
@@ -416,6 +419,11 @@ console.log('\n── Движение: «перелей воду» по оче�
   c = r.cards()
   ok('досчиталось до 2 025 (и в «жидкости» тоже)',
      c[0].on && c[0].phase === 'p3' && c[0].card === '2 025' && c[0].liqNum === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} ${c[0].phase}`)
+  ok('налито до краёв — молния бьёт разрядом (вспышка, рывок, искры)',
+     /zap/.test(`${cs(c[0].el.querySelector('.seg-b .liq .bolt')).animationName} ${cs(c[0].el.querySelector('.seg-b .liq .bolt')).getPropertyValue('animation')}`)
+       && /zap-spark/.test(`${cs(c[0].el.querySelector('.seg-b .liq .spark')).animationName} ${cs(c[0].el.querySelector('.seg-b .liq .spark')).getPropertyValue('animation')}`),
+     cs(c[0].el.querySelector('.seg-b .liq .bolt')).getPropertyValue('animation'))
+  ok('у спокойных карточек молния не бьёт', ![1, 2].some((i) => /zap/.test(`${cs(c[i].el.querySelector('.seg-b .bolt')).animationName} ${cs(c[i].el.querySelector('.seg-b .bolt')).getPropertyValue('animation')}`)))
   ok('«на карте» красуется — поворот гранями и свет', /brag/.test(`${cs(c[0].el.querySelector('.seg-b')).animationName} ${cs(c[0].el.querySelector('.seg-b')).getPropertyValue('animation')}`),
      cs(c[0].el.querySelector('.seg-b')).getPropertyValue('animation'))
   ok('подпись «на карте» выросла, «пополнение» — уменьшилась', lblT(c, 0, '.seg-b') === 'scale(1.2)' && lblT(c, 0, '.seg-a') === 'scale(.85)')
@@ -520,7 +528,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.0 · собрано ДД.ММ»', /^v2\.0 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.1 · собрано ДД.ММ»', /^v2\.1 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))

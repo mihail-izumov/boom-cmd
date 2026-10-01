@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.0'
+const PAGE_VERSION = 'v2.1'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -110,8 +110,15 @@ function plural(n, one, few, many) {
 }
 
 const STAR = '<span class="star" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg></span>'
-/* Молния после числа «на карте»: пополнение — в рублях, на карте — заряды */
-const BOLT = '<svg class="bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
+/* Молния после числа «на карте»: пополнение — в рублях, на карте — заряды.
+   Форма — молния владельца (01.10), из его SVG с вложенными сдвигами
+   пересчитана в один путь в своих координатах. Обёртка .zap — для
+   «разряда», когда «на карте» налито до краёв (index.html): вспышка (::before)
+   и восемь искр (.spark) вокруг молнии. */
+const BOLT = '<span class="zap" aria-hidden="true">'
+  + '<svg class="bolt" viewBox="0 0 784.1 926.5"><path d="M491.3,387.2 L735.7,0 L0,578.8 L376.5,558.1 L202,926.5 L784.1,366.6Z"/></svg>'
+  + '<i class="spark"></i>'.repeat(8)
+  + '</span>'
 
 function renderOffer() {
   document.getElementById('offer').innerHTML =
