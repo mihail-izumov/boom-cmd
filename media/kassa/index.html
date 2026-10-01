@@ -24,7 +24,7 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v2.3 — правки владельца 01.10)
+  БЛОКИ (v2.4 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
     2. Три карточки «X1» · «X2» · «X4–6», у каждой свой цвет (лайм,
        голубой, розовый — offers[].tone в данных). Внутри — два сосуда с
@@ -60,7 +60,7 @@
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v2.3 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v2.4 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -205,7 +205,7 @@
     border:3px solid rgba(var(--cr),.16);transition:transform .5s ease, border-color .5s ease, box-shadow .5s ease;
   }
   .card.on{transform:translateY(-8px);border-color:rgba(var(--cr),.7);box-shadow:0 18px 56px rgba(var(--cr),.24)}
-  /* Основная сумма (1 500) — рамка своего цвета, свечение и значок со стрелками */
+  /* Основная сумма (1 500) — рамка своего цвета, свечение и стрелки за «X1» */
   .card.main{
     border:4px solid var(--c);
     background:linear-gradient(160deg, rgba(var(--cr),.20) 0%, var(--tile) 55%);
@@ -215,38 +215,79 @@
     0%,100%{box-shadow:0 0 0 0 rgba(var(--cr),0), 0 18px 50px rgba(var(--cr),.18)}
     50%{box-shadow:0 0 0 6px rgba(var(--cr),.22), 0 22px 70px rgba(var(--cr),.36)}
   }
-  /* Значок основной карточки — три стрелки вниз, как поворотник в гоночной
-     игре: каждая следующая ярче (--o), по ним сверху вниз бежит волна
-     (решение владельца 01.10: вместо звезды). */
-  .star{position:absolute;top:-4px;right:-4px;width:74px;height:74px;border-radius:0 var(--radius) 0 22px;background:var(--c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:2px}
-  .star .chev{display:block;width:40px;height:16px;margin:-2px 0;color:var(--dark);opacity:var(--o);animation:chev 1.2s ease-in-out infinite;animation-delay:var(--d)}
-  .star .chev svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
-  .star .chev:nth-child(1){--o:.22;--d:0s}
-  .star .chev:nth-child(2){--o:.5;--d:.2s}
-  .star .chev:nth-child(3){--o:.82;--d:.4s}
-  @keyframes chev{0%,100%{opacity:var(--o);transform:translateY(0)}35%{opacity:1;transform:translateY(3px)}}
 
   /* X1 / X2 / X4–6 — сколько пришло играть. «X» — цветом карточки. Справа
-     от метки — компания пиксельных лиц (kassa.js, CREWS): один, двое,
-     четверо, к которым по кругу подходят ещё двое. Метка ужимается под
-     место, что осталось (fitUniform по всем трём). */
+     от метки — компания пиксельных лиц (kassa.js, CREWS). Метка ужимается
+     под место, что осталось (fitUniform по всем трём). */
   .xlabel{display:flex;align-items:center;gap:12px;min-width:0}
   .xlabel .fit-box{flex:1;min-width:0}
   .xlabel .fs-x{font-family:'Unbounded';font-weight:900;font-size:84px;line-height:.95;color:var(--white);letter-spacing:-1px}
   .xlabel .fs-x i{font-style:normal;color:var(--c);margin-right:.04em}
+
+  /* Три стрелки вниз сразу за «X1» — поворотник из гоночной игры: острые
+     углы, жирные; каждая следующая ярче (--o), волна бежит сверху вниз.
+     В em — растут вместе с меткой. Решения владельца 01.10: вместо звезды
+     в углу, без плашки и скруглений. */
+  .fs-x .chevs{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:top;margin-left:.14em;height:.95em}
+  .fs-x .chev{display:block;width:.62em;height:.27em;margin:-.02em 0;color:var(--c);opacity:var(--o);animation:chev .9s linear infinite;animation-delay:var(--d)}
+  .fs-x .chev svg{display:block;width:100%;height:100%;overflow:visible;fill:none;stroke:currentColor;stroke-width:8;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10}
+  .fs-x .chev:nth-child(1){--o:.16;--d:0s}
+  .fs-x .chev:nth-child(2){--o:.45;--d:.15s}
+  .fs-x .chev:nth-child(3){--o:.8;--d:.3s}
+  @keyframes chev{0%,100%{opacity:var(--o)}30%{opacity:1;filter:drop-shadow(0 0 .08em rgba(var(--cr),.9))}}
+
+  /* «X4–6» без тире: цифра крутится барабаном 4 → 5 → 6 в такт компании
+     (круг 6 с — тот же, что у двоих подходящих ниже). */
+  .fs-x .roll{display:inline-grid;vertical-align:top;overflow:hidden}
+  .fs-x .roll b{grid-area:1/1;font-weight:inherit;opacity:0}
+  .fs-x .roll b:nth-child(1){animation:roll-a 6s ease-in-out infinite}
+  .fs-x .roll b:nth-child(2){animation:roll-b 6s ease-in-out infinite}
+  .fs-x .roll b:nth-child(3){animation:roll-c 6s ease-in-out infinite}
+  @keyframes roll-a{0%,38%{opacity:1;transform:none}42%,90%{opacity:0;transform:translateY(-.6em)}90.1%{transform:translateY(.6em)}94%,100%{opacity:1;transform:none}}
+  @keyframes roll-b{0%,38%{opacity:0;transform:translateY(.6em)}42%,58%{opacity:1;transform:none}62%,100%{opacity:0;transform:translateY(-.6em)}}
+  @keyframes roll-c{0%,58%{opacity:0;transform:translateY(.6em)}62%,90%{opacity:1;transform:none}94%,100%{opacity:0;transform:translateY(-.6em)}}
+
+  /* Лица — как .ph-ava на «Твоей карте»: цветная плашка, белые пиксели,
+     тень снизу. Размер у всех один; компания 4–6 стоит колодой — каждое
+     следующее лицо наезжает на предыдущее, обводка цветом плитки их
+     разделяет. */
   .crew{position:relative;flex:none}
-  .card.main .crew{margin-right:58px}   /* место под значок со стрелками */
-  /* Лицо — как .ph-ava на «Твоей карте»: цветная плашка, белые пиксели,
-     тень снизу. Лица стоят вплотную, не перекрывая друг друга. */
-  .ava{
-    position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s);border-radius:24%;background:var(--av);
-    display:grid;place-items:center;box-shadow:inset 0 calc(var(--s) * -.07) 0 rgba(0,0,0,.25);
+  .ava{position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s)}
+  .ava-in{
+    display:grid;place-items:center;width:100%;height:100%;border-radius:24%;background:var(--av);
+    box-shadow:inset 0 calc(var(--s) * -.07) 0 rgba(0,0,0,.25), 0 0 0 4px var(--tile);
+    transform-origin:50% 100%;animation:ava-live var(--t) ease-in-out var(--d) infinite;
   }
   .ava svg{width:72%;height:72%;fill:#fff;shape-rendering:crispEdges}
-  /* Ещё двое к четверым — по кругу: подходят, стоят, уходят */
-  .ava.extra{opacity:0;transform:scale(.3);animation:crew-in 6s cubic-bezier(.3,1.4,.5,1) infinite}
-  .ava.extra:last-child{animation-delay:.35s}
-  @keyframes crew-in{0%,38%{opacity:0;transform:scale(.3)}46%{opacity:1;transform:scale(1.12)}52%,86%{opacity:1;transform:scale(1)}94%,100%{opacity:0;transform:scale(.3)}}
+  /* Живые: у каждого свой ритм (--t, --d из kassa.js) — моргает,
+     мотает головой, подпрыгивает и кричит, распахнув рот. */
+  .ava .f-blink,.ava .f-shout{opacity:0}
+  .ava .f-eyes{animation:ava-eyes var(--t) steps(1) var(--d) infinite}
+  .ava .f-blink{animation:ava-blink var(--t) steps(1) var(--d) infinite}
+  .ava .f-mouth{animation:ava-mouth var(--t) steps(1) var(--d) infinite}
+  .ava .f-shout{animation:ava-shout var(--t) steps(1) var(--d) infinite}
+  @keyframes ava-eyes{0%,17%{opacity:1}18%,21%{opacity:0}22%,84%{opacity:1}85%,88%{opacity:0}89%,100%{opacity:1}}
+  @keyframes ava-blink{0%,17%{opacity:0}18%,21%{opacity:1}22%,84%{opacity:0}85%,88%{opacity:1}89%,100%{opacity:0}}
+  @keyframes ava-mouth{0%,54%{opacity:1}55%,70%{opacity:0}71%,100%{opacity:1}}
+  @keyframes ava-shout{0%,54%{opacity:0}55%,70%{opacity:1}71%,100%{opacity:0}}
+  @keyframes ava-live{
+    0%,28%{transform:none}
+    31%{transform:rotate(-8deg)} 34%{transform:rotate(7deg)} 37%{transform:rotate(-4deg)} 40%,54%{transform:none}
+    57%{transform:translateY(-16%) scale(1.06,.96)}
+    60%{transform:translateY(0) scale(1.12,.88)}
+    63%{transform:translateY(-8%) scale(1.08)}
+    66%{transform:scale(1.1) rotate(-4deg)}
+    68%{transform:scale(1.1) rotate(4deg)}
+    70%{transform:scale(1.06)}
+    74%,100%{transform:none}
+  }
+  /* Ещё двое к четверым — по кругу (6 с, в такт цифре X4 → X5 → X6):
+     подходят по одному, стоят, уходят */
+  .ava.extra{opacity:0;transform:scale(.3)}
+  .crew-group .ava:nth-child(5){animation:crew-5 6s cubic-bezier(.3,1.4,.5,1) infinite}
+  .crew-group .ava:nth-child(6){animation:crew-6 6s cubic-bezier(.3,1.4,.5,1) infinite}
+  @keyframes crew-5{0%,38%{opacity:0;transform:scale(.3)}43%{opacity:1;transform:scale(1.12)}47%,90%{opacity:1;transform:scale(1)}95%,100%{opacity:0;transform:scale(.3)}}
+  @keyframes crew-6{0%,58%{opacity:0;transform:scale(.3)}63%{opacity:1;transform:scale(1.12)}67%,90%{opacity:1;transform:scale(1)}95%,100%{opacity:0;transform:scale(.3)}}
 
   /* ══ СОСУДЫ: «пополнение» сверху, «на карте» снизу ═════════════════════
      Окно — сосуд с пропорциями пластиковой карты (85,6 × 54 мм → 1,586),
@@ -452,7 +493,6 @@
   }
   body.portrait .card.on{transform:translateX(8px)}
   body.portrait .xlabel{grid-area:x;align-self:center;flex-direction:column;align-items:flex-start;gap:10px}
-  body.portrait .card.main .crew{margin-right:0}
   body.portrait .slider{grid-area:slider;flex-direction:row;min-height:0}
   body.portrait .seg{aspect-ratio:auto}
   body.portrait .seg-a{flex:0 0 36%}
@@ -460,8 +500,6 @@
   body.portrait .faces{grid-area:faces;flex:none;min-height:0}
   body.portrait .face{flex-direction:row;align-items:center;justify-content:flex-start;gap:18px}
   body.portrait .fliq{flex-direction:row;align-items:center;justify-content:flex-start;gap:18px}
-  /* Звезда основной карточки — в правом верхнем углу, над сосудами */
-  body.portrait .card.main .slider{margin-right:58px}
 
   /* ══ 3. ПОЛОСА СТУПЕНЕЙ ════════════════════════════════════════════════ */
   .steps{flex:none;padding:16px 24px 18px;gap:10px;justify-content:flex-start}
@@ -617,8 +655,9 @@
     .face.roll-in,.face.roll-out{animation:none}
     .card.done .seg-b,.card.done .seg-b::after,.card.done .seg-b .liq{animation:none}
     .card.done .fs-card .bolt,.card.done .fs-card .zap::before,.card.done .fs-card .zap .spark{animation:none}
-    .star .chev{animation:none}
-    .ava.extra{animation:none;opacity:.45;transform:none}
+    .fs-x .chev,.ava-in,.ava .f-eyes,.ava .f-blink,.ava .f-mouth,.ava .f-shout,.fs-x .roll b,.crew-group .ava{animation:none}
+    .fs-x .roll b:first-child{opacity:1}
+    .ava.extra{opacity:.45;transform:none}
   }
 </style>
 </head>

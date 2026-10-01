@@ -27,7 +27,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.3'
+const PAGE_VERSION = 'v2.4'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -110,11 +110,24 @@ function plural(n, one, few, many) {
   return many
 }
 
-/* Значок основной карточки — три стрелки вниз, как поворотник в гоночной
-   игре: каждая следующая ярче, по ним бежит волна (index.html, .star .chev).
-   Класс .star — место значка в углу (решение владельца 01.10: вместо звезды). */
-const CHEV = '<i class="chev"><svg viewBox="0 0 40 16"><path d="M5 3 L20 12.5 L35 3"/></svg></i>'
-const STAR = `<span class="star" aria-hidden="true">${CHEV.repeat(3)}</span>`
+/* Три стрелки вниз сразу за «X1» — как поворотник в гоночной игре:
+   острые углы, жирные, каждая следующая ярче, по ним бежит волна
+   (index.html, .chevs). Стоят ВНУТРИ метки — растут вместе с её кеглем.
+   Решения владельца 01.10: вместо звезды; без плашки и скруглений. */
+const CHEV = '<i class="chev"><svg viewBox="0 0 40 18"><path d="M3 3 L20 14 L37 3"/></svg></i>'
+const CHEVS = `<span class="chevs" aria-hidden="true">${CHEV.repeat(3)}</span>`
+
+/* Метка «X4–6» без тире: цифра крутится барабаном 4 → 5 → 6 в такт
+   компании лиц (index.html, .roll; тот же круг CREW_MS, что у .ava.extra).
+   Полная метка — в data-label и aria-label. */
+function labelHtml(o) {
+  const label = String(o.label)
+  const m = label.match(/^X(\d+)[–-](\d+)$/)
+  const body = m
+    ? `<span class="roll">${Array.from({ length: Number(m[2]) - Number(m[1]) + 1 }, (_, k) => `<b>${Number(m[1]) + k}</b>`).join('')}</span>`
+    : esc(label.slice(1))
+  return `<span class="fit fs-x" data-label="${esc(label)}" aria-label="${esc(label)}"><i>${esc(label.slice(0, 1))}</i>${body}${o.main ? CHEVS : ''}</span>`
+}
 
 /* «Сколько пришло» — пиксельные лица, как в кабинете на «Твоей карте»
    (media/loyalty, .ph-ava): сетка 12×12, белые пиксели на цветной плашке.
@@ -130,27 +143,43 @@ const FACES = {
   excited:   [[3,3,1,2],[8,3,1,2],[3,7,6,1],[3,8,1,1],[8,8,1,1],[4,9,4,1]],
   game:      [[2,2,1,1],[3,3,1,1],[9,2,1,1],[8,3,1,1],[3,4,1,1],[8,4,1,1],[3,7,6,1],[3,8,1,1],[5,8,1,1],[7,8,1,1]],
 }
-/* Кто где: X1 — один, X2 — двое, X4–6 — четверо, по кругу подходят ещё
-   двое (extra). Цвет плашки — свой у каждого. Координаты — в px канвы,
-   лица не перекрывают друг друга: компания 4–6 — сетка 3×2, двое новых
-   встают в свободный правый столбец. */
+/* Кадры «живых» лиц: глаза закрыты (моргнул) и рот нараспашку (кричит).
+   Лицо делится на глаза (пиксели выше 6-й строки) и рот — в анимации
+   (index.html, .ava) кадры подменяют друг друга. У «очков» моргать нечем. */
+const BLINK = [[2,4,3,1],[7,4,3,1]]
+const SHOUT = [[4,7,4,1],[4,8,1,2],[7,8,1,2],[4,10,4,1]]
+const NO_BLINK = new Set(['cool'])
+const rects = (list) => list.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`).join('')
+
+/* Кто где: X1 — один, X2 — двое, X4–6 — четверо, к ним по кругу подходят
+   ещё двое (extra). Размер у всех лиц ОДИН (решение владельца 01.10):
+   компания 4–6 стоит колодой — каждое следующее лицо наезжает на
+   предыдущее. Цвет плашки — свой у каждого. Координаты — px канвы. */
+const AVA = 64
+const DECK = 40   // шаг колоды 4–6: лицо наезжает на соседа на треть
 const CREWS = {
-  one:   { size: 72, people: [['happy', '#3d47a0', 0, 0]] },
-  two:   { size: 60, people: [['wink', '#c2187a', 0, 0], ['love', '#1b8a6b', 66, 0]] },
-  group: { size: 44, people: [
-    ['laugh', '#7a3fd1', 0, 0], ['wow', '#d9480f', 50, 0],
-    ['cool', '#1864ab', 0, 50], ['tongue', '#a61e4d', 50, 50],
-    ['excited', '#0b7285', 100, 0, true], ['game', '#5c940d', 100, 50, true],
-  ] },
+  one:   [['happy', '#3d47a0']],
+  two:   [['wink', '#c2187a'], ['love', '#1b8a6b']],
+  group: [['laugh', '#7a3fd1'], ['wow', '#d9480f'], ['cool', '#1864ab'], ['tongue', '#a61e4d'],
+          ['excited', '#0b7285', true], ['game', '#5c940d', true]],
 }
+let avaN = 0   // сквозной номер лица — у каждого свой ритм «жизни»
 function crewHtml(id) {
-  const c = CREWS[id]
-  if (!c) return ''
-  const w = Math.max(...c.people.map((p) => p[2])) + c.size
-  const h = Math.max(...c.people.map((p) => p[3])) + c.size
-  return `<span class="crew crew-${id}" aria-hidden="true" style="width:${w}px;height:${h}px">` + c.people.map(([face, color, x, y, extra]) =>
-    `<span class="ava${extra ? ' extra' : ''}" style="--av:${color};--x:${x}px;--y:${y}px;--s:${c.size}px"><svg viewBox="0 0 12 12">${
-      FACES[face].map(([rx, ry, rw, rh]) => `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}"/>`).join('')}</svg></span>`).join('') + '</span>'
+  const people = CREWS[id]
+  if (!people) return ''
+  const step = id === 'group' ? DECK : AVA + 6
+  const w = (people.length - 1) * step + AVA
+  return `<span class="crew crew-${id}" aria-hidden="true" style="width:${w}px;height:${AVA}px">` + people.map(([face, color, extra], i) => {
+    const k = avaN++
+    const eyes = FACES[face].filter((r) => r[1] < 6)
+    const mouth = FACES[face].filter((r) => r[1] >= 6)
+    /* Период 4,4–5,8 с и сдвиг — свои у каждого: моргают и кричат вразнобой */
+    const t = (4.4 + ((k * 0.53) % 1.4)).toFixed(2)
+    const d = (-((k * 1.37) % Number(t))).toFixed(2)
+    return `<span class="ava${extra ? ' extra' : ''}" style="--av:${color};--x:${i * step}px;--y:0px;--s:${AVA}px;--t:${t}s;--d:${d}s"><span class="ava-in"><svg viewBox="0 0 12 12">`
+      + `<g class="f-eyes">${rects(eyes)}</g><g class="f-blink">${rects(NO_BLINK.has(face) ? eyes : BLINK)}</g>`
+      + `<g class="f-mouth">${rects(mouth)}</g><g class="f-shout">${rects(SHOUT)}</g></svg></span></span>`
+  }).join('') + '</span>'
 }
 /* Молния после числа «на карте»: пополнение — в рублях, на карте — заряды.
    Форма — молния владельца (01.10), из его SVG с вложенными сдвигами
@@ -210,15 +239,13 @@ function renderCards(p) {
     ]
     if (games > 0) faces.push({ kind: 'games', big: `≈\u00a0+${fmt(games)}`, small: T.face_games })
     if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}`, small: T.face_tickets })
-    const [x, n] = [String(o.label).slice(0, 1), String(o.label).slice(1)]
     const tone = TONES.includes(o.tone) ? o.tone : TONES[i % TONES.length]
     const split = Math.round((o.sum / (o.sum + gift)) * 1000) / 10
     const inA = `<div class="lbl l-sum">${esc(T.label_sum)}</div><div class="fit-box"><span class="fit fs-sum">${fmt(o.sum)}\u00a0₽</span></div>`
     const inB = `<div class="lbl l-card">${esc(T.label_card)}</div><div class="fit-box"><span class="fit fs-card"><span class="num">${fmt(o.sum + gift)}</span>${BOLT}</span></div>`
     return `
       <div class="card tone-${tone}${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}" data-total="${o.sum + gift}" style="--split:${split}%">
-        ${o.main ? STAR : ''}
-        <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div>${crewHtml(o.id)}</div>
+        <div class="xlabel"><div class="fit-box">${labelHtml(o)}</div>${crewHtml(o.id)}</div>
         <div class="slider">
           <div class="seg seg-a">${inA}<div class="liq" aria-hidden="true">${inA}</div></div>
           <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div></div>
