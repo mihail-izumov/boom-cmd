@@ -35,6 +35,13 @@
  *     перезагружается в обход кэша (?r=…), второй экран плеера грузится
  *     заново вместе с ней. Персоналу парка версия не нужна: на панели
  *     всегда последняя. На паузе не дёргаем — обновится после пуска.
+ *     Бейдж в подвале (рядом с меткой версии) сам говорит, что с версией:
+ *       ✓ Актуальная версия            — сверились с сервером, совпало;
+ *       ✓ Актуальная · обновилась сама ЧЧ:ММ — пришла автообновлением;
+ *       ↻ Вышла новая — обновится на смене экрана (или «после пуска»);
+ *       ⚠ Устарела — нажмите, чтобы обновить — автообновление не помогло;
+ *       Нет связи — версия не проверена.
+ *     Кнопка ⟳ в подвале тоже грузит страницу в обход кэша.
  *
  *  ⚠ Турбо (media/turbo/) этот модуль НЕ подключает — его шапка не менялась.
  *  ⚠ Новый экран в ротацию: строка в SCREENS ниже + initScreens() в его js
@@ -148,6 +155,15 @@ body.has-screens .brand-badge{font-size:23px;gap:12px;padding:9px 18px;border-ra
 .sc-curtain.out{opacity:0;transition:opacity ${OUT_MS}ms cubic-bezier(.4,0,.2,1)}
 .sc-curtain.out .sc-say{opacity:0;transform:scale(.96);transition:opacity ${Math.round(OUT_MS * 0.25)}ms ease,transform ${Math.round(OUT_MS * 0.25)}ms ease}
 .sc-curtain.out img{animation:sc-shoot ${OUT_MS}ms cubic-bezier(.5,0,.75,0) forwards}
+/* Бейдж версии в подвале — в ряд с меткой времени и версии */
+.sc-ver{flex:none;display:flex;align-items:center;gap:9px;border-radius:11px;padding:0 14px;
+  font-family:'Inter';font-weight:800;font-size:15px;letter-spacing:.3px;white-space:nowrap;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#cfcae8}
+.sc-ver i{font-style:normal;font-weight:900}
+.sc-ver.ok{background:rgba(33,196,90,.14);border-color:rgba(33,196,90,.45);color:#7ee2a2}
+.sc-ver.pending{background:rgba(255,176,32,.14);border-color:rgba(255,176,32,.5);color:#ffc964}
+.sc-ver.stale{background:#ff3d68;border-color:#ff3d68;color:#fff;cursor:pointer}
+.sc-ver.off{color:#8f88bd}
 @keyframes sc-shoot{0%{transform:scale(1);opacity:1}100%{transform:scale(9);opacity:0}}
 `
 
@@ -264,7 +280,8 @@ function setupPlayer(act) {
     if (b) act(b.dataset.act, b.dataset.id)
   })
   const btn = slot.querySelector('.sc-btn')
-  const tabs = [...slot.querySelectorAll('.sc-tab')]
+  const tabs = [...slot.querySelector('.sc-tabs').children]
+  const ver = setupVerBadge(act)
 
   /* Состояние приходит от хозяина 5 раз в секунду: { current, playing,
      progress 0..1 }.
@@ -280,6 +297,7 @@ function setupPlayer(act) {
       btn.classList.toggle('play', !st.playing)
       btn.setAttribute('aria-label', st.playing ? 'Пауза' : 'Пуск')
     }
+    ver(st)
     tabs.forEach((t) => {
       const on = t.dataset.id === st.current
       t.classList.toggle('on', on)
@@ -287,6 +305,44 @@ function setupPlayer(act) {
       const bar = t.querySelector('.sc-bar')
       if (bar.style.width !== w) bar.style.width = w
     })
+  }
+}
+
+/* ── Бейдж версии в подвале + ⟳ в обход кэша ───────────────────────────── */
+function setupVerBadge(act) {
+  const svc = document.querySelector('.fineband .svc')
+  if (!svc || !BUILD) return () => {}
+  const el = document.createElement('span')
+  el.className = 'sc-ver'
+  el.setAttribute('role', 'status')
+  svc.appendChild(el)
+  el.addEventListener('click', () => { if (el.classList.contains('stale')) act('fresh') })
+  /* ⟳ в подвале: страница сама зовёт location.reload(), а он может взять
+     её из кэша. Перехватываем раньше и грузим заново в обход кэша. */
+  const rl = document.getElementById('reload')
+  if (rl) {
+    rl.addEventListener('click', (e) => {
+      e.stopImmediatePropagation()
+      rl.classList.add('spin')
+      act('fresh')
+    }, true)
+  }
+  let shown = ''
+  return (st) => {
+    const v = st.ver || {}
+    const text = {
+      check: '<i>…</i> Проверка версии',
+      ok: v.auto ? `<i>✓</i> Актуальная · обновилась сама в ${v.auto}` : '<i>✓</i> Актуальная версия',
+      pending: st.playing ? '<i>↻</i> Вышла новая — обновится на смене экрана' : '<i>↻</i> Вышла новая — обновится после пуска',
+      stale: '<i>⚠</i> Устарела — нажмите, чтобы обновить',
+      off: 'Нет связи — версия не проверена',
+    }[v.state] || ''
+    const key = v.state + text
+    if (key === shown) return
+    shown = key
+    el.className = `sc-ver ${{ check: '', ok: 'ok', pending: 'pending', stale: 'stale', off: 'off' }[v.state] || ''}`
+    el.innerHTML = text
+    el.hidden = !text
   }
 }
 
@@ -307,6 +363,8 @@ function becomeHost(o, selfApi) {
     startedAt: 0,
     timer: 0,
     busy: true,           // пока открывается первый раз
+    update: '',           // номер новой сборки, если вышла
+    ver: { state: BUILD ? 'check' : 'none', auto: '' },   // для бейджа в подвале
   }
   let markChild
   H.childReady = new Promise((r) => { markChild = r })
@@ -347,7 +405,18 @@ function becomeHost(o, selfApi) {
 
   setInterval(broadcast, 200)
   broadcast()
-  if (BUILD) setInterval(checkBuild, CHECK_MS)
+  if (BUILD) {
+    /* Пришли автообновлением: в адресе метка ?r=…, и эту сборку мы и ждали */
+    let tried = ''
+    try { tried = sessionStorage.getItem('boom-upd') || '' } catch {}
+    if (Q.get('r') && tried === BUILD) H.ver.auto = mskHm()
+    setTimeout(checkBuild, 4000)
+    setInterval(checkBuild, CHECK_MS)
+  }
+}
+
+function mskHm() {
+  try { return new Date().toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }
 
 /* ── Автообновление ────────────────────────────────────────────────────── */
@@ -356,20 +425,25 @@ function checkBuild() {
   fetch(`${import.meta.env.BASE_URL}media/build.json?t=${Date.now()}`, { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => {
-      if (!j || !j.build || String(j.build) === BUILD) return
+      if (!j || !j.build) { H.ver.state = 'off'; broadcast(); return }
+      if (String(j.build) === BUILD) { H.ver.state = 'ok'; broadcast(); return }
       /* Уже перезагружались ради этой сборки, а пришла всё равно старая
          (публикация ещё раскатывается) — не крутимся в перезагрузках,
          обновимся в 05:00 или при следующей сборке. */
       let tried = ''
       try { tried = sessionStorage.getItem('boom-upd') || '' } catch {}
-      if (tried === String(j.build)) return
+      if (tried === String(j.build)) { H.ver.state = 'stale'; broadcast(); return }
       H.update = String(j.build)
+      H.ver.state = 'pending'
+      broadcast()
     })
-    .catch(() => {})                   // нет сети — проверим через минуту
+    .catch(() => {                     // нет сети — проверим через минуту
+      if (H.ver.state !== 'ok') { H.ver.state = 'off'; broadcast() }
+    })
 }
 /** Перезагрузка в обход кэша — вызывается, когда заставка уже закрыла экран. */
 function reloadFresh() {
-  try { sessionStorage.setItem('boom-upd', H.update) } catch {}
+  try { if (H && H.update) sessionStorage.setItem('boom-upd', H.update) } catch {}
   const u = new URL(location.href)
   u.searchParams.set('r', Date.now())
   u.searchParams.delete('embed')
@@ -445,6 +519,12 @@ async function switchTo(id) {
 
 function hostAct(action, arg) {
   if (!H) return
+  if (action === 'fresh') {            // ⟳ или «Устарела — нажмите»: под заставкой, в обход кэша
+    clearTimeout(H.timer)
+    H.busy = true
+    curtainIn().then(reloadFresh)
+    return
+  }
   if (action === 'toggle' && H.holding) {
     H.playing = !H.playing             // экран ещё стоит на первом кадре — запомним, играть ли потом
   } else if (action === 'toggle') {
@@ -469,7 +549,7 @@ function hostAct(action, arg) {
 function broadcast() {
   if (!H) return
   const run = H.elapsed + (H.playing && H.startedAt ? performance.now() - H.startedAt : 0)
-  const st = { current: H.current, playing: H.playing, progress: H.dwell ? Math.min(1, run / H.dwell) : 0 }
+  const st = { current: H.current, playing: H.playing, progress: H.dwell ? Math.min(1, run / H.dwell) : 0, ver: H.ver }
   H.self.update(st)
   if (H.child) { try { H.child.update(st) } catch { H.child = null } }
 }
