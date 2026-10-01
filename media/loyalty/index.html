@@ -239,8 +239,8 @@
      в телефон (карта его заряжает), на обратном ходе — в карту. В момент
      входа принимающий вздрагивает (jolt, отдельное свойство translate —
      не мешает орбите на transform) и вспыхивает.
-     ⚠ Форма молнии — один <path> в разметке (.strike svg). Владелец
-       пришлёт свою иконку — заменить только path и viewBox. */
+     ⚠ Форма молнии — иконка владельца (1.10), один <path> в разметке
+       (.strike svg); трансформы исходного SVG сведены в координаты path. */
   .strike{position:absolute;left:4em;top:4em;width:52em;height:60em;z-index:20;pointer-events:none;opacity:0;color:var(--lime);
           transform-origin:50% 56%;
           filter:drop-shadow(0 0 1em #fff) drop-shadow(0 0 3.5em rgba(198,245,46,.95));animation:strike 30s linear infinite}
@@ -277,9 +277,9 @@
   /* ФОКУС. Выделенный блок: плотная заливка + размытие под ним (ничего не
      просвечивает), рамка своего цвета и бегущие по часовой полоски (::before
      — кольцо conic-градиента, крутится --ang). Остальные притушены. */
-  /* ⚠ Ширина выделения у всех четырёх блоков одна — внутренняя ширина
-     телефона (23.5em): блоки внутри .ph-card шириной 18.5em растут ×1.27,
-     прогресс (21.1em) — ×1.114. Центр масштаба — центр блока, а блоки
+  /* ⚠ Ширина выделения у всех четырёх блоков одна — 44em, почти весь блок
+     сцены (60em): выделенная плашка доминирует на экране. Блоки внутри
+     .ph-card шириной 18.5em растут ×2.38, прогресс (21.1em) — ×2.085. Центр масштаба — центр блока, а блоки
      стоят по центру телефона, поэтому выделение всегда по его оси. */
   .fz{position:relative;border-radius:.9em;opacity:.4;animation:30s ease-in-out infinite;transform-origin:center;
       backdrop-filter:blur(.8em);-webkit-backdrop-filter:blur(.8em)}
@@ -295,10 +295,10 @@
   .fz.f-top{--rc:var(--lime);animation-name:f-top,top-lime;animation-duration:30s,30s}.fz.f-top::before{animation-name:ring-spin,r-top}
   .fz.f-prog{--rc:var(--magenta);animation-name:f-prog}.fz.f-prog::before{animation-name:ring-spin,r-prog}
   .fz.f-stat{--rc:var(--lv-gold);animation-name:f-stat}.fz.f-stat::before{animation-name:ring-spin,r-stat}
-  @keyframes f-bal{0%,17.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}18.6%,29.8%{opacity:1;transform:scale(1.27);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lime),0 1.6em 4em rgba(0,0,0,.75)}31.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
-  @keyframes f-top{0%,31.2%{opacity:.4;transform:none;z-index:1;box-shadow:none}32.6%,41.8%{opacity:1;transform:scale(1.27);z-index:5;box-shadow:0 0 0 .22em #eaffb0,0 1.6em 4em rgba(0,0,0,.75)}43.2%,77%{opacity:.4;transform:none;z-index:1;box-shadow:none}79%,100%{opacity:1;transform:none;z-index:1;box-shadow:none}}
-  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,53.8%{opacity:1;transform:scale(1.114);z-index:5;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}55.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
-  @keyframes f-stat{0%,55.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}56.6%,65.8%{opacity:1;transform:scale(1.27);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes f-bal{0%,17.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}18.6%,29.8%{opacity:1;transform:scale(2.38);z-index:30;background:#16143f;box-shadow:0 0 0 .22em var(--lime),0 1.6em 4em rgba(0,0,0,.75)}31.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes f-top{0%,31.2%{opacity:.4;transform:none;z-index:1;box-shadow:none}32.6%,41.8%{opacity:1;transform:scale(2.38);z-index:30;box-shadow:0 0 0 .22em #eaffb0,0 1.6em 4em rgba(0,0,0,.75)}43.2%,77%{opacity:.4;transform:none;z-index:1;box-shadow:none}79%,100%{opacity:1;transform:none;z-index:1;box-shadow:none}}
+  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,53.8%{opacity:1;transform:scale(2.085);z-index:30;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}55.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
+  @keyframes f-stat{0%,55.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}56.6%,65.8%{opacity:1;transform:scale(2.38);z-index:30;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
   @keyframes r-bal{0%,18%{opacity:0}18.8%,29.6%{opacity:1}30.4%,100%{opacity:0}}
   @keyframes r-top{0%,32%{opacity:0}32.8%,41.6%{opacity:1}42.4%,100%{opacity:0}}
   @keyframes r-prog{0%,44%{opacity:0}44.8%,53.6%{opacity:1}54.4%,100%{opacity:0}}
@@ -559,7 +559,7 @@
           <img class="el e-f2" src="./img/card-f2.webp" alt="">
           <span class="glint"></span>
         </div>
-        <span class="strike" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 L3 14 h9 l-1 8 10-12 h-9 l1-8 z"/></svg></span>
+        <span class="strike" aria-hidden="true"><svg viewBox="0 0 784 927" preserveAspectRatio="xMidYMid meet" fill="currentColor"><path d="M491.3 387.2 L735.7 0 L0 578.8 L376.5 558.1 L202 926.5 L784.1 366.6 Z"/></svg></span>
         <!-- Макет кабинета — с главной b00m.fun (Cabinet.vue): те же имя,
              статус, цифры и приз. Хост в шапке — кабинет ЭТОГО парка. -->
         <div class="phone" aria-hidden="true">
@@ -615,7 +615,7 @@
       <div class="qr-lead">Наведи камеру</div>
       <div class="path have">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg></span>
-        <div><div class="q">Есть карта?</div><div class="a">Открой личный кабинет</div></div>
+        <div><div class="q">Личный кабинет</div><div class="a">Есть карта?</div></div>
       </div>
       <div class="path new" id="path-new">
         <span class="ticket"><b>+500</b><small>ЗАРЯДОВ</small></span>
