@@ -27,7 +27,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.4'
+const PAGE_VERSION = 'v2.5'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -191,9 +191,29 @@ const BOLT = '<span class="zap" aria-hidden="true">'
   + '<i class="spark"></i>'.repeat(8)
   + '</span>'
 
+/* Оффер: «Заряди карту» + слово лаймом. «онлайн» и «сейчас» (offer_b_alt)
+   сменяют друг друга табло-перещёлкиванием: каждая буква — своё окошко,
+   прокручивает случайные буквы и встаёт на новую, слева направо (tickOffer).
+   Ширина окошка — по самой широкой из двух букв на этом месте (sizeOffer),
+   поэтому строка не дёргается. */
+const WORDS = [T.offer_b, T.offer_b_alt || T.offer_b]
+const WLEN = Math.max(...WORDS.map((w) => [...w].length))
+const wordAt = (k) => [...WORDS[k]].concat(Array(WLEN).fill('')).slice(0, WLEN)
 function renderOffer() {
+  const w = wordAt(0)
   document.getElementById('offer').innerHTML =
-    `<span class="oa">${esc(T.offer_a)}</span> <b class="ob">${esc(T.offer_b)}</b>`
+    `<span class="oa">${esc(T.offer_a)}</span> <b class="ob">${w.map((ch) => `<span class="ol">${esc(ch)}</span>`).join('')}</b>`
+}
+function sizeOffer() {
+  const fs = parseFloat(getComputedStyle(document.getElementById('offer')).fontSize) || 1
+  document.querySelectorAll('#offer .ol').forEach((el, i) => {
+    const cur = el.textContent
+    el.style.width = 'auto'
+    let max = 0
+    WORDS.forEach((_, k) => { el.textContent = wordAt(k)[i]; max = Math.max(max, el.offsetWidth) })
+    el.textContent = cur
+    el.style.width = `${(max / fs).toFixed(3)}em`
+  })
 }
 
 /**
@@ -281,9 +301,54 @@ function renderSteps(p) {
 
 /** Строка «на кассе»: «Не хватило — докинем…» — по парку. Тикеты за
     наличные переехали в карточки (решение владельца 01.10). */
+/* Строка «докинем»: вопрос («Не хватило?») — крупно сверху, ответ под ним,
+   «без очереди» — лаймом. Слева — счётчик баланса карты (renderMeter). */
 function renderInfo(p) {
-  document.getElementById('hall').textContent = p.topup_in_hall ? T.topup_in_hall : ''
+  const t = String(T.topup_in_hall || '')
+  const cut = t.indexOf('?') + 1
+  const q = cut > 0 ? t.slice(0, cut) : ''
+  const a = (cut > 0 ? t.slice(cut) : t).trim()
+  document.getElementById('hall').innerHTML = p.topup_in_hall
+    ? `${q ? `<span class="hq"><span class="fit fs-hq">${esc(q)}</span></span> ` : ''}<span class="ha"><span class="fit fs-ha">${esc(a).replace('без очереди', '<b>без очереди</b>')}</span></span>`
+    : ''
   document.getElementById('info').hidden = !p.topup_in_hall
+  renderMeter()
+}
+
+/* Счётчик баланса: механические барабаны цифр, как на счётчике. Сумма —
+   «на карте» основной карточки (2 025 ⚡): стекает до нуля («не хватило»),
+   ноль мигает розовым, потом «докинули» — сумма возвращается (tickMeter). */
+const METER_FROM = (() => { const o = DATA.offers.find((x) => x.main) || DATA.offers[0]; return o.sum + giftFor(o.sum) })()
+const METER_N = String(METER_FROM).length
+const METER_BOLT = '<svg class="mbolt" viewBox="0 0 784.1 926.5"><path d="M491.3,387.2 L735.7,0 L0,578.8 L376.5,558.1 L202,926.5 L784.1,366.6Z"/></svg>'
+function renderMeter() {
+  const m = document.getElementById('meter')
+  if (!m) return
+  let html = ''
+  for (let k = METER_N - 1; k >= 0; k--) {
+    html += `<span class="col" data-k="${k}"><span class="strip">${'01234567890'.split('').map((d) => `<i>${d}</i>`).join('')}</span></span>`
+    if (k === 3) html += '<span class="th"></span>'
+  }
+  m.innerHTML = html + METER_BOLT
+  setMeter(REDUCED ? 0 : METER_FROM, REDUCED ? 'empty' : '')
+}
+/* Барабан k стоит на цифре floor(v/10^k) и докручивается, когда младшие
+   разряды проходят через 9 → 0 — как у механического счётчика. */
+function setMeter(v, state) {
+  const m = document.getElementById('meter')
+  if (!m) return
+  m.querySelectorAll('.col').forEach((c) => {
+    const k = Number(c.dataset.k)
+    const p = 10 ** k
+    const whole = Math.floor(v / p)
+    const lower = v - whole * p
+    const pos = (whole % 10) + Math.max(0, lower - (p - 1))
+    c.style.setProperty('--p', pos.toFixed(3))
+    c.classList.toggle('lead', k > 0 && Math.floor(v) < p)
+  })
+  m.dataset.v = String(Math.round(v))
+  m.classList.toggle('empty', state === 'empty')
+  m.classList.toggle('refill', state === 'refill')
 }
 
 /** QR — только при включённом онлайне. Выключен — плитки нет совсем. */
@@ -482,6 +547,7 @@ function fitStage() {
   stageScale = k
 
   const offer = document.getElementById('offer')
+  sizeOffer()
   fitCount(offer, portrait ? 112 : 104, 40)
   fitUniform('.fs-x', 84, 30)
   fitUniform('.fs-sum', 60, 26)
@@ -496,7 +562,11 @@ function fitStage() {
     fitUniform('.fs-ssum', 30, 14)
     fitUniform('.fs-sgift', 40, 16)
   }
-  fitUniform('.fs-info', 28, 16)
+  /* Строки «докинем» может не быть (парк не найден) — подгоняем то, что есть */
+  const hq = document.querySelector('.fs-hq')
+  const ha = document.querySelector('.fs-ha')
+  if (hq) fitCount(hq, 48, 20)
+  if (ha) fitCount(ha, 34, 16)
   fitQr()
 }
 
@@ -668,6 +738,63 @@ function cardMs(card) {
   return Math.round(Math.max(halfAt(card) + n * FACE_STEP_MS, FILL_MS + POUR_MS + 100 + COUNT_MS + BRAG_MS + 300))
 }
 
+/* ── 6б. Табло оффера и счётчик баланса — по часам экрана (clockNow) ──────
+   Один цикл кадров на обе анимации. Время — clockNow(): на паузе плеера
+   экранов оно стоит, и табло со счётчиком замирают вместе со всем экраном. */
+const HOLD_MS = 4200        // слово стоит
+const LETTER_MS = 420       // одна буква перещёлкивается
+const STAGGER_MS = 80       // следующая буква начинает позже
+const TICK_MS = 55          // смена случайной буквы
+const LAND_MS = 260         // буква «встала» — короткая вспышка
+const FLIP_MS = LETTER_MS + (WLEN - 1) * STAGGER_MS
+const OFFER_CYCLE = 2 * (HOLD_MS + FLIP_MS)
+const SCRAMBLE = [...'абвгдезиклнопрстухчэя']
+const rnd = (a, b, c) => { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x) }
+
+function tickOffer(t) {
+  const lt = t % OFFER_CYCLE
+  const n = Math.floor(t / OFFER_CYCLE)
+  const half = HOLD_MS + FLIP_MS
+  const from = lt < half ? 0 : 1
+  const to = 1 - from
+  const fs = (lt < half ? 0 : half) + HOLD_MS     // начало перещёлкивания
+  const A = wordAt(from)
+  const B = wordAt(to)
+  document.querySelectorAll('#offer .ol').forEach((el, i) => {
+    const local = lt - fs - i * STAGGER_MS
+    let ch = A[i]
+    let cls = ''
+    if (local >= LETTER_MS) { ch = B[i]; if (local < LETTER_MS + LAND_MS) cls = 'land' }
+    else if (local >= 0) {
+      const b = Math.floor(local / TICK_MS)
+      ch = SCRAMBLE[Math.floor(rnd(i, b, n * 2 + from) * SCRAMBLE.length)]
+      cls = b % 2 ? 'spin ta' : 'spin tb'
+    }
+    if (el.textContent !== ch) el.textContent = ch
+    if (el.className !== `ol ${cls}`.trim()) el.className = `ol ${cls}`.trim()
+  })
+}
+
+const METER_CYCLE = 5600
+function tickMeter(t) {
+  const lt = t % METER_CYCLE
+  if (lt < 600) return setMeter(METER_FROM, '')
+  if (lt < 3000) { const u = (lt - 600) / 2400; return setMeter(METER_FROM * (1 - u * u), '') }
+  if (lt < 4400) return setMeter(0, 'empty')
+  if (lt < 5000) { const u = (lt - 4400) / 600; return setMeter(METER_FROM * (1 - (1 - u) ** 3), 'refill') }
+  return setMeter(METER_FROM, 'refill')
+}
+
+let frameT0 = null
+function frame() {
+  const now = clockNow()
+  if (frameT0 === null) frameT0 = now
+  const t = now - frameT0
+  tickOffer(t)
+  if (document.querySelector('#meter .col')) tickMeter(t)
+  requestAnimationFrame(frame)
+}
+
 /* ── 7. Жизненный цикл ───────────────────────────────────────────────────── */
 render()
 fitStage()
@@ -679,6 +806,7 @@ if (REDUCED) {
   document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('done'))
 } else if (PARKS[park]) {
   cycleTimer = later(cycleCards, 700)
+  requestAnimationFrame(frame)
 }
 
 /* ── Плеер экранов (loyalty ⇄ kassa) и выбор парка — media/shared/screens.js.
@@ -701,6 +829,7 @@ if (PARKS[park]) {
       stopCards()
       clockResume()
       active = -1
+      frameT0 = null           // табло и счётчик — тоже с начала
       restartAnimations()
       if (!REDUCED) cycleTimer = later(cycleCards, 700)
     },

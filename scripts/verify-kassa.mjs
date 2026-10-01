@@ -69,14 +69,15 @@ const PHASES = ['p1', 'p2', 'p3']
 // сумму — 200 за 1 000 ₽, 500 за 5 000 ₽; только Охта и Питерленд. Из трёх
 // карточек (1 500 / 3 000 / 5 000) тикеты есть лишь у 5 000.
 const SPEC_PARKS = {
-  ohta: { name: 'Охта Молл', online: true, hall: false, tickets: [0, 0, 500],
+  ohta: { name: 'Охта Молл', online: true, hall: true, tickets: [0, 0, 500],
     qr: 'https://b00m.fun/popolnit/ohtamall?from=kassa-tv' },
   piterland: { name: 'Питерленд', online: true, hall: true, tickets: [0, 0, 500],
     qr: 'https://b00m.fun/popolnit/piterland?from=kassa-tv' },
   iyun: { name: 'ТЦ Июнь', online: true, hall: true, tickets: null,
     qr: 'https://b00m.fun/popolnit/june?from=kassa-tv' },
 }
-const HALL = 'Не хватило — докинем без очереди: скажите сотруднику в зале'
+// Строка «докинем» — во всех парках, текст владельца 01.10
+const HALL = 'Не хватило? Докинем без очереди — скажи сотруднику в зале'
 const OFFER = 'Заряди карту онлайн'
 const QR_LEAD = 'Докинуть на карту без очереди'
 const QR_CAPTION = 'Баланс, тикеты и статус — в твоём телефоне'
@@ -252,6 +253,11 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     stepCount: d.querySelectorAll('#ladder .step').length,
     infoShown: !$('info').hidden,
     hall: sp($('hall').textContent),
+    hallQ: sp($('hall').querySelector('.fs-hq')?.textContent),
+    hallMark: sp($('hall').querySelector('.fs-ha b')?.textContent),
+    meterCols: d.querySelectorAll('#meter .col .strip').length,
+    meterBolt: !!d.querySelector('#meter svg.mbolt path[d^="M491.3,387.2"]'),
+    offerSlots: d.querySelectorAll('#offer .ob .ol').length,
     cashRow: !!$('row-tickets'),
     qrShown: !$('qr-tile').hidden,
     qrD: $('qr-path').getAttribute('d') || '',
@@ -320,6 +326,9 @@ ok('цвета карточек: лайм · голубой · розовый, �
   ok('в стилях у каждого цвета свой оттенок', Object.values(toneC).every(Boolean) && new Set(Object.values(toneC)).size === 3, JSON.stringify(toneC))
 }
 ok('средняя цена игры — 70 ₽, как на /rewards', DATA.game_price === 70, String(DATA.game_price))
+ok('слова оффера: «онлайн» ⇄ «сейчас», одной длины (табло меняет буквы место в место)',
+   DATA.text.offer_b === 'онлайн' && DATA.text.offer_b_alt === 'сейчас' && [...DATA.text.offer_b].length === [...DATA.text.offer_b_alt].length)
+ok('строка «докинем» включена во всех парках (владелец 01.10)', Object.values(DATA.parks).every((p) => p.topup_in_hall === true))
 ok('полоса ступеней выключена (решение владельца 01.10)', DATA.show_steps === false)
 ok('парков ровно три, коды как у турбо', DATA.park_order.join() === 'ohta,piterland,iyun')
 for (const [code, s] of Object.entries(SPEC_PARKS)) {
@@ -403,6 +412,11 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   }
   ok(`${code}: строка докидки ${s.hall ? 'есть' : 'нет'}`,
      s.hall ? r.infoShown && r.hall === HALL : !r.infoShown && !r.text.includes('докинем'))
+  if (s.hall) {
+    ok(`${code}: «Не хватило?» — крупно отдельной строкой, «без очереди» подсвечено`, r.hallQ === 'Не хватило?' && r.hallMark === 'без очереди', `${r.hallQ} / ${r.hallMark}`)
+    ok(`${code}: вместо иконки — счётчик баланса (4 барабана цифр, молния владельца)`, r.meterCols === 4 && r.meterBolt, String(r.meterCols))
+  }
+  ok(`${code}: слово оффера — табло из 6 окошек`, r.offerSlots === 6, String(r.offerSlots))
   ok(`${code}: QR на экране`, r.qrShown && r.qrD === KASSA_QR[code].d && r.qrUrl === s.qr, r.qrUrl)
   ok(`${code}: над QR «${QR_LEAD}», «без очереди» выделено`, r.qrLead === QR_LEAD && r.qrMark === 'без очереди', r.qrLead)
   ok(`${code}: подпись QR — целиком синяя, без тёмной половины`, r.qrCap === QR_CAPTION && !r.qrCapBold, r.qrCap)
@@ -495,6 +509,7 @@ console.log('\n── Движение: «перелей воду» по оче�
   await wait(1300)   // X1 +4,7 — ещё держит ход: обе грани показаны, «красуется» досматривается
   c = r.cards()
   ok('пока плашка не показала все грани — ход не переходит', c[0].on && !c[1].on, c.map((x) => x.on).join())
+
   ok('«барабан» закончился чисто: видна одна грань, меток смены нет',
      c.every((x) => x.faces.filter((f) => f.on).length === 1) && !r.d.querySelector('.face.roll-in, .face.roll-out'))
 
@@ -527,6 +542,30 @@ console.log('\n── Движение: «перелей воду» по оче�
   const zc = z.cards()
   ok('без движения: сосуды спокойные, итоги стоят, плашки на бонусе',
      zc.every((x) => !x.phase && !x.on) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000' && kinds(zc) === 'gift,gift,gift')
+  z.window.close()
+}
+
+console.log('\n── Счётчик баланса и табло «онлайн ⇄ сейчас» ──')
+{
+  // Отдельный прогон: ждём состояния по очереди, а не по секундомеру —
+  // часы экрана стоят на заставке плеера, и сдвиг старта плавает.
+  const r = await run('?park=ohta&tv=1')
+  r.window.boomScreens?.register({ id: 'loyalty', cycleMs: () => 42400, restart() {}, pause() {}, resume() {}, update() {} })
+  const meter = () => ({ v: Number(r.d.getElementById('meter').dataset.v), cls: r.d.getElementById('meter').className })
+  const word = () => sp(r.d.querySelector('#offer b').textContent)
+  const until = async (pred, ms) => { const t0 = Date.now(); while (!pred() && Date.now() - t0 < ms) await wait(20); return pred() }
+  ok('счётчик стоит полным: 2 025', meter().v === 2025, String(meter().v))
+  ok('счётчик стекает: барабаны крутятся вниз', await until(() => meter().v > 0 && meter().v < 2000, 9000), String(meter().v))
+  ok('слово пока «онлайн»', word() === 'онлайн', word())
+  ok('счётчик дошёл до нуля — розовый, мигает', await until(() => meter().v === 0 && /empty/.test(meter().cls), 4000), `${meter().v} ${meter().cls}`)
+  ok('табло перещёлкивает буквы (случайные буквы по пути)', await until(() => !['онлайн', 'сейчас'].includes(word()), 3000), word())
+  ok('и встаёт на «сейчас»', await until(() => word() === 'сейчас', 2000), word())
+  ok('счётчик «докинули» — снова 2 025, лаймом', await until(() => meter().v === 2025 && /refill/.test(meter().cls), 3000), `${meter().v} ${meter().cls}`)
+  ok('и обратно на «онлайн»', await until(() => word() === 'онлайн', 7000), word())
+  r.window.close()
+  const z = await run('?park=ohta', { reduced: true })
+  await wait(300)
+  ok('без движения: табло стоит на «онлайн», счётчик — на нуле', sp(z.d.querySelector('#offer b').textContent) === 'онлайн' && z.d.getElementById('meter').dataset.v === '0')
   z.window.close()
 }
 
@@ -598,7 +637,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.4 · собрано ДД.ММ»', /^v2\.4 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.5 · собрано ДД.ММ»', /^v2\.5 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
