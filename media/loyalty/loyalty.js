@@ -14,12 +14,13 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { LOYALTY_QR } from './loyalty-qr.js'
+import { initScreens, isEmbedded, pauseAnimations, restartAnimations } from '../shared/screens.js'
 
 /* ── 0. Конфиг ───────────────────────────────────────────────────────────── */
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v6.5'
+const PAGE_VERSION = 'v7.0'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -36,6 +37,12 @@ const PARKS = {
   iyun:      { name: 'ТЦ Июнь',   host: 'JUN.B00M.FUN', bonus: true },
 }
 const PARK_ORDER = ['ohta', 'piterland', 'iyun']
+
+/* Длина круга сцены, мс — ровно длительность @keyframes сцены в index.html
+   (animation: … 42.4s). По ней плеер (media/shared/screens.js) в режиме
+   «цикл» держит экран ровно один круг. Поменяли длительность в CSS —
+   поменяйте и здесь. */
+const SCENE_MS = 42400
 
 /* Статусы. Пороги, скидки, «≈ игр за 1 500 ₽» и цвета — ровно из
    BoomRewards.vue (b00m.fun/rewards). Владелец подтвердил 30.09: «цифры
@@ -134,23 +141,8 @@ function renderPaths(p) {
   document.body.classList.toggle('no-bonus', !p.bonus)
 }
 
-/** Переключатель парков — как у турбо: при ?park= скрыт. */
-function renderParks() {
-  const box = document.getElementById('parks')
-  if (FIXED) { box.hidden = true; document.body.classList.remove('has-parks'); return }
-  box.hidden = false
-  document.body.classList.add('has-parks')
-  box.innerHTML = PARK_ORDER
-    .map((code) => `<button data-park="${code}"${code === park ? ' class="on"' : ''}>${esc(PARKS[code].name)}</button>`)
-    .join('')
-  box.querySelectorAll('button').forEach((b) => {
-    b.addEventListener('click', () => {
-      park = b.dataset.park
-      try { localStorage.setItem(PARK_KEY, park) } catch {}
-      render()
-    })
-  })
-}
+/* Переключатель парков — выпадающий список на плашке «БУМБАСТИК // парк»
+   (media/shared/screens.js, общий с экраном кассы). */
 
 function renderPark() {
   const p = PARKS[park]
@@ -178,7 +170,6 @@ function renderPark() {
 }
 
 function render() {
-  renderParks()
   renderPark()
   renderLevels()
   fitStage()
@@ -304,10 +295,23 @@ render()
 
 /* Суточный самоперезапуск в 05:00 по Москве — как у турбо: забрать новую
    сборку и не копить утечки. */
-if (TV) {
+if (TV && !isEmbedded()) {   // встроенную в плеер перезапускает хозяин
   setInterval(() => {
     if (/ 05:00 /.test(mskStamp(new Date()))) location.reload()
   }, 60000)
+}
+
+/* Выбор парка и плеер экранов (loyalty ⇄ kassa) */
+if (PARKS[park]) {
+  initScreens({
+    id: 'loyalty',
+    park,
+    parks: PARKS,
+    parkOrder: PARK_ORDER,
+    cycleMs: () => SCENE_MS,
+    restart: restartAnimations,
+    pause: pauseAnimations,
+  })
 }
 
 /* ── 6. Песочница (?demo=1) — в бой не идёт ─────────────────────────────── */

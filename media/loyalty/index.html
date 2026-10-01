@@ -119,12 +119,11 @@
     border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
   .brand-badge .sep{color:var(--lime)}
-  .parks{position:absolute;right:18px;top:50%;transform:translateY(-50%);display:flex;gap:5px;background:rgba(255,255,255,.06);border-radius:14px;padding:5px}
-  .parks button{background:transparent;border:none;color:var(--muted);font-family:'Inter';font-weight:700;font-size:15px;padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap}
-  .parks button.on{background:var(--blue);color:#fff}
-  .parks[hidden]{display:none}
+  /* Справа — плеер экранов (loyalty ⇄ kassa), разметку кладёт
+     media/shared/screens.js. Парк выбирается списком на плашке слева. */
+  .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%)}
   body.portrait .head .slogan{position:absolute;right:26px;font-size:24px}
-  body.portrait.has-parks .head .slogan{display:none}
+  body.portrait.has-screens .head .slogan{display:none}
 
   /* ══ 1. СЦЕНА «КАРТА ↔ КАБИНЕТ» ══════════════════════════════════════
      Окна цикла 30 с (проценты — одни и те же во всех @keyframes ниже):
@@ -679,7 +678,8 @@
       </span>
     </div>
     <div class="slogan">Играй больше — <b>плати меньше</b></div>
-    <div class="parks" id="parks" hidden></div>
+    <!-- Плеер экранов — заполняет media/shared/screens.js -->
+    <div class="slot" id="screens" aria-hidden="true"></div>
   </header>
 
   <!-- 1. СЦЕНА «КАРТА ↔ КАБИНЕТ» — окна цикла описаны в CSS у .scene -->
