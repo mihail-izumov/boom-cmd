@@ -161,6 +161,7 @@
   .cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;opacity:0;animation:30s linear infinite}
   .cap .t{font-family:'Unbounded';font-weight:900;font-size:4.2em;line-height:1.06}
   .cap .t b{color:var(--lime)}
+  .cap .nb{white-space:nowrap}   /* «нон-стоп» не рвём по дефису */
   .cap .s{font-size:2em;font-weight:700;color:var(--soft);margin-top:.4em;line-height:1.3}
   .cap.c7 .t{font-size:4.8em;text-transform:uppercase;line-height:1}
   .cap.c7 .t b{display:block}
@@ -177,33 +178,28 @@
   @keyframes cap6{0%,67%{opacity:0;transform:translateY(14px)}67.8%,75.2%{opacity:1;transform:none}76%,100%{opacity:0}}
   @keyframes cap7{0%,76%{opacity:0;transform:scale(.94)}77%,99.2%{opacity:1;transform:none}100%{opacity:0}}
 
-  /* ── КАРТА — РЕАЛЬНЫЙ МАКЕТ «Новая игровая карта», вариант 1 (лайм),
-     лицевая сторона один в один: boom-cmd/public/materials/new-game-card_v2.jpg.
-     Карта = однотонная основа (#3b4470, цвет фона макета) + 8 ОТДЕЛЬНЫХ
-     элементов макета, вырезанных с прозрачным фоном (img/card-*.webp):
-     «Играть», БУМБАСТИК, табло B00M.FUN, БООМ!, «Это умная карта», номер,
-     «Копит заряды», «Начисляет бонусы». Координаты — из макета 486×775 px,
-     переведены в em карты (27em = 486px); вырезает build_card_layers.py,
-     он же перекрашивает лайм макета в --lime экрана. Элементы по очереди
-     ложатся на основу и ОСТАЮТСЯ на карте всё время (и когда она в фоне);
-     при передаче каждый по очереди вспыхивает — «отдаёт заряд».
-     ⚠ Не резать макет полосами: полоса несёт кусок фона и режет элементы
-     пополам — на панели это читалось как рваные прямоугольники (v5.1). */
+  /* ── КАРТА — векторный макет лицевой стороны от владельца (01.10):
+     card-src/card-front.svg. Карта = основа цвета фона макета (#2c2a6c)
+     + 7 слоёв (img/card-*.svg, каждый во весь холст карты): «ИГРАТЬ»,
+     БУМБАСТИК, БООМ!, «Это умная карта», номер, «Майнит тикеты»,
+     «Бустит заряды». Слои собирает build_card_layers.py, он же
+     перекрашивает оранжевый акцент макета в --lime экрана. Слои по
+     очереди ложатся на основу и остаются на карте всё время; при передаче
+     каждый вспыхивает. */
   .card{
-    position:absolute;left:16.5em;top:16.5em;width:27em;height:43em;border-radius:2.8em;
-    background:#3b4470;
+    position:absolute;left:16.5em;top:16.7em;width:27em;height:42.6em;border-radius:2.8em;
+    background:#2c2a6c;
     animation:card-orb 30s ease-in-out infinite, jolt-card 30s linear infinite;
   }
   .card::after{content:'';position:absolute;inset:0;border-radius:inherit;border:.25em solid rgba(150,170,255,.55);pointer-events:none}
-  .card .el{position:absolute;display:block;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
-  .card .e-tab{left:7.500em;top:0.000em;width:12.111em;height:5.389em;animation-name:el0}
-  .card .e-name{left:1.333em;top:6.333em;width:24.333em;height:4.167em;animation-name:el1}
-  .card .e-site{left:1.389em;top:11.056em;width:24.556em;height:5.611em;animation-name:el2}
-  .card .e-boom{left:1.500em;top:16.889em;width:24.333em;height:7.278em;animation-name:el3}
-  .card .e-smart{left:1.389em;top:24.889em;width:24.389em;height:3.778em;animation-name:el4}
-  .card .e-num{left:2.833em;top:29.278em;width:3.000em;height:11.167em;animation-name:el5}
-  .card .e-f1{left:7.222em;top:29.278em;width:18.778em;height:5.833em;animation-name:el6}
-  .card .e-f2{left:7.222em;top:35.000em;width:18.778em;height:5.444em;animation-name:el7}
+  .card .el{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
+  .card .e-tab{animation-name:el0}
+  .card .e-name{animation-name:el1}
+  .card .e-boom{animation-name:el2}
+  .card .e-smart{animation-name:el3}
+  .card .e-num{animation-name:el4}
+  .card .e-f1{animation-name:el5}
+  .card .e-f2{animation-name:el6}
   @keyframes el0{0%,0.80%{opacity:0;transform:translateY(-2.5em) scale(1.25)}2.20%{opacity:1;transform:translateY(.2em) scale(.97)}2.80%,11.00%{opacity:1;transform:none;filter:none}11.60%{opacity:1;transform:scale(1.1);filter:brightness(1.8) drop-shadow(0 0 .8em rgba(198,245,46,.9))}12.40%,71.20%{opacity:1;transform:none;filter:none}71.80%{opacity:1;transform:scale(1.1);filter:brightness(1.8) drop-shadow(0 0 .8em rgba(198,245,46,.9))}72.60%,99.2%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
   @keyframes el1{0%,1.35%{opacity:0;transform:translateY(-2.5em) scale(1.25)}2.75%{opacity:1;transform:translateY(.2em) scale(.97)}3.35%,11.30%{opacity:1;transform:none;filter:none}11.90%{opacity:1;transform:scale(1.1);filter:brightness(1.8) drop-shadow(0 0 .8em rgba(198,245,46,.9))}12.70%,71.50%{opacity:1;transform:none;filter:none}72.10%{opacity:1;transform:scale(1.1);filter:brightness(1.8) drop-shadow(0 0 .8em rgba(198,245,46,.9))}72.90%,99.2%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
   @keyframes el2{0%,1.90%{opacity:0;transform:translateY(-2.5em) scale(1.25)}3.30%{opacity:1;transform:translateY(.2em) scale(.97)}3.90%,11.60%{opacity:1;transform:none;filter:none}12.20%{opacity:1;transform:scale(1.1);filter:brightness(1.8) drop-shadow(0 0 .8em rgba(198,245,46,.9))}13.00%,71.80%{opacity:1;transform:none;filter:none}72.40%{opacity:1;transform:scale(1.1);filter:brightness(1.8) drop-shadow(0 0 .8em rgba(198,245,46,.9))}73.20%,99.2%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:translateY(-2.5em) scale(1.25)}}
@@ -349,7 +345,6 @@
   .ph-ava svg{width:2.6em;height:2.6em;fill:#fff;shape-rendering:crispEdges}
   .ph-name{font-family:'Unbounded';font-weight:700;font-size:1.3em}
   .ph-status{display:flex;align-items:center;gap:.4em;margin-top:.2em}
-  .ph-status i{width:.5em;height:.5em;border-radius:50%;background:var(--green)}
   .ph-status b{font-family:'Unbounded';font-weight:700;font-size:.9em;color:var(--st);letter-spacing:.08em}
 
   .f-bal{margin-top:1em;padding:.6em}
@@ -599,23 +594,22 @@
         <div class="caps">
           <div class="cap c0"><div class="t">Заряжай <b>онлайн</b></div><div class="s">Баланс, тикеты и статус — в одном месте</div></div>
           <div class="cap c1"><div class="t">Виртуальная <b>карта</b></div><div class="s">Заряжай в телефоне — играй в парке</div></div>
-          <div class="cap c2"><div class="t">Баланс <b>в кармане</b></div><div class="s">Развлечения нон-стоп</div></div>
+          <div class="cap c2"><div class="t">Развлечения <b class="nb">нон-стоп</b></div><div class="s">Быстро намайнить на крутой приз</div></div>
           <div class="cap c3"><div class="t">Пополняй <b>онлайн</b></div><div class="s">Быстро докинуть — играть без очереди</div></div>
           <div class="cap c4"><div class="t">Прогресс <b>до приза</b></div><div class="s">Мотивация на виду каждый день</div></div>
           <div class="cap c5"><div class="t">Статус <b>растёт</b></div><div class="s">Одна карта — больше скидка</div></div>
-          <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
+          <div class="cap c6"><div class="t">Не выбрасывать. <b>Заряжено!</b></div><div class="s">Умная карта — майнит тикеты, бустит заряды</div></div>
           <div class="cap c7"><div class="t"><b>Не стой</b>в очереди</div></div>
         </div>
-        <!-- Карта гостя — реальный макет: основа + 8 отдельных элементов -->
+        <!-- Карта гостя — векторный макет владельца: основа + 7 слоёв -->
         <div class="card" aria-hidden="true">
-          <img class="el e-tab" src="./img/card-tab.webp" alt="">
-          <img class="el e-name" src="./img/card-name.webp" alt="">
-          <img class="el e-site" src="./img/card-site.webp" alt="">
-          <img class="el e-boom" src="./img/card-boom.webp" alt="">
-          <img class="el e-smart" src="./img/card-smart.webp" alt="">
-          <img class="el e-num" src="./img/card-num.webp" alt="">
-          <img class="el e-f1" src="./img/card-f1.webp" alt="">
-          <img class="el e-f2" src="./img/card-f2.webp" alt="">
+          <img class="el e-tab" src="./img/card-tab.svg" alt="">
+          <img class="el e-name" src="./img/card-name.svg" alt="">
+          <img class="el e-boom" src="./img/card-boom.svg" alt="">
+          <img class="el e-smart" src="./img/card-smart.svg" alt="">
+          <img class="el e-num" src="./img/card-num.svg" alt="">
+          <img class="el e-f1" src="./img/card-f1.svg" alt="">
+          <img class="el e-f2" src="./img/card-f2.svg" alt="">
           <span class="glint"></span>
           <span class="sparks"><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i><i class="sp"><svg viewBox="0 0 10 10"><path d="M5 0 L6.2 3.8 L10 5 L6.2 6.2 L5 10 L3.8 6.2 L0 5 L3.8 3.8 Z"/></svg></i></span>
         </div>
@@ -628,10 +622,10 @@
             <div class="ph-host"><img class="ph-logo" src="./img/logo-white.svg" alt="БумБастик"></div>
             <div class="ph-card">
               <div class="fz f-stat">
-                <div class="who p0" style="--av:#3d47a0;--st:#FFD60A"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="4" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="8" y="3" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="3" y="7" width="1" height="1"/><rect x="4" y="8" width="4" height="1"/><rect x="8" y="7" width="1" height="1"/></svg></span><div><div class="ph-name">Артём К.</div><div class="ph-status"><i></i><b>ЗОЛОТОЙ</b></div></div></div>
-                <div class="who p1" style="--av:#c2187a;--st:#00D4FF"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="3" y="3" width="2" height="2"/><rect x="7" y="3" width="2" height="2"/><rect x="5" y="7" width="2" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="7" y="8" width="1" height="1"/><rect x="5" y="9" width="2" height="1"/></svg></span><div><div class="ph-name">Алина М.</div><div class="ph-status"><i></i><b>СЕРЕБРЯНЫЙ</b></div></div></div>
-                <div class="who p2" style="--av:#1b8a6b;--st:#FF5CAA"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="3" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="8" y="4" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="3" y="7" width="6" height="1"/><rect x="4" y="8" width="4" height="1"/></svg></span><div><div class="ph-name">Тимур Б.</div><div class="ph-status"><i></i><b>ПЛАТИНОВЫЙ</b></div></div></div>
-                <div class="who p3" style="--av:#7a3fd1;--st:#FFD60A"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="4" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="7" y="3" width="2" height="2"/><rect x="4" y="7" width="1" height="1"/><rect x="5" y="8" width="2" height="1"/><rect x="7" y="7" width="1" height="1"/></svg></span><div><div class="ph-name">Вика Р.</div><div class="ph-status"><i></i><b>ЗОЛОТОЙ</b></div></div></div>
+                <div class="who p0" style="--av:#3d47a0;--st:#FFD60A"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="4" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="8" y="3" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="3" y="7" width="1" height="1"/><rect x="4" y="8" width="4" height="1"/><rect x="8" y="7" width="1" height="1"/></svg></span><div><div class="ph-name">Артём К.</div><div class="ph-status"><b>ЗОЛОТОЙ</b></div></div></div>
+                <div class="who p1" style="--av:#c2187a;--st:#00D4FF"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="3" y="3" width="2" height="2"/><rect x="7" y="3" width="2" height="2"/><rect x="5" y="7" width="2" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="7" y="8" width="1" height="1"/><rect x="5" y="9" width="2" height="1"/></svg></span><div><div class="ph-name">Алина М.</div><div class="ph-status"><b>СЕРЕБРЯНЫЙ</b></div></div></div>
+                <div class="who p2" style="--av:#1b8a6b;--st:#FF5CAA"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="3" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="8" y="4" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="3" y="7" width="6" height="1"/><rect x="4" y="8" width="4" height="1"/></svg></span><div><div class="ph-name">Тимур Б.</div><div class="ph-status"><b>ПЛАТИНОВЫЙ</b></div></div></div>
+                <div class="who p3" style="--av:#7a3fd1;--st:#FFD60A"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="4" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="7" y="3" width="2" height="2"/><rect x="4" y="7" width="1" height="1"/><rect x="5" y="8" width="2" height="1"/><rect x="7" y="7" width="1" height="1"/></svg></span><div><div class="ph-name">Вика Р.</div><div class="ph-status"><b>ЗОЛОТОЙ</b></div></div></div>
               </div>
               <div class="fz f-bal">
                 <div class="ph-balance">Баланс: <b>1 200 ₽</b></div>
