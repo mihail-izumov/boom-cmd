@@ -316,7 +316,8 @@
   .fz{position:relative;border-radius:.9em;opacity:.4;animation:30s ease-in-out infinite;transform-origin:center;
       backdrop-filter:blur(.8em);-webkit-backdrop-filter:blur(.8em)}
   .fz::before{
-    content:'';position:absolute;inset:-.75em;border-radius:1.4em;padding:.38em;pointer-events:none;
+    content:'';position:absolute;inset:-.75em;border-radius:1.65em;padding:.38em;  /* радиус блока .9em + отступ .75em — кольцо соосно плашке */
+    pointer-events:none;
     background:repeating-conic-gradient(from var(--ang), var(--rc) 0deg 7deg, transparent 7deg 14deg);
     -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask-composite:exclude;
@@ -411,37 +412,61 @@
   .lvl{grid-area:lvl;justify-content:space-between;gap:16px;padding:0 24px 20px;box-shadow:inset 0 0 0 4px var(--lime)}
   .lvl-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 -24px;padding:14px 26px;background:var(--lime);color:var(--dark)}
   .lvl-kicker{flex:none;font-family:'Unbounded';font-weight:900;font-size:30px;letter-spacing:1px;white-space:nowrap}
-  .lvl-rule{min-width:0;text-align:right;font-size:19px;font-weight:800;line-height:1.25}
+  .lvl-rule{flex:none;white-space:nowrap;background:var(--dark);color:var(--lime);font-family:'Unbounded';font-weight:700;font-size:17px;letter-spacing:.3px;border-radius:999px;padding:8px 16px}
   .ladder{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+  /* Ступени: волна идёт снизу вверх, по 3 с на ступень (цикл 12 с).
+     В свою очередь ступень приподнимается, иконка сильно вырастает,
+     следом — скидка и бейдж «+игры». Платина, поднимаясь, упирается в
+     плашку «ИГРОВОЙ СТАТУС», трясётся и даёт трещину — вот-вот пробьёт. */
   .step{
-    --c:#fff;position:relative;border-radius:18px;padding:14px 16px 14px;
+    --c:#fff;position:relative;border-radius:18px;padding:14px 14px 16px;
     background:linear-gradient(180deg, color-mix(in srgb, var(--c) 20%, transparent) 0%, rgba(255,255,255,.03) 100%);
     border:2px solid var(--c);
-    display:flex;flex-direction:column;justify-content:flex-end;gap:6px;min-height:max-content;
-    animation:lit 8s ease-in-out infinite;
+    display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:8px;min-height:max-content;
+    animation:lit 12s ease-in-out infinite;
   }
-  .step:nth-child(1){height:70%;animation-delay:0s}
-  .step:nth-child(2){height:80%;animation-delay:2s}
-  .step:nth-child(3){height:90%;animation-delay:4s}
-  .step:nth-child(4){height:100%;animation-delay:6s}
+  .step:nth-child(1){height:72%}
+  .step:nth-child(2){height:82%}
+  .step:nth-child(3){height:91%}
+  .step:nth-child(4){height:100%;animation-name:lit-top;z-index:3}
+  .step:nth-child(2){--d:3s}.step:nth-child(3){--d:6s}.step:nth-child(4){--d:9s}
   @keyframes lit{
-    0%,3%{transform:translateY(0);box-shadow:none}
-    8%,22%{transform:translateY(-8px);box-shadow:0 0 0 3px var(--c), 0 14px 40px color-mix(in srgb, var(--c) 55%, transparent)}
-    28%,100%{transform:translateY(0);box-shadow:none}
+    0%,2%{transform:none;box-shadow:none}
+    6%,20%{transform:translateY(-10px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 55%, transparent)}
+    26%,100%{transform:none;box-shadow:none}
   }
-  .step .s-ico{width:42px;height:42px;color:var(--c)}
-  .step .s-name,.step .s-disc{width:100%}
-  .step .fs-name{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:24px;color:var(--c)}
-  .step[data-id="standard"] .fs-name{color:#b4b4c4}
-  .step .fs-disc{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1}
-  .step .s-lbl{font-size:15px;font-weight:800;color:var(--soft);letter-spacing:.5px;text-transform:uppercase}
-  /* Сменная строка: две фразы в одном месте, по 8 с каждая */
-  .alt{position:relative;height:2.6em;font-size:19px;font-weight:700;line-height:1.3;color:var(--soft)}
-  .alt span{position:absolute;inset:0;animation:16s ease-in-out infinite}
-  .alt span b{color:var(--white)}
-  .alt .a1{animation-name:alt1}.alt .a2{animation-name:alt2}
-  @keyframes alt1{0%,46%{opacity:1;transform:none}50%,96%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:none}}
-  @keyframes alt2{0%,46%{opacity:0;transform:translateY(8px)}50%,96%{opacity:1;transform:none}100%{opacity:0;transform:translateY(8px)}}
+  @keyframes lit-top{
+    0%,2%{transform:none;box-shadow:none}
+    6%{transform:translateY(-22px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 60%, transparent)}
+    7%{transform:translateY(-16px) rotate(-1deg)}8%{transform:translateY(-22px) rotate(1deg)}
+    9%{transform:translateY(-17px) rotate(-1.2deg)}10%{transform:translateY(-22px) rotate(.8deg)}
+    11%{transform:translateY(-16px) rotate(-.6deg)}12%{transform:translateY(-22px) rotate(1deg)}
+    13%{transform:translateY(-17px) rotate(-1deg)}14%{transform:translateY(-22px) rotate(.5deg)}
+    16%,20%{transform:translateY(-20px);box-shadow:0 0 0 3px var(--c), 0 16px 44px color-mix(in srgb, var(--c) 60%, transparent)}
+    26%,100%{transform:none;box-shadow:none}
+  }
+  /* Плашка-«потолок» вздрагивает в такт ударам Платины */
+  .lvl-head{position:relative;z-index:2;animation:ceil-hit 12s linear 9s infinite}
+  @keyframes ceil-hit{0%,5.5%{transform:none}6.5%{transform:translateY(-3px)}8%{transform:translateY(-1px) rotate(.3deg)}9.5%{transform:translateY(-3px) rotate(-.3deg)}11%{transform:translateY(-1px)}12.5%{transform:translateY(-3px) rotate(.2deg)}15%,100%{transform:none}}
+  .step .crack{position:absolute;left:12%;right:12%;top:-34px;height:34px;opacity:0;pointer-events:none;color:#fff;filter:drop-shadow(0 0 6px var(--c));animation:crack 12s steps(1) infinite}
+  .step .crack svg{width:100%;height:100%;display:block}
+  @keyframes crack{0%,6.5%{opacity:0}7%,19%{opacity:1}20%,100%{opacity:0}}
+
+  .step .s-ico{width:52px;height:52px;color:var(--c);transform-origin:left bottom;animation:pop-ico 12s ease-in-out infinite}
+  @keyframes pop-ico{0%,3%{transform:none}8%,18%{transform:scale(1.7)}24%,100%{transform:none}}
+  .step .fs-name{font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.1;color:var(--c)}
+  .step[data-id="standard"] .fs-name{color:#d0d0de}
+  .step .s-disc{width:100%}
+  .step .fs-disc{display:inline-block;white-space:nowrap;font-family:'Unbounded';font-weight:900;font-size:64px;line-height:1;transform-origin:left center;animation:pop-disc 12s ease-in-out infinite}
+  @keyframes pop-disc{0%,6%{transform:none}10%,19%{transform:scale(1.08)}24%,100%{transform:none}}
+  .step .s-thr{font-size:19px;font-weight:800;color:var(--soft);white-space:nowrap}
+  .step .plus{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:22px;background:var(--c);color:var(--dark);border-radius:10px;padding:5px 12px;white-space:nowrap;transform-origin:left center;animation:pop-plus 12s ease-in-out infinite}
+  .step .plus sup{font-size:.6em;vertical-align:.6em;margin-left:1px}
+  @keyframes pop-plus{0%,9%{transform:none}13%,19%{transform:scale(1.25) rotate(-3deg)}24%,100%{transform:none}}
+  /* Сноска к «+игры» — вне ячеек, полупрозрачно */
+  /* задержка волны — после всех shorthand-ов animation, иначе они её сбрасывают */
+  .step,.step .s-ico,.step .fs-disc,.step .plus,.step .crack{animation-delay:var(--d,0s)}
+  .lvl-note{font-size:16px;font-weight:700;color:var(--soft);opacity:.55;text-align:right;margin-top:-6px}
 
   /* ══ 3. QR — выбор: «есть карта → кабинет» или «новый → +500 на старт».
      Нарратив второго пути — с наклейки «Бонус на старт» (bonus500):
@@ -453,7 +478,26 @@
   }
   .qr-frame{position:relative;flex:none;width:var(--qr,380px);height:var(--qr,380px);padding:16px}
   .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
-  .qr-frame .cn{position:absolute;width:52px;height:52px;border:7px solid var(--blue);animation:aim 2.4s ease-in-out infinite}
+  /* Видоискатель: раз в 10 с «рука» неровно наводит рамку, она ловит код,
+     защёлкивается по центру — и вспышка, как будто сделан снимок. Двигается
+     только рамка из уголков; сам QR стоит на месте и читается всегда. */
+  .qr-frame .aimbox{position:absolute;inset:0;animation:aim-hand 10s ease-in-out infinite}
+  @keyframes aim-hand{
+    0%{transform:translate(-7%,5%) rotate(-4deg) scale(1.1)}
+    12%{transform:translate(6%,-4%) rotate(3deg) scale(1.06)}
+    24%{transform:translate(-4%,-6%) rotate(-2deg) scale(1.08)}
+    36%{transform:translate(5%,4%) rotate(1.5deg) scale(1.04)}
+    48%{transform:translate(-2%,2%) rotate(-.8deg) scale(1.03)}
+    58%{transform:translate(.8%,-.6%) rotate(.3deg) scale(1.01)}
+    66%{transform:none}
+    70%{transform:scale(.95)}
+    73%,92%{transform:none}
+    100%{transform:translate(-7%,5%) rotate(-4deg) scale(1.1)}
+  }
+  .qr-frame .cn{position:absolute;width:52px;height:52px;border:7px solid var(--blue);animation:lock 10s steps(1) infinite}
+  @keyframes lock{0%,68%{border-color:var(--blue)}69%,92%{border-color:#21c45a}93%,100%{border-color:var(--blue)}}
+  .qr-frame .flash{position:absolute;inset:8px;border-radius:12px;background:#fff;opacity:0;pointer-events:none;animation:flash 10s ease-out infinite}
+  @keyframes flash{0%,73%{opacity:0}74.5%{opacity:.95}84%,100%{opacity:0}}
   .qr-frame .c1{left:0;top:0;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
   .qr-frame .c2{right:0;top:0;border-left:none;border-bottom:none;border-radius:0 16px 0 0}
   .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
@@ -551,12 +595,11 @@
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
     .card,.card::after,.card .sparks,.card .sp,.card .el,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.who,.soon,.ph-fill,.ph-fill::after,
-    .step,.alt span,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
+    .step,.step *,.lvl-head,.qr-frame .aimbox,.qr-frame .flash,.ticket,.stamp .rl.spin svg{animation:none}
     .card .el{opacity:1;transform:none}
     .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
     .cap.c7{opacity:1}
     .fz{opacity:1}
-    .alt .a2{opacity:0}
   }
 </style>
 </head>
@@ -599,11 +642,11 @@
         <div class="caps">
           <div class="cap c0"><div class="t">Заряжай <b>онлайн</b></div><div class="s">Баланс, тикеты и статус — в одном месте</div></div>
           <div class="cap c1"><div class="t">Виртуальная <b>карта</b></div><div class="s">Заряжай в телефоне — играй в парке</div></div>
-          <div class="cap c2"><div class="t">Развлечения <b class="nb">нон-стоп</b></div><div class="s">Быстро намайнить на крутой приз</div></div>
+          <div class="cap c2"><div class="t">Буст <b>зарядов</b></div><div class="s">Быстро намайнить на крутой приз</div></div>
           <div class="cap c3"><div class="t">Пополняй <b>онлайн</b></div><div class="s">Быстро докинуть — играть без очереди</div></div>
-          <div class="cap c4"><div class="t">Прогресс <b>до приза</b></div><div class="s">Мотивация на виду каждый день</div></div>
+          <div class="cap c4"><div class="t">Дроп <b>призов</b></div><div class="s">Подкопить на крутой приз</div></div>
           <div class="cap c5"><div class="t">Статус <b>растёт</b></div><div class="s">Одна карта — больше скидка</div></div>
-          <div class="cap c6"><div class="t">Не выбрасывать. <b>Заряжено!</b></div><div class="s">Умная карта — майнит тикеты, бустит заряды</div></div>
+          <div class="cap c6"><div class="t"><b>Заряжено</b></div><div class="s">Умная карта — майнит тикеты, бустит заряды</div></div>
           <div class="cap c7"><div class="t"><b>Не стой</b>в очереди</div></div>
         </div>
         <!-- Карта гостя — векторный макет владельца: основа + 7 слоёв -->
@@ -661,16 +704,18 @@
   <section class="tile lvl">
     <div class="lvl-head">
       <span class="lvl-kicker">ИГРОВОЙ СТАТУС</span>
-      <span class="lvl-rule">Уровень растёт автоматически и не понижается</span>
+      <span class="lvl-rule">Всегда растёт на твоей карте</span>
     </div>
     <div class="ladder" id="ladder"></div>
+    <div class="lvl-note">* дополнительные игры при каждом пополнении на 1 500 ₽</div>
   </section>
 
   <!-- 3. QR — выбор пути. Путь кода подставляет loyalty.js по парку -->
   <section class="tile qr-tile" id="qr-tile">
     <div class="qr-frame" id="qr-frame">
-      <i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i>
+      <span class="aimbox"><i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i></span>
       <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: личный кабинет"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
+      <span class="flash"></span>
     </div>
     <div class="qr-text" id="qr-text">
       <div class="qr-lead">Наведи камеру</div>

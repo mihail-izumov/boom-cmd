@@ -19,7 +19,7 @@ import { LOYALTY_QR } from './loyalty-qr.js'
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v6.1'
+const PAGE_VERSION = 'v6.2'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -46,7 +46,7 @@ const PARK_ORDER = ['ohta', 'piterland', 'iyun']
    Выключатель на случай, если цифры снова окажутся под вопросом. */
 const SHOW_LEVEL_NUMBERS = true
 const LEVELS = [
-  { id: 'standard', name: 'Стандарт', threshold: 0,     discount: 0,  games: 21, color: '#6B6B7C', icon: 'bow' },
+  { id: 'standard', name: 'Новая карта', threshold: 0,     discount: 0,  games: 21, color: '#6B6B7C', icon: 'bow' },
   { id: 'silver',   name: 'Серебро',  threshold: 5000,  discount: 15, games: 25, color: '#00D4FF', icon: 'swords' },
   { id: 'gold',     name: 'Золото',   threshold: 10500, discount: 30, games: 30, color: '#FFD60A', icon: 'medal' },
   { id: 'platinum', name: 'Платина',  threshold: 45000, discount: 50, games: 42, color: '#FF0080', icon: 'crown' },
@@ -102,18 +102,19 @@ const LEVEL_ICONS = {
  */
 function renderLevels() {
   const box = document.getElementById('ladder')
-  box.innerHTML = LEVELS.map((l) => {
-    const games = `<b>≈${l.games}\u00a0игр</b> за 1\u00a0500\u00a0₽`
+  const base = LEVELS[0].games
+  const plural = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'игра' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'игры' : 'игр')
+  const crack = '<i class="crack"><svg viewBox="0 0 100 30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M50 30 L46 18 L53 12 L48 2"/><path d="M46 18 L34 14 L28 4"/><path d="M53 12 L66 9 L72 1"/><path d="M34 14 L20 16"/><path d="M66 9 L80 13"/></svg></i>'
+  box.innerHTML = LEVELS.map((l, i) => {
+    const plus = l.games - base
     const body = !showNumbers
       ? ''
       : `<div class="s-disc"><span class="fs-disc">${l.discount ? `−${l.discount}%` : '0%'}</span></div>
-         <div class="s-lbl">${l.discount ? 'скидка' : 'базовый'}</div>
-         <div class="alt">
-           <span class="a1">${l.threshold ? `от <b>${fmt(l.threshold)}\u00a0₽</b> на игры` : 'с первой игры'}</span>
-           <span class="a2">${games}</span>
-         </div>`
+         ${l.threshold ? `<div class="s-thr">от ${fmt(l.threshold)} ₽</div>` : ''}
+         ${plus > 0 ? `<span class="plus">+${plus} ${plural(plus)}<sup>*</sup></span>` : ''}`
     return `
       <div class="step" data-id="${l.id}" style="--c:${l.color}">
+        ${i === LEVELS.length - 1 ? crack : ''}
         <svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LEVEL_ICONS[l.icon] || ''}</svg>
         <div class="s-name"><span class="fs-name">${esc(l.name)}</span></div>
         ${body}
@@ -291,7 +292,6 @@ function fitStage() {
   stageEl.style.transform = `scale(${k})`
   stageScale = k
   fitScene()
-  fitUniform('.fs-name', 24, 12)
   fitUniform('.fs-disc', 72, 28)
   fitQr()
 }
