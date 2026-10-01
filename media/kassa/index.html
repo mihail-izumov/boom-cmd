@@ -32,8 +32,8 @@
        2 025 ⚡» снизу (пополнение — рубли, на карте — заряды, отсюда
        молния). По очереди (1 500 → 3 000 → 5 000) верхний наливается,
        наклоняется и льёт струёй в нижний; там деньги встают нижним слоем,
-       сверху доливается слой бонуса светлее, и число досчитывается до
-       итога — видно, как 1 500 превращаются в 2 025. Сосуд, который сейчас
+       сверху доливается бонус (жидкость светлеет кверху), и число
+       досчитывается до итога — видно, как 1 500 превращаются в 2 025. Сосуд, который сейчас
        не главный, уходит в тень.
        КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте»): однажды
        гости прочли «1 300 зарядов» наоборот, как цену.
@@ -213,36 +213,31 @@
   .lbl{font-size:19px;font-weight:800;color:var(--soft);letter-spacing:.6px;text-transform:uppercase;line-height:1.15}
 
   /* ══ СОСУДЫ: «пополнение» сверху, «на карте» снизу ═════════════════════
-     Окно — стеклянный сосуд: светлая кромка, блик слева, скруглённое дно.
+     Окно — сосуд: ровная подложка без рамок и бликов, скруглённое дно
+     (решение владельца 01.10: «чисто, без лишних обводок и бликов»).
      В нём два слоя текста: светлый (сам сосуд) и тёмный — в «жидкости»
      (.liq, копия с фоном цвета карточки). Жидкость обрезана по уровню
-     clip-path — буквы темнеют ровно там, где их накрыло. Над уровнем —
-     бегущая волна (.wave).
+     clip-path — край ровный, буквы темнеют ровно там, где их накрыло.
      Фазы активной карточки (kassa.js, countUp):
        p1 — наливается верхний, нижний пуст и в тени;
        p2 — верхний наклоняется и льёт струёй (.stream) в нижний: сверху
             уровень падает, снизу растёт слой денег до --split;
-       p3 — доливается слой бонуса (--c2, светлее) с пузырьками, число
-            досчитывается; пустой верхний — в тени (решение владельца 01.10).
-     Спокойная карточка: верхний пуст, нижний едва залит теми же двумя
-     слоями (::before), оба окна читаются. */
-  .slider{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;border-radius:24px;background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 2px rgba(255,255,255,.07);padding:6px}
+       p3 — доливается бонус: жидкость плавно светлеет кверху (--c → --c2,
+            без линии раздела), число досчитывается; пустой верхний — в тени.
+     Спокойная карточка: верхний пуст, нижний ровно чуть подкрашен
+     (::before), оба окна читаются. Ни одной линии поперёк текста. */
+  .slider{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
   .seg{
-    position:relative;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 14px 12px 22px;min-width:0;
-    border:3px solid rgba(255,255,255,.14);border-radius:16px 16px 30px 30px;overflow:hidden;
-    background:rgba(255,255,255,.025);
+    position:relative;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 20px 12px;min-width:0;
+    border-radius:18px 18px 30px 30px;overflow:hidden;
+    background:rgba(255,255,255,.05);
     transition:opacity .45s ease, filter .45s ease, transform .4s cubic-bezier(.3,0,.3,1);transform-origin:100% 100%;
   }
   /* Два окна — два равных сосуда */
   .seg-a,.seg-b{flex:1 1 0;min-height:0}
   .seg > .lbl,.seg > .fit-box{position:relative;z-index:1}
-  /* Блик стекла — тонкая полоска у левой стенки, поверх всего */
-  .seg::after{content:'';position:absolute;z-index:5;left:7px;top:14px;bottom:22px;width:5px;border-radius:3px;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.04) 85%)}
-  /* Спокойный нижний сосуд: деньги внизу, бонус над ними — едва-едва */
-  .seg-b::before{
-    content:'';position:absolute;z-index:0;inset:0;pointer-events:none;transition:opacity .45s ease;
-    background:linear-gradient(0deg, rgba(var(--cr),.15) 0 calc(var(--split,70%) - 1px), rgba(var(--cr),.4) calc(var(--split,70%) - 1px) calc(var(--split,70%) + 1px), rgba(var(--cr2),.10) calc(var(--split,70%) + 1px));
-  }
+  /* Спокойный нижний сосуд — ровная лёгкая заливка цветом карточки */
+  .seg-b::before{content:'';position:absolute;z-index:0;inset:0;pointer-events:none;background:rgba(var(--cr),.11);transition:opacity .45s ease}
   .card.on .seg-b::before{opacity:0}
 
   /* Жидкость. Уходит со сцены (карточка гаснет) — сперва тает, потом
@@ -252,7 +247,7 @@
     background:var(--c);clip-path:inset(100% 0 0 0);opacity:0;pointer-events:none;
     transition:opacity .5s ease, clip-path 0s linear .5s;
   }
-  .seg-b .liq{background:linear-gradient(0deg, var(--c) 0 calc(var(--split,70%) - 1px), rgba(13,10,46,.14) calc(var(--split,70%) - 1px) calc(var(--split,70%) + 1px), var(--c2) calc(var(--split,70%) + 1px))}
+  .seg-b .liq{background:linear-gradient(0deg, var(--c) 0 calc(var(--split,70%) - 8%), var(--c2) calc(var(--split,70%) + 8%))}
   .card.on .liq{opacity:1;transition:clip-path .9s cubic-bezier(.45,0,.3,1)}
   .card.p1 .seg-a .liq{clip-path:inset(0 0 0 0);transition-duration:.65s}
   .card.p2 .seg-b .liq{clip-path:inset(calc(100% - var(--split,70%)) 0 0 0)}
@@ -261,48 +256,18 @@
   .liq .lbl{color:rgba(13,10,46,.72)}
   .liq .fs-sum,.seg-b .liq .fs-card{color:var(--dark)}
   .liq .fs-card .bolt{fill:var(--dark);filter:none}
-  /* Пузырьки в слое бонуса */
-  .seg-b .liq::after{
-    content:'';position:absolute;inset:0;opacity:0;pointer-events:none;
-    background:
-      radial-gradient(circle at 12% 88%, rgba(255,255,255,.75) 0 5px, transparent 6px),
-      radial-gradient(circle at 34% 70%, rgba(255,255,255,.6) 0 3px, transparent 4px),
-      radial-gradient(circle at 58% 92%, rgba(255,255,255,.7) 0 6px, transparent 7px),
-      radial-gradient(circle at 76% 76%, rgba(255,255,255,.6) 0 4px, transparent 5px),
-      radial-gradient(circle at 90% 95%, rgba(255,255,255,.7) 0 3px, transparent 4px),
-      radial-gradient(circle at 46% 84%, rgba(255,255,255,.5) 0 2px, transparent 3px);
-  }
-  .card.p3 .seg-b .liq::after{animation:fizz 1.7s ease-out infinite}
-  @keyframes fizz{0%{opacity:0;transform:translateY(10%)}20%{opacity:1}100%{opacity:0;transform:translateY(-75%)}}
 
-  /* Волна над уровнем — гребешки цвета жидкости бегут вбок */
-  .wave{
-    --wc:var(--c);position:absolute;z-index:3;left:0;right:0;bottom:0;height:12px;pointer-events:none;opacity:0;
-    background:radial-gradient(circle at 50% 100%, var(--wc) 0 9px, transparent 10px) 0 100%/28px 12px repeat-x;
-    transition:opacity .3s ease, bottom 0s linear .5s;
-  }
-  .card.on .wave{animation:wave-x .9s linear infinite;transition:opacity .3s ease, bottom .9s cubic-bezier(.45,0,.3,1)}
-  @keyframes wave-x{to{background-position:28px 100%}}
-  .card.p1 .seg-a .wave{bottom:100%;opacity:1;transition-duration:.3s,.65s}
-  .card.p2 .seg-a .wave{bottom:0;opacity:1}
-  .card.p2 .seg-b .wave{bottom:var(--split,70%);opacity:1}
-  .card.p3 .seg-b .wave{--wc:var(--c2);bottom:100%;opacity:1;transition-duration:.3s,1s}
-
-  /* Струя: из-под угла верхнего сосуда в нижний, бежит вниз. Координаты —
+  /* Струя — ровная, цветом карточки: из-под угла верхнего сосуда в нижний,
+     у самой стенки, мимо букв (поля окна шире струи). Координаты —
      layoutStreams (kassa.js): --sx/--sy и длина --sh. Под жидкостью нижнего
      сосуда, поэтому «втекает» в неё. */
   .stream{
-    position:absolute;z-index:2;left:0;top:0;width:14px;height:var(--sh,0px);transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(0);transform-origin:50% 0;
-    border-radius:7px;pointer-events:none;
-    background:
-      linear-gradient(90deg, rgba(255,255,255,0) 15%, rgba(255,255,255,.55) 38%, rgba(255,255,255,0) 60%),
-      repeating-linear-gradient(180deg, var(--c) 0, var(--c2) 32px, var(--c) 64px) 0 0/100% 64px;
-    box-shadow:0 0 16px rgba(var(--cr),.5);
+    position:absolute;z-index:2;left:0;top:0;width:10px;height:var(--sh,0px);transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(0);transform-origin:50% 0;
+    border-radius:5px;pointer-events:none;background:var(--c);
     transition:transform .3s ease-in;
   }
-  .card.p2 .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(1);animation:flow .5s linear infinite}
+  .card.p2 .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(1)}
   .card.p3 .stream{transform-origin:50% 100%}
-  @keyframes flow{to{background-position:0 0, 0 64px}}
 
   /* Наклон верхнего сосуда, пока льёт; тень — у того, что сейчас не главный */
   .card.p2 .seg-a{transform:rotate(4deg)}
@@ -319,13 +284,13 @@
   @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
 
   /* Плашка бонуса — во всю ширину карточки, цветом карточки: у активной
-     залита, у спокойных — контуром. Грани одного бонуса сменяют друг друга
+     залита, у спокойных — лёгкой подложкой, без обводки. Грани одного бонуса сменяют друг друга
      (kassa.js, rotateFaces): «+525 бонус» → «≈ +7 игр бонус» → «+500
      тикетов за наличные». Все грани — в одной ячейке, видна одна. */
   .faces{flex:none;display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
   .face{
     grid-area:1/1;min-width:0;opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease, background-color .45s ease;
-    background:rgba(var(--cr),.14);box-shadow:inset 0 0 0 2px rgba(var(--cr),.55);border-radius:18px;padding:12px 18px 13px;
+    background:rgba(var(--cr),.14);border-radius:18px;padding:12px 18px 13px;
   }
   .face.on{opacity:1;transform:none}
   .face .fs-face{
@@ -333,7 +298,7 @@
     font-family:'Unbounded';font-weight:900;font-size:48px;line-height:1;color:var(--c);
   }
   .face .fs-face small{font-family:'Inter';font-weight:800;font-size:.46em;letter-spacing:.3px;line-height:1.1;color:var(--c2)}
-  .card.on .face{background:var(--c);box-shadow:none}
+  .card.on .face{background:var(--c)}
   .card.on .face .fs-face,.card.on .face .fs-face small{color:var(--dark)}
 
   /* Вертикаль: X слева, сосуды справа рядом — верхний льёт в соседний;
@@ -502,8 +467,8 @@
   }
 
   @media (prefers-reduced-motion: reduce){
-    .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg,.wave,.stream,.liq::after{animation:none}
-    .card,.seg,.liq,.wave,.stream,.face,.fs-card{transition:none}
+    .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg{animation:none}
+    .card,.seg,.liq,.stream,.face,.fs-card{transition:none}
   }
 </style>
 </head>

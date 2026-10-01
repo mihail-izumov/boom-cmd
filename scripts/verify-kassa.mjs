@@ -191,7 +191,7 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     liqHidden: [...c.querySelectorAll('.liq')].length === 2 && [...c.querySelectorAll('.liq')].every((l) => l.getAttribute('aria-hidden') === 'true'),
     bolt: !!c.querySelector('.seg-b > .fit-box .fs-card svg.bolt'),
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
-      && !!c.querySelector('.slider > .stream') && c.querySelectorAll('.slider .wave').length === 2,
+      && !!c.querySelector('.slider > .stream') && !c.querySelector('.wave'),
     toggle: !!c.querySelector('.toggle'),
     faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector('.fit-box > .fs-face')),
     faces: [...c.querySelectorAll('.face')].map((f) => ({
@@ -250,6 +250,16 @@ ok('цвета карточек: лайм · голубой · розовый, �
    DATA.offers.map((o) => o.tone).join() === SPEC_OFFERS.map((o) => o.tone).join() && new Set(DATA.offers.map((o) => o.tone)).size === DATA.offers.length,
    DATA.offers.map((o) => o.tone).join())
 {
+  // «Чисто» (решение владельца 01.10): у сосудов нет рамок и бликов, у
+  // плашек — обводок, в жидкости — волн, пузырьков и линий раздела слоёв.
+  const css = (html.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || ''
+  const rule = (sel) => (css.match(new RegExp(`(^|\\n)\\s*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\{([^}]*)\\}`)) || [])[2] || ''
+  ok('у сосуда нет рамки, под сосудами нет подложки с обводкой', rule('.seg') && !/border:/.test(rule('.seg')) && !/box-shadow|background/.test(rule('.slider')), rule('.slider'))
+  ok('бликов, волн и пузырьков нет', !/\.seg::after|\.wave|@keyframes (fizz|wave-x|flow)/.test(css))
+  ok('у плашек бонуса нет обводки', rule('.face') && !/box-shadow/.test(rule('.face')))
+  ok('слой бонуса без линии раздела — плавный переход', /\.seg-b \.liq\{background:linear-gradient\(0deg, var\(--c\) 0 calc\(var\(--split,70%\) - 8%\), var\(--c2\) calc\(var\(--split,70%\) \+ 8%\)\)\}/.test(css))
+}
+{
   // Цвета описаны в стилях страницы — у каждого тона свой --c
   const toneC = Object.fromEntries(SPEC_OFFERS.map((o) => [o.tone, (html.match(new RegExp(`\\.tone-${o.tone}[^{]*\\{--c:(#[0-9a-f]{6})`, 'i')) || [])[1] || '']))
   ok('в стилях у каждого цвета свой оттенок', Object.values(toneC).every(Boolean) && new Set(Object.values(toneC)).size === 3, JSON.stringify(toneC))
@@ -292,7 +302,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
        `${c.x} · ${c.sum} → ${c.card}`)
     ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: ${o.label} — два сосуда, струя и волны; подсветки и переключателя нет`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — два сосуда и струя; ни волн, ни подсветки, ни переключателя`, c.slider && !c.toggle)
     ok(`${code}: ${o.label} — цвет «${o.tone}»`, c.tone === `tone-${o.tone}`, c.tone)
     ok(`${code}: ${o.label} — «жидкость» с тем же текстом, скрыта от чтения`,
        c.liqHidden && c.liqSum === c.sum && c.liqNum === c.card, `${c.liqSum} / ${c.liqNum}`)
@@ -439,7 +449,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.4 · собрано ДД.ММ»', /^v1\.4 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.5 · собрано ДД.ММ»', /^v1\.5 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
