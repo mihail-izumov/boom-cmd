@@ -19,7 +19,7 @@ import { LOYALTY_QR } from './loyalty-qr.js'
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v5.3'
+const PAGE_VERSION = 'v5.4'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -102,8 +102,6 @@ const LEVEL_ICONS = {
  */
 function renderLevels() {
   const box = document.getElementById('ladder')
-  document.getElementById('lvl-max').hidden = !showNumbers
-  document.getElementById('lvl-pct').textContent = `до −${Math.max(...LEVELS.map((l) => l.discount))}%`
   box.innerHTML = LEVELS.map((l) => {
     const games = `<b>≈${l.games}\u00a0игр</b> за 1\u00a0500\u00a0₽`
     const body = !showNumbers
@@ -123,11 +121,11 @@ function renderLevels() {
   }).join('')
 }
 
-/* Подвал справа — правило статусов (FAQ b00m.fun/rewards), у всех парков
-   одинаковое. «+500» переехал в плитку QR вторым путём. */
+/* Подвал справа пуст: правило статусов переехало в плашку блока статусов,
+   «+500» — в плитку QR. Строку оставляем пустой, структура подвала — как у
+   турбо (экраны чередуются на одной панели). */
 function renderTerms() {
-  document.getElementById('terms').textContent =
-    'Уровень растёт автоматически и не понижается · работает во всех парках'
+  document.getElementById('terms').textContent = ''
 }
 
 /* Второй путь «+500 на старт» — только у парков с бонусом */
@@ -163,7 +161,6 @@ function renderPark() {
     return false
   }
   document.getElementById('brand-park').textContent = p.name
-  document.getElementById('ph-host').textContent = p.host
   renderTerms()
   renderPaths(p)
 
@@ -294,7 +291,6 @@ function fitStage() {
   stageEl.style.transform = `scale(${k})`
   stageScale = k
   fitScene()
-  fitCount(document.getElementById('lvl-pct'), 60, 24)
   fitUniform('.fs-name', 24, 12)
   fitUniform('.fs-disc', 72, 28)
   fitQr()

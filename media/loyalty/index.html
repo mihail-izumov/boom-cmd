@@ -189,7 +189,7 @@
   .card{
     position:absolute;left:16.5em;top:16.5em;width:27em;height:43em;border-radius:2.8em;
     background:#3b4470;
-    animation:card-orb 30s ease-in-out infinite;
+    animation:card-orb 30s ease-in-out infinite, jolt-card 30s linear infinite;
   }
   .card::after{content:'';position:absolute;inset:0;border-radius:inherit;border:.25em solid rgba(150,170,255,.55);pointer-events:none}
   .card .el{position:absolute;display:block;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
@@ -220,30 +220,44 @@
     14.5%{transform:translate(-18em,1em) scale(.86);z-index:3;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
     16.5%,67.5%{transform:translate(-14em,-4em) scale(.7);z-index:1;filter:brightness(.62) saturate(.8);box-shadow:0 1em 2em rgba(0,0,0,.4)}
     69.5%{transform:translate(-18em,1em) scale(.86);z-index:3;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
-    71.8%{transform:none;z-index:3;filter:brightness(1.7);box-shadow:0 0 0 .6em rgba(198,245,46,.9),0 0 6em rgba(198,245,46,.7)}
+    71.8%{transform:none;z-index:3;filter:none}
+    73.4%{transform:none;z-index:3;filter:brightness(1.8);box-shadow:0 0 0 .6em rgba(198,245,46,.9),0 0 6em rgba(198,245,46,.7)}
     74.5%,100%{transform:none;z-index:3;filter:none;box-shadow:0 3em 6em rgba(0,0,0,.6)}
   }
   @keyframes phone-orb{
     0%,12.5%{transform:translate(14em,-4em) scale(.7);z-index:1;filter:brightness(.5) saturate(.7);box-shadow:0 1em 2em rgba(0,0,0,.4)}
     14.5%{transform:translate(18em,1em) scale(.86);z-index:1;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
-    16.2%{transform:none;z-index:3;filter:brightness(1.6);box-shadow:0 0 0 .6em rgba(198,245,46,.9),0 0 6em rgba(198,245,46,.7)}
-    18.8%,67.5%{transform:none;z-index:3;filter:none;box-shadow:0 3em 7em rgba(255,0,128,.35)}
+    16.4%{transform:none;z-index:3;filter:none;box-shadow:0 3em 7em rgba(255,0,128,.35)}
+    17.8%{transform:none;z-index:3;filter:brightness(1.8);box-shadow:0 0 0 .6em rgba(198,245,46,.9),0 0 6em rgba(198,245,46,.7)}
+    19.4%,67.5%{transform:none;z-index:3;filter:none;box-shadow:0 3em 7em rgba(255,0,128,.35)}
     69.5%{transform:translate(18em,1em) scale(.86);z-index:1;filter:brightness(.85);box-shadow:0 2em 4em rgba(0,0,0,.5)}
     71.5%,100%{transform:translate(14em,-4em) scale(.7);z-index:1;filter:brightness(.5) saturate(.7);box-shadow:0 1em 2em rgba(0,0,0,.4)}
   }
 
-  /* МОЛНИЯ — прямо поверх того, кто вышел вперёд: в телефон (карта его
-     зарядила), на обратном ходе — в карту. Взрывов-кругов нет. */
-  .strike{position:absolute;left:18em;top:20em;width:24em;height:36em;z-index:8;pointer-events:none;opacity:0;color:var(--lime);
-          filter:drop-shadow(0 0 1em #fff) drop-shadow(0 0 3em rgba(198,245,46,.95));animation:strike 30s linear infinite}
+  /* МОЛНИЯ — на весь блок: возникает огромной, чуть выходит за края сцены
+     (летит на зрителя), затем сжимается и «уходит» в того, кто впереди —
+     в телефон (карта его заряжает), на обратном ходе — в карту. В момент
+     входа принимающий вздрагивает (jolt, отдельное свойство translate —
+     не мешает орбите на transform) и вспыхивает.
+     ⚠ Форма молнии — один <path> в разметке (.strike svg). Владелец
+       пришлёт свою иконку — заменить только path и viewBox. */
+  .strike{position:absolute;left:4em;top:4em;width:52em;height:60em;z-index:20;pointer-events:none;opacity:0;color:var(--lime);
+          transform-origin:50% 56%;
+          filter:drop-shadow(0 0 1em #fff) drop-shadow(0 0 3.5em rgba(198,245,46,.95));animation:strike 30s linear infinite}
   .strike svg{width:100%;height:100%;display:block}
   @keyframes strike{
-    0%,15.6%{opacity:0;transform:translateY(-8em) scale(.5)}
-    16.2%{opacity:1;transform:none}16.7%{opacity:.25}17.2%{opacity:1}17.7%{opacity:.4}18.2%{opacity:.9}
-    19%,71.2%{opacity:0;transform:translateY(-8em) scale(.5)}
-    71.8%{opacity:1;transform:none}72.3%{opacity:.25}72.8%{opacity:1}73.3%{opacity:.4}73.8%{opacity:.9}
-    74.6%,100%{opacity:0;transform:translateY(-8em) scale(.5)}
+    0%,15%{opacity:0;transform:scale(2.3) rotate(-10deg)}
+    15.6%{opacity:1;transform:scale(1.5) rotate(-5deg)}16.1%{opacity:.55}16.6%{opacity:1;transform:scale(1.15) rotate(-2deg)}
+    17.6%{opacity:1;transform:scale(.16) rotate(0)}
+    18%,70.6%{opacity:0;transform:scale(.08)}
+    71.2%{opacity:1;transform:scale(1.5) rotate(5deg)}71.7%{opacity:.55}72.2%{opacity:1;transform:scale(1.15) rotate(2deg)}
+    73.2%{opacity:1;transform:scale(.16) rotate(0)}
+    73.6%,100%{opacity:0;transform:scale(.08)}
   }
+  @keyframes jolt-phone{0%,17.5%{translate:0 0}17.8%{translate:-1em .4em}18.1%{translate:.9em -.5em}18.4%{translate:-.7em .3em}18.7%{translate:.5em -.2em}19%{translate:-.2em 0}19.3%,100%{translate:0 0}}
+  @keyframes jolt-card{0%,73.1%{translate:0 0}73.4%{translate:1em .4em}73.7%{translate:-.9em -.5em}74%{translate:.7em .3em}74.3%{translate:-.5em -.2em}74.6%{translate:.2em 0}74.9%,100%{translate:0 0}}
+  /* Сцена выпускает молнию за свои края — на зрителя */
+  .scene{overflow:visible;z-index:5}
 
   /* ── Телефон — макет кабинета с главной b00m.fun (Cabinet.vue), в em ── */
   .phone{
@@ -251,18 +265,22 @@
     background:linear-gradient(165deg,#1a1840,#0D1421);
     border:.25em solid rgba(255,0,128,.45);
     display:flex;flex-direction:column;
-    animation:phone-orb 30s ease-in-out infinite;z-index:1;
+    animation:phone-orb 30s ease-in-out infinite, jolt-phone 30s linear infinite;z-index:1;
   }
   .ph-screen{flex:1;display:flex;flex-direction:column}
   .ph-top{height:3em;flex:none}
-  .ph-host{display:flex;align-items:center;gap:.8em;padding:.4em 1.6em .6em;opacity:.85}
-  .ph-host svg{width:2.2em;height:1.4em}
-  .ph-host span{font-family:'Unbounded';font-weight:700;font-size:1em;color:var(--lime);letter-spacing:.06em}
+  .ph-host{display:flex;align-items:center;justify-content:center;padding:.4em 1.6em .8em}
+  /* Логотип БумБастик белым — тот же файл, что на b00m.fun (public/boombastic-icon-white.svg) */
+  .ph-logo{height:1.5em;width:auto;display:block}
   .ph-card{margin:.6em 1.2em;padding:1.2em;border-radius:1em;background:linear-gradient(135deg,rgba(34,32,80,.85),rgba(28,26,62,.9));border:.1em solid rgba(255,0,128,.15)}
 
   /* ФОКУС. Выделенный блок: плотная заливка + размытие под ним (ничего не
      просвечивает), рамка своего цвета и бегущие по часовой полоски (::before
      — кольцо conic-градиента, крутится --ang). Остальные притушены. */
+  /* ⚠ Ширина выделения у всех четырёх блоков одна — внутренняя ширина
+     телефона (23.5em): блоки внутри .ph-card шириной 18.5em растут ×1.27,
+     прогресс (21.1em) — ×1.114. Центр масштаба — центр блока, а блоки
+     стоят по центру телефона, поэтому выделение всегда по его оси. */
   .fz{position:relative;border-radius:.9em;opacity:.4;animation:30s ease-in-out infinite;transform-origin:center;
       backdrop-filter:blur(.8em);-webkit-backdrop-filter:blur(.8em)}
   .fz::before{
@@ -277,16 +295,16 @@
   .fz.f-top{--rc:var(--lime);animation-name:f-top,top-lime;animation-duration:30s,30s}.fz.f-top::before{animation-name:ring-spin,r-top}
   .fz.f-prog{--rc:var(--magenta);animation-name:f-prog}.fz.f-prog::before{animation-name:ring-spin,r-prog}
   .fz.f-stat{--rc:var(--lv-gold);animation-name:f-stat}.fz.f-stat::before{animation-name:ring-spin,r-stat}
-  @keyframes f-bal{0%,17.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}18.6%,29.8%{opacity:1;transform:scale(1.4);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lime),0 1.6em 4em rgba(0,0,0,.75)}31.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
-  @keyframes f-top{0%,31.2%{opacity:.4;transform:none;z-index:1;box-shadow:none}32.6%,41.8%{opacity:1;transform:scale(1.45);z-index:5;box-shadow:0 0 0 .22em #eaffb0,0 1.6em 4em rgba(0,0,0,.75)}43.2%,77%{opacity:.4;transform:none;z-index:1;box-shadow:none}79%,100%{opacity:1;transform:none;z-index:1;box-shadow:none}}
-  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,53.8%{opacity:1;transform:scale(1.4);z-index:5;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}55.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
-  @keyframes f-stat{0%,55.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}56.6%,65.8%{opacity:1;transform:scale(1.35);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes f-bal{0%,17.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}18.6%,29.8%{opacity:1;transform:scale(1.27);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lime),0 1.6em 4em rgba(0,0,0,.75)}31.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes f-top{0%,31.2%{opacity:.4;transform:none;z-index:1;box-shadow:none}32.6%,41.8%{opacity:1;transform:scale(1.27);z-index:5;box-shadow:0 0 0 .22em #eaffb0,0 1.6em 4em rgba(0,0,0,.75)}43.2%,77%{opacity:.4;transform:none;z-index:1;box-shadow:none}79%,100%{opacity:1;transform:none;z-index:1;box-shadow:none}}
+  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,53.8%{opacity:1;transform:scale(1.114);z-index:5;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}55.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
+  @keyframes f-stat{0%,55.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}56.6%,65.8%{opacity:1;transform:scale(1.27);z-index:5;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
   @keyframes r-bal{0%,18%{opacity:0}18.8%,29.6%{opacity:1}30.4%,100%{opacity:0}}
   @keyframes r-top{0%,32%{opacity:0}32.8%,41.6%{opacity:1}42.4%,100%{opacity:0}}
   @keyframes r-prog{0%,44%{opacity:0}44.8%,53.6%{opacity:1}54.4%,100%{opacity:0}}
   @keyframes r-stat{0%,56%{opacity:0}56.8%,65.6%{opacity:1}66.4%,100%{opacity:0}}
 
-  .f-stat{display:flex;align-items:center;gap:1em;padding:.5em .6em;transform-origin:35% 50%}
+  .f-stat{display:flex;align-items:center;gap:1em;padding:.5em .6em}
   .ph-ava{width:3.6em;height:3.6em;border-radius:50%;background:linear-gradient(135deg,#3d47a0,#4a5aad);display:grid;place-items:center;flex:none}
   .ph-ava svg{width:1.8em;height:1.8em;color:#fff}
   .ph-name{font-family:'Unbounded';font-weight:700;font-size:1.3em}
@@ -329,17 +347,12 @@
   /* ══ 2. B00M! СТАТУСЫ — горизонтальная лестница ═══════════════════════
      Под скидкой — одна строка, которая сменяется: порог ↔ «игр за 1 500 ₽».
      Меньше слов в моменте, крупнее кегль, а за 16 с читается всё. */
-  .lvl{grid-area:lvl;justify-content:space-between;gap:12px;padding:22px 24px 20px}
-  .lvl-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
-  .lvl-kicker{
-    display:inline-block;flex:none;font-family:'Unbounded';font-weight:900;font-size:26px;letter-spacing:1.5px;white-space:nowrap;
-    background:var(--lime);color:var(--dark);padding:7px 16px;border-radius:12px;transform:rotate(-2deg);
-    box-shadow:0 8px 24px rgba(198,245,46,.3);
-  }
-  .lvl-max{flex:1;min-width:0;text-align:right;line-height:1;white-space:nowrap}
-  .lvl-max[hidden]{display:none}
-  .lvl-max .pct{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:54px;color:var(--lv-platinum);animation:pct-glow 2.8s ease-in-out infinite}
-  @keyframes pct-glow{0%,100%{text-shadow:0 0 18px rgba(255,0,128,.35)}50%{text-shadow:0 0 40px rgba(255,0,128,.85)}}
+  /* Цветная плашка во всю ширину сверху + рамка того же цвета вокруг
+     всего блока — объединяют заголовок и лестницу в одно целое. */
+  .lvl{grid-area:lvl;justify-content:space-between;gap:16px;padding:0 24px 20px;box-shadow:inset 0 0 0 4px var(--lime)}
+  .lvl-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 -24px;padding:14px 26px;background:var(--lime);color:var(--dark)}
+  .lvl-kicker{flex:none;font-family:'Unbounded';font-weight:900;font-size:30px;letter-spacing:1px;white-space:nowrap}
+  .lvl-rule{min-width:0;text-align:right;font-size:19px;font-weight:800;line-height:1.25}
   .ladder{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
   .step{
     --c:#fff;position:relative;border-radius:18px;padding:14px 16px 14px;
@@ -479,7 +492,7 @@
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
     .card,.card .el,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
-    .step,.alt span,.lvl-max .pct,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
+    .step,.alt span,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
     .card .el{opacity:1;transform:none}
     .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
     .cap.c7{opacity:1}
@@ -532,7 +545,7 @@
           <div class="cap c4"><div class="t">Прогресс <b>до приза</b></div><div class="s">Мотивация на виду каждый день</div></div>
           <div class="cap c5"><div class="t">Статус <b>растёт</b></div><div class="s">Больше играешь — больше привилегий</div></div>
           <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
-          <div class="cap c7"><div class="t">Заряжай <b>онлайн</b></div><div class="s"><i>—</i> не стой в очереди</div></div>
+          <div class="cap c7"><div class="t">Не стой <b>в очереди</b></div><div class="s">Заряжай <i>онлайн</i></div></div>
         </div>
         <!-- Карта гостя — реальный макет: основа + 8 отдельных элементов -->
         <div class="card" aria-hidden="true">
@@ -552,10 +565,7 @@
         <div class="phone" aria-hidden="true">
           <div class="ph-screen">
             <div class="ph-top"></div>
-            <div class="ph-host">
-              <svg viewBox="0 0 241 153" style="fill-rule:evenodd"><g transform="matrix(1,0,0,1,-4601.23,-4106.91)"><g transform="matrix(8.77664e-18,0.143333,-0.353616,2.16527e-17,4841.38,4106.91)"><g><g transform="matrix(2.6863e-16,-1.77824,4.39328,1.0904e-16,-45825.6,8012.07)"><path d="M4368.24,10448.4L4505.63,10440.8C4505.63,10440.8 4501.3,10486.6 4491.87,10531.6C4475.88,10607.8 4458.86,10662.7 4458.86,10662.7L4260.49,10672.8L4350.14,10534.7L4325.11,10534.8L4365.12,10454.6L4365.14,10454.6L4365.8,10453.3L4368.24,10448.4ZM4272.15,10569.3L4296.18,10569.2L4253.91,10655.4L4123.72,10661.7C4123.72,10661.7 4131.45,10597.1 4145.77,10533.5C4160.78,10466.8 4170.9,10440.7 4170.9,10440.7L4363.5,10430.8L4272.15,10569.3ZM4447.79,10507.4C4446.91,10512.2 4445.97,10516.9 4444.97,10521.7C4436.79,10560.7 4428.35,10593.9 4422.2,10616.6L4337.79,10620.9L4381.48,10530.8C4405.55,10526.2 4427.95,10518.2 4447.79,10507.4ZM4204.13,10496.3C4221.83,10508.5 4242.25,10518.2 4264.55,10524.9L4223.35,10608.9L4179.57,10611C4182.92,10590.9 4187.26,10567.4 4192.52,10544C4196.91,10524.5 4200.83,10508.8 4204.13,10496.3Z" style="fill:#c6f52e"/></g></g></g></g></svg>
-              <span id="ph-host">LK.B00M.FUN</span>
-            </div>
+            <div class="ph-host"><img class="ph-logo" src="./img/logo-white.svg" alt="БумБастик"></div>
             <div class="ph-card">
               <div class="fz f-stat">
                 <span class="ph-ava"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18a2 2 0 0 0-4 0"/><path d="m19 11-2.11-6.657a2 2 0 0 0-2.752-1.148l-1.276.61A2 2 0 0 1 12 4H8.5a2 2 0 0 0-1.925 1.456L5 11"/><path d="M2 11h20"/><circle cx="17" cy="18" r="3"/><circle cx="7" cy="18" r="3"/></svg></span>
@@ -564,7 +574,7 @@
               <div class="fz f-bal">
                 <div class="ph-balance">Баланс: <b>1 200 ₽</b></div>
                 <div class="ph-stats">
-                  <div class="ph-stat tk"><small>Тикеты</small><b>5,020</b></div>
+                  <div class="ph-stat tk"><small>Тикеты</small><b>5020</b></div>
                   <div class="ph-stat bn"><small>Бонусы</small><b>300</b></div>
                 </div>
               </div>
@@ -589,8 +599,8 @@
   <!-- 2. B00M! СТАТУСЫ — ступени рисует loyalty.js из LEVELS -->
   <section class="tile lvl">
     <div class="lvl-head">
-      <span class="lvl-kicker">B00M! СТАТУСЫ</span>
-      <div class="lvl-max" id="lvl-max"><span class="pct" id="lvl-pct">до −50%</span></div>
+      <span class="lvl-kicker">ИГРОВОЙ СТАТУС</span>
+      <span class="lvl-rule">Уровень растёт автоматически и не понижается</span>
     </div>
     <div class="ladder" id="ladder"></div>
   </section>
@@ -609,7 +619,7 @@
       </div>
       <div class="path new" id="path-new">
         <span class="ticket"><b>+500</b><small>ЗАРЯДОВ</small></span>
-        <div><div class="q">Новый гость?</div><div class="a">Регайся и <i>забирай</i> — бонус на старт</div></div>
+        <div><div class="a">Регайся и <i>забирай</i> — бонус на старт</div></div>
       </div>
     </div>
   </section>
