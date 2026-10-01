@@ -37,7 +37,9 @@
     6. QR на страницу b00m.fun/popolnit/<парк>?from=kassa-tv — только если
        у парка включён онлайн; выключен — плитки QR нет, левая часть
        занимает всю ширину.
-    7. Штамп «v1.0 · собрано ДД.ММ» внизу слева, как у турбо.
+    7. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
+       v1.0 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
   (экраны будут чередоваться на одной панели). Отличия намеренные:
@@ -46,8 +48,10 @@
     · слогана «Играй больше — плати меньше» нет: оффер этого экрана сам
       начинается с «играй больше», а «плати меньше» над ценами читалось бы
       как обещание скидки;
-    · на экране НИЧЕГО НЕ НАЖИМАЕТСЯ: ни ссылок, ни кнопок, ни подсказки по
-      клику на штампе. Перезапуск — суточный, в режиме ТВ.
+    · у ГОСТЯ на экране ничего не нажимается: ни кнопок, ни ссылок в
+      содержании. Служебный подвал — как у соседей, по просьбе владельца
+      01.10: «Работает на Ранскеил», бейдж (время загрузки по Москве, версия,
+      дата сборки), подсказка по нажатию на бейдж и кнопка обновления ⟳.
 
   КАНВА — механизм турбо: эталон 1920×1080, k = min(vw/1920, vh/1080),
   кегли — замером (fitCount). Вертикаль: эталон 1080×1920, как у «Твоей карты».
@@ -288,14 +292,26 @@
   .stamp{
     flex:none;display:flex;align-items:center;gap:11px;
     background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
-    color:#cfcae8;border-radius:11px;padding:0 13px;
-    font-family:'Inter';font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap;
+    color:#cfcae8;border-radius:11px;padding:0 6px 0 13px;
+    font-family:'Inter';font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap;cursor:pointer;
   }
   .stamp .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
-  .stamp .when{color:#8f88bd}
-  /* «Работает на Ранскеил» — тот же вид, что у соседей, но не ссылка:
-     на этом экране ничего не нажимается. */
-  .powered{flex:none;display:inline-flex;align-items:center;background:var(--blue);color:var(--white);border-radius:11px;padding:0 15px;font-family:'Inter';font-weight:800;font-size:15px;letter-spacing:.3px;white-space:nowrap}
+  .stamp .ver{color:#8f88bd}
+  .stamp .rl{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none;background:rgba(255,255,255,.07);border:none;border-radius:8px;color:#cfcae8;cursor:pointer;padding:0}
+  .stamp .rl:hover{background:rgba(255,255,255,.14)}
+  .stamp .rl svg{width:17px;height:17px}
+  .stamp .rl.spin svg{animation:bc-spin .8s linear infinite}
+  @keyframes bc-spin{to{transform:rotate(360deg)}}
+  .powered{flex:none;display:inline-flex;align-items:center;background:var(--blue);color:var(--white);border-radius:11px;padding:0 15px;font-family:'Inter';font-weight:800;font-size:15px;letter-spacing:.3px;white-space:nowrap;text-decoration:none}
+  .powered:hover{filter:brightness(1.1)}
+  .hint{
+    position:absolute;left:150px;bottom:calc(100% + 8px);max-width:min(620px,70vw);
+    background:var(--tile2);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;padding:12px 15px;font-size:15px;font-weight:600;color:var(--white);line-height:1.4;
+    box-shadow:0 12px 30px rgba(0,0,0,.45);display:none;z-index:20;text-align:left;white-space:normal;
+  }
+  .hint.on{display:block}
+  .hint b{color:var(--lime)}
 
   .parkerr{position:fixed;inset:0;z-index:60;background:rgba(6,4,26,.86);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px}
   .parkerr.on{display:flex}
@@ -323,7 +339,7 @@
   }
 
   @media (prefers-reduced-motion: reduce){
-    .card.main,.step,.qr-frame .cn{animation:none}
+    .card.main,.step,.qr-frame .cn,.stamp .rl.spin svg{animation:none}
   }
 </style>
 </head>
@@ -394,14 +410,23 @@
     <div class="qr-text"><div class="qr-lead" id="qr-lead"></div><div class="qr-cap" id="qr-cap"></div></div>
   </section>
 
-  <!-- ПОДВАЛ — как у турбо, но без ссылок и кнопок -->
+  <!-- ПОДВАЛ — разметка как у турбо и «Твоей карты»: служебный бейдж
+       с временем загрузки, версией и кнопкой обновления ⟳ -->
   <div class="fineband">
+    <div class="hint" id="hint"></div>
     <div class="svc">
-      <span class="powered">Работает на Ранскеил</span>
-      <span class="stamp" id="stamp">
+      <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
+      <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
         <i class="dot"></i>
+        <span class="when" id="stamp-when">—</span>
         <span class="ver" id="stamp-ver">v—</span>
-        <span class="when" id="stamp-when"></span>
+        <button class="rl" id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+          </svg>
+        </button>
       </span>
     </div>
     <span class="terms" id="terms"></span>

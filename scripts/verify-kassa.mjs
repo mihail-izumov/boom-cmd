@@ -329,21 +329,36 @@ console.log('\n── Шапка, подвал, штамп ──')
   const r = await run('?park=ohta')
   ok('слот под переключатель экранов на месте и пуст', !!r.slot && r.slot.children.length === 0 && sp(r.slot.textContent) === '')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
-  ok('бейдж: версия носителя', /^v\d+\.\d+$/.test(r.stampVer), r.stampVer)
-  ok('штамп «· собрано ДД.ММ»', /^· собрано \d{2}\.\d{2}$/.test(r.stampWhen), r.stampWhen)
+  // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
+  ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
+  ok('бейдж: «v1.0 · собрано ДД.ММ»', /^v\d+\.\d+ · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
+  ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
+  r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
+  ok('бейдж: нажатие показывает подсказку', r.d.getElementById('hint').className.includes('on') &&
+     /Зелёная точка/.test(r.d.getElementById('hint').textContent))
   ok('иконка бренда инлайном в шапке', !!r.d.querySelector('.head .brand-icon path'))
   const turboHtml = readFileSync(resolve(OUT, 'media/turbo/index.html'), 'utf8')
   const fonts = (h) => (h.match(/fonts\.googleapis\.com\/css2\?[^"]+/) || [''])[0]
   ok('шрифты и веса — ровно как у турбо', fonts(html) && fonts(html) === fonts(turboHtml), fonts(html))
 }
 
-console.log('\n── Ничего не нажимается, ничего не грузится ──')
+console.log('\n── У гостя ничего не нажимается, ничего не грузится ──')
 {
+  // Нажимается только служебный подвал (как у турбо и «Твоей карты»):
+  // ссылка «Работает на Ранскеил», бейдж с подсказкой и ⟳. Всё остальное —
+  // содержание для гостя, там ни ссылок, ни кнопок быть не должно.
   const body = html.slice(html.indexOf('<body')).replace(/<!--[\s\S]*?-->/g, '')
-  ok('в разметке нет ссылок', !/<a[\s>]/i.test(body))
-  ok('в разметке нет кнопок и полей', !/<(button|input|select|textarea|form)[\s>]/i.test(body))
+  const r = await run('?park=ohta')
+  const page = r.d.querySelector('.page').cloneNode(true)
+  page.querySelector('.fineband').remove()
+  ok('в содержании для гостя нет ссылок', !page.querySelector('a'))
+  ok('в содержании для гостя нет кнопок и полей', !page.querySelector('button, input, select, textarea, form, [role=button]'))
+  const fineLinks = [...r.d.querySelectorAll('.fineband a')].map((a) => a.getAttribute('href'))
+  ok('в подвале одна ссылка — «Работает на Ранскеил»', fineLinks.join() === 'https://runscale.ru', fineLinks.join())
+  ok('в подвале одна кнопка — ⟳', [...r.d.querySelectorAll('.fineband button')].map((b) => b.id).join() === 'reload')
   ok('нет обработчиков в разметке', !/\son[a-z]+=/i.test(body))
-  ok('в коде нет обработчиков клика', !/addEventListener\(\s*["'](click|pointerdown|touchstart|keydown)/.test(bundle))
+  ok('в коде нет обработчиков касаний и клавиш', !/addEventListener\(\s*["'](pointerdown|touchstart|keydown)/.test(bundle))
   ok('в коде нет fetch / XHR / sendBeacon', !/\bfetch\(|XMLHttpRequest|sendBeacon/.test(bundle))
   ok('нет адресов Apps Script и Google-таблиц', !/script\.google|googleusercontent|docs\.google/.test(bundle + html))
   ok('нет переменных окружения (VITE_*)', !/VITE_[A-Z_]+/.test(bundle))

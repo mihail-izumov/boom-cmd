@@ -12,8 +12,9 @@
  *  стамп, режим ТВ, суточный перезапуск). Экраны будут чередоваться на одной
  *  панели — поведение обязано совпадать. Своего механизма не изобретаем.
  *
- *  ⚠ НА ЭКРАНЕ НИЧЕГО НЕ НАЖИМАЕТСЯ: ни одного обработчика клика. Слушаем
- *    только движение мыши — чтобы прятать курсор в режиме ТВ.
+ *  ⚠ У ГОСТЯ НА ЭКРАНЕ НИЧЕГО НЕ НАЖИМАЕТСЯ. Клики слушает только служебный
+ *    бейдж в подвале (подсказка и ⟳ «обновить») — как у турбо и «Твоей
+ *    карты». Движение мыши — чтобы прятать курсор в режиме ТВ.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import DATA from './kassa.data.json'
@@ -198,10 +199,18 @@ function render() {
   return true
 }
 
-/* ── 4. Служебный бейдж «v1.0 · собрано ДД.ММ» ──────────────────────────────
+/* ── 4. Служебный бейдж — как у турбо и «Твоей карты» ───────────────────────
+   «● 01.10 08:15 МСК   v1.0 · собрано 01.10   ⟳»
    У турбо время в бейдже — свежесть расписания. Здесь данных из сети нет,
-   поэтому это дата СБОРКИ по Москве: по ней видно, доехала ли до панели
-   последняя выкладка. */
+   поэтому время — момент загрузки страницы по Москве (видно, что панель жива
+   и суточный перезапуск отработал), а «собрано» — дата СБОРКИ: доехала ли
+   до панели последняя выкладка. ⟳ — перезагрузить страницу для персонала. */
+function mskStamp(d) {
+  try {
+    const s = d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    return `${s.replace(',', '')} МСК`
+  } catch { return '' }
+}
 function builtDay(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(s || ''))
   if (!m) return ''
@@ -210,9 +219,23 @@ function builtDay(s) {
     return d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit' })
   } catch { return `${m[3]}.${m[2]}` }
 }
-document.getElementById('stamp-ver').textContent = PAGE_VERSION
 const day = builtDay(BUILT)
-document.getElementById('stamp-when').textContent = day ? `· собрано ${day}` : ''
+document.getElementById('stamp-when').textContent = mskStamp(new Date())
+document.getElementById('stamp-ver').textContent = day ? `${PAGE_VERSION} · собрано ${day}` : PAGE_VERSION
+
+const hintEl = document.getElementById('hint')
+function toggleHint() {
+  hintEl.innerHTML = `<b>Зелёная точка</b> — страница загружена в это время (по Москве). Экран статичный, данных из таблиц не берёт. <b>${PAGE_VERSION}</b> — версия экрана${day ? `, собран ${day}` : ''}.`
+  hintEl.classList.toggle('on')
+}
+document.getElementById('stamp').addEventListener('click', (e) => {
+  if (e.target.closest('#reload')) return   // кнопка перезагрузки — не подсказка
+  toggleHint()
+})
+document.getElementById('reload').addEventListener('click', () => {
+  document.getElementById('reload').classList.add('spin')
+  location.reload()
+})
 
 /* ── 5. Канва и подгон кеглей ────────────────────────────────────────────── */
 
