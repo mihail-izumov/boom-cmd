@@ -130,9 +130,27 @@ function loadBuild(dir) {
     console.error('✗ бандл носителя не собрался')
     process.exit(1)
   }
-  // Как в verify-turbo: импорт modulepreload-полифила срезаем — чанк у
-  // носителя один, остальной код исполняется ровно тот, что поедет на панель.
-  const bundle = readFileSync(resolve(dir, 'assets', name), 'utf8').replace(/import\s*["'][^"']+["'];?/g, '')
+  // Как в verify-turbo: импорт modulepreload-полифила срезаем. Общие чанки
+  // (01.10 появился screens-*.js — плеер экранов, общий с «Твоей картой»)
+  // вклеиваем: код чанка — в замыкание, его export — в объект, импорт
+  // бандла — в разбор этого объекта. Имена у чанка и бандла минифицированы
+  // независимо, поэтому замыкание: иначе одноимённые переменные столкнутся.
+  // Исполняется ровно тот код, что поедет на панель.
+  const strip = (code) => code.replace(/import\s*["'][^"']+["'];?/g, '')
+  const chunk = (file) => {
+    const code = strip(readFileSync(resolve(dir, 'assets', file), 'utf8'))
+    const m = code.match(/export\s*\{([^}]*)\}\s*;?\s*$/)
+    if (!m) throw new Error(`чанк ${file}: не нашёл export`)
+    const pairs = m[1].split(',').map((x) => x.trim()).filter(Boolean).map((x) => {
+      const [local, as] = x.split(/\s+as\s+/)
+      return `${JSON.stringify(as || local)}: ${local}`
+    })
+    return `(() => { ${code.slice(0, m.index)}; return { ${pairs.join(', ')} } })()`
+  }
+  const bundle = strip(readFileSync(resolve(dir, 'assets', name), 'utf8')).replace(
+    /import\s*\{([^}]*)\}\s*from\s*["']\.\/([^"']+)["'];?/g,
+    (_, names, file) => `const {${names.replace(/\s+as\s+/g, ': ')}} = ${chunk(file)};`,
+  )
   return { html, bundle }
 }
 const MAIN = loadBuild(OUT)
@@ -524,11 +542,15 @@ console.log('\n── Парк в адресе ──')
 console.log('\n── Шапка, подвал, штамп ──')
 {
   const r = await run('?park=ohta')
-  ok('слот под переключатель экранов на месте и пуст', !!r.slot && r.slot.children.length === 0 && sp(r.slot.textContent) === '')
-  ok('переключателя парков нет', !r.d.getElementById('parks'))
+  // 01.10 соседняя сессия поставила в слот плеер экранов (media/shared/
+  // screens.js): «Твоя карта ⇄ Заряди карту», ▶/❚❚, режим смены; выбор
+  // парка — список на плашке бренда. Переключателя парков турбо нет.
+  ok('в слоте шапки — плеер экранов «Твоя карта ⇄ Заряди карту»',
+     !!r.slot && /Твоя карта/.test(r.slot.textContent) && /Заряди карту/.test(r.slot.textContent), sp(r.slot?.textContent))
+  ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.1 · собрано ДД.ММ»', /^v2\.1 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.2 · собрано ДД.ММ»', /^v2\.2 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
@@ -549,8 +571,11 @@ console.log('\n── У гостя ничего не нажимается, ни
   const r = await run('?park=ohta')
   const page = r.d.querySelector('.page').cloneNode(true)
   page.querySelector('.fineband').remove()
+  // Служебное — шапка (плеер экранов и выбор парка) и подвал; в карточках,
+  // строке «докинем» и QR для гостя ничего не нажимается.
+  page.querySelector('.head').remove()
   ok('в содержании для гостя нет ссылок', !page.querySelector('a'))
-  ok('в содержании для гостя нет кнопок и полей', !page.querySelector('button, input, select, textarea, form, [role=button]'))
+  ok('в содержании для гостя нет кнопок и полей (служебное — только шапка и подвал)', !page.querySelector('button, input, select, textarea, form, [role=button]'))
   const fineLinks = [...r.d.querySelectorAll('.fineband a')].map((a) => a.getAttribute('href'))
   // Адрес — как у «Твоей карты» v6.3 (ultra.runscale.ru)
   ok('в подвале одна ссылка — «Работает на Ранскеил»', fineLinks.join() === 'https://ultra.runscale.ru', fineLinks.join())

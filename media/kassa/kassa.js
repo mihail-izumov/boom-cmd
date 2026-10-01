@@ -27,7 +27,7 @@ import { initScreens, isEmbedded, pauseAnimations, restartAnimations } from '../
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.1'
+const PAGE_VERSION = 'v2.2'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
