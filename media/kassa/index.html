@@ -24,7 +24,7 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v2.2 — правки владельца 01.10)
+  БЛОКИ (v2.3 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
     2. Три карточки «X1» · «X2» · «X4–6», у каждой свой цвет (лайм,
        голубой, розовый — offers[].tone в данных). Внутри — два сосуда с
@@ -60,16 +60,15 @@
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v2.2 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v2.3 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
   (экраны будут чередоваться на одной панели). Отличия намеренные:
-    · справа в шапке — ПУСТОЙ слот под будущий переключатель страниц экрана
-      (логики переключения нет);
-    · слогана «Играй больше — плати меньше» нет: оффер этого экрана сам
-      начинается с «играй больше», а «плати меньше» над ценами читалось бы
-      как обещание скидки;
+    · справа в шапке — плеер экранов «Твоя карта ⇄ Заряди карту»
+      (media/shared/screens.js), парк выбирается списком на плашке слева;
+    · посередине — слоган «Играй больше — плати меньше», как на всех
+      страницах ТВ-панели (решение владельца 01.10);
     · у ГОСТЯ на экране ничего не нажимается: ни кнопок, ни ссылок в
       содержании. Служебный подвал — как у соседей, по просьбе владельца
       01.10: «Работает на Ранскеил», бейдж (время загрузки по Москве, версия,
@@ -163,6 +162,11 @@
     border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
   .brand-badge .sep{color:var(--lime)}
+  /* Слоган — как у turbo/ и loyalty/ (решение владельца 01.10) */
+  .head .slogan{font-family:'Unbounded';font-weight:700;font-size:30px;color:var(--white);letter-spacing:.5px}
+  .head .slogan b{color:var(--lime)}
+  body.portrait .head .slogan{position:absolute;right:26px;font-size:24px}
+  body.portrait.has-screens .head .slogan{display:none}
   /* Слот плеера экранов (loyalty ⇄ kassa) — на месте переключателя парков
      турбо. Разметку кладёт media/shared/screens.js. */
   .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%);height:46px;min-width:280px;border-radius:14px}
@@ -201,7 +205,7 @@
     border:3px solid rgba(var(--cr),.16);transition:transform .5s ease, border-color .5s ease, box-shadow .5s ease;
   }
   .card.on{transform:translateY(-8px);border-color:rgba(var(--cr),.7);box-shadow:0 18px 56px rgba(var(--cr),.24)}
-  /* Основная сумма (1 500) — рамка своего цвета, свечение и звезда */
+  /* Основная сумма (1 500) — рамка своего цвета, свечение и значок со стрелками */
   .card.main{
     border:4px solid var(--c);
     background:linear-gradient(160deg, rgba(var(--cr),.20) 0%, var(--tile) 55%);
@@ -211,12 +215,38 @@
     0%,100%{box-shadow:0 0 0 0 rgba(var(--cr),0), 0 18px 50px rgba(var(--cr),.18)}
     50%{box-shadow:0 0 0 6px rgba(var(--cr),.22), 0 22px 70px rgba(var(--cr),.36)}
   }
-  .star{position:absolute;top:-4px;right:-4px;width:74px;height:74px;border-radius:0 var(--radius) 0 22px;background:var(--c);display:grid;place-items:center}
-  .star svg{width:42px;height:42px;fill:var(--dark)}
+  /* Значок основной карточки — три стрелки вниз, как поворотник в гоночной
+     игре: каждая следующая ярче (--o), по ним сверху вниз бежит волна
+     (решение владельца 01.10: вместо звезды). */
+  .star{position:absolute;top:-4px;right:-4px;width:74px;height:74px;border-radius:0 var(--radius) 0 22px;background:var(--c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:2px}
+  .star .chev{display:block;width:40px;height:16px;margin:-2px 0;color:var(--dark);opacity:var(--o);animation:chev 1.2s ease-in-out infinite;animation-delay:var(--d)}
+  .star .chev svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+  .star .chev:nth-child(1){--o:.22;--d:0s}
+  .star .chev:nth-child(2){--o:.5;--d:.2s}
+  .star .chev:nth-child(3){--o:.82;--d:.4s}
+  @keyframes chev{0%,100%{opacity:var(--o);transform:translateY(0)}35%{opacity:1;transform:translateY(3px)}}
 
-  /* X1 / X2 / X4–6 — сколько пришло играть. «X» — цветом карточки. */
+  /* X1 / X2 / X4–6 — сколько пришло играть. «X» — цветом карточки. Справа
+     от метки — компания пиксельных лиц (kassa.js, CREWS): один, двое,
+     четверо, к которым по кругу подходят ещё двое. Метка ужимается под
+     место, что осталось (fitUniform по всем трём). */
+  .xlabel{display:flex;align-items:center;gap:12px;min-width:0}
+  .xlabel .fit-box{flex:1;min-width:0}
   .xlabel .fs-x{font-family:'Unbounded';font-weight:900;font-size:84px;line-height:.95;color:var(--white);letter-spacing:-1px}
   .xlabel .fs-x i{font-style:normal;color:var(--c);margin-right:.04em}
+  .crew{position:relative;flex:none}
+  .card.main .crew{margin-right:58px}   /* место под значок со стрелками */
+  /* Лицо — как .ph-ava на «Твоей карте»: цветная плашка, белые пиксели,
+     тень снизу. Лица стоят вплотную, не перекрывая друг друга. */
+  .ava{
+    position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s);border-radius:24%;background:var(--av);
+    display:grid;place-items:center;box-shadow:inset 0 calc(var(--s) * -.07) 0 rgba(0,0,0,.25);
+  }
+  .ava svg{width:72%;height:72%;fill:#fff;shape-rendering:crispEdges}
+  /* Ещё двое к четверым — по кругу: подходят, стоят, уходят */
+  .ava.extra{opacity:0;transform:scale(.3);animation:crew-in 6s cubic-bezier(.3,1.4,.5,1) infinite}
+  .ava.extra:last-child{animation-delay:.35s}
+  @keyframes crew-in{0%,38%{opacity:0;transform:scale(.3)}46%{opacity:1;transform:scale(1.12)}52%,86%{opacity:1;transform:scale(1)}94%,100%{opacity:0;transform:scale(.3)}}
 
   /* ══ СОСУДЫ: «пополнение» сверху, «на карте» снизу ═════════════════════
      Окно — сосуд с пропорциями пластиковой карты (85,6 × 54 мм → 1,586),
@@ -421,7 +451,8 @@
     grid-template-areas:"x slider" "faces faces";
   }
   body.portrait .card.on{transform:translateX(8px)}
-  body.portrait .xlabel{grid-area:x;align-self:center}
+  body.portrait .xlabel{grid-area:x;align-self:center;flex-direction:column;align-items:flex-start;gap:10px}
+  body.portrait .card.main .crew{margin-right:0}
   body.portrait .slider{grid-area:slider;flex-direction:row;min-height:0}
   body.portrait .seg{aspect-ratio:auto}
   body.portrait .seg-a{flex:0 0 36%}
@@ -586,6 +617,8 @@
     .face.roll-in,.face.roll-out{animation:none}
     .card.done .seg-b,.card.done .seg-b::after,.card.done .seg-b .liq{animation:none}
     .card.done .fs-card .bolt,.card.done .fs-card .zap::before,.card.done .fs-card .zap .spark{animation:none}
+    .star .chev{animation:none}
+    .ava.extra{animation:none;opacity:.45;transform:none}
   }
 </style>
 </head>
@@ -617,6 +650,7 @@
         <span id="brand-park"></span>
       </span>
     </div>
+    <div class="slogan">Играй больше — <b>плати меньше</b></div>
     <!-- Плеер экранов — заполняет media/shared/screens.js -->
     <div class="slot" id="screens" aria-hidden="true"></div>
   </header>

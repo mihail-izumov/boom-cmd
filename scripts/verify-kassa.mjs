@@ -195,6 +195,11 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     main: c.classList.contains('main'),
     on: c.classList.contains('on'),
     star: !!c.querySelector('.star'),
+    chev: c.querySelectorAll('.star > .chev').length,
+    starSvgPath: !!c.querySelector('.star svg path[d^="M12 2.5"]'),   // старая звезда
+    crew: c.querySelectorAll('.xlabel .crew .ava').length,
+    crewExtra: c.querySelectorAll('.xlabel .crew .ava.extra').length,
+    faces9: [...c.querySelectorAll('.xlabel .crew .ava svg')].map((x) => x.innerHTML),
     x: sp(c.querySelector('.fs-x')?.textContent),
     xLime: sp(c.querySelector('.fs-x i')?.textContent),
     sum: sp(c.querySelector('.fs-sum')?.textContent),
@@ -349,7 +354,13 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.split === `${Math.round((o.sum / o.onCard) * 1000) / 10}%`, c.split)
     ok(`${code}: ${o.label} — после числа «на карте» молния владельца, с искрами для разряда`, c.bolt)
     ok(`${code}: ${o.label} — плашка во всю ширину: бейдж сверху, цифра под ним, копия в заливке`, c.faceFull)
-    ok(`${code}: ${o.label} — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
+    ok(`${code}: ${o.label} — ${o.main ? 'выделена значком «три стрелки вниз» (не звездой)' : 'не выделена'}`,
+       c.main === o.main && c.star === o.main && (!o.main || (c.chev === 3 && !c.starSvgPath)))
+    {
+      const want = { X1: [1, 0], X2: [2, 0], 'X4–6': [6, 2] }[o.label]
+      ok(`${code}: ${o.label} — пиксельные лица: ${want[0] - want[1]}${want[1] ? ` → ${want[0]} (двое подходят по кругу)` : ''}`,
+         c.crew === want[0] && c.crewExtra === want[1], `${c.crew}/${c.crewExtra}`)
+    }
     const want = [
       { kind: 'gift', big: `+${fmt(o.gift)}`, small: 'бонус' },
       { kind: 'games', big: o.games, small: 'бонус в играх' },
@@ -360,6 +371,12 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        JSON.stringify(got) === JSON.stringify(want), got.map((w) => `${w.big} ${w.small}`).join(' / '))
     ok(`${code}: ${o.label} — видна одна грань, первая — подарок`, c.faces.filter((f) => f.on).length === 1 && c.faces[0]?.on)
   })
+  {
+    const all = cards.flatMap((x) => x.faces9)
+    ok(`${code}: у всех девяти лиц разные эмоции`, all.length === 9 && new Set(all).size === 9, `${new Set(all).size} из ${all.length}`)
+  }
+  ok(`${code}: в шапке слоган «Играй больше — плати меньше», «плати меньше» лаймом`,
+     sp(r.d.querySelector('.head .slogan')?.textContent) === 'Играй больше — плати меньше' && sp(r.d.querySelector('.head .slogan b')?.textContent) === 'плати меньше')
   ok(`${code}: полосы ступеней нет`, r.stepsHidden && r.stepCount === 0 && !r.text.includes('Круглая сумма'))
   ok(`${code}: нижней строки про тикеты нет — тикеты в карточках`, !r.cashRow)
   if (code === 'ohta') ok('ohta: подарка +125 на экране нет', !/\+125\b/.test(r.text))
@@ -550,7 +567,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.2 · собрано ДД.ММ»', /^v2\.2 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.3 · собрано ДД.ММ»', /^v2\.3 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))

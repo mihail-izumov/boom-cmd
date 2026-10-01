@@ -27,7 +27,7 @@ import { initScreens, isEmbedded, pauseAnimations, restartAnimations } from '../
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.2'
+const PAGE_VERSION = 'v2.3'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -110,7 +110,48 @@ function plural(n, one, few, many) {
   return many
 }
 
-const STAR = '<span class="star" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg></span>'
+/* Значок основной карточки — три стрелки вниз, как поворотник в гоночной
+   игре: каждая следующая ярче, по ним бежит волна (index.html, .star .chev).
+   Класс .star — место значка в углу (решение владельца 01.10: вместо звезды). */
+const CHEV = '<i class="chev"><svg viewBox="0 0 40 16"><path d="M5 3 L20 12.5 L35 3"/></svg></i>'
+const STAR = `<span class="star" aria-hidden="true">${CHEV.repeat(3)}</span>`
+
+/* «Сколько пришло» — пиксельные лица, как в кабинете на «Твоей карте»
+   (media/loyalty, .ph-ava): сетка 12×12, белые пиксели на цветной плашке.
+   У всех девяти — своя эмоция (решение владельца 01.10). [x, y, w, h]. */
+const FACES = {
+  happy:     [[2,4,1,1],[3,3,1,1],[4,4,1,1],[7,4,1,1],[8,3,1,1],[9,4,1,1],[3,7,1,1],[4,8,4,1],[8,7,1,1]],
+  wink:      [[2,4,1,1],[3,3,1,1],[4,4,1,1],[7,3,2,2],[4,7,1,1],[5,8,2,1],[7,7,1,1]],
+  love:      [[2,3,1,1],[4,3,1,1],[2,4,3,1],[3,5,1,1],[7,3,1,1],[9,3,1,1],[7,4,3,1],[8,5,1,1],[3,7,1,1],[4,8,4,1],[8,7,1,1]],
+  laugh:     [[2,3,1,1],[3,4,1,1],[2,5,1,1],[9,3,1,1],[8,4,1,1],[9,5,1,1],[3,7,6,1],[4,8,4,1]],
+  wow:       [[3,3,2,2],[7,3,2,2],[5,7,2,1],[4,8,1,1],[7,8,1,1],[5,9,2,1]],
+  cool:      [[2,4,8,1],[2,5,3,1],[7,5,3,1],[5,8,3,1],[8,7,1,1]],
+  tongue:    [[3,4,1,1],[8,4,1,1],[3,7,6,1],[6,8,2,2]],
+  excited:   [[3,3,1,2],[8,3,1,2],[3,7,6,1],[3,8,1,1],[8,8,1,1],[4,9,4,1]],
+  game:      [[2,2,1,1],[3,3,1,1],[9,2,1,1],[8,3,1,1],[3,4,1,1],[8,4,1,1],[3,7,6,1],[3,8,1,1],[5,8,1,1],[7,8,1,1]],
+}
+/* Кто где: X1 — один, X2 — двое, X4–6 — четверо, по кругу подходят ещё
+   двое (extra). Цвет плашки — свой у каждого. Координаты — в px канвы,
+   лица не перекрывают друг друга: компания 4–6 — сетка 3×2, двое новых
+   встают в свободный правый столбец. */
+const CREWS = {
+  one:   { size: 72, people: [['happy', '#3d47a0', 0, 0]] },
+  two:   { size: 60, people: [['wink', '#c2187a', 0, 0], ['love', '#1b8a6b', 66, 0]] },
+  group: { size: 44, people: [
+    ['laugh', '#7a3fd1', 0, 0], ['wow', '#d9480f', 50, 0],
+    ['cool', '#1864ab', 0, 50], ['tongue', '#a61e4d', 50, 50],
+    ['excited', '#0b7285', 100, 0, true], ['game', '#5c940d', 100, 50, true],
+  ] },
+}
+function crewHtml(id) {
+  const c = CREWS[id]
+  if (!c) return ''
+  const w = Math.max(...c.people.map((p) => p[2])) + c.size
+  const h = Math.max(...c.people.map((p) => p[3])) + c.size
+  return `<span class="crew crew-${id}" aria-hidden="true" style="width:${w}px;height:${h}px">` + c.people.map(([face, color, x, y, extra]) =>
+    `<span class="ava${extra ? ' extra' : ''}" style="--av:${color};--x:${x}px;--y:${y}px;--s:${c.size}px"><svg viewBox="0 0 12 12">${
+      FACES[face].map(([rx, ry, rw, rh]) => `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}"/>`).join('')}</svg></span>`).join('') + '</span>'
+}
 /* Молния после числа «на карте»: пополнение — в рублях, на карте — заряды.
    Форма — молния владельца (01.10), из его SVG с вложенными сдвигами
    пересчитана в один путь в своих координатах. Обёртка .zap — для
@@ -177,7 +218,7 @@ function renderCards(p) {
     return `
       <div class="card tone-${tone}${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}" data-total="${o.sum + gift}" style="--split:${split}%">
         ${o.main ? STAR : ''}
-        <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
+        <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div>${crewHtml(o.id)}</div>
         <div class="slider">
           <div class="seg seg-a">${inA}<div class="liq" aria-hidden="true">${inA}</div></div>
           <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div></div>
