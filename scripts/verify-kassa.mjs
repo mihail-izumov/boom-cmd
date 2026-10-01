@@ -178,6 +178,11 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
   window.XMLHttpRequest = function () { net.xhr++; throw new Error('сети нет') }
   window.navigator.sendBeacon = () => { net.beacon++; return false }
   window.matchMedia = (q) => ({ matches: reduced && /reduce/.test(q), media: q, addEventListener() {}, removeEventListener() {} })
+  // В jsdom нет Web Animations API — плеер экранов (media/shared/screens.js)
+  // ставит CSS-анимации на паузу через document.getAnimations(). В браузере
+  // панели он есть; здесь — пустой список.
+  if (!window.document.getAnimations) window.document.getAnimations = () => []
+  if (!window.Element.prototype.getAnimations) window.Element.prototype.getAnimations = () => []
   // jsdom не считает раскладку: размер окна отдаём только узлу #viewport —
   // этого достаточно, чтобы fitStage посчитал масштаб канвы.
   Object.defineProperty(window.HTMLElement.prototype, 'clientWidth', {
@@ -402,13 +407,14 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
 
 console.log('\n── Движение: «перелей воду» по очереди, плашка — все грани ──')
 {
-  // Тайминг kassa.js: старт через 0,7 с; p1 1 с → p2 0,9 с → p3 + досчёт
-  // 1,1 с → «красуется» 1,6 с. «На карте» доходит до половины через ~1,45 с
-  // после старта карточки — плашка наливается и идёт по всем граням, по
-  // 1,7 с каждая; только потом следующая карточка (cardMs):
-  //   X1 0,7–5,7 с (половина 2,14; игры 3,84) · X2 5,7–10,7 (игры 8,88) ·
-  //   X4–6 10,7–17,3 (игры 13,92; тикеты 15,62) · X1 снова с 17,3
-  //   (стоит на играх → половина 18,76 → «барабан» на бонус 20,46).
+  // Тайминг kassa.js — от старта первой карточки (после заставки плеера):
+  // p1 1 с → p2 0,9 с → p3 + досчёт 1,1 с → «красуется» 1,6 с. «На карте»
+  // доходит до половины через ~1,45 с после старта карточки — плашка
+  // наливается и идёт по всем граням, по 1,7 с каждая; только потом
+  // следующая карточка (cardMs):
+  //   X1 +0–5,0 (половина 1,44; игры 3,14) · X2 +5,0–10,0 (игры 8,18) ·
+  //   X4–6 +10,0–16,6 (игры 13,22; тикеты 14,92) · X1 снова с +16,6, и
+  //   плеер, отыграв полный круг (cycleMs), уводит на «Твою карту».
   // Гаснет карточка — заливка стекает, значение плашки остаётся.
   const r = await run('?park=ohta&tv=1')
   const w = r.window
@@ -420,8 +426,17 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('до старта все числа — итог, сосуды спокойные',
      cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000' && cards0.every((c) => !c.phase && !c.on))
   ok('у каждой карточки свой цвет', new Set(cards0.map((c) => c.tone)).size === 3, cards0.map((c) => c.tone).join())
+  // Плеер экранов (media/shared/screens.js) на старте ждёт вторую страницу —
+  // «Твою карту» в скрытом iframe — и держит заставку. В jsdom iframe не
+  // грузится: отвечаем за неё сами, как это делает встроенная страница
+  // (window.parent.boomScreens.register). Время дальше — от старта карточек.
+  ok('плеер экранов поднят (window.boomScreens)', !!w.boomScreens)
+  w.boomScreens?.register({ id: 'loyalty', cycleMs: () => 42400, restart() {}, pause() {}, resume() {}, update() {} })
+  const t0 = Date.now()
+  while (!r.cards()[0].on && Date.now() - t0 < 10000) await wait(20)
+  ok('после заставки плеера пошли карточки', r.cards()[0].on, `${Date.now() - t0} мс`)
 
-  await wait(1200)   // t≈1,2 — X1 p1
+  await wait(500)    // X1 +0,5 — p1
   let c = r.cards()
   ok('первой — 1 500: наливается «пополнение», внизу пока та же сумма',
      c[0].on && c[0].phase === 'p1' && c[0].card === '1 500' && c[0].liqNum === '1 500' && !c[1].on && !c[2].on, `${c[0].card} ${c[0].phase}`)
@@ -430,7 +445,7 @@ console.log('\n── Движение: «перелей воду» по оче�
      `${lblT(c, 0, '.seg-a')} / ${lblT(c, 0, '.seg-b')}`)
   ok('пока «на карте» пусто — плашка не залита, у всех бонус', faceBg(c, 0) === 'не залита' && kinds(c) === 'gift,gift,gift', `${faceBg(c, 0)} ${kinds(c)}`)
 
-  await wait(700)    // t≈1,9 — X1 p2
+  await wait(700)    // X1 +1,2 — p2
   c = r.cards()
   ok('перелив: верхний чуть наклонён, оба сосуда не в тени',
      c[0].phase === 'p2' && /rotate\(3deg\)/.test(cs(c[0].el.querySelector('.seg-a')).transform || '')
@@ -438,7 +453,7 @@ console.log('\n── Движение: «перелей воду» по оче�
      `${c[0].phase} ${cs(c[0].el.querySelector('.seg-a')).transform}`)
   ok('в начале перелива «на карте» меньше половины — плашка стоит', !c[0].el.classList.contains('half') && faceBg(c, 0) === 'не залита' && kinds(c) === 'gift,gift,gift')
 
-  await wait(600)    // t≈2,5 — X1 налита наполовину
+  await wait(600)    // X1 +1,8 — налита наполовину
   c = r.cards()
   ok('«на карте» за половиной — плашка ожила: залита, первая грань — бонус',
      c[0].el.classList.contains('half') && faceBg(c, 0) === 'залита' && kinds(c) === 'gift,gift,gift', `${faceBg(c, 0)} ${kinds(c)}`)
@@ -450,7 +465,7 @@ console.log('\n── Движение: «перелей воду» по оче�
   }
   ok('у спокойных карточек плашка не залита', [1, 2].every((i) => !c[i].el.classList.contains('half') && faceBg(c, i) === 'не залита'))
 
-  await wait(1600)   // t≈4,1 — X1 досчитана, красуется, плашка на играх
+  await wait(1600)   // X1 +3,4 — досчитана, красуется, плашка на играх
   c = r.cards()
   ok('досчиталось до 2 025 (и в «жидкости» тоже)',
      c[0].on && c[0].phase === 'p3' && c[0].card === '2 025' && c[0].liqNum === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} ${c[0].phase}`)
@@ -466,13 +481,13 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('пустое «пополнение» — в тени, «на карте» — нет',
      Number(cs(c[0].el.querySelector('.seg-a')).opacity) < 0.5 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1)
 
-  await wait(1300)   // t≈5,4 — X1 ещё держит ход: обе грани показаны, «красуется» досматривается
+  await wait(1300)   // X1 +4,7 — ещё держит ход: обе грани показаны, «красуется» досматривается
   c = r.cards()
   ok('пока плашка не показала все грани — ход не переходит', c[0].on && !c[1].on, c.map((x) => x.on).join())
   ok('«барабан» закончился чисто: видна одна грань, меток смены нет',
      c.every((x) => x.faces.filter((f) => f.on).length === 1) && !r.d.querySelector('.face.roll-in, .face.roll-out'))
 
-  await wait(600)    // t≈6,0 — X2 p1
+  await wait(600)    // X1 +5,3 — X2 p1
   c = r.cards()
   ok('следом — 3 000; у первой итог на месте, заливка плашки стекла, значение осталось (игры)',
      !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && kinds(c) === 'games,gift,gift' && faceBg(c, 0) === 'не залита',
@@ -480,21 +495,20 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('у спокойных карточек оба сосуда читаются', [0, 2].every((i) =>
     Number(cs(c[i].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[i].el.querySelector('.seg-b')).opacity || 1) === 1))
 
-  await wait(3200)   // t≈9,2 — X2 на играх
+  await wait(3200)   // X1 +8,5 — X2 на играх
   c = r.cards()
   ok('3 000: плашка ожила и перешла к играм, остальные стоят', c[1].on && kinds(c) === 'games,games,gift', kinds(c))
 
-  await wait(6700)   // t≈15,9 — X4–6 на тикетах
+  await wait(6700)   // X1 +15,2 — X4–6 на тикетах
   c = r.cards()
   ok('5 000: плашка дошла до тикетов («тикеты за наличные»), остальные стоят',
      c[2].on && kinds(c) === 'games,games,tickets' && c[2].faces.find((f) => f.on)?.small === 'тикеты за наличные', kinds(c))
 
-  await wait(1800)   // t≈17,7 — снова X1
+  await wait(1800)   // X1 +17,0 — снова X1
   c = r.cards()
   ok('показав все три грани, ход вернулся к 1 500; плашки спокойных стоят на своём', c[0].on && !c[2].on && kinds(c) === 'games,games,tickets', `${c.map((x) => x.on).join()} ${kinds(c)}`)
-  await wait(3300)   // t≈21,0 — у 1 500 второй круг: налилась игрой, «барабан» вернул бонус
-  c = r.cards()
-  ok('второй круг 1 500: начала с того, что стояло (игры), «барабаном» дошла до бонуса', c[0].on && kinds(c) === 'gift,games,tickets', kinds(c))
+  await wait(1200)   // X1 +18,2 — круг отыгран, плеер увёл на «Твою карту»
+  ok('после полного круга карточек плеер переключил на «Твою карту»', !!r.d.querySelector('.sc-frame.on'))
   r.window.close()
 
   const z = await run('?park=ohta', { reduced: true })
