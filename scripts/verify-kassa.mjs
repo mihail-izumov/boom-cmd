@@ -576,8 +576,14 @@ console.log('\n── Шапка, подвал, штамп ──')
   // 01.10 соседняя сессия поставила в слот плеер экранов (media/shared/
   // screens.js): «Твоя карта ⇄ Заряди карту», ▶/❚❚, режим смены; выбор
   // парка — список на плашке бренда. Переключателя парков турбо нет.
-  ok('в слоте шапки — плеер экранов «Твоя карта ⇄ Заряди карту»',
-     !!r.slot && /Твоя карта/.test(r.slot.textContent) && /Заряди карту/.test(r.slot.textContent), sp(r.slot?.textContent))
+  // Подписи экранов плеер берёт из SCREENS в screens.js (их меняет хозяин
+  // плеера: 01.10 стали «Статус» / «Зарядка») — сверяем с ним, не с текстом.
+  {
+    const src = readFileSync(resolve(ROOT, 'media/shared/screens.js'), 'utf8')
+    const names = [...src.matchAll(/\{\s*id:\s*'(?:loyalty|kassa)',\s*name:\s*'([^']+)'/g)].map((m) => m[1])
+    ok(`в слоте шапки — плеер экранов («${names.join('» ⇄ «')}»)`,
+       !!r.slot && names.length === 2 && names.every((n) => r.slot.textContent.includes(n)), sp(r.slot?.textContent))
+  }
   ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
