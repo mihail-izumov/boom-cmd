@@ -6,6 +6,22 @@ import { fileURLToPath } from 'node:url'
 
 const root = dirname(fileURLToPath(import.meta.url))
 
+// Номер сборки ТВ-экранов (/media/loyalty, /media/kassa). Один и тот же —
+// вшит в страницы (__MEDIA_BUILD__) и лежит рядом файлом media/build.json.
+// Панель раз в минуту сверяет свой номер с файлом и, если вышла новая
+// сборка, сама перезагружается на ближайшей заставке (media/shared/
+// screens.js). Так в парках всегда открыта последняя версия.
+const MEDIA_BUILD = String(Date.now())
+function mediaBuildPlugin() {
+  return {
+    name: 'media-build',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'media/build.json', source: JSON.stringify({ build: MEDIA_BUILD }) + '\n' })
+    },
+  }
+}
+
 // Плагин: заменяет плейсхолдер __BUILD_ID__ в собранном sw.js
 // на уникальную метку времени каждого билда (TZ-3.3 §5).
 // Каждый билд → свой CACHE_NAME → старые кэши вычищаются на activate.
@@ -45,7 +61,7 @@ function swBuildIdPlugin() {
 }
 
 export default defineConfig({
-  plugins: [vue(), swBuildIdPlugin()],
+  plugins: [vue(), swBuildIdPlugin(), mediaBuildPlugin()],
   base: '/',   // ← корень собственного домена b00m-cmd.ru (CNAME в public/CNAME)
 
   // Метка сборки ДЛЯ ПРИЛОЖЕНИЯ (D-22). Отдельное имя, не `__BUILD_ID__`:
@@ -59,6 +75,7 @@ export default defineConfig({
   // установленного приложения это не теоретический случай.
   define: {
     __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+    __MEDIA_BUILD__: JSON.stringify(MEDIA_BUILD),
   },
 
   // MPA: два независимых входа.

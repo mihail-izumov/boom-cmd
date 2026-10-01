@@ -642,7 +642,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.8 · собрано ДД.ММ»', /^v2\.8 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.9 · собрано ДД.ММ»', /^v2\.9 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
@@ -674,7 +674,14 @@ console.log('\n── У гостя ничего не нажимается, ни
   ok('в подвале одна кнопка — ⟳', [...r.d.querySelectorAll('.fineband button')].map((b) => b.id).join() === 'reload')
   ok('нет обработчиков в разметке', !/\son[a-z]+=/i.test(body))
   ok('в коде нет обработчиков касаний и клавиш', !/addEventListener\(\s*["'](pointerdown|touchstart|keydown)/.test(bundle))
-  ok('в коде нет fetch / XHR / sendBeacon', !/\bfetch\(|XMLHttpRequest|sendBeacon/.test(bundle))
+  // Единственный разрешённый запрос — автообновление плеера (media/shared/
+  // screens.js): сверка номера сборки со своим же media/build.json. Данных
+  // не берёт и не шлёт; нет сети — экран работает дальше как есть.
+  {
+    const calls = bundle.match(/\bfetch\([^)]*\)/g) || []
+    ok('в коде нет fetch / XHR / sendBeacon — кроме сверки сборки (media/build.json)',
+       calls.every((c) => /build\.json/.test(c)) && !/XMLHttpRequest|sendBeacon/.test(bundle), calls.join(' | ') || 'нет')
+  }
   ok('нет адресов Apps Script и Google-таблиц', !/script\.google|googleusercontent|docs\.google/.test(bundle + html))
   ok('нет переменных окружения (VITE_*)', !/VITE_[A-Z_]+/.test(bundle))
   ok('данные вкомпилированы в бандл', bundle.includes('X4–6') && bundle.includes('kassa-tv'))

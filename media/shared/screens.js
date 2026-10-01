@@ -28,6 +28,14 @@
  *   своего плеера не ведёт — показывает состояние хозяина и передаёт ему
  *   нажатия (window.parent.boomScreens).
  *
+ *  4. Автообновление. Каждая публикация кладёт рядом media/build.json со
+ *     своим номером; тот же номер вшит в страницу (__MEDIA_BUILD__,
+ *     vite.config.js). Хозяин раз в минуту сверяет их. Вышла новая сборка —
+ *     на ближайшей смене экрана, когда заставка уже закрыла экран, страница
+ *     перезагружается в обход кэша (?r=…), второй экран плеера грузится
+ *     заново вместе с ней. Персоналу парка версия не нужна: на панели
+ *     всегда последняя. На паузе не дёргаем — обновится после пуска.
+ *
  *  ⚠ Турбо (media/turbo/) этот модуль НЕ подключает — его шапка не менялась.
  *  ⚠ Новый экран в ротацию: строка в SCREENS ниже + initScreens() в его js
  *    + слот <div class="slot" id="screens"> в шапке.
@@ -48,6 +56,9 @@ const MIN_DWELL = 8000               // страховка, если стран�
 const IN_MS = 400                    // заставка закрывает экран
 const HOLD_MS = 1300                 // минимум на заставке — фраза успевает прочитаться
 const OUT_MS = 750                   // «выстрел» глаз и проявление экрана
+// eslint-disable-next-line no-undef
+const BUILD = typeof __MEDIA_BUILD__ !== 'undefined' ? __MEDIA_BUILD__ : ''
+const CHECK_MS = 60000               // как часто сверять номер сборки с сервером
 const FIRST_MS = 3000                // после перехода экран стоит на первом кадре (решение владельца 01.10)
 
 const Q = new URLSearchParams(location.search)
@@ -316,6 +327,7 @@ function becomeHost(o, selfApi) {
     for (const k of ['park', 'tv', 'demo']) if (Q.get(k)) u.searchParams.set(k, Q.get(k))
     if (!u.searchParams.get('park')) u.searchParams.set('park', o.park)
     u.searchParams.set('embed', '1')
+    if (BUILD) u.searchParams.set('v', BUILD)   // свой адрес у каждой сборки — браузер не подсунет старую из кэша
     H.frame = document.createElement('iframe')
     H.frame.className = 'sc-frame'
     H.frame.title = other.name
@@ -335,6 +347,34 @@ function becomeHost(o, selfApi) {
 
   setInterval(broadcast, 200)
   broadcast()
+  if (BUILD) setInterval(checkBuild, CHECK_MS)
+}
+
+/* ── Автообновление ────────────────────────────────────────────────────── */
+function checkBuild() {
+  if (H.update) return
+  fetch(`${import.meta.env.BASE_URL}media/build.json?t=${Date.now()}`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      if (!j || !j.build || String(j.build) === BUILD) return
+      /* Уже перезагружались ради этой сборки, а пришла всё равно старая
+         (публикация ещё раскатывается) — не крутимся в перезагрузках,
+         обновимся в 05:00 или при следующей сборке. */
+      let tried = ''
+      try { tried = sessionStorage.getItem('boom-upd') || '' } catch {}
+      if (tried === String(j.build)) return
+      H.update = String(j.build)
+    })
+    .catch(() => {})                   // нет сети — проверим через минуту
+}
+/** Перезагрузка в обход кэша — вызывается, когда заставка уже закрыла экран. */
+function reloadFresh() {
+  try { sessionStorage.setItem('boom-upd', H.update) } catch {}
+  const u = new URL(location.href)
+  u.searchParams.set('r', Date.now())
+  u.searchParams.delete('embed')
+  u.searchParams.delete('play')
+  location.replace(u.toString())
 }
 
 function apiOf(id) {
@@ -380,6 +420,7 @@ async function switchTo(id) {
   H.busy = true
   clearTimeout(H.timer)
   await curtainIn()
+  if (H.update) { reloadFresh(); return }   // вышла новая сборка — грузимся под заставкой
   /* Встроенная ещё грузится — держим заставку, пока не будет готова */
   if (!apiOf(id)) await Promise.race([H.childReady, wait(15000)])
   const target = apiOf(id)

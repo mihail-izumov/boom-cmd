@@ -414,7 +414,9 @@
   .soon{position:absolute;top:0;left:67%;transform:translateX(-50%);font-style:normal;white-space:nowrap;
     font-family:'Unbounded';font-weight:900;font-size:.75em;letter-spacing:.06em;background:var(--magenta);color:#fff;
     border-radius:.45em;padding:.2em .55em;animation:soon-ride 42.4s cubic-bezier(.3,.7,.3,1) infinite}
-  .soon::after{content:'';position:absolute;left:50%;bottom:-.45em;margin-left:-.4em;border:.4em solid transparent;border-bottom:0;border-top-color:var(--magenta)}
+  /* Хвостик — залитый треугольник, чуть заходит под бейдж. Раньше был
+     рамкой и висел на .05em ниже: в фокусе (×2) щель читалась чёрной полоской. */
+  .soon::after{content:'';position:absolute;left:50%;bottom:-.4em;width:.8em;height:.44em;margin-left:-.4em;background:var(--magenta);clip-path:polygon(0 0,100% 0,50% 100%)}
   @keyframes soon-ride{
     0%,45.14%{left:67%;transform:translateX(-50%)}
     45.88%{left:0%;transform:translateX(-10%) scale(.9)}
