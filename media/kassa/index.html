@@ -24,27 +24,30 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v1.1 — правки владельца 01.10)
+  БЛОКИ (v1.2 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
-    2. Три карточки «X1» · «X2» · «X4–6» (вместо слов и фигурок людей).
-       Пополнение → переключатель → на карте. Переключатели щёлкают по
-       очереди (1 500 → 3 000 → 5 000), и число «на карте» вырастает из суммы
-       пополнения — видно, как пополнение превращается в сумму на карте.
+    2. Три карточки «X1» · «X2» · «X4–6». Внутри — слайдер из двух окон:
+       «пополнение 1 500 ₽» сверху и «на карте 2 025 ⚡» снизу (пополнение —
+       рубли, на карте — заряды, отсюда молния). По очереди (1 500 → 3 000 →
+       5 000) подсветка встаёт на «пополнение» и переезжает на «на карте», а
+       число досчитывается до итога — видно, как 1 500 превращаются в 2 025.
        КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте»): однажды
        гости прочли «1 300 зарядов» наоборот, как цену.
-       Под числом — одна плашка, грани одного бонуса сменяют друг друга:
-       «+525 в подарок» → «≈ +7 игр в подарок» → «+200 тикетов за наличные».
-       Игры — подарок / средняя цена игры ~70 ₽ (как на b00m.fun/rewards),
-       вниз до целого. Тикеты — только при оплате наличными на кассе, по
-       ступеням парка; у Июня акции нет — граней две.
+       Под слайдером — плашка во всю ширину карточки, грани одного бонуса
+       сменяют друг друга: «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов
+       за наличные». Игры — бонус / средняя цена игры ~70 ₽ (как на
+       b00m.fun/rewards), вниз до целого. Тикеты — только за наличные на
+       кассе и только за точную сумму из cash_tickets парка (200 — за 1 000 ₽,
+       500 — за 5 000 ₽; Охта и Питерленд, у Июня акции нет).
     3. Полоса ступеней — убрана (show_steps:false в данных, код оставлен).
     4. Строка «Не хватило — докинем без очереди…» — по парку.
-    5. QR, если онлайн у парка включён: «Докинуть на карту без очереди»
-       («без очереди» — лаймовой плашкой), видоискатель как у «Твоей карты»,
-       подпись «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
+    5. QR, если онлайн у парка включён: над кодом, по центру свободного поля,
+       «Докинуть на карту без очереди» («без очереди» — лаймовой плашкой);
+       видоискатель как у «Твоей карты»; под кодом, по центру поля, синим —
+       «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v1.1 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v1.2 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -197,56 +200,72 @@
 
   /* Подписи к числам — одним стилем по всей странице */
   .lbl{font-size:19px;font-weight:800;color:var(--soft);letter-spacing:.6px;text-transform:uppercase;line-height:1.15}
-  .sum .fs-sum{font-family:'Unbounded';font-weight:900;font-size:50px;line-height:1.05;color:var(--white)}
 
-  /* Переключатель вместо разделителя: дорожка, лаймовая заливка и ручка-
-     молния. Включается у активной карточки — заливка и ручка едут вправо. */
-  .toggle{position:relative;flex:none;height:44px;margin:4px 4px 2px;border-radius:22px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 2px rgba(255,255,255,.14)}
-  .toggle .fill{position:absolute;left:0;top:0;bottom:0;width:44px;border-radius:22px;background:linear-gradient(90deg,rgba(198,245,46,.18),var(--lime));opacity:.35;transition:width .55s cubic-bezier(.6,0,.25,1), opacity .55s}
-  .toggle .chev{position:absolute;inset:0;display:grid;place-items:center;font-family:'Unbounded';font-weight:900;font-size:26px;letter-spacing:6px;color:rgba(255,255,255,.22)}
-  .toggle .knob{position:absolute;top:-5px;left:-4px;width:54px;height:54px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.5);transition:left .55s cubic-bezier(.6,0,.25,1), background .55s, box-shadow .55s}
-  .toggle .knob svg{width:28px;height:28px;fill:var(--dark)}
-  .card.on .toggle .fill{width:100%;opacity:1}
-  .card.on .toggle .chev{color:rgba(13,10,46,.35)}
-  .card.on .toggle .knob{left:calc(100% - 50px);background:var(--lime);box-shadow:0 0 0 5px rgba(198,245,46,.3),0 0 28px rgba(198,245,46,.8)}
-
-  .oncard .fit-box{line-height:0}
-  .oncard .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px;transform-origin:left center}
+  /* ══ СЛАЙДЕР из двух окон: «пополнение» сверху, «на карте» снизу ══════
+     Подсветка (.thumb) спокойно стоит над нижним окном. У активной карточки
+     (.on) она сначала встаёт на верхнее окно (.fa), потом переезжает вниз —
+     и число «на карте» досчитывается от суммы пополнения до итога (kassa.js,
+     cycleCards). Координаты окон для подсветки — из layoutThumbs:
+     --ax/--ay/--aw/--ah (верхнее) и --bx/--by/--bw/--bh (нижнее). */
+  .slider{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;border-radius:24px;background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 2px rgba(255,255,255,.07);padding:6px}
+  .seg{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 12px 12px;border-radius:18px;min-width:0}
+  /* Два окна — две равные карточки слайдера */
+  .seg-a,.seg-b{flex:1 1 0;min-height:0}
+  .thumb{
+    position:absolute;z-index:0;left:0;top:0;width:var(--bw,0px);height:var(--bh,0px);transform:translate(var(--bx,0px),var(--by,0px));
+    border-radius:18px;border:3px solid rgba(198,245,46,.4);background:rgba(198,245,46,.06);
+    transition:transform .7s cubic-bezier(.6,0,.25,1), width .7s cubic-bezier(.6,0,.25,1), height .7s cubic-bezier(.6,0,.25,1), border-color .5s, box-shadow .5s, background .5s;
+  }
+  .card.on .thumb{border-color:var(--lime);background:rgba(198,245,46,.13);box-shadow:0 0 0 4px rgba(198,245,46,.18),0 0 40px rgba(198,245,46,.35)}
+  /* На «пополнение» подсветка встаёт быстро, на «на карте» едет плавнее */
+  .card.fa .thumb{width:var(--aw,0px);height:var(--ah,0px);transform:translate(var(--ax,0px),var(--ay,0px));transition-duration:.4s}
+  /* Пока подсветка на «пополнении», внизу — та же сумма, приглушённо: сейчас
+     она «перельётся» на карту и вырастет до итога */
+  .card.fa .seg-b .fs-card{opacity:.35}
+  .seg .fit-box{min-width:0}
+  .seg-a .fs-sum{font-family:'Unbounded';font-weight:900;font-size:60px;line-height:1.05;color:var(--white)}
+  .seg-b .fit-box{line-height:0}
+  .seg-b .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px;transform-origin:left center;transition:opacity .4s ease}
+  /* Молния после числа: пополнение — в рублях, на карте — заряды */
+  .fs-card .bolt{display:inline-block;width:.46em;height:.62em;margin-left:.1em;vertical-align:baseline;fill:var(--lime);filter:drop-shadow(0 0 .1em rgba(198,245,46,.6))}
   /* Итог досчитан — короткая вспышка числа */
   .card.done .fs-card{animation:pop .6s ease-out}
   @keyframes pop{0%{transform:scale(1);text-shadow:none}35%{transform:scale(1.06);text-shadow:0 0 30px rgba(198,245,46,.9)}100%{transform:scale(1);text-shadow:none}}
 
-  /* Плашка бонуса: грани одного подарка сменяют друг друга (kassa.js,
-     rotateFaces): «+525 в подарок» → «≈ +7 игр в подарок» → «+200 тикетов за
-     наличные». Все грани — в одной ячейке, видна одна. */
-  .faces{display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
-  .face{grid-area:1/1;min-width:0;opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease}
+  /* Плашка бонуса — во всю ширину карточки. Грани одного бонуса сменяют
+     друг друга (kassa.js, rotateFaces): «+525 бонус» → «≈ +7 игр бонус» →
+     «+500 тикетов за наличные». Все грани — в одной ячейке, видна одна. */
+  .faces{flex:none;display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
+  .face{
+    grid-area:1/1;min-width:0;opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease;
+    background:var(--lime);border-radius:18px;padding:12px 18px 13px;
+  }
   .face.on{opacity:1;transform:none}
   .face .fs-face{
     display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;white-space:nowrap;
     font-family:'Unbounded';font-weight:900;font-size:48px;line-height:1;color:var(--dark);
-    background:var(--lime);border-radius:16px;padding:10px 16px 11px;
   }
   .face .fs-face small{font-family:'Inter';font-weight:800;font-size:.46em;letter-spacing:.3px;line-height:1.1}
-  .card:not(.main) .face .fs-face{background:rgba(198,245,46,.14);color:var(--lime);box-shadow:inset 0 0 0 2px rgba(198,245,46,.55)}
+  .card:not(.main) .face{background:rgba(198,245,46,.14);box-shadow:inset 0 0 0 2px rgba(198,245,46,.55)}
+  .card:not(.main) .face .fs-face{color:var(--lime)}
   .card:not(.main) .face .fs-face small{color:#e6ffb0}
 
-  /* Вертикаль: карточки строками — слева «X + пополнение + переключатель»,
-     справа «на карте» и плашка бонуса. */
+  /* Вертикаль: X слева, слайдер справа — окна рядом, подсветка едет слева
+     направо; плашка бонуса — во всю ширину карточки внизу. */
   body.portrait .cards{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr))}
   body.portrait .card{
-    display:grid;gap:8px 28px;justify-content:stretch;
-    grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);grid-template-rows:auto minmax(0,1fr) auto;
-    grid-template-areas:"x oncard" "sum oncard" "toggle faces";
+    display:grid;gap:12px 22px;
+    grid-template-columns:auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;
+    grid-template-areas:"x slider" "faces faces";
   }
   body.portrait .card.on{transform:translateX(8px)}
-  body.portrait .xlabel{grid-area:x}
-  body.portrait .sum{grid-area:sum;align-self:end}
-  body.portrait .toggle{grid-area:toggle;align-self:center}
-  body.portrait .oncard{grid-area:oncard;display:flex;flex-direction:column;justify-content:center}
+  body.portrait .xlabel{grid-area:x;align-self:center}
+  body.portrait .slider{grid-area:slider;flex-direction:row}
+  body.portrait .seg-a{flex:0 0 36%}
+  body.portrait .seg-b{flex:1 1 0;min-width:0}
   body.portrait .faces{grid-area:faces}
-  /* Звезда основной карточки — в правом верхнем углу, над числом «на карте» */
-  body.portrait .card.main .oncard{padding-right:66px}
+  /* Звезда основной карточки — в правом верхнем углу, над слайдером */
+  body.portrait .card.main .slider{margin-right:58px}
 
   /* ══ 3. ПОЛОСА СТУПЕНЕЙ ════════════════════════════════════════════════ */
   .steps{flex:none;padding:16px 24px 18px;gap:10px;justify-content:flex-start}
@@ -321,10 +340,13 @@
   .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
   .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 16px 0}
   .qr-cap{font-family:'Unbounded';font-weight:900;font-size:30px;line-height:1.2;text-align:center;color:#1d4fd0}
-  .qr-cap b{color:var(--dark)}
+  /* Горизонталь: строки над и под кодом растягиваются на свободное поле
+     (flex:1), а их текст стоит по центру этого поля. */
+  .qr-lead,.qr-cap{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
   /* Вертикаль: плитка QR горизонтальная — код слева, слова справа */
   body.portrait .qr-tile{flex-direction:row;justify-content:flex-start;gap:30px;padding:20px 30px 20px 20px}
-  body.portrait .qr-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px}
+  body.portrait .qr-text{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:24px}
+  body.portrait .qr-lead,body.portrait .qr-cap{flex:0 0 auto;justify-content:flex-start}
   body.portrait .qr-lead,body.portrait .qr-cap{text-align:left}
   body.portrait .qr-lead{font-size:44px}
   body.portrait .qr-cap{font-size:42px}
@@ -395,7 +417,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg{animation:none}
-    .card,.toggle .fill,.toggle .knob,.face{transition:none}
+    .card,.thumb,.face,.fs-card{transition:none}
   }
 </style>
 </head>

@@ -4,15 +4,17 @@
  * Как verify-turbo.mjs: проверяет СОБРАННЫЙ бандл, а не исходник — именно он
  * поедет на панель. Сценарии гоняются в jsdom.
  *
- * Что держит (v1.1, правки владельца 01.10):
+ * Что держит (v1.2, правки владельца 01.10):
  *   · числа на экране совпадают с kassa.data.json И с таблицей подарков,
  *     подтверждённой ИТ 13.08 (она вписана ниже отдельно — если кто-то
  *     поправит данные, проверка покажет расхождение с подтверждённым);
- *   · карточки X1 / X2 / X4–6: пополнение → переключатель → на карте; каждое
- *     крупное число подписано; переключатели щёлкают по очереди;
- *   · плашка бонуса — грани одного подарка: «+525 в подарок», «≈ +7 игр в
- *     подарок» (подарок / 70 ₽, вниз), «+200 тикетов за наличные»;
- *   · тикеты — только за наличные и только где акция есть (у Июня нет);
+ *   · карточки X1 / X2 / X4–6: слайдер из двух окон «пополнение 1 500 ₽» →
+ *     «на карте 2 025 ⚡»; каждое крупное число подписано; подсветка
+ *     переезжает по очереди, число досчитывается;
+ *   · плашка бонуса во всю ширину — грани одного бонуса: «+525 бонус»,
+ *     «≈ +7 игр бонус» (бонус / 70 ₽, вниз), «+500 тикетов за наличные»;
+ *   · тикеты — только за наличные, только за точную сумму (200 — за 1 000 ₽,
+ *     500 — за 5 000 ₽) и только в Охте и Питерленде;
  *   · при выключенном онлайне QR пропадает (настоящая сборка с online:false);
  *   · запретные слова и проценты на экран не попали;
  *   · у гостя ничего не нажимается, ни одного сетевого запроса;
@@ -61,12 +63,13 @@ const SPEC_OFFERS = [
   { label: 'X2', sum: 3000, onCard: 4500, gift: 1500, games: '≈ +21 игра', main: false },
   { label: 'X4–6', sum: 5000, onCard: 8000, gift: 3000, games: '≈ +42 игры', main: false },
 ]
-// Тикеты при оплате наличными (решение владельца 01.10): Охта и Питерленд —
-// 200 от 1 000 ₽ и 500 от 5 000 ₽; у Июня акции нет.
+// Тикеты при оплате наличными (решение владельца 01.10): только за точную
+// сумму — 200 за 1 000 ₽, 500 за 5 000 ₽; только Охта и Питерленд. Из трёх
+// карточек (1 500 / 3 000 / 5 000) тикеты есть лишь у 5 000.
 const SPEC_PARKS = {
-  ohta: { name: 'Охта Молл', online: true, hall: false, tickets: [200, 200, 500],
+  ohta: { name: 'Охта Молл', online: true, hall: false, tickets: [0, 0, 500],
     qr: 'https://b00m.fun/popolnit/ohtamall?from=kassa-tv' },
-  piterland: { name: 'Питерленд', online: true, hall: true, tickets: [200, 200, 500],
+  piterland: { name: 'Питерленд', online: true, hall: true, tickets: [0, 0, 500],
     qr: 'https://b00m.fun/popolnit/piterland?from=kassa-tv' },
   iyun: { name: 'ТЦ Июнь', online: true, hall: true, tickets: null,
     qr: 'https://b00m.fun/popolnit/june?from=kassa-tv' },
@@ -176,9 +179,13 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     xLime: sp(c.querySelector('.fs-x i')?.textContent),
     sum: sp(c.querySelector('.fs-sum')?.textContent),
     lblSum: sp(c.querySelector('.l-sum')?.textContent),
-    card: sp(c.querySelector('.fs-card')?.textContent),
+    card: sp(c.querySelector('.fs-card .num')?.textContent),
     lblCard: sp(c.querySelector('.l-card')?.textContent),
-    toggle: !!c.querySelector('.toggle .knob') && !!c.querySelector('.toggle .fill'),
+    fa: c.classList.contains('fa'),
+    bolt: !!c.querySelector('.seg-b .fs-card svg.bolt'),
+    slider: !!c.querySelector('.slider > .thumb') && !!c.querySelector('.slider .seg-a .fs-sum') && !!c.querySelector('.slider .seg-b .fs-card'),
+    toggle: !!c.querySelector('.toggle'),
+    faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector('.fit-box > .fs-face')),
     faces: [...c.querySelectorAll('.face')].map((f) => ({
       kind: f.dataset.kind,
       on: f.classList.contains('on'),
@@ -203,6 +210,8 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     qrLead: sp($('qr-lead').textContent),
     qrMark: sp($('qr-lead').querySelector('mark')?.textContent),
     qrCap: sp($('qr-cap').textContent),
+    qrCapBold: !!$('qr-cap').querySelector('b'),
+    qrInner: !!$('qr-lead').querySelector(':scope > span') && !!$('qr-cap').querySelector(':scope > span'),
     viewfinder: !!d.querySelector('#qr-frame .aimbox .cn') && !!d.querySelector('#qr-frame .flash'),
     text: visibleText(d.querySelector('.page')),
     leftText: visibleText(d.querySelector('.leftcol') || d.getElementById('cards')),
@@ -235,8 +244,8 @@ ok('парков ровно три, коды как у турбо', DATA.park_or
 for (const [code, s] of Object.entries(SPEC_PARKS)) {
   const p = DATA.parks[code] || {}
   ok(`${code}: название как у турбо («${s.name}»)`, p.name === s.name, p.name)
-  ok(`${code}: тикеты за наличные ${s.tickets ? '200 от 1 000 ₽ и 500 от 5 000 ₽' : '— акции нет'}`,
-     s.tickets ? JSON.stringify(p.cash_tickets) === '[{"from":1000,"tickets":200},{"from":5000,"tickets":500}]'
+  ok(`${code}: тикеты за наличные ${s.tickets ? '200 за 1 000 ₽ и 500 за 5 000 ₽ (точно)' : '— акции нет'}`,
+     s.tickets ? JSON.stringify(p.cash_tickets) === '[{"sum":1000,"tickets":200},{"sum":5000,"tickets":500}]'
                : Array.isArray(p.cash_tickets) && p.cash_tickets.length === 0, JSON.stringify(p.cash_tickets))
   ok(`${code}: строка докидки ${s.hall ? 'есть' : 'нет'}`, p.topup_in_hall === s.hall)
   ok(`${code}: флаг онлайна заведён`, typeof p.online === 'boolean')
@@ -267,11 +276,13 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
        `${c.x} · ${c.sum} → ${c.card}`)
     ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: ${o.label} — переключатель вместо разделителя`, c.toggle)
+    ok(`${code}: ${o.label} — слайдер из двух окон с подсветкой, старого переключателя нет`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — после числа «на карте» молния (заряды)`, c.bolt)
+    ok(`${code}: ${o.label} — плашка бонуса во всю ширину карточки`, c.faceFull)
     ok(`${code}: ${o.label} — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
     const want = [
-      { kind: 'gift', big: `+${fmt(o.gift)}`, small: 'в подарок' },
-      { kind: 'games', big: o.games, small: 'в подарок' },
+      { kind: 'gift', big: `+${fmt(o.gift)}`, small: 'бонус' },
+      { kind: 'games', big: o.games, small: 'бонус' },
       ...(t ? [{ kind: 'tickets', big: `+${t} тикетов`, small: 'за наличные' }] : []),
     ]
     const got = c.faces.map(({ kind, big, small }) => ({ kind, big, small }))
@@ -291,7 +302,9 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
      s.hall ? r.infoShown && r.hall === HALL : !r.infoShown && !r.text.includes('докинем'))
   ok(`${code}: QR на экране`, r.qrShown && r.qrD === KASSA_QR[code].d && r.qrUrl === s.qr, r.qrUrl)
   ok(`${code}: над QR «${QR_LEAD}», «без очереди» выделено`, r.qrLead === QR_LEAD && r.qrMark === 'без очереди', r.qrLead)
-  ok(`${code}: подпись QR`, r.qrCap === QR_CAPTION, r.qrCap)
+  ok(`${code}: подпись QR — целиком синяя, без тёмной половины`, r.qrCap === QR_CAPTION && !r.qrCapBold, r.qrCap)
+  ok(`${code}: тексты у QR стоят по центру своего поля (внутренний span)`, r.qrInner)
+  ok(`${code}: «в подарок» заменено на «бонус»`, !/в подарок/i.test(r.text))
   ok(`${code}: видоискатель как у «Твоей карты»`, r.viewfinder)
   ok(`${code}: рядом с QR о наличных ни слова`, !/налич/i.test(r.qrText), r.qrText)
   for (const [re, what] of FORBIDDEN) ok(`${code}: нет: ${what}`, !re.test(r.text), (r.text.match(re) || [''])[0])
@@ -300,27 +313,33 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   ok(`${code}: «Парк не найден» не показан`, !r.parkErr)
 }
 
-console.log('\n── Движение: переключатели по очереди, грани плашки ──')
+console.log('\n── Движение: подсветка слайдера по очереди, грани плашки ──')
 {
-  const r = await run('?park=piterland&tv=1')
+  const r = await run('?park=ohta&tv=1')
   const cards0 = r.cards()
-  ok('до старта все числа — итог', cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000')
-  await wait(3200)   // старт через 0,7 с, щелчок 0,45 с, досчёт 1,1 с; грань — раз в 3 с
+  ok('до старта все числа — итог, подсветка на «на карте»',
+     cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000' && cards0.every((c) => !c.fa && !c.on))
+  await wait(1200)   // старт через 0,7 с, подсветка стоит на «пополнении» 1 с
   let c = r.cards()
-  ok('первой щёлкает 1 500', c[0].on && !c[1].on && !c[2].on, c.map((x) => x.on).join())
-  ok('число «на карте» досчиталось до итога', c[0].card === '2 025' && c[0].el.classList.contains('done'), c[0].card)
-  ok('грань сменилась на игры', c.every((x) => x.faces.find((f) => f.on)?.kind === 'games'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  ok('первой — 1 500: подсветка на «пополнении», внизу пока та же сумма',
+     c[0].on && c[0].fa && c[0].card === '1 500' && !c[1].on && !c[2].on, `${c[0].card} fa=${c[0].fa}`)
+  await wait(2000)
+  c = r.cards()
+  ok('подсветка переехала на «на карте», число досчиталось до 2 025',
+     c[0].on && !c[0].fa && c[0].card === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} fa=${c[0].fa}`)
+  ok('грань сменилась на игры у всех трёх', c.every((x) => x.faces.find((f) => f.on)?.kind === 'games'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
   await wait(3200)
   c = r.cards()
-  ok('следом щёлкает 3 000, первая выключена', !c[0].on && c[1].on && !c[2].on, c.map((x) => x.on).join())
-  ok('у выключенной стоит итог', c[0].card === '2 025', c[0].card)
-  ok('грань дошла до тикетов', c.every((x) => x.faces.find((f) => f.on)?.kind === 'tickets'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  ok('следом — 3 000, у первой итог на месте', !c[0].on && c[1].on && c[0].card === '2 025', c.map((x) => x.on).join())
+  ok('шаг тикетов: у 5 000 — тикеты, у остальных снова бонус (не сбиваются)',
+     c[2].faces.find((f) => f.on)?.kind === 'tickets' && c[0].faces.find((f) => f.on)?.kind === 'gift' && c[1].faces.find((f) => f.on)?.kind === 'gift',
+     c.map((x) => x.faces.find((f) => f.on)?.kind).join())
   r.window.close()
   const z = await run('?park=ohta', { reduced: true })
   await wait(900)
   const zc = z.cards()
-  ok('без движения: все переключатели включены, итоги стоят',
-     zc.every((x) => x.on) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000')
+  ok('без движения: подсветка на «на карте», итоги стоят',
+     zc.every((x) => !x.fa) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000')
   z.window.close()
 }
 
@@ -332,7 +351,7 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   ok(`${code}: раскладка без QR (no-online)`, r.body.includes('no-online'))
   ok(`${code}: слов про телефон и камеру на экране нет`, !/телефон|камер/i.test(r.text), r.text.match(/телефон|камер/i)?.[0])
   ok(`${code}: карточки остались`, cards.length === 3 && cards[0].card === '2 025')
-  if (s.tickets) ok(`${code}: тикеты за наличные в карточках остались`, cards[2].faces.some((f) => f.big === '+500 тикетов'))
+  if (s.tickets) ok(`${code}: тикеты за наличные в карточке 5 000 остались`, cards[2].faces.some((f) => f.big === '+500 тикетов'))
 }
 
 console.log('\n── Песочница и защита от правки адресом ──')
@@ -382,7 +401,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.1 · собрано ДД.ММ»', /^v1\.1 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.2 · собрано ДД.ММ»', /^v1\.2 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))

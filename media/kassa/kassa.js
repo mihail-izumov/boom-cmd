@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.1'
+const PAGE_VERSION = 'v1.2'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -87,11 +87,12 @@ function giftFor(sum) {
 
 /* ── 3. Отрисовка ────────────────────────────────────────────────────────── */
 
-/** Тикеты за наличные на кассе для суммы — по ступеням парка (0 — акции нет). */
+/** Тикеты за наличные на кассе — за ТОЧНУЮ сумму пополнения (0 — нет).
+    200 тикетов — только за 1 000 ₽, поэтому у карточек 1 500 и 3 000 их нет
+    (решение владельца 01.10). */
 function cashTicketsFor(p, sum) {
-  let t = 0
-  for (const s of p.cash_tickets || []) if (sum >= s.from) t = s.tickets
-  return t
+  const hit = (p.cash_tickets || []).find((t) => t.sum === sum)
+  return hit ? hit.tickets : 0
 }
 
 /** «≈ +7 игр» — подарок / средняя цена игры (game_price), вниз до целого. */
@@ -109,8 +110,8 @@ function plural(n, one, few, many) {
 }
 
 const STAR = '<span class="star" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg></span>'
-/* Ручка переключателя — молния: «заряди карту» */
-const BOLT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
+/* Молния после числа «на карте»: пополнение — в рублях, на карте — заряды */
+const BOLT = '<svg class="bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
 
 function renderOffer() {
   document.getElementById('offer').innerHTML =
@@ -120,14 +121,15 @@ function renderOffer() {
 /**
  * Три карточки: «X1 / X2 / X4–6» — сколько пришло играть.
  *
- * Каждое крупное число подписано: «пополнение» и «на карте». Между ними —
- * переключатель: по очереди (1 500 → 3 000 → 5 000) он щёлкает, и число «на
- * карте» вырастает из суммы пополнения до итога — видно, как пополнение
- * превращается в сумму на карте (см. cycleCards ниже).
+ * Внутри — СЛАЙДЕР из двух окон: сверху «пополнение 1 500 ₽», снизу «на
+ * карте 2 025 ⚡». Подсветка (.thumb) переезжает с верхнего окна на нижнее,
+ * и число «на карте» досчитывается от суммы пополнения до итога — видно, как
+ * 1 500 превращаются в 2 025 (cycleCards ниже). Пополнение — в рублях, на
+ * карте — заряды, поэтому после числа молния.
  *
- * Под числом — ОДНА плашка с тремя гранями одного бонуса, они сменяют друг
- * друга: «+525 в подарок» → «≈ +7 игр в подарок» → «+200 тикетов за
- * наличные». Тикетов нет у парка (Июнь) — граней две.
+ * Под слайдером — плашка во всю ширину карточки, грани одного бонуса
+ * сменяют друг друга: «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за
+ * наличные» (тикеты — только там, где сумма карточки есть в cash_tickets).
  *
  * На карте = сумма + подарок, считается здесь, а не пишется в данные: так
  * числа на карточке не могут разойтись.
@@ -147,11 +149,13 @@ function renderCards(p) {
       <div class="card${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}" data-total="${o.sum + gift}">
         ${o.main ? STAR : ''}
         <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
-        <div class="sum"><div class="lbl l-sum">${esc(T.label_sum)}</div><div class="fit-box"><span class="fit fs-sum">${fmt(o.sum)}\u00a0₽</span></div></div>
-        <div class="toggle" aria-hidden="true"><span class="fill"></span><span class="chev">›››</span><span class="knob">${BOLT}</span></div>
-        <div class="oncard"><div class="lbl l-card">${esc(T.label_card)}</div><div class="fit-box"><span class="fit fs-card">${fmt(o.sum + gift)}</span></div></div>
+        <div class="slider">
+          <span class="thumb" aria-hidden="true"></span>
+          <div class="seg seg-a"><div class="lbl l-sum">${esc(T.label_sum)}</div><div class="fit-box"><span class="fit fs-sum">${fmt(o.sum)}\u00a0₽</span></div></div>
+          <div class="seg seg-b"><div class="lbl l-card">${esc(T.label_card)}</div><div class="fit-box"><span class="fit fs-card"><span class="num">${fmt(o.sum + gift)}</span>${BOLT}</span></div></div>
+        </div>
         <div class="faces">${faces.map((f, i) => `
-          <div class="face${i === 0 ? ' on' : ''}" data-kind="${f.kind}"><span class="fit fs-face"><b>${esc(f.big)}</b><small>${esc(f.small)}</small></span></div>`).join('')}
+          <div class="face${i === 0 ? ' on' : ''}" data-kind="${f.kind}"><div class="fit-box"><span class="fit fs-face"><b>${esc(f.big)}</b><small>${esc(f.small)}</small></span></div></div>`).join('')}
         </div>
       </div>`
   }).join('')
@@ -197,15 +201,15 @@ function renderQr(p) {
   svg.setAttribute('viewBox', q.viewBox)
   path.setAttribute('d', q.d)
   svg.dataset.url = q.url   // для проверки глазами в инспекторе
-  /* «Докинуть на карту без очереди» — «без очереди» выделено лаймовой плашкой */
-  document.getElementById('qr-lead').innerHTML = `${esc(T.qr_lead_a)} <mark>${esc(T.qr_lead_b)}</mark>`
-  /* «Баланс, тикеты и статус — в твоём телефоне»: первая половина тёмным,
-     вторая синим. Тире держится за словом справа — неразрывным пробелом,
-     чтобы не повиснуть отдельной строкой. */
-  /* Короткие слова («с», «без», «те») держатся за следующим — не висят в конце строки */
-  const glue = (x) => x.replace(/(^|\s)([А-Яа-яЁё]{1,3}) /g, '$1$2\u00a0')
-  const [a, b] = String(T.qr_caption).split(' — ').map(glue)
-  document.getElementById('qr-cap').innerHTML = b ? `<b>${esc(a)}</b> —\u00a0${esc(b)}` : esc(a)
+  /* «Докинуть на карту без очереди» — «без очереди» выделено лаймовой
+     плашкой. Текст — во внутреннем <span>: сама строка растягивается на
+     свободное поле над кодом, а текст стоит по центру этого поля. */
+  document.getElementById('qr-lead').innerHTML = `<span>${esc(T.qr_lead_a)} <mark>${esc(T.qr_lead_b)}</mark></span>`
+  /* «Баланс, тикеты и статус — в твоём телефоне» — целиком синим, по центру
+     поля под кодом. Короткие слова («и», «в») и тире держатся за соседним
+     словом — не висят в конце строки. */
+  const glue = (x) => x.replace(/(^|\s)([А-Яа-яЁё]{1,3}) /g, '$1$2\u00a0').replace(/ — /g, ' —\u00a0')
+  document.getElementById('qr-cap').innerHTML = `<span>${esc(glue(String(T.qr_caption)))}</span>`
 }
 
 function render() {
@@ -304,27 +308,34 @@ function fitUniform(sel, max, min, maxH) {
   els.forEach((e) => { e.style.fontSize = `${size}px` })
 }
 
-/* Сколько места по высоте у карточки: числа «на карте» не должны вытолкнуть
-   подпись подарка за край, если панель ниже эталона по пропорциям. */
+/* Сколько места по высоте у числа «на карте»: нижнее окно слайдера растёт
+   на всё свободное место карточки (flex:1 1 0), из него вычитаем поля окна
+   и подпись. Так число не вытолкнет плашку бонуса за край. */
 function cardRoom() {
-  const c = document.querySelector('.card')
-  if (!c) return 0
-  const cs = getComputedStyle(c)
-  const oc = c.querySelector('.oncard')
-  const ocs = getComputedStyle(oc)
+  const seg = document.querySelector('.card .seg-b')
+  if (!seg) return 0
+  const cs = getComputedStyle(seg)
+  const label = seg.querySelector('.lbl').offsetHeight
   const gap = parseFloat(cs.rowGap) || 0
-  const label = oc.querySelector('.lbl').offsetHeight
-  let used
-  if (document.body.classList.contains('portrait')) {
-    /* Вертикаль: «на карте» занимает правую колонку над плашкой подарка */
-    used = c.querySelector('.faces').offsetHeight + gap + label
-  } else {
-    const kids = [...c.children].filter((e) => !e.classList.contains('star'))   // звезда — поверх, места не занимает
-    used = gap * (kids.length - 1) + parseFloat(ocs.paddingTop) + parseFloat(ocs.borderTopWidth) + label
-    kids.forEach((e) => { if (e !== oc) used += e.offsetHeight })
-  }
-  const inner = c.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
-  return Math.max(0, Math.floor(inner - used))
+  return Math.max(0, Math.floor(seg.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - label - gap))
+}
+
+/* Подсветка слайдера: по размерам окон считаем, где ей стоять над верхним
+   (A) и над нижним (B) окном. Переезд — CSS-переходом между двумя наборами. */
+function layoutThumbs() {
+  document.querySelectorAll('#cards .card').forEach((c) => {
+    const a = c.querySelector('.seg-a')
+    const b = c.querySelector('.seg-b')
+    if (!a || !b) return
+    const set = (k, el) => {
+      c.style.setProperty(`--${k}x`, `${el.offsetLeft}px`)
+      c.style.setProperty(`--${k}y`, `${el.offsetTop}px`)
+      c.style.setProperty(`--${k}w`, `${el.offsetWidth}px`)
+      c.style.setProperty(`--${k}h`, `${el.offsetHeight}px`)
+    }
+    set('a', a)
+    set('b', b)
+  })
 }
 
 /* QR — самый крупный квадрат, что помещается в плитку рядом с подписями,
@@ -343,9 +354,10 @@ function fitQr() {
   if (portrait) {
     side = Math.min(tile.clientHeight - padV, tile.clientWidth * 0.46, 620)
   } else {
-    const lead = document.getElementById('qr-lead').offsetHeight
-    const cap = document.getElementById('qr-cap').offsetHeight
-    side = Math.min(tile.clientHeight - padV - lead - cap - 2 * 14, tile.clientWidth - padH, 620)
+    /* Строки над и под кодом растягиваются на свободное поле — меряем
+       сам текст (внутренний <span>) и оставляем ему воздух */
+    const inner = (id) => (document.getElementById(id).firstElementChild || {}).offsetHeight || 0
+    side = Math.min(tile.clientHeight - padV - inner('qr-lead') - inner('qr-cap') - 2 * 52, tile.clientWidth - padH, 620)
   }
   side = Math.max(Math.floor(side), 160)
   const q = KASSA_QR[park]
@@ -378,9 +390,9 @@ function fitStage() {
   const offer = document.getElementById('offer')
   fitCount(offer, portrait ? 112 : 104, 40)
   fitUniform('.fs-x', 84, 30)
-  fitUniform('.fs-sum', 50, 26)
+  fitUniform('.fs-sum', 60, 26)
   fitUniform('.fs-face', 48, 16)
-  fitUniform('.fs-card', portrait ? 170 : 150, 48, cardRoom() || 0)
+  fitUniform('.fs-card', portrait ? 150 : 150, 44, cardRoom() || 0)
   if (DATA.show_steps) {
     fitCount(document.getElementById('round'), 34, 18)
     fitUniform('.fs-ssum', 30, 14)
@@ -388,59 +400,75 @@ function fitStage() {
   }
   fitUniform('.fs-info', 28, 16)
   fitQr()
+  layoutThumbs()
 }
 
-/* ── 6. Движение: «пополнение превращается в сумму на карте» ──────────────
-   Карточки по очереди (1 500 → 3 000 → 5 000, по CARD_MS каждая): у активной
-   переключатель щёлкает слева направо, и число «на карте» вырастает из суммы
-   пополнения до итога. У остальных итог стоит на месте — все три числа
-   читаются в любой момент.
-   Плашка под числом раз в FACE_MS меняет грань: подарок → игры → тикеты,
+/* ── 6. Движение: «1 500 превращаются в 2 025» ───────────────────────────
+   Карточки по очереди (1 500 → 3 000 → 5 000, по CARD_MS каждая). У активной
+   подсветка слайдера сначала встаёт на верхнее окно «пополнение 1 500 ₽»,
+   затем переезжает на нижнее «на карте», и число досчитывается от суммы
+   пополнения до итога. У остальных подсветка спокойно стоит на «на карте»,
+   итог на месте — все три числа читаются в любой момент.
+   Плашка под слайдером раз в FACE_MS меняет грань: бонус → игры → тикеты,
    у всех карточек одновременно — так грани легко сравнивать.
-   Без движения (prefers-reduced-motion) — все переключатели включены,
-   итог и первая грань стоят. */
+   Без движения (prefers-reduced-motion) — подсветка на «на карте», итог и
+   первая грань стоят. */
 const CARD_MS = 4000
 const FACE_MS = 3000
+const TO_B_MS = 1000    // столько подсветка стоит на «пополнении», потом переезжает
 const COUNT_MS = 1100
 const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
+let timers = []
 function countUp(card) {
-  const node = card.querySelector('.fs-card')
+  const node = card.querySelector('.fs-card .num')
   const from = Number(card.dataset.sum)
   const to = Number(card.dataset.total)
-  const t0 = performance.now() + 450   // сначала щёлкает переключатель
-  node.textContent = fmt(from)
+  node.textContent = fmt(from)          // пока подсветка на «пополнении» — внизу та же сумма, приглушённо
+  card.classList.add('on', 'fa')
   card.classList.remove('done')
-  const step = (now) => {
-    if (!card.classList.contains('on')) { node.textContent = fmt(to); return }
-    const k = Math.min(1, Math.max(0, (now - t0) / COUNT_MS))
-    const e = 1 - Math.pow(1 - k, 3)
-    node.textContent = fmt(Math.round((from + (to - from) * e) / 5) * 5)
-    if (k < 1) requestAnimationFrame(step)
-    else { node.textContent = fmt(to); card.classList.add('done') }
-  }
-  requestAnimationFrame(step)
+  timers.push(setTimeout(() => {
+    card.classList.remove('fa')         // подсветка едет вниз, на «на карте»
+    const t0 = performance.now() + 150
+    const step = (now) => {
+      if (!card.classList.contains('on')) { node.textContent = fmt(to); return }
+      const k = Math.min(1, Math.max(0, (now - t0) / COUNT_MS))
+      const e = 1 - Math.pow(1 - k, 3)
+      node.textContent = fmt(Math.round((from + (to - from) * e) / 5) * 5)
+      if (k < 1) requestAnimationFrame(step)
+      else { node.textContent = fmt(to); card.classList.add('done') }
+    }
+    requestAnimationFrame(step)
+  }, TO_B_MS))
 }
 
 let active = -1
 function cycleCards() {
   const cards = [...document.querySelectorAll('#cards .card')]
   if (!cards.length) return
+  timers.forEach(clearTimeout)
+  timers = []
   cards.forEach((c) => {
-    c.classList.remove('on', 'done')
-    c.querySelector('.fs-card').textContent = fmt(Number(c.dataset.total))
+    c.classList.remove('on', 'fa', 'done')
+    c.querySelector('.fs-card .num').textContent = fmt(Number(c.dataset.total))
   })
   active = (active + 1) % cards.length
-  cards[active].classList.add('on')
   countUp(cards[active])
 }
 
+/* Грани идут в одном порядке у всех карточек: бонус → игры → тикеты. Шаг
+   общий (по самой длинной карточке): у карточки без тикетов в этот шаг
+   снова стоит бонус — так карточки не сбиваются друг с другом. */
 let face = 0
 function rotateFaces() {
   face += 1
-  document.querySelectorAll('#cards .card').forEach((c) => {
+  const cards = [...document.querySelectorAll('#cards .card')]
+  const n = Math.max(1, ...cards.map((c) => c.querySelectorAll('.face').length))
+  const step = face % n
+  cards.forEach((c) => {
     const fs = [...c.querySelectorAll('.face')]
-    fs.forEach((f, i) => f.classList.toggle('on', i === face % fs.length))
+    const show = step < fs.length ? step : 0
+    fs.forEach((f, i) => f.classList.toggle('on', i === show))
   })
 }
 
@@ -452,7 +480,7 @@ setTimeout(fitStage, 1200)
 window.addEventListener('resize', fitStage)
 
 if (REDUCED) {
-  document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('on', 'done'))
+  document.querySelectorAll('#cards .card').forEach((c) => c.classList.add('done'))
 } else if (PARKS[park]) {
   setTimeout(() => { cycleCards(); setInterval(cycleCards, CARD_MS) }, 700)
   setInterval(rotateFaces, FACE_MS)
