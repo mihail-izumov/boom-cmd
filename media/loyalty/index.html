@@ -132,8 +132,8 @@
        10–17    смена мест, молния в телефон     c1
        17–31    фокус: баланс                    c2
        31–43    фокус: пополнить                 c3
-       43–55    фокус: прогресс до приза         c4
-       55–67    фокус: статус                    c5
+       43–51    фокус: прогресс до приза         c4
+       51–67    фокус: статус — 4 гостя по ~1 с  c5
        67–76    смена мест, молния в карту       c6
        76–100   итог: «ЗАРЯЖАЙ ОНЛАЙН — …»       c7
      Подписи гаснут полностью ДО того, как проявится следующая (зазор
@@ -169,8 +169,8 @@
   @keyframes cap1{0%,10%{opacity:0;transform:translateY(14px)}10.8%,16.2%{opacity:1;transform:none}17%,100%{opacity:0}}
   @keyframes cap2{0%,17%{opacity:0;transform:translateY(14px)}17.8%,30.2%{opacity:1;transform:none}31%,100%{opacity:0}}
   @keyframes cap3{0%,31%{opacity:0;transform:translateY(14px)}31.8%,42.2%{opacity:1;transform:none}43%,100%{opacity:0}}
-  @keyframes cap4{0%,43%{opacity:0;transform:translateY(14px)}43.8%,54.2%{opacity:1;transform:none}55%,100%{opacity:0}}
-  @keyframes cap5{0%,55%{opacity:0;transform:translateY(14px)}55.8%,66.2%{opacity:1;transform:none}67%,100%{opacity:0}}
+  @keyframes cap4{0%,43%{opacity:0;transform:translateY(14px)}43.8%,50.2%{opacity:1;transform:none}51%,100%{opacity:0}}
+  @keyframes cap5{0%,51%{opacity:0;transform:translateY(14px)}51.8%,66.2%{opacity:1;transform:none}67%,100%{opacity:0}}
   @keyframes cap6{0%,67%{opacity:0;transform:translateY(14px)}67.8%,75.2%{opacity:1;transform:none}76%,100%{opacity:0}}
   @keyframes cap7{0%,76%{opacity:0;transform:scale(.94)}77%,99.2%{opacity:1;transform:none}100%{opacity:0}}
 
@@ -297,20 +297,29 @@
   .fz.f-stat{--rc:var(--lv-gold);animation-name:f-stat}.fz.f-stat::before{animation-name:ring-spin,r-stat}
   @keyframes f-bal{0%,17.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}18.6%,29.8%{opacity:1;transform:scale(2.38);z-index:30;background:#16143f;box-shadow:0 0 0 .22em var(--lime),0 1.6em 4em rgba(0,0,0,.75)}31.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
   @keyframes f-top{0%,31.2%{opacity:.4;transform:none;z-index:1;box-shadow:none}32.6%,41.8%{opacity:1;transform:scale(2.38);z-index:30;box-shadow:0 0 0 .22em #eaffb0,0 1.6em 4em rgba(0,0,0,.75)}43.2%,77%{opacity:.4;transform:none;z-index:1;box-shadow:none}79%,100%{opacity:1;transform:none;z-index:1;box-shadow:none}}
-  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,53.8%{opacity:1;transform:scale(2.085);z-index:30;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}55.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
-  @keyframes f-stat{0%,55.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}56.6%,65.8%{opacity:1;transform:scale(2.38);z-index:30;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
+  @keyframes f-prog{0%,43.2%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}44.6%,49.8%{opacity:1;transform:scale(2.085);z-index:30;background:#2a0f3d;box-shadow:0 0 0 .22em var(--magenta),0 1.6em 4em rgba(0,0,0,.75)}51.2%,100%{opacity:.4;transform:none;z-index:1;background:rgba(255,0,128,.08);box-shadow:none}}
+  @keyframes f-stat{0%,51.2%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}52.6%,65.8%{opacity:1;transform:scale(2.38);z-index:30;background:#16143f;box-shadow:0 0 0 .22em var(--lv-gold),0 1.6em 4em rgba(0,0,0,.75)}67.2%,100%{opacity:.4;transform:none;z-index:1;background:transparent;box-shadow:none}}
   @keyframes r-bal{0%,18%{opacity:0}18.8%,29.6%{opacity:1}30.4%,100%{opacity:0}}
   @keyframes r-top{0%,32%{opacity:0}32.8%,41.6%{opacity:1}42.4%,100%{opacity:0}}
-  @keyframes r-prog{0%,44%{opacity:0}44.8%,53.6%{opacity:1}54.4%,100%{opacity:0}}
-  @keyframes r-stat{0%,56%{opacity:0}56.8%,65.6%{opacity:1}66.4%,100%{opacity:0}}
+  @keyframes r-prog{0%,44%{opacity:0}44.8%,49.6%{opacity:1}50.4%,100%{opacity:0}}
+  @keyframes r-stat{0%,52%{opacity:0}52.8%,65.6%{opacity:1}66.4%,100%{opacity:0}}
 
-  .f-stat{display:flex;align-items:center;gap:1em;padding:.5em .6em}
-  .ph-ava{width:3.6em;height:3.6em;border-radius:50%;background:linear-gradient(135deg,#3d47a0,#4a5aad);display:grid;place-items:center;flex:none}
-  .ph-ava svg{width:1.8em;height:1.8em;color:#fff}
+  .f-stat{display:grid;padding:.5em .6em}
+  /* Четыре гостя в одной ячейке: в окне статуса сменяются по очереди
+     (≈1 с каждый) — разные люди, разные статусы, разные 8-бит лица. */
+  .who{grid-area:1/1;display:flex;align-items:center;gap:1em;animation:30s ease-in-out infinite}
+  .who.p0{animation-name:who0}.who.p1{animation-name:who1}.who.p2{animation-name:who2}.who.p3{animation-name:who3}
+  @keyframes who0{0%,55.4%{opacity:1;transform:none}56%,65.6%{opacity:0;transform:translateY(-.5em)}66.2%,100%{opacity:1;transform:none}}
+  @keyframes who1{0%,55.4%{opacity:0;transform:translateY(.5em)}56%,58.8%{opacity:1;transform:none}59.4%,100%{opacity:0;transform:translateY(-.5em)}}
+  @keyframes who2{0%,58.8%{opacity:0;transform:translateY(.5em)}59.4%,62.2%{opacity:1;transform:none}62.8%,100%{opacity:0;transform:translateY(-.5em)}}
+  @keyframes who3{0%,62.2%{opacity:0;transform:translateY(.5em)}62.8%,65.2%{opacity:1;transform:none}65.8%,100%{opacity:0;transform:translateY(-.5em)}}
+  /* Аватар — 8-бит эмоция (ретрофутуризм): только глаза и рот пикселями */
+  .ph-ava{width:3.6em;height:3.6em;border-radius:.9em;background:var(--av);display:grid;place-items:center;flex:none;box-shadow:inset 0 -.25em 0 rgba(0,0,0,.25)}
+  .ph-ava svg{width:2.6em;height:2.6em;fill:#fff;shape-rendering:crispEdges}
   .ph-name{font-family:'Unbounded';font-weight:700;font-size:1.3em}
   .ph-status{display:flex;align-items:center;gap:.4em;margin-top:.2em}
   .ph-status i{width:.5em;height:.5em;border-radius:50%;background:var(--green)}
-  .ph-status b{font-family:'Unbounded';font-weight:700;font-size:.9em;color:var(--lv-gold);letter-spacing:.08em}
+  .ph-status b{font-family:'Unbounded';font-weight:700;font-size:.9em;color:var(--st);letter-spacing:.08em}
 
   .f-bal{margin-top:1em;padding:.6em}
   .ph-balance{font-size:1.05em;font-weight:700;margin-bottom:.6em}
@@ -332,6 +341,10 @@
   .f-prog{margin:.6em 1.2em 0;padding:.9em 1em;border:.1em solid rgba(255,0,128,.2)}
   .f-prog .row{display:flex;justify-content:space-between;margin-bottom:.5em;font-size:.9em;font-weight:700}
   .f-prog .row b{font-family:'Unbounded';color:var(--magenta)}
+  /* «СКОРО»: прогресс до приза в кабинете ещё не запущен */
+  .soon{display:inline-block;font-family:'Unbounded';font-weight:900;font-size:.75em;letter-spacing:.06em;background:var(--magenta);color:#fff;border-radius:.4em;padding:.15em .45em;margin-left:.4em;vertical-align:.1em;animation:soon-blink 1.6s ease-in-out infinite}
+  .cap .soon{font-size:.32em;vertical-align:.55em}
+  @keyframes soon-blink{0%,100%{opacity:1}50%{opacity:.55}}
   .ph-track{height:.55em;border-radius:.3em;background:rgba(255,0,128,.18);overflow:hidden}
   .ph-fill{height:100%;width:67%;border-radius:.3em;background:linear-gradient(90deg,var(--magenta),#FF5CAA);position:relative;overflow:hidden}
   .ph-fill::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.22) 0 .4em,transparent .4em .8em);background-size:2em 100%;animation:stripes 1.2s linear infinite}
@@ -491,7 +504,7 @@
 
   /* Без движения: итоговый кадр — карта и кабинет рядом, посыл-итог. */
   @media (prefers-reduced-motion: reduce){
-    .card,.card .el,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.ph-fill::after,
+    .card,.card .el,.card .glint::after,.strike,.phone,.fz,.fz::before,.cap,.who,.soon,.ph-fill::after,
     .step,.alt span,.qr-frame .cn,.ticket,.stamp .rl.spin svg{animation:none}
     .card .el{opacity:1;transform:none}
     .phone{transform:translate(14em,-4em) scale(.7);filter:brightness(.5)}
@@ -538,14 +551,14 @@
     <div class="board-wrap" id="board-wrap">
       <div class="board" id="board">
         <div class="caps">
-          <div class="cap c0"><div class="t">Твоя карта — <b>это счёт</b></div><div class="s">Заряды, тикеты и статус остаются на ней</div></div>
+          <div class="cap c0"><div class="t">Заряжай <b>онлайн</b></div><div class="s">Заряды, тикеты и статус остаются на ней</div></div>
           <div class="cap c1"><div class="t">Карта <b>в кабинете</b></div><div class="s">Всё, что на карте, — у тебя в телефоне</div></div>
           <div class="cap c2"><div class="t">Баланс <b>в кармане</b></div><div class="s">Заряды, бонусы и рубли всегда видны</div></div>
           <div class="cap c3"><div class="t">Пополняй <b>онлайн</b></div><div class="s">Прямо в кабинете — с телефона</div></div>
-          <div class="cap c4"><div class="t">Прогресс <b>до приза</b></div><div class="s">Мотивация на виду каждый день</div></div>
+          <div class="cap c4"><div class="t">Прогресс <b>до приза</b><span class="soon">СКОРО</span></div><div class="s">Мотивация на виду каждый день</div></div>
           <div class="cap c5"><div class="t">Статус <b>растёт</b></div><div class="s">Больше играешь — больше привилегий</div></div>
           <div class="cap c6"><div class="t">Заряд <b>на карту</b></div><div class="s">Пополнил в кабинете — играй по карте</div></div>
-          <div class="cap c7"><div class="t">Не стой <b>в очереди</b></div><div class="s">Заряжай <i>онлайн</i></div></div>
+          <div class="cap c7"><div class="t">Не стой <b>в очереди</b></div></div>
         </div>
         <!-- Карта гостя — реальный макет: основа + 8 отдельных элементов -->
         <div class="card" aria-hidden="true">
@@ -568,8 +581,10 @@
             <div class="ph-host"><img class="ph-logo" src="./img/logo-white.svg" alt="БумБастик"></div>
             <div class="ph-card">
               <div class="fz f-stat">
-                <span class="ph-ava"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18a2 2 0 0 0-4 0"/><path d="m19 11-2.11-6.657a2 2 0 0 0-2.752-1.148l-1.276.61A2 2 0 0 1 12 4H8.5a2 2 0 0 0-1.925 1.456L5 11"/><path d="M2 11h20"/><circle cx="17" cy="18" r="3"/><circle cx="7" cy="18" r="3"/></svg></span>
-                <div><div class="ph-name">Артём К.</div><div class="ph-status"><i></i><b>ЗОЛОТОЙ</b></div></div>
+                <div class="who p0" style="--av:#3d47a0;--st:#FFD60A"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="4" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="8" y="3" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="3" y="7" width="1" height="1"/><rect x="4" y="8" width="4" height="1"/><rect x="8" y="7" width="1" height="1"/></svg></span><div><div class="ph-name">Артём К.</div><div class="ph-status"><i></i><b>ЗОЛОТОЙ</b></div></div></div>
+                <div class="who p1" style="--av:#c2187a;--st:#00D4FF"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="3" y="3" width="2" height="2"/><rect x="7" y="3" width="2" height="2"/><rect x="5" y="7" width="2" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="7" y="8" width="1" height="1"/><rect x="5" y="9" width="2" height="1"/></svg></span><div><div class="ph-name">Алина М.</div><div class="ph-status"><i></i><b>СЕРЕБРЯНЫЙ</b></div></div></div>
+                <div class="who p2" style="--av:#1b8a6b;--st:#FF5CAA"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="3" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="8" y="4" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="3" y="7" width="6" height="1"/><rect x="4" y="8" width="4" height="1"/></svg></span><div><div class="ph-name">Тимур Б.</div><div class="ph-status"><i></i><b>ПЛАТИНОВЫЙ</b></div></div></div>
+                <div class="who p3" style="--av:#7a3fd1;--st:#FFD60A"><span class="ph-ava"><svg viewBox="0 0 12 12"><rect x="2" y="4" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="7" y="3" width="2" height="2"/><rect x="4" y="7" width="1" height="1"/><rect x="5" y="8" width="2" height="1"/><rect x="7" y="7" width="1" height="1"/></svg></span><div><div class="ph-name">Вика Р.</div><div class="ph-status"><i></i><b>ЗОЛОТОЙ</b></div></div></div>
               </div>
               <div class="fz f-bal">
                 <div class="ph-balance">Баланс: <b>1 200 ₽</b></div>
@@ -581,7 +596,7 @@
               <div class="fz f-top">Пополнить заряды</div>
             </div>
             <div class="fz f-prog">
-              <div class="row"><span>Razer Cobra Minecraft</span><b>5020/7500</b></div>
+              <div class="row"><span>Razer Cobra Minecraft<i class="soon">СКОРО</i></span><b>5020/7500</b></div>
               <div class="ph-track"><div class="ph-fill"></div></div>
             </div>
             <div class="ph-tabs">
