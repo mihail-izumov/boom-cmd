@@ -716,7 +716,8 @@ function countUp(card) {
 let active = -1
 let cycleTimer = 0
 /* В плеере экранов касса играет ОДИН круг: все карточки по очереди, потом
-   стоит на последнем кадре TAIL_MS и только тогда плеер уводит на другой
+   последняя гаснет, и экран TAIL_MS стоит «между ходами» — ни одна карточка
+   не горит, следующая не начинается — и только тогда плеер уводит на другой
    экран (решение владельца 01.10). roundLeft — сколько карточек ещё
    показать в этом круге; вне плеера — бесконечно. */
 const TAIL_MS = 5000
@@ -724,8 +725,6 @@ let roundLeft = Infinity   // следующий ход — его снимае�
 function cycleCards() {
   const cards = [...document.querySelectorAll('#cards .card')]
   if (!cards.length) return
-  if (roundLeft <= 0) return          // круг сыгран — последний кадр стоит
-  roundLeft -= 1
   timers.forEach(cancel)
   timers = []
   /* Гаснущая карточка: заливка плашки стекает (снят half), значение на
@@ -735,6 +734,10 @@ function cycleCards() {
     c.querySelectorAll('.face').forEach((f) => f.classList.remove('roll-in', 'roll-out'))
     setNum(c, Number(c.dataset.total))
   })
+  /* Круг сыгран: последняя карточка погасла, следующая не начинается —
+     экран стоит «между ходами», пока плеер не уведёт дальше. */
+  if (roundLeft <= 0) return
+  roundLeft -= 1
   active = (active + 1) % cards.length
   countUp(cards[active])
   cycleTimer = later(cycleCards, cardMs(cards[active]))

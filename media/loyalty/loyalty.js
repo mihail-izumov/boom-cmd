@@ -20,7 +20,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v7.2'
+const PAGE_VERSION = 'v7.3'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -254,6 +254,15 @@ function fitScene() {
    с модулем в ЦЕЛОЕ число физических пикселей: при дробном модуле
    crispEdges рисует соседние модули разной толщины, и код хуже читается. */
 let stageScale = 0
+/* Строки плашек QR («Баланс, тикеты и статус — / в телефоне», «Регайся и
+   забирай») — кегль по ширине плашки, от заданного в CSS вниз. */
+function fitPaths() {
+  document.querySelectorAll('.path .a').forEach((n) => {
+    if (!n.dataset.max) n.dataset.max = parseFloat(getComputedStyle(n).fontSize)
+    fitCount(n, Number(n.dataset.max), 14)
+  })
+}
+
 function fitQr() {
   const tile = document.getElementById('qr-tile')
   const frame = document.getElementById('qr-frame')
@@ -292,6 +301,7 @@ function fitStage() {
   fitScene()
   fitUniform('.fs-disc', 72, 28)
   fitQr()
+  fitPaths()
 }
 
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStage)
