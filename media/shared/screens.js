@@ -36,8 +36,10 @@ import SHARK from './shark-eyes.svg'
 
 /* Экраны ротации — по порядку показа. path — от корня сайта. */
 const SCREENS = [
-  { id: 'loyalty', name: 'Твоя карта',   path: 'media/loyalty/' },
-  { id: 'kassa',   name: 'Заряди карту', path: 'media/kassa/' },
+  { id: 'loyalty', name: 'Статус',  path: 'media/loyalty/' },
+  { id: 'kassa',   name: 'Зарядка', path: 'media/kassa/' },
+  /* Третьим встанет турбо — подпись «Турбо» (решение владельца 01.10).
+     Пока не подключён: media/turbo/ модуль не импортирует. */
 ]
 
 const PARK_KEY = 'boom-turbo-park'   // тот же ключ, что у турбо и обеих страниц
