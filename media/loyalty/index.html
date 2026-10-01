@@ -193,7 +193,12 @@
   }
   .card::after{content:'';position:absolute;inset:0;border-radius:inherit;border:.25em solid rgba(150,170,255,.55);pointer-events:none}
   .card .el{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:0;animation:30s cubic-bezier(.2,.8,.3,1) infinite}
-  .card .e-tab{animation-name:el0}
+  /* «ИГРАТЬ» — внутренний слой карты, а не летающий элемент: полукруг
+     обрезан по скруглённому контуру карты (overflow:hidden у .card-base)
+     и не уезжает с неё. Мягко «дышит» — манит играть. */
+  .card .card-base{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+  .card .card-base .tab{position:absolute;inset:0;width:100%;height:100%;display:block;animation:tab-breathe 2.4s ease-in-out infinite}
+  @keyframes tab-breathe{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25) drop-shadow(0 0 1.2em rgba(198,245,46,.7))}}
   .card .e-name{animation-name:el1}
   .card .e-boom{animation-name:el2}
   .card .e-smart{animation-name:el3}
@@ -603,7 +608,7 @@
         </div>
         <!-- Карта гостя — векторный макет владельца: основа + 7 слоёв -->
         <div class="card" aria-hidden="true">
-          <img class="el e-tab" src="./img/card-tab.svg" alt="">
+          <span class="card-base"><img class="tab" src="./img/card-tab.svg" alt=""></span>
           <img class="el e-name" src="./img/card-name.svg" alt="">
           <img class="el e-boom" src="./img/card-boom.svg" alt="">
           <img class="el e-smart" src="./img/card-smart.svg" alt="">
