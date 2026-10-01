@@ -26,7 +26,7 @@ import { KASSA_QR } from './kassa-qr.js'
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v1.3'
+const PAGE_VERSION = 'v1.4'
 
 /* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
    vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
@@ -119,13 +119,21 @@ function renderOffer() {
 }
 
 /**
- * Три карточки: «X1 / X2 / X4–6» — сколько пришло играть.
+ * Три карточки: «X1 / X2 / X4–6» — сколько пришло играть. У каждой свой
+ * цвет «жидкости» (offers[].tone: lime / cyan / pink, цвета — .tone-… в
+ * index.html).
  *
- * Внутри — СЛАЙДЕР из двух окон: сверху «пополнение 1 500 ₽», снизу «на
- * карте 2 025 ⚡». Подсветка (.thumb) переезжает с верхнего окна на нижнее,
- * и число «на карте» досчитывается от суммы пополнения до итога — видно, как
- * 1 500 превращаются в 2 025 (cycleCards ниже). Пополнение — в рублях, на
- * карте — заряды, поэтому после числа молния.
+ * Внутри — два СОСУДА, как в играх «перелей воду»: сверху «пополнение
+ * 1 500 ₽», снизу «на карте 2 025 ⚡». Верхний наливается, наклоняется и
+ * переливается струёй в нижний; деньги гостя встают в нижнем нижним слоем,
+ * сверху доливается слой бонуса светлее, и число «на карте» досчитывается от
+ * суммы до итога (cycleCards ниже). Пополнение — в рублях, на карте —
+ * заряды, поэтому после числа молния.
+ *
+ * Текст в сосуде записан дважды: светлый — сам сосуд, тёмный — в «жидкости»
+ * (.liq, aria-hidden). Жидкость обрезана по уровню (clip-path), поэтому буквы
+ * темнеют ровно там, где их накрыло. Высота слоя денег — --split, доля суммы
+ * в итоге (1 500 из 2 025 → 74 %).
  *
  * Под слайдером — плашка во всю ширину карточки, грани одного бонуса
  * сменяют друг друга: «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов за
@@ -134,8 +142,10 @@ function renderOffer() {
  * На карте = сумма + подарок, считается здесь, а не пишется в данные: так
  * числа на карточке не могут разойтись.
  */
+const TONES = ['lime', 'cyan', 'pink']
+
 function renderCards(p) {
-  document.getElementById('cards').innerHTML = DATA.offers.map((o) => {
+  document.getElementById('cards').innerHTML = DATA.offers.map((o, i) => {
     const gift = giftFor(o.sum)
     const games = gamesFor(gift)
     const tickets = cashTicketsFor(p, o.sum)
@@ -145,14 +155,18 @@ function renderCards(p) {
     if (games > 0) faces.push({ kind: 'games', big: `≈\u00a0+${fmt(games)}\u00a0${plural(games, 'игра', 'игры', 'игр')}`, small: T.face_games })
     if (tickets > 0) faces.push({ kind: 'tickets', big: `+${fmt(tickets)}\u00a0${plural(tickets, 'тикет', 'тикета', 'тикетов')}`, small: T.face_tickets })
     const [x, n] = [String(o.label).slice(0, 1), String(o.label).slice(1)]
+    const tone = TONES.includes(o.tone) ? o.tone : TONES[i % TONES.length]
+    const split = Math.round((o.sum / (o.sum + gift)) * 1000) / 10
+    const inA = `<div class="lbl l-sum">${esc(T.label_sum)}</div><div class="fit-box"><span class="fit fs-sum">${fmt(o.sum)}\u00a0₽</span></div>`
+    const inB = `<div class="lbl l-card">${esc(T.label_card)}</div><div class="fit-box"><span class="fit fs-card"><span class="num">${fmt(o.sum + gift)}</span>${BOLT}</span></div>`
     return `
-      <div class="card${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}" data-total="${o.sum + gift}">
+      <div class="card tone-${tone}${o.main ? ' main' : ''}" data-id="${esc(o.id)}" data-sum="${o.sum}" data-total="${o.sum + gift}" style="--split:${split}%">
         ${o.main ? STAR : ''}
         <div class="xlabel"><div class="fit-box"><span class="fit fs-x"><i>${esc(x)}</i>${esc(n)}</span></div></div>
         <div class="slider">
-          <span class="thumb" aria-hidden="true"></span>
-          <div class="seg seg-a"><div class="lbl l-sum">${esc(T.label_sum)}</div><div class="fit-box"><span class="fit fs-sum">${fmt(o.sum)}\u00a0₽</span></div></div>
-          <div class="seg seg-b"><div class="lbl l-card">${esc(T.label_card)}</div><div class="fit-box"><span class="fit fs-card"><span class="num">${fmt(o.sum + gift)}</span>${BOLT}</span></div></div>
+          <div class="seg seg-a">${inA}<div class="liq" aria-hidden="true">${inA}</div><i class="wave" aria-hidden="true"></i></div>
+          <i class="stream" aria-hidden="true"></i>
+          <div class="seg seg-b">${inB}<div class="liq" aria-hidden="true">${inB}</div><i class="wave" aria-hidden="true"></i></div>
         </div>
         <div class="faces">${faces.map((f, i) => `
           <div class="face${i === 0 ? ' on' : ''}" data-kind="${f.kind}"><div class="fit-box"><span class="fit fs-face"><b>${esc(f.big)}</b><small>${esc(f.small)}</small></span></div></div>`).join('')}
@@ -320,21 +334,21 @@ function cardRoom() {
   return Math.max(0, Math.floor(seg.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - label - gap))
 }
 
-/* Подсветка слайдера: по размерам окон считаем, где ей стоять над верхним
-   (A) и над нижним (B) окном. Переезд — CSS-переходом между двумя наборами. */
-function layoutThumbs() {
+/* Струя между сосудами: по размерам окон считаем, откуда она течёт и куда.
+   Горизонталь: верхний сосуд над нижним — струя выходит из-под правого
+   угла верхнего и падает у правой стенки нижнего. Вертикаль: сосуды рядом —
+   верхний наклоняется вправо, струя падает у левой стенки нижнего. */
+function layoutStreams() {
+  const portrait = document.body.classList.contains('portrait')
   document.querySelectorAll('#cards .card').forEach((c) => {
     const a = c.querySelector('.seg-a')
     const b = c.querySelector('.seg-b')
     if (!a || !b) return
-    const set = (k, el) => {
-      c.style.setProperty(`--${k}x`, `${el.offsetLeft}px`)
-      c.style.setProperty(`--${k}y`, `${el.offsetTop}px`)
-      c.style.setProperty(`--${k}w`, `${el.offsetWidth}px`)
-      c.style.setProperty(`--${k}h`, `${el.offsetHeight}px`)
-    }
-    set('a', a)
-    set('b', b)
+    const x = portrait ? b.offsetLeft + 5 : b.offsetLeft + b.offsetWidth - 30 - 14   // у стенки, мимо букв
+    const y = portrait ? b.offsetTop + 4 : a.offsetTop + a.offsetHeight - 8
+    c.style.setProperty('--sx', `${x}px`)
+    c.style.setProperty('--sy', `${y}px`)
+    c.style.setProperty('--sh', `${Math.max(0, b.offsetTop + b.offsetHeight - y - 10)}px`)
   })
 }
 
@@ -400,46 +414,59 @@ function fitStage() {
   }
   fitUniform('.fs-info', 28, 16)
   fitQr()
-  layoutThumbs()
+  layoutStreams()
 }
 
-/* ── 6. Движение: «1 500 превращаются в 2 025» ───────────────────────────
+/* ── 6. Движение: «перелей воду» — 1 500 превращаются в 2 025 ─────────────
    Карточки по очереди (1 500 → 3 000 → 5 000, по CARD_MS каждая). У активной
-   подсветка слайдера сначала встаёт на верхнее окно «пополнение 1 500 ₽»,
-   затем переезжает на нижнее «на карте», и число досчитывается от суммы
-   пополнения до итога. У остальных подсветка спокойно стоит на «на карте»,
-   итог на месте — все три числа читаются в любой момент.
-   Плашка под слайдером раз в FACE_MS меняет грань: бонус → игры → тикеты,
+   три фазы — классы на карточке:
+     p1 — верхний сосуд «пополнение» наливается; нижний в тени, в нём пока
+          та же сумма;
+     p2 — верхний наклоняется и переливается струёй в нижний: уровень сверху
+          падает, снизу растёт слой денег гостя до --split;
+     p3 — сверху доливается слой бонуса, число досчитывается до итога, в тень
+          уходит пустой верхний сосуд; досчитало — done (вспышка числа).
+   У остальных карточек сосуды спокойные: нижний едва залит теми же двумя
+   слоями, итог на месте — все три числа читаются в любой момент.
+   Плашка под сосудами раз в FACE_MS меняет грань: бонус → игры → тикеты,
    у всех карточек одновременно — так грани легко сравнивать.
-   Без движения (prefers-reduced-motion) — подсветка на «на карте», итог и
-   первая грань стоят. */
-const CARD_MS = 4000
+   Без движения (prefers-reduced-motion) — спокойные сосуды, итог и первая
+   грань стоят. */
+const CARD_MS = 5200
 const FACE_MS = 3000
-const TO_B_MS = 1000    // столько подсветка стоит на «пополнении», потом переезжает
+const FILL_MS = 1000    // верхний наливается и стоит полный, потом переливается
+const POUR_MS = 900     // переливание в нижний (как transition у .liq в index.html)
 const COUNT_MS = 1100
 const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
+/* Число «на карте» — в двух местах: в сосуде и в «жидкости» над ним */
+function setNum(card, v) {
+  card.querySelectorAll('.fs-card .num').forEach((n) => { n.textContent = fmt(v) })
+}
+
 let timers = []
 function countUp(card) {
-  const node = card.querySelector('.fs-card .num')
   const from = Number(card.dataset.sum)
   const to = Number(card.dataset.total)
-  node.textContent = fmt(from)          // пока подсветка на «пополнении» — внизу та же сумма, приглушённо
-  card.classList.add('on', 'fa')
-  card.classList.remove('done')
+  setNum(card, from)                    // пока наливается «пополнение» — внизу та же сумма, в тени
+  card.classList.remove('done', 'p2', 'p3')
+  card.classList.add('on', 'p1')
   timers.push(setTimeout(() => {
-    card.classList.remove('fa')         // подсветка едет вниз, на «на карте»
-    const t0 = performance.now() + 150
+    card.classList.replace('p1', 'p2')  // наклон и струя: деньги перетекают вниз
+  }, FILL_MS))
+  timers.push(setTimeout(() => {
+    card.classList.replace('p2', 'p3')  // доливается бонус, число растёт
+    const t0 = performance.now() + 100
     const step = (now) => {
-      if (!card.classList.contains('on')) { node.textContent = fmt(to); return }
+      if (!card.classList.contains('on')) { setNum(card, to); return }
       const k = Math.min(1, Math.max(0, (now - t0) / COUNT_MS))
       const e = 1 - Math.pow(1 - k, 3)
-      node.textContent = fmt(Math.round((from + (to - from) * e) / 5) * 5)
+      setNum(card, Math.round((from + (to - from) * e) / 5) * 5)
       if (k < 1) requestAnimationFrame(step)
-      else { node.textContent = fmt(to); card.classList.add('done') }
+      else { setNum(card, to); card.classList.add('done') }
     }
     requestAnimationFrame(step)
-  }, TO_B_MS))
+  }, FILL_MS + POUR_MS))
 }
 
 let active = -1
@@ -449,8 +476,8 @@ function cycleCards() {
   timers.forEach(clearTimeout)
   timers = []
   cards.forEach((c) => {
-    c.classList.remove('on', 'fa', 'done')
-    c.querySelector('.fs-card .num').textContent = fmt(Number(c.dataset.total))
+    c.classList.remove('on', 'p1', 'p2', 'p3', 'done')
+    setNum(c, Number(c.dataset.total))
   })
   active = (active + 1) % cards.length
   countUp(cards[active])

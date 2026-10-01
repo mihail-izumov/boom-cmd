@@ -58,11 +58,13 @@ const SPEC_STEPS = [
 ]
 const SPEC_ON_CARD = { 500: 625, 1000: 1300, 1500: 2025, 2000: 2800, 3000: 4500, 5000: 8000 }
 // Игры — подарок / 70 ₽ (средняя цена игры с b00m.fun/rewards), вниз до целого.
+// Цвет «жидкости» у каждой карточки свой (решение владельца 01.10).
 const SPEC_OFFERS = [
-  { label: 'X1', sum: 1500, onCard: 2025, gift: 525, games: '≈ +7 игр', main: true },
-  { label: 'X2', sum: 3000, onCard: 4500, gift: 1500, games: '≈ +21 игра', main: false },
-  { label: 'X4–6', sum: 5000, onCard: 8000, gift: 3000, games: '≈ +42 игры', main: false },
+  { label: 'X1', sum: 1500, onCard: 2025, gift: 525, games: '≈ +7 игр', main: true, tone: 'lime' },
+  { label: 'X2', sum: 3000, onCard: 4500, gift: 1500, games: '≈ +21 игра', main: false, tone: 'cyan' },
+  { label: 'X4–6', sum: 5000, onCard: 8000, gift: 3000, games: '≈ +42 игры', main: false, tone: 'pink' },
 ]
+const PHASES = ['p1', 'p2', 'p3']
 // Тикеты при оплате наличными (решение владельца 01.10): только за точную
 // сумму — 200 за 1 000 ₽, 500 за 5 000 ₽; только Охта и Питерленд. Из трёх
 // карточек (1 500 / 3 000 / 5 000) тикеты есть лишь у 5 000.
@@ -140,7 +142,7 @@ const { html, bundle } = MAIN
 /** Текст узла без скрытых потомков — то, что видит гость. */
 function visibleText(root) {
   const c = root.cloneNode(true)
-  c.querySelectorAll('[hidden]').forEach((n) => n.remove())
+  c.querySelectorAll('[hidden], .liq').forEach((n) => n.remove())
   return sp(c.textContent)
 }
 
@@ -181,9 +183,15 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     lblSum: sp(c.querySelector('.l-sum')?.textContent),
     card: sp(c.querySelector('.fs-card .num')?.textContent),
     lblCard: sp(c.querySelector('.l-card')?.textContent),
-    fa: c.classList.contains('fa'),
-    bolt: !!c.querySelector('.seg-b .fs-card svg.bolt'),
-    slider: !!c.querySelector('.slider > .thumb') && !!c.querySelector('.slider .seg-a .fs-sum') && !!c.querySelector('.slider .seg-b .fs-card'),
+    phase: PHASES.find((k) => c.classList.contains(k)) || '',
+    tone: [...c.classList].find((k) => k.startsWith('tone-')) || '',
+    split: c.style.getPropertyValue('--split'),
+    liqNum: sp(c.querySelector('.seg-b .liq .fs-card .num')?.textContent),
+    liqSum: sp(c.querySelector('.seg-a .liq .fs-sum')?.textContent),
+    liqHidden: [...c.querySelectorAll('.liq')].length === 2 && [...c.querySelectorAll('.liq')].every((l) => l.getAttribute('aria-hidden') === 'true'),
+    bolt: !!c.querySelector('.seg-b > .fit-box .fs-card svg.bolt'),
+    slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
+      && !!c.querySelector('.slider > .stream') && c.querySelectorAll('.slider .wave').length === 2,
     toggle: !!c.querySelector('.toggle'),
     faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector('.fit-box > .fs-face')),
     faces: [...c.querySelectorAll('.face')].map((f) => ({
@@ -238,6 +246,14 @@ ok('три суммы кассира: 1 500 / 3 000 / 5 000',
    DATA.offers.map((o) => o.sum).join() === '1500,3000,5000', DATA.offers.map((o) => o.sum).join())
 ok('основная — только 1 500', DATA.offers.filter((o) => o.main).map((o) => o.sum).join() === '1500')
 ok('метки X1 · X2 · X4–6', DATA.offers.map((o) => o.label).join(' · ') === 'X1 · X2 · X4–6')
+ok('цвета карточек: лайм · голубой · розовый, все разные',
+   DATA.offers.map((o) => o.tone).join() === SPEC_OFFERS.map((o) => o.tone).join() && new Set(DATA.offers.map((o) => o.tone)).size === DATA.offers.length,
+   DATA.offers.map((o) => o.tone).join())
+{
+  // Цвета описаны в стилях страницы — у каждого тона свой --c
+  const toneC = Object.fromEntries(SPEC_OFFERS.map((o) => [o.tone, (html.match(new RegExp(`\\.tone-${o.tone}[^{]*\\{--c:(#[0-9a-f]{6})`, 'i')) || [])[1] || '']))
+  ok('в стилях у каждого цвета свой оттенок', Object.values(toneC).every(Boolean) && new Set(Object.values(toneC)).size === 3, JSON.stringify(toneC))
+}
 ok('средняя цена игры — 70 ₽, как на /rewards', DATA.game_price === 70, String(DATA.game_price))
 ok('полоса ступеней выключена (решение владельца 01.10)', DATA.show_steps === false)
 ok('парков ровно три, коды как у турбо', DATA.park_order.join() === 'ohta,piterland,iyun')
@@ -276,7 +292,12 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
        c.x === o.label && c.xLime === 'X' && c.sum === `${fmt(o.sum)} ₽` && c.card === fmt(o.onCard),
        `${c.x} · ${c.sum} → ${c.card}`)
     ok(`${code}: ${o.label} — каждое число подписано`, c.lblSum === 'пополнение' && c.lblCard === 'на карте')
-    ok(`${code}: ${o.label} — слайдер из двух окон с подсветкой, старого переключателя нет`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — два сосуда, струя и волны; подсветки и переключателя нет`, c.slider && !c.toggle)
+    ok(`${code}: ${o.label} — цвет «${o.tone}»`, c.tone === `tone-${o.tone}`, c.tone)
+    ok(`${code}: ${o.label} — «жидкость» с тем же текстом, скрыта от чтения`,
+       c.liqHidden && c.liqSum === c.sum && c.liqNum === c.card, `${c.liqSum} / ${c.liqNum}`)
+    ok(`${code}: ${o.label} — слой денег ${Math.round((o.sum / o.onCard) * 1000) / 10}% сосуда «на карте»`,
+       c.split === `${Math.round((o.sum / o.onCard) * 1000) / 10}%`, c.split)
     ok(`${code}: ${o.label} — после числа «на карте» молния (заряды)`, c.bolt)
     ok(`${code}: ${o.label} — плашка бонуса во всю ширину карточки`, c.faceFull)
     ok(`${code}: ${o.label} — ${o.main ? 'выделена со звездой' : 'не выделена'}`, c.main === o.main && c.star === o.main)
@@ -313,44 +334,50 @@ for (const [code, s] of Object.entries(SPEC_PARKS)) {
   ok(`${code}: «Парк не найден» не показан`, !r.parkErr)
 }
 
-console.log('\n── Движение: подсветка слайдера по очереди, грани плашки ──')
+console.log('\n── Движение: «перелей воду» по очереди, грани плашки ──')
 {
+  // Тайминг kassa.js: старт через 0,7 с; p1 1 с → p2 0,9 с → p3 + досчёт
+  // 1,1 с; карточка — 5,2 с; грани — раз в 3 с.
   const r = await run('?park=ohta&tv=1')
+  const w = r.window
+  const cs = (el) => w.getComputedStyle(el)
   const cards0 = r.cards()
-  ok('до старта все числа — итог, подсветка на «на карте»',
-     cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000' && cards0.every((c) => !c.fa && !c.on))
-  await wait(1200)   // старт через 0,7 с, подсветка стоит на «пополнении» 1 с
+  ok('до старта все числа — итог, сосуды спокойные',
+     cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000' && cards0.every((c) => !c.phase && !c.on))
+  ok('у каждой карточки свой цвет', new Set(cards0.map((c) => c.tone)).size === 3, cards0.map((c) => c.tone).join())
+  await wait(1200)   // t≈1,2 с — p1
   let c = r.cards()
-  ok('первой — 1 500: подсветка на «пополнении», внизу пока та же сумма',
-     c[0].on && c[0].fa && c[0].card === '1 500' && !c[1].on && !c[2].on, `${c[0].card} fa=${c[0].fa}`)
-  await wait(2000)
+  ok('первой — 1 500: наливается «пополнение», внизу пока та же сумма',
+     c[0].on && c[0].phase === 'p1' && c[0].card === '1 500' && c[0].liqNum === '1 500' && !c[1].on && !c[2].on, `${c[0].card} ${c[0].phase}`)
+  ok('пока наливается — «на карте» в тени', Number(cs(c[0].el.querySelector('.seg-b')).opacity) < 0.5, cs(c[0].el.querySelector('.seg-b')).opacity)
+  await wait(700)    // t≈1,9 с — p2
   c = r.cards()
-  ok('подсветка переехала на «на карте», число досчиталось до 2 025',
-     c[0].on && !c[0].fa && c[0].card === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} fa=${c[0].fa}`)
+  ok('дальше — переливание: фаза p2, верхний наклонён, оба сосуда не в тени',
+     c[0].phase === 'p2' && /rotate/.test(cs(c[0].el.querySelector('.seg-a')).transform)
+       && Number(cs(c[0].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1,
+     `${c[0].phase} ${cs(c[0].el.querySelector('.seg-a')).transform}`)
+  await wait(2200)   // t≈4,1 с — досчитано
+  c = r.cards()
+  ok('долит бонус, число досчиталось до 2 025 (и в «жидкости» тоже)',
+     c[0].on && c[0].phase === 'p3' && c[0].card === '2 025' && c[0].liqNum === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} ${c[0].phase}`)
+  ok('пустое «пополнение» — в тени, «на карте» — нет',
+     Number(cs(c[0].el.querySelector('.seg-a')).opacity) < 0.5 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1)
   ok('грань сменилась на игры у всех трёх', c.every((x) => x.faces.find((f) => f.on)?.kind === 'games'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
-  await wait(3200)
+  await wait(2600)   // t≈6,7 с — вторая карточка, p1
   c = r.cards()
-  ok('следом — 3 000, у первой итог на месте', !c[0].on && c[1].on && c[0].card === '2 025', c.map((x) => x.on).join())
+  ok('следом — 3 000, у первой итог на месте, сосуды спокойные',
+     !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && c[0].liqNum === '2 025', c.map((x) => x.phase || '-').join())
   ok('шаг тикетов: у 5 000 — тикеты, у остальных снова бонус (не сбиваются)',
      c[2].faces.find((f) => f.on)?.kind === 'tickets' && c[0].faces.find((f) => f.on)?.kind === 'gift' && c[1].faces.find((f) => f.on)?.kind === 'gift',
      c.map((x) => x.faces.find((f) => f.on)?.kind).join())
-  // Сплошная заливка и тень (v1.3): jsdom применяет каскад стилей —
-  // у активной карточки залито одно окно, второе притушено.
-  const w = r.window
-  const seg = (i, k) => w.getComputedStyle(c[i].el.querySelector(k))
-  // jsdom не раскрывает var(--…) — сверяем объявленное значение фона
-  const thumbBg = (i) => { const t = w.getComputedStyle(c[i].el.querySelector('.thumb')); return (t.getPropertyValue('background') || t.backgroundColor || '').trim() }
-  ok('у активной карточки заливка сплошная лаймовая', thumbBg(1) === 'var(--lime)', thumbBg(1))
-  ok('у спокойной — едва видная', /rgba\(198,\s*245,\s*46,\s*0?\.08\)/.test(thumbBg(0)), thumbBg(0))
-  ok('у активной на «на карте» — «пополнение» в тени', c[1].on && !c[1].fa && Number(seg(1, '.seg-a').opacity) < 0.5 && Number(seg(1, '.seg-b').opacity || 1) === 1,
-     `a=${seg(1, '.seg-a').opacity} b=${seg(1, '.seg-b').opacity}`)
-  ok('у спокойных карточек оба окна читаются', [0, 2].every((i) => Number(seg(i, '.seg-a').opacity || 1) === 1 && Number(seg(i, '.seg-b').opacity || 1) === 1))
+  ok('у спокойных карточек оба сосуда читаются', [0, 2].every((i) =>
+    Number(cs(c[i].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[i].el.querySelector('.seg-b')).opacity || 1) === 1))
   r.window.close()
   const z = await run('?park=ohta', { reduced: true })
   await wait(900)
   const zc = z.cards()
-  ok('без движения: подсветка на «на карте», итоги стоят',
-     zc.every((x) => !x.fa) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000')
+  ok('без движения: сосуды спокойные, итоги стоят',
+     zc.every((x) => !x.phase && !x.on) && zc.map((x) => x.card).join(' / ') === '2 025 / 4 500 / 8 000')
   z.window.close()
 }
 
@@ -412,7 +439,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.3 · собрано ДД.ММ»', /^v1\.3 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.4 · собрано ДД.ММ»', /^v1\.4 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
