@@ -1,0 +1,67 @@
+{
+  "о_файле": [
+    "Данные ТВ-экрана у кассы «Пополни карту» (media/kassa/). Файл вкомпилирован в бандл при сборке: страница не ходит ни в сеть, ни в таблицы.",
+    "Цифры подарков — единые для всех парков (подтверждено ИТ 13.08, те же на b00m.fun/charge). Те же числа — на странице сайта b00m.fun/popolnit (boom-fun/.vitepress/data/popolnit.js). Поменялись на кассе — править ОБА файла в один день.",
+    "Подарок начисляется за интервал суммы: от steps[i].sum до следующей ступени. Поэтому 1 400 ₽ дают +300, а 1 500 ₽ — уже +525.",
+    "parks — переключатели по паркам, каждое поле правится одной строкой: steps_from — с какой суммы полоса ступеней; tickets — строка про тикеты за наличные ('' — нет строки); topup_in_hall — строка «Не хватило — докинем…»; online — онлайн-пополнение работает (false — QR на экране скрыт).",
+    "slug — адрес страницы сайта: QR ведёт на https://b00m.fun/popolnit/<slug>?from=kassa-tv. Коды QR пересобирает media/kassa/build_kassa_qr.py.",
+    "После любой правки: поднять PAGE_VERSION в kassa.js и прогнать node scripts/verify-kassa.mjs."
+  ],
+
+  "steps": [
+    { "sum": 500,  "gift": 125 },
+    { "sum": 1000, "gift": 300 },
+    { "sum": 1500, "gift": 525 },
+    { "sum": 2000, "gift": 800 },
+    { "sum": 3000, "gift": 1500 },
+    { "sum": 5000, "gift": 3000 }
+  ],
+
+  "offers": [
+    { "id": "one",   "who": "Один",         "people": 1, "sum": 1500, "main": true },
+    { "id": "two",   "who": "Вдвоём",       "people": 2, "sum": 3000, "main": false },
+    { "id": "group", "who": "Компания 4–6", "people": 4, "sum": 5000, "main": false }
+  ],
+
+  "text": {
+    "offer_a": "Пополни карту —",
+    "offer_b": "играй больше",
+    "label_sum": "пополнение",
+    "label_card": "на карте",
+    "label_gift": "в подарок",
+    "round": "Круглая сумма — больше подарок",
+    "round_example": "1 400 ₽ дают +300, 1 500 ₽ — уже +525",
+    "topup_in_hall": "Не хватило — докинем без очереди: скажите сотруднику в зале",
+    "qr_lead": "Наведи камеру",
+    "qr_caption": "Пополняй с телефона — подарки те же, без очереди"
+  },
+
+  "park_order": ["ohta", "piterland", "iyun"],
+
+  "parks": {
+    "ohta": {
+      "name": "Охта Молл",
+      "slug": "ohtamall",
+      "steps_from": 1000,
+      "tickets": "+200 тикетов при оплате наличными от 1 000 ₽",
+      "topup_in_hall": false,
+      "online": true
+    },
+    "piterland": {
+      "name": "Питерленд",
+      "slug": "piterland",
+      "steps_from": 500,
+      "tickets": "200 тикетов за 1 000 ₽ и 500 тикетов за 5 000 ₽ — при оплате наличными",
+      "topup_in_hall": true,
+      "online": true
+    },
+    "iyun": {
+      "name": "ТЦ Июнь",
+      "slug": "june",
+      "steps_from": 500,
+      "tickets": "",
+      "topup_in_hall": true,
+      "online": true
+    }
+  }
+}

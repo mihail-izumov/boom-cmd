@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0d0a2e">
+<title>Пополни карту // Бумбастик</title>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+   b00m-cmd · /media/kassa/ · ТВ-экран у кассы «Пополни карту»
+  ═══════════════════════════════════════════════════════════════════════════
+  Третий экран той же серии, что /media/turbo/ и /media/loyalty/. Свой
+  Vite-вход, БЕЗ гейта доступа, без API, без сети: данные — media/kassa/
+  kassa.data.json, вкомпилированы в бандл.
+
+  ⚠ DESIGN-STANDARD-boom-cmd.md на эту страницу НЕ распространяется — это
+    носитель для гостя (то же исключение, что у турбо и «Твоей карты»).
+
+  ЗАЧЕМ ЭКРАН. Кассир по стандарту продаж не спрашивает сумму, а сам
+  называет её по числу гостей и говорит подарок фразой «Если пополните на
+  1 500, то можно будет играть на 2 025 — в подарок 525 ₽ идёт». Экран
+  показывает ровно эти суммы и ровно эти числа, разложенные по тем же трём
+  случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
+  QR: пополнять можно с телефона, подарки те же, что на кассе.
+
+  БЛОКИ
+    1. Оффер — во всю ширину, читается через зал.
+    2. Три карточки по случаям: «Один» · «Вдвоём» · «Компания 4–6».
+       КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте» / «в
+       подарок»): однажды гости прочли «1 300 зарядов» наоборот, как цену.
+    3. Полоса ступеней подарка (с какой суммы — по парку) + «Круглая сумма —
+       больше подарок».
+    4–5. Строки «на кассе»: тикеты за наличные и «докинем без очереди» —
+       по парку. Стоят слева, ДАЛЕКО от QR: тикеты дают только за наличные
+       на кассе, онлайн их нет, и рядом с QR о них ни слова.
+    6. QR на страницу b00m.fun/popolnit/<парк>?from=kassa-tv — только если
+       у парка включён онлайн; выключен — плитки QR нет, левая часть
+       занимает всю ширину.
+    7. Штамп «v1.0 · собрано ДД.ММ» внизу слева, как у турбо.
+
+  ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
+  (экраны будут чередоваться на одной панели). Отличия намеренные:
+    · справа в шапке — ПУСТОЙ слот под будущий переключатель страниц экрана
+      (логики переключения нет);
+    · слогана «Играй больше — плати меньше» нет: оффер этого экрана сам
+      начинается с «играй больше», а «плати меньше» над ценами читалось бы
+      как обещание скидки;
+    · на экране НИЧЕГО НЕ НАЖИМАЕТСЯ: ни ссылок, ни кнопок, ни подсказки по
+      клику на штампе. Перезапуск — суточный, в режиме ТВ.
+
+  КАНВА — механизм турбо: эталон 1920×1080, k = min(vw/1920, vh/1080),
+  кегли — замером (fitCount). Вертикаль: эталон 1080×1920, как у «Твоей карты».
+
+  ПАРАМЕТРЫ URL (те же, что у турбо)
+    ?park=ohta|piterland|iyun  — парк экрана; неизвестный код — «Парк не найден»
+    &tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
+    &demo=1                    — песочница: видно настройки парка и пустой слот;
+                                 &online=0|1 — посмотреть экран с выключенным
+                                 или включённым онлайном, не правя данные
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Веса — ровно те, что у media/turbo/index.html. -->
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Палитра — та же, что у турбо и «Твоей карты»: экраны чередуются на одной панели */
+    --bg:#0d0a2e;
+    --tile:#171243;
+    --tile2:#1e1856;
+    --blue:#2d6bff;
+    --green:#3fe06c;
+    --lime:#c6f52e;
+    --yellow:#ffd530;
+    --pink:#ff3d68;
+    --white:#ffffff;
+    --muted:#9b94d0;
+    --soft:#b3ade0;
+    --dark:#0d0a2e;
+    --radius:26px;
+    --cyan:#00D4FF;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:#07051c;color:var(--white);font-family:'Inter',system-ui,sans-serif;overflow:hidden}
+
+  /* ══ КАНВА ══ механика турбо, см. fitStage в kassa.js ══ */
+  .viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#07051c;overflow:hidden}
+  .stage{flex:none;transform-origin:center center;background:var(--bg);position:relative}
+
+  /* Ряды: шапка 76 и подвал 46 — ровно как у турбо и «Твоей карты». */
+  .page{
+    width:100%;height:100%;display:grid;gap:16px;padding:20px;
+    grid-template-columns:minmax(0,2.55fr) minmax(0,1fr);
+    grid-template-rows:76px auto minmax(0,1fr) auto auto 46px;
+    grid-template-areas:
+      "head  head"
+      "offer offer"
+      "cards qr"
+      "steps qr"
+      "info  qr"
+      "fine  fine";
+  }
+  /* Онлайн выключен — плитки QR нет, левая часть во всю ширину */
+  body.no-online .page{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"head" "offer" "cards" "steps" "info" "fine";
+  }
+  /* Строк «на кассе» у парка нет — ряд схлопывается */
+  body.no-info .page{grid-template-areas:"head head" "offer offer" "cards qr" "steps qr" "steps qr" "fine fine"}
+  body.no-info.no-online .page{grid-template-areas:"head" "offer" "cards" "steps" "steps" "fine"}
+
+  body.portrait .page{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-rows:76px auto minmax(0,1.15fr) auto auto minmax(0,.85fr) 46px;
+    grid-template-areas:"head" "offer" "cards" "steps" "info" "qr" "fine";
+  }
+  body.portrait.no-online .page{grid-template-rows:76px auto minmax(0,1fr) auto auto 46px;grid-template-areas:"head" "offer" "cards" "steps" "info" "fine"}
+  body.portrait.no-info .page{grid-template-rows:76px auto minmax(0,1.15fr) auto minmax(0,.85fr) 46px;grid-template-areas:"head" "offer" "cards" "steps" "qr" "fine"}
+  body.portrait.no-info.no-online .page{grid-template-rows:76px auto minmax(0,1fr) auto 46px;grid-template-areas:"head" "offer" "cards" "steps" "fine"}
+
+  .tile{
+    background:var(--tile);border-radius:var(--radius);padding:26px 30px;
+    position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
+    min-height:0;min-width:0;
+  }
+  /* Узел, который меряет fitCount: ширина по тексту, сравнение — с родителем */
+  .fit{display:inline-block;white-space:nowrap;vertical-align:top}
+
+  /* ══ ШАПКА — как у turbo/index.html и loyalty/index.html ══════════════ */
+  .head{grid-area:head;background:var(--tile);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;position:relative}
+  .brand{position:absolute;left:22px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:14px}
+  .brand-icon{width:44px;height:auto;flex:none;color:var(--white)}
+  .brand-badge{
+    display:inline-flex;align-items:center;gap:9px;
+    font-family:'Unbounded';font-weight:700;font-size:16px;letter-spacing:.6px;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
+  }
+  .brand-badge .sep{color:var(--lime)}
+  /* Пустой слот под будущий переключатель страниц экрана — на месте
+     переключателя парков турбо. Логики нет; в песочнице виден контуром. */
+  .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%);height:46px;min-width:280px;border-radius:14px}
+  body.sandbox .slot{outline:2px dashed rgba(255,255,255,.22);outline-offset:-2px}
+  body.sandbox .slot::after{content:'слот: переключатель экранов';position:absolute;inset:0;display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--muted)}
+
+  /* ══ 1. ОФФЕР ══════════════════════════════════════════════════════════ */
+  .offer{
+    grid-area:offer;padding:14px 40px 18px;align-items:center;text-align:center;
+    background:
+      radial-gradient(60% 120% at 82% 50%, rgba(198,245,46,.16) 0%, rgba(198,245,46,0) 70%),
+      radial-gradient(70% 140% at 12% 20%, rgba(45,107,255,.38) 0%, rgba(45,107,255,0) 70%),
+      linear-gradient(180deg,#241d66 0%, var(--tile) 100%);
+  }
+  .offer .fit-box{width:100%;text-align:center}
+  .offer .fs-offer{font-family:'Unbounded';font-weight:900;font-size:88px;line-height:1.08;letter-spacing:-.5px}
+  .offer .fs-offer b{color:var(--lime)}
+  body.portrait .offer .fs-offer .ob{display:block}
+
+  /* ══ 2. ТРИ КАРТОЧКИ ═══════════════════════════════════════════════════ */
+  .cards{grid-area:cards;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;min-height:0}
+  .card{
+    background:var(--tile);border-radius:var(--radius);padding:22px 22px 24px;min-width:0;min-height:0;
+    display:flex;flex-direction:column;justify-content:space-between;gap:8px;position:relative;
+    border:3px solid rgba(255,255,255,.08);
+  }
+  /* Основная сумма (1 500) — лаймовая рамка, свечение и звезда */
+  .card.main{
+    border:4px solid var(--lime);
+    background:linear-gradient(160deg, rgba(198,245,46,.20) 0%, var(--tile) 55%);
+    animation:main-glow 3.2s ease-in-out infinite;
+  }
+  @keyframes main-glow{
+    0%,100%{box-shadow:0 0 0 0 rgba(198,245,46,0), 0 18px 50px rgba(198,245,46,.18)}
+    50%{box-shadow:0 0 0 6px rgba(198,245,46,.22), 0 22px 70px rgba(198,245,46,.36)}
+  }
+  .who{display:flex;align-items:center;gap:14px;min-width:0}
+  .who .ppl{height:38px;width:auto;flex:none;color:var(--soft)}
+  .card.main .who .ppl{color:var(--lime)}
+  .who .fit-box{flex:1;min-width:0}
+  .who .fs-who{font-family:'Unbounded';font-weight:900;font-size:32px;line-height:1.1}
+  body.portrait .cards{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr))}
+  body.portrait .card{
+    display:grid;gap:8px 28px;justify-content:stretch;
+    grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"who oncard" "sum oncard" "sum gift";
+  }
+  body.portrait .who{grid-area:who}
+  body.portrait .sum{grid-area:sum;align-self:end}
+  body.portrait .oncard{grid-area:oncard;border-top:none;padding-top:0;padding-left:26px;border-left:2px solid rgba(255,255,255,.1);align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+  body.portrait .gift{grid-area:gift;padding-left:28px}
+  .star{position:absolute;top:-4px;right:-4px;width:74px;height:74px;border-radius:0 var(--radius) 0 22px;background:var(--lime);display:grid;place-items:center}
+  .star svg{width:42px;height:42px;fill:var(--dark)}
+
+  /* Подписи к числам — одним стилем по всей странице */
+  .lbl{font-size:19px;font-weight:800;color:var(--soft);letter-spacing:.6px;text-transform:uppercase;line-height:1.15}
+  .sum .fs-sum{font-family:'Unbounded';font-weight:900;font-size:50px;line-height:1.05;color:var(--white)}
+  .oncard{padding-top:10px;border-top:2px solid rgba(255,255,255,.1)}
+  .oncard .fit-box{line-height:0}
+  .oncard .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px}
+  .gift .fs-gift{font-family:'Unbounded';font-weight:900;font-size:32px;line-height:1;color:var(--dark);background:var(--lime);border-radius:14px;padding:10px 16px}
+  .card:not(.main) .gift .fs-gift{background:rgba(198,245,46,.16);color:var(--lime);box-shadow:inset 0 0 0 2px rgba(198,245,46,.55)}
+
+  /* ══ 3. ПОЛОСА СТУПЕНЕЙ ════════════════════════════════════════════════ */
+  .steps{grid-area:steps;padding:16px 24px 18px;gap:10px;justify-content:flex-start}
+  .steps-head{display:flex;align-items:baseline;gap:18px;min-width:0}
+  .steps-head .fit-box{flex:1;min-width:0}
+  .steps-head .fs-round{font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.1;color:var(--white)}
+  .steps-head .fs-round i{font-style:normal;font-family:'Inter';font-weight:700;font-size:.72em;color:var(--soft);margin-left:16px;letter-spacing:0}
+  .ladder{display:grid;grid-template-columns:auto repeat(var(--n,6),minmax(0,1fr));gap:10px;align-items:stretch}
+  .legend{display:grid;grid-template-rows:1fr 1fr;align-items:center;padding-right:6px}
+  .legend .lbl{font-size:19px;white-space:nowrap}
+  /* Ступени: чем больше сумма — тем гуще лайм. Волна подсветки слева
+     направо — «больше сумма — больше подарок» без слов. */
+  .step{
+    --lv:.5;border-radius:18px;padding:6px 8px 8px;display:grid;grid-template-rows:1fr 1fr;align-items:center;justify-items:stretch;min-width:0;
+    /* Колонка — minmax(0,1fr): иначе она растягивается по тексту, и подгон
+       кегля (fitCount) меряет текст сам с собой и ничего не ужимает. */
+    grid-template-columns:minmax(0,1fr);
+    background:rgba(198,245,46,calc(.05 + var(--lv) * .15));
+    border:2px solid rgba(198,245,46,calc(.15 + var(--lv) * .5));
+    animation:lit 7.2s ease-in-out infinite;animation-delay:calc(var(--i) * 1.2s);
+  }
+  .step .fit-box{width:100%;text-align:center}
+  .step .fs-ssum{font-family:'Unbounded';font-weight:700;font-size:30px;line-height:1.2;color:var(--white)}
+  .step .fs-sgift{font-family:'Unbounded';font-weight:900;font-size:40px;line-height:1.15;color:var(--lime)}
+  @keyframes lit{
+    0%,3%{transform:translateY(0);box-shadow:none}
+    7%,15%{transform:translateY(-6px);box-shadow:0 0 0 3px var(--lime),0 12px 34px rgba(198,245,46,.4)}
+    20%,100%{transform:translateY(0);box-shadow:none}
+  }
+
+  /* ══ 4–5. СТРОКИ «НА КАССЕ» ════════════════════════════════════════════ */
+  .info{grid-area:info;padding:12px 24px;gap:8px}
+  .info[hidden]{display:none}
+  .info-row{display:flex;align-items:center;gap:16px;min-width:0}
+  .info-row[hidden]{display:none}
+  .info-row .ic{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;border:2px solid currentColor;background:rgba(255,255,255,.04)}
+  .info-row .ic svg{width:28px;height:28px}
+  .info-row.cash .ic{color:var(--yellow)}
+  .info-row.hall .ic{color:var(--cyan)}
+  .info-row .fit-box{flex:1;min-width:0}
+  .info-row .fs-info{font-family:'Inter';font-weight:800;font-size:28px;line-height:1.2;color:var(--white)}
+
+  /* ══ 6. QR ═════════════════════════════════════════════════════════════ */
+  .qr-tile{
+    grid-area:qr;background:var(--white);color:var(--dark);align-items:center;justify-content:space-between;gap:14px;padding:22px 22px 26px;
+    box-shadow:0 0 0 4px rgba(198,245,46,.9), 0 22px 60px rgba(45,107,255,.25);
+  }
+  .qr-tile[hidden]{display:none}
+  .qr-lead{font-family:'Unbounded';font-weight:900;font-size:34px;line-height:1.05;text-align:center}
+  .qr-frame{position:relative;flex:none;width:var(--qr,420px);height:var(--qr,420px);padding:16px}
+  .qr-img{display:block;width:100%;height:100%;color:var(--dark)}
+  .qr-frame .cn{position:absolute;width:52px;height:52px;border:7px solid var(--blue);animation:aim 2.4s ease-in-out infinite}
+  .qr-frame .c1{left:0;top:0;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
+  .qr-frame .c2{right:0;top:0;border-left:none;border-bottom:none;border-radius:0 16px 0 0}
+  .qr-frame .c3{left:0;bottom:0;border-right:none;border-top:none;border-radius:0 0 0 16px}
+  .qr-frame .c4{right:0;bottom:0;border-left:none;border-top:none;border-radius:0 0 16px 0}
+  @keyframes aim{0%,100%{opacity:1}50%{opacity:.45}}
+  .qr-cap{font-family:'Unbounded';font-weight:900;font-size:30px;line-height:1.2;text-align:center;color:#1d4fd0}
+  .qr-cap b{color:var(--dark)}
+  /* Вертикаль: плитка QR горизонтальная — код слева, слова справа */
+  body.portrait .qr-tile{flex-direction:row;justify-content:flex-start;gap:30px;padding:20px 30px 20px 20px}
+  body.portrait .qr-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px}
+  body.portrait .qr-lead,body.portrait .qr-cap{text-align:left}
+  body.portrait .qr-lead{font-size:44px}
+  body.portrait .qr-cap{font-size:42px}
+  /* Горизонталь: текстовый блок «растворяется», и заголовок встаёт над
+     кодом, подпись — под ним. Вертикаль: код слева, оба текста справа. */
+  .qr-text{display:contents}
+  .qr-lead{order:-1}
+  body.portrait .qr-text{display:flex}
+  body.portrait .qr-lead{order:0}
+
+  /* ══ ПОДВАЛ — как у turbo/index.html и loyalty/index.html ═══════════════ */
+  .fineband{
+    grid-area:fine;background:rgba(255,255,255,.04);border-radius:16px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    font-size:17px;color:var(--muted);font-weight:600;padding:0 22px 0 10px;text-align:right;position:relative;
+  }
+  .fineband .terms{min-width:0}
+  .svc{display:flex;align-items:stretch;gap:8px;flex:none}
+  .svc > *{height:36px}
+  .stamp{
+    flex:none;display:flex;align-items:center;gap:11px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+    color:#cfcae8;border-radius:11px;padding:0 13px;
+    font-family:'Inter';font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap;
+  }
+  .stamp .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .stamp .when{color:#8f88bd}
+  /* «Работает на Ранскеил» — тот же вид, что у соседей, но не ссылка:
+     на этом экране ничего не нажимается. */
+  .powered{flex:none;display:inline-flex;align-items:center;background:var(--blue);color:var(--white);border-radius:11px;padding:0 15px;font-family:'Inter';font-weight:800;font-size:15px;letter-spacing:.3px;white-space:nowrap}
+
+  .parkerr{position:fixed;inset:0;z-index:60;background:rgba(6,4,26,.86);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px}
+  .parkerr.on{display:flex}
+  .parkerr .box{max-width:min(680px,90vw);text-align:center;background:var(--tile2);border:2px solid var(--pink);border-radius:var(--radius);padding:28px 32px}
+  .parkerr h2{font-family:'Unbounded';font-weight:900;font-size:22px;line-height:1.25;color:var(--pink);margin-bottom:10px}
+  .parkerr p{font-size:14.5px;font-weight:600;color:var(--white);line-height:1.5}
+  .parkerr code{display:inline-block;background:rgba(255,255,255,.1);border-radius:7px;padding:2px 8px;font-family:ui-monospace,monospace}
+  .parkerr .list{margin-top:14px;font-size:13.5px;color:var(--muted);line-height:1.7}
+
+  /* Песочница: только показывает настройки парка, ничего не нажимается */
+  .demo{position:fixed;right:12px;bottom:8px;display:none;gap:10px;align-items:center;background:rgba(0,0,0,.7);border-radius:10px;padding:7px 11px;z-index:9;font-size:12px;font-weight:700;color:#cfc9ff}
+  .demo.on{display:flex}
+  .demo span{font-size:10px;color:#8f88bd;text-transform:uppercase;letter-spacing:1px}
+
+  body.tv.idle, body.tv.idle *{cursor:none !important}
+
+  .toosmall{display:none;position:fixed;inset:0;z-index:70;background:linear-gradient(160deg,#2d6bff 0%,#1b3fa8 100%);color:var(--white);align-items:center;justify-content:center;text-align:center;padding:28px}
+  .toosmall .in{max-width:440px}
+  .toosmall h2{font-family:'Unbounded';font-weight:900;font-size:clamp(20px,5.5vw,27px);line-height:1.25;margin-bottom:10px}
+  .toosmall p{font-size:clamp(13.5px,3.6vw,15.5px);font-weight:600;line-height:1.5;opacity:.92}
+  @media (max-width:479px), (max-height:479px){
+    .viewport{display:none}
+    .parkerr{display:none !important}
+    .toosmall{display:flex}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .card.main,.step,.qr-frame .cn{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="viewport" id="viewport">
+<div class="stage" id="stage">
+<div class="page">
+
+  <!-- ШАПКА — разметка как у турбо и «Твоей карты» -->
+  <header class="head">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 180 114" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+           style="fill-rule:evenodd;clip-rule:evenodd" aria-label="БумБастик">
+        <g transform="matrix(1,0,0,0.633333,0,0)">
+          <g transform="matrix(1.21253,0,0,1.91453,-19.1576,-81.8723)">
+            <g transform="matrix(0.388571,0,0,0.388571,-1586.56,-4010.12)">
+              <path d="M4368.24,10448.4L4505.63,10440.8C4505.63,10440.8 4501.3,10486.6 4491.87,10531.6C4475.88,10607.8 4458.86,10662.7 4458.86,10662.7L4260.49,10672.8L4350.14,10534.7L4325.11,10534.8L4365.12,10454.6L4365.14,10454.6L4365.8,10453.3L4368.24,10448.4ZM4447.79,10507.4C4446.91,10512.2 4445.97,10516.9 4444.97,10521.7C4436.79,10560.7 4428.35,10593.9 4422.2,10616.6C4422.2,10616.6 4337.79,10620.9 4337.79,10620.9L4381.48,10530.8C4405.55,10526.2 4427.95,10518.2 4447.79,10507.4Z"/>
+            </g>
+            <g transform="matrix(0.388571,0,0,0.388571,-1586.56,-4010.12)">
+              <path d="M4272.15,10569.3L4296.18,10569.2L4253.91,10655.4L4123.72,10661.7C4123.72,10661.7 4131.45,10597.1 4145.77,10533.5C4160.78,10466.8 4170.9,10440.7 4170.9,10440.7L4363.5,10430.8L4272.15,10569.3ZM4204.13,10496.3C4221.83,10508.5 4242.25,10518.2 4264.55,10524.9L4223.35,10608.9C4223.35,10608.9 4179.57,10611 4179.57,10611C4182.92,10590.9 4187.26,10567.4 4192.52,10544C4196.91,10524.5 4200.83,10508.8 4204.13,10496.3Z"/>
+            </g>
+          </g>
+        </g>
+      </svg>
+      <span class="brand-badge">
+        <span>БУМБАСТИК</span>
+        <span class="sep">//</span>
+        <span id="brand-park"></span>
+      </span>
+    </div>
+    <!-- Пустой слот под будущий переключатель страниц экрана -->
+    <div class="slot" id="screens" aria-hidden="true"></div>
+  </header>
+
+  <!-- 1. ОФФЕР — текст из kassa.data.json (text.offer_a / offer_b) -->
+  <section class="tile offer">
+    <div class="fit-box"><span class="fit fs-offer" id="offer"></span></div>
+  </section>
+
+  <!-- 2. ТРИ КАРТОЧКИ — рисует kassa.js из offers -->
+  <section class="cards" id="cards"></section>
+
+  <!-- 3. ПОЛОСА СТУПЕНЕЙ — рисует kassa.js из steps и steps_from парка -->
+  <section class="tile steps">
+    <div class="steps-head"><div class="fit-box"><span class="fit fs-round" id="round"></span></div></div>
+    <div class="ladder" id="ladder"></div>
+  </section>
+
+  <!-- 4–5. НА КАССЕ: тикеты за наличные и докидка — далеко от QR -->
+  <section class="tile info" id="info">
+    <div class="info-row cash" id="row-tickets">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+      <div class="fit-box"><span class="fit fs-info" id="tickets"></span></div>
+    </div>
+    <div class="info-row hall" id="row-hall">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span>
+      <div class="fit-box"><span class="fit fs-info" id="hall"></span></div>
+    </div>
+  </section>
+
+  <!-- 6. QR — только при включённом онлайне. Путь кода подставляет kassa.js -->
+  <section class="tile qr-tile" id="qr-tile">
+    <div class="qr-frame" id="qr-frame">
+      <i class="cn c1"></i><i class="cn c2"></i><i class="cn c3"></i><i class="cn c4"></i>
+      <svg class="qr-img" id="qr-svg" viewBox="0 0 41 41" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="QR: пополнить карту"><path id="qr-path" fill="none" stroke="currentColor" stroke-width="1" d=""/></svg>
+    </div>
+    <div class="qr-text"><div class="qr-lead" id="qr-lead"></div><div class="qr-cap" id="qr-cap"></div></div>
+  </section>
+
+  <!-- ПОДВАЛ — как у турбо, но без ссылок и кнопок -->
+  <div class="fineband">
+    <div class="svc">
+      <span class="powered">Работает на Ранскеил</span>
+      <span class="stamp" id="stamp">
+        <i class="dot"></i>
+        <span class="ver" id="stamp-ver">v—</span>
+        <span class="when" id="stamp-when"></span>
+      </span>
+    </div>
+    <span class="terms" id="terms"></span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<div class="toosmall">
+  <div class="in">
+    <h2>Экран для ТВ-панели</h2>
+    <p>Эта страница рассчитана на экран в парке. Разверните окно шире.</p>
+  </div>
+</div>
+
+<div class="parkerr" id="parkerr">
+  <div class="box">
+    <h2>Парк не найден</h2>
+    <p>В адресе панели указан <code id="parkerr-asked">—</code>, такого парка нет.<br>
+       Без парка неизвестно, какие строки показывать и куда вести QR.</p>
+    <div class="list">Правильные адреса:<br>
+      <code>?park=ohta</code> · <code>?park=piterland</code> · <code>?park=iyun</code>
+    </div>
+  </div>
+</div>
+
+<div class="demo" id="demo"><span>Песочница</span><b id="demo-info"></b></div>
+
+<script type="module" src="./kassa.js"></script>
+</body>
+</html>

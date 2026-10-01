@@ -65,6 +65,7 @@ export default defineConfig({
   //   app   — Vue-приложение «Мастерплан» (/)
   //   turbo — носитель для ТВ-панелей у кассы (/media/turbo/), DRV-10
   //   loyalty — ТВ-экран «Твоя карта» для постоянных гостей (/media/loyalty/)
+  //   kassa — ТВ-экран у кассы «Пополни карту» (/media/kassa/)
   //
   // Почему вход, а не файл в public/: только внутри сборки работает подстановка
   // import.meta.env, через которую URL Apps Script приходит из repo Variable.
@@ -81,6 +82,9 @@ export default defineConfig({
         turbo: resolve(root, 'media/turbo/index.html'),
         // ТВ-экран «Твоя карта» (/media/loyalty/) — статичный, без API
         loyalty: resolve(root, 'media/loyalty/index.html'),
+        // ТВ-экран у кассы «Пополни карту» (/media/kassa/) — статичный, без API;
+        // данные kassa.data.json вкомпилированы в бандл
+        kassa: resolve(root, 'media/kassa/index.html'),
       },
     },
   },

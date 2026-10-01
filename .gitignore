@@ -22,6 +22,9 @@ dist-ssr
 .tmp-verify-report/
 # Приёмка носителя /media/turbo/ — заведено сразу, а не после повторения истории.
 .tmp-verify-turbo/
+# Приёмка экрана у кассы /media/kassa/ (вторая папка — сборка с выключенным онлайном)
+.tmp-verify-kassa/
+.tmp-verify-kassa-offline/
 
 # Локальные env: URL источников (VITE_PROJECTS_API, VITE_ANALYTICS_API).
 # Фраза доступа здесь НЕ хранится (она только в localStorage).
