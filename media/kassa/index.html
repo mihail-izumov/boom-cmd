@@ -29,8 +29,9 @@
     2. Три карточки «X1» · «X2» · «X4–6». Внутри — слайдер из двух окон:
        «пополнение 1 500 ₽» сверху и «на карте 2 025 ⚡» снизу (пополнение —
        рубли, на карте — заряды, отсюда молния). По очереди (1 500 → 3 000 →
-       5 000) подсветка встаёт на «пополнение» и переезжает на «на карте», а
-       число досчитывается до итога — видно, как 1 500 превращаются в 2 025.
+       5 000) сплошная лаймовая заливка встаёт на «пополнение» и переезжает
+       на «на карте», а число досчитывается до итога — видно, как 1 500
+       превращаются в 2 025. Незалитое окно в этот момент уходит в тень.
        КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте»): однажды
        гости прочли «1 300 зарядов» наоборот, как цену.
        Под слайдером — плашка во всю ширину карточки, грани одного бонуса
@@ -47,7 +48,7 @@
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v1.2 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v1.3 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -202,35 +203,45 @@
   .lbl{font-size:19px;font-weight:800;color:var(--soft);letter-spacing:.6px;text-transform:uppercase;line-height:1.15}
 
   /* ══ СЛАЙДЕР из двух окон: «пополнение» сверху, «на карте» снизу ══════
-     Подсветка (.thumb) спокойно стоит над нижним окном. У активной карточки
-     (.on) она сначала встаёт на верхнее окно (.fa), потом переезжает вниз —
-     и число «на карте» досчитывается от суммы пополнения до итога (kassa.js,
-     cycleCards). Координаты окон для подсветки — из layoutThumbs:
-     --ax/--ay/--aw/--ah (верхнее) и --bx/--by/--bw/--bh (нижнее). */
+     Подсветка (.thumb) — сплошная заливка. У спокойной карточки она едва
+     видна под «на карте», оба окна читаются. У активной (.on) заливка
+     становится лаймовой и сначала встаёт на «пополнение» (.fa) — «на карте»
+     уходит в тень; потом заливка переезжает вниз, число досчитывается до
+     итога, а в тень уходит «пополнение» (решение владельца 01.10).
+     Координаты окон — из layoutThumbs (kassa.js): --ax/--ay/--aw/--ah
+     (верхнее) и --bx/--by/--bw/--bh (нижнее). */
   .slider{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;border-radius:24px;background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 2px rgba(255,255,255,.07);padding:6px}
-  .seg{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 12px 12px;border-radius:18px;min-width:0}
+  .seg{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 12px 12px;border-radius:18px;min-width:0;transition:opacity .45s ease, filter .45s ease}
   /* Два окна — две равные карточки слайдера */
   .seg-a,.seg-b{flex:1 1 0;min-height:0}
   .thumb{
     position:absolute;z-index:0;left:0;top:0;width:var(--bw,0px);height:var(--bh,0px);transform:translate(var(--bx,0px),var(--by,0px));
-    border-radius:18px;border:3px solid rgba(198,245,46,.4);background:rgba(198,245,46,.06);
-    transition:transform .7s cubic-bezier(.6,0,.25,1), width .7s cubic-bezier(.6,0,.25,1), height .7s cubic-bezier(.6,0,.25,1), border-color .5s, box-shadow .5s, background .5s;
+    border-radius:18px;background:rgba(198,245,46,.08);
+    transition:transform .7s cubic-bezier(.6,0,.25,1), width .7s cubic-bezier(.6,0,.25,1), height .7s cubic-bezier(.6,0,.25,1), box-shadow .5s, background .5s;
   }
-  .card.on .thumb{border-color:var(--lime);background:rgba(198,245,46,.13);box-shadow:0 0 0 4px rgba(198,245,46,.18),0 0 40px rgba(198,245,46,.35)}
+  /* Активная карточка: заливка сплошная лаймовая, со свечением */
+  .card.on .thumb{background:var(--lime);box-shadow:0 0 0 4px rgba(198,245,46,.22),0 0 44px rgba(198,245,46,.5)}
   /* На «пополнение» подсветка встаёт быстро, на «на карте» едет плавнее */
   .card.fa .thumb{width:var(--aw,0px);height:var(--ah,0px);transform:translate(var(--ax,0px),var(--ay,0px));transition-duration:.4s}
-  /* Пока подсветка на «пополнении», внизу — та же сумма, приглушённо: сейчас
-     она «перельётся» на карту и вырастет до итога */
-  .card.fa .seg-b .fs-card{opacity:.35}
+  /* Залитое окно — тёмный текст на лайме; второе окно — в тени. Пока
+     залито «пополнение», внизу в тени та же сумма: сейчас она «перельётся»
+     на карту и вырастет до итога. */
+  .seg .lbl,.seg-a .fs-sum,.seg-b .fs-card{transition:color .35s ease}
+  .fs-card .bolt{transition:fill .35s ease}
+  .card.on.fa .seg-a .lbl,.card.on:not(.fa) .seg-b .lbl{color:rgba(13,10,46,.72)}
+  .card.on.fa .seg-a .fs-sum{color:var(--dark)}
+  .card.on:not(.fa) .seg-b .fs-card{color:var(--dark)}
+  .card.on:not(.fa) .seg-b .fs-card .bolt{fill:var(--dark);filter:none}
+  .card.on.fa .seg-b,.card.on:not(.fa) .seg-a{opacity:.25;filter:saturate(.3)}
   .seg .fit-box{min-width:0}
   .seg-a .fs-sum{font-family:'Unbounded';font-weight:900;font-size:60px;line-height:1.05;color:var(--white)}
   .seg-b .fit-box{line-height:0}
-  .seg-b .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px;transform-origin:left center;transition:opacity .4s ease}
+  .seg-b .fs-card{font-family:'Unbounded';font-weight:900;font-size:150px;line-height:.98;color:var(--lime);letter-spacing:-2px;transform-origin:left center}
   /* Молния после числа: пополнение — в рублях, на карте — заряды */
   .fs-card .bolt{display:inline-block;width:.46em;height:.62em;margin-left:.1em;vertical-align:baseline;fill:var(--lime);filter:drop-shadow(0 0 .1em rgba(198,245,46,.6))}
   /* Итог досчитан — короткая вспышка числа */
   .card.done .fs-card{animation:pop .6s ease-out}
-  @keyframes pop{0%{transform:scale(1);text-shadow:none}35%{transform:scale(1.06);text-shadow:0 0 30px rgba(198,245,46,.9)}100%{transform:scale(1);text-shadow:none}}
+  @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
 
   /* Плашка бонуса — во всю ширину карточки. Грани одного бонуса сменяют
      друг друга (kassa.js, rotateFaces): «+525 бонус» → «≈ +7 игр бонус» →
@@ -417,7 +428,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg{animation:none}
-    .card,.thumb,.face,.fs-card{transition:none}
+    .card,.thumb,.seg,.face,.fs-card{transition:none}
   }
 </style>
 </head>

@@ -334,6 +334,17 @@ console.log('\n── Движение: подсветка слайдера по
   ok('шаг тикетов: у 5 000 — тикеты, у остальных снова бонус (не сбиваются)',
      c[2].faces.find((f) => f.on)?.kind === 'tickets' && c[0].faces.find((f) => f.on)?.kind === 'gift' && c[1].faces.find((f) => f.on)?.kind === 'gift',
      c.map((x) => x.faces.find((f) => f.on)?.kind).join())
+  // Сплошная заливка и тень (v1.3): jsdom применяет каскад стилей —
+  // у активной карточки залито одно окно, второе притушено.
+  const w = r.window
+  const seg = (i, k) => w.getComputedStyle(c[i].el.querySelector(k))
+  // jsdom не раскрывает var(--…) — сверяем объявленное значение фона
+  const thumbBg = (i) => { const t = w.getComputedStyle(c[i].el.querySelector('.thumb')); return (t.getPropertyValue('background') || t.backgroundColor || '').trim() }
+  ok('у активной карточки заливка сплошная лаймовая', thumbBg(1) === 'var(--lime)', thumbBg(1))
+  ok('у спокойной — едва видная', /rgba\(198,\s*245,\s*46,\s*0?\.08\)/.test(thumbBg(0)), thumbBg(0))
+  ok('у активной на «на карте» — «пополнение» в тени', c[1].on && !c[1].fa && Number(seg(1, '.seg-a').opacity) < 0.5 && Number(seg(1, '.seg-b').opacity || 1) === 1,
+     `a=${seg(1, '.seg-a').opacity} b=${seg(1, '.seg-b').opacity}`)
+  ok('у спокойных карточек оба окна читаются', [0, 2].every((i) => Number(seg(i, '.seg-a').opacity || 1) === 1 && Number(seg(i, '.seg-b').opacity || 1) === 1))
   r.window.close()
   const z = await run('?park=ohta', { reduced: true })
   await wait(900)
@@ -401,7 +412,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.2 · собрано ДД.ММ»', /^v1\.2 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.3 · собрано ДД.ММ»', /^v1\.3 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
