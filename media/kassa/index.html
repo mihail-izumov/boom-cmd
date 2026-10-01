@@ -24,21 +24,22 @@
   случаям, — кассиру достаточно сказать «посмотрите на экран». Вторая задача —
   QR: пополнять можно с телефона, подарки те же, что на кассе.
 
-  БЛОКИ (v1.4 — правки владельца 01.10)
+  БЛОКИ (v1.6 — правки владельца 01.10)
     1. Оффер во всю ширину: «Заряди карту онлайн», «онлайн» — лаймом.
     2. Три карточки «X1» · «X2» · «X4–6», у каждой свой цвет (лайм,
        голубой, розовый — offers[].tone в данных). Внутри — два сосуда, как
        в играх «перелей воду»: «пополнение 1 500 ₽» сверху и «на карте
        2 025 ⚡» снизу (пополнение — рубли, на карте — заряды, отсюда
-       молния). По очереди (1 500 → 3 000 → 5 000) верхний наливается,
-       наклоняется и льёт струёй в нижний; там деньги встают нижним слоем,
-       сверху доливается бонус (жидкость светлеет кверху), и число
-       досчитывается до итога — видно, как 1 500 превращаются в 2 025. Сосуд, который сейчас
-       не главный, уходит в тень.
+       молния). По очереди (1 500 → 3 000 → 5 000) верхний наливается и
+       переливается по ровному каналу из угла в угол в нижний; там деньги
+       встают внизу, сверху доливается бонус (жидкость светлеет кверху), и
+       число досчитывается до итога — видно, как 1 500 превращаются в
+       2 025. Сосуд, который сейчас не главный, уходит в тень.
        КАЖДОЕ КРУПНОЕ ЧИСЛО ПОДПИСАНО («пополнение» / «на карте»): однажды
        гости прочли «1 300 зарядов» наоборот, как цену.
-       Под сосудами — плашка во всю ширину карточки, грани одного бонуса
-       сменяют друг друга: «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов
+       Под сосудами — плашка во всю ширину карточки; у активной она
+       заливается, когда «на карте» налито хотя бы наполовину. Грани одного
+       бонуса сменяют друг друга: «+525 бонус» → «≈ +7 игр бонус» → «+500 тикетов
        за наличные». Игры — бонус / средняя цена игры ~70 ₽ (как на
        b00m.fun/rewards), вниз до целого. Тикеты — только за наличные на
        кассе и только за точную сумму из cash_tickets парка (200 — за 1 000 ₽,
@@ -51,7 +52,7 @@
        «Баланс, тикеты и статус — в твоём телефоне». Ссылка:
        b00m.fun/popolnit/<парк>?from=kassa-tv. Выключен — плитки QR нет.
     6. Служебный бейдж внизу слева, как у турбо: «● 01.10 08:15 МСК
-       v1.4 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
+       v1.6 · собрано ДД.ММ ⟳» — время загрузки, версия, дата сборки и
        кнопка обновления.
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
@@ -220,8 +221,11 @@
      clip-path — край ровный, буквы темнеют ровно там, где их накрыло.
      Фазы активной карточки (kassa.js, countUp):
        p1 — наливается верхний, нижний пуст и в тени;
-       p2 — верхний наклоняется и льёт струёй (.stream) в нижний: сверху
-            уровень падает, снизу растёт слой денег до --split;
+       p2 — верхний переливается в нижний по ровному каналу (.stream): углы
+            сосудов, что смотрят друг на друга, на это время спрямляются, и
+            канал выходит из угла одного прямо в угол другого. Сверху
+            уровень падает, снизу растёт слой денег до --split. Без наклона:
+            наклон давал косое дно и клин в стыке (решение владельца 01.10);
        p3 — доливается бонус: жидкость плавно светлеет кверху (--c → --c2,
             без линии раздела), число досчитывается; пустой верхний — в тени.
      Спокойная карточка: верхний пуст, нижний ровно чуть подкрашен
@@ -231,7 +235,7 @@
     position:relative;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:10px 20px 12px;min-width:0;
     border-radius:18px 18px 30px 30px;overflow:hidden;
     background:rgba(255,255,255,.05);
-    transition:opacity .45s ease, filter .45s ease, transform .4s cubic-bezier(.3,0,.3,1);transform-origin:100% 100%;
+    transition:opacity .45s ease, filter .45s ease, border-radius .3s ease;
   }
   /* Два окна — два равных сосуда */
   .seg-a,.seg-b{flex:1 1 0;min-height:0}
@@ -257,20 +261,26 @@
   .liq .fs-sum,.seg-b .liq .fs-card{color:var(--dark)}
   .liq .fs-card .bolt{fill:var(--dark);filter:none}
 
-  /* Струя — ровная, цветом карточки: из-под угла верхнего сосуда в нижний,
-     у самой стенки, мимо букв (поля окна шире струи). Координаты —
-     layoutStreams (kassa.js): --sx/--sy и длина --sh. Под жидкостью нижнего
-     сосуда, поэтому «втекает» в неё. */
+  /* Канал — ровный, цветом карточки, у самой стенки, мимо букв (поля окна
+     шире канала). Горизонталь: из нижнего правого угла верхнего сосуда в
+     верхний правый угол нижнего и вниз вдоль стенки. Вертикаль (сосуды
+     рядом): по дну, из нижнего правого угла левого в нижний левый угол
+     правого. Координаты — layoutStreams (kassa.js): --sx/--sy, --sw/--sh.
+     Под жидкостью обоих сосудов — поэтому выходит из одной и «втекает» в
+     другую без шва. */
   .stream{
-    position:absolute;z-index:2;left:0;top:0;width:10px;height:var(--sh,0px);transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(0);transform-origin:50% 0;
-    border-radius:5px;pointer-events:none;background:var(--c);
+    position:absolute;z-index:2;left:0;top:0;width:var(--sw,10px);height:var(--sh,0px);
+    transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(0);transform-origin:50% 0;
+    border-radius:0 0 5px 5px;pointer-events:none;background:var(--c);
     transition:transform .3s ease-in;
   }
-  .card.p2 .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(1)}
+  .card.p2 .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleY(1);transition-delay:.15s}   /* сперва спрямятся углы */
   .card.p3 .stream{transform-origin:50% 100%}
+  /* Стык: углы, между которыми идёт канал, спрямляются на время перелива */
+  .card.p2 .seg-a{border-bottom-right-radius:4px}
+  .card.p2 .seg-b{border-top-right-radius:4px}
 
-  /* Наклон верхнего сосуда, пока льёт; тень — у того, что сейчас не главный */
-  .card.p2 .seg-a{transform:rotate(4deg)}
+  /* Тень — у сосуда, который сейчас не главный */
   .card.p1 .seg-b,.card.p3 .seg-a{opacity:.28;filter:saturate(.3)}
 
   .seg .fit-box{min-width:0}
@@ -283,23 +293,32 @@
   .card.done .fs-card{animation:pop .6s ease-out}
   @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
 
-  /* Плашка бонуса — во всю ширину карточки, цветом карточки: у активной
-     залита, у спокойных — лёгкой подложкой, без обводки. Грани одного бонуса сменяют друг друга
+  /* Плашка бонуса — во всю ширину карточки, цветом карточки: лёгкой
+     подложкой, без обводки. Когда «на карте» налито хотя бы наполовину
+     (класс half, kassa.js — решение владельца 01.10), плашка «наливается»
+     снизу, как сосуды: копия текста в заливке (.fliq) обрезана по уровню,
+     буквы темнеют ровно там, где их накрыло — без мутной середины.
+     Грани одного бонуса сменяют друг друга
      (kassa.js, rotateFaces): «+525 бонус» → «≈ +7 игр бонус» → «+500
      тикетов за наличные». Все грани — в одной ячейке, видна одна. */
   .faces{flex:none;display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
   .face{
-    grid-area:1/1;min-width:0;opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease, background-color .45s ease;
+    grid-area:1/1;position:relative;overflow:hidden;min-width:0;opacity:0;transform:translateY(12px);transition:opacity .45s ease, transform .45s ease;
     background:rgba(var(--cr),.14);border-radius:18px;padding:12px 18px 13px;
   }
+  .fliq{
+    position:absolute;inset:0;padding:inherit;pointer-events:none;background:var(--c);
+    clip-path:inset(100% 0 0 0);opacity:0;transition:opacity .4s ease, clip-path 0s linear .4s;
+  }
+  .card.half .fliq{opacity:1;clip-path:inset(0 0 0 0);transition:clip-path .5s cubic-bezier(.45,0,.3,1)}
+  /* .face .fliq — сильнее, чем .face .fs-face ниже: иначе буквы лаймом по лайму */
+  .face .fliq .fs-face,.face .fliq .fs-face small{color:var(--dark)}
   .face.on{opacity:1;transform:none}
   .face .fs-face{
     display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;white-space:nowrap;
     font-family:'Unbounded';font-weight:900;font-size:48px;line-height:1;color:var(--c);
   }
   .face .fs-face small{font-family:'Inter';font-weight:800;font-size:.46em;letter-spacing:.3px;line-height:1.1;color:var(--c2)}
-  .card.on .face{background:var(--c)}
-  .card.on .face .fs-face,.card.on .face .fs-face small{color:var(--dark)}
 
   /* Вертикаль: X слева, сосуды справа рядом — верхний льёт в соседний;
      плашка бонуса — во всю ширину карточки внизу. */
@@ -314,6 +333,10 @@
   body.portrait .slider{grid-area:slider;flex-direction:row}
   body.portrait .seg-a{flex:0 0 36%}
   body.portrait .seg-b{flex:1 1 0;min-width:0}
+  body.portrait .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleX(0);transform-origin:0 50%;border-radius:0}
+  body.portrait .card.p2 .stream{transform:translate(var(--sx,0px),var(--sy,0px)) scaleX(1)}
+  body.portrait .card.p3 .stream{transform-origin:100% 50%}
+  body.portrait .card.p2 .seg-b{border-top-right-radius:18px;border-bottom-left-radius:4px}
   body.portrait .faces{grid-area:faces}
   /* Звезда основной карточки — в правом верхнем углу, над сосудами */
   body.portrait .card.main .slider{margin-right:58px}
@@ -468,7 +491,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .card.main,.card.done .fs-card,.step,.qr-frame .aimbox,.qr-frame .cn,.qr-frame .flash,.stamp .rl.spin svg{animation:none}
-    .card,.seg,.liq,.stream,.face,.fs-card{transition:none}
+    .card,.seg,.liq,.stream,.face,.fliq,.fs-card{transition:none}
   }
 </style>
 </head>

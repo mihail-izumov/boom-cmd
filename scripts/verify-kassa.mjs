@@ -142,7 +142,7 @@ const { html, bundle } = MAIN
 /** Текст узла без скрытых потомков — то, что видит гость. */
 function visibleText(root) {
   const c = root.cloneNode(true)
-  c.querySelectorAll('[hidden], .liq').forEach((n) => n.remove())
+  c.querySelectorAll('[hidden], .liq, .fliq').forEach((n) => n.remove())
   return sp(c.textContent)
 }
 
@@ -193,7 +193,8 @@ async function run(query, { build = MAIN, view = [1920, 1080], storage = {}, red
     slider: !c.querySelector('.thumb') && !!c.querySelector('.slider > .seg-a > .fit-box .fs-sum') && !!c.querySelector('.slider > .seg-b > .fit-box .fs-card')
       && !!c.querySelector('.slider > .stream') && !c.querySelector('.wave'),
     toggle: !!c.querySelector('.toggle'),
-    faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector('.fit-box > .fs-face')),
+    faceFull: [...c.querySelectorAll('.face')].every((f) => f.parentElement.classList.contains('faces') && !!f.querySelector(':scope > .fit-box > .fs-face')
+      && sp(f.querySelector('.fliq')?.textContent) === sp(f.querySelector(':scope > .fit-box')?.textContent) && f.querySelector('.fliq').getAttribute('aria-hidden') === 'true'),
     faces: [...c.querySelectorAll('.face')].map((f) => ({
       kind: f.dataset.kind,
       on: f.classList.contains('on'),
@@ -360,16 +361,34 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('первой — 1 500: наливается «пополнение», внизу пока та же сумма',
      c[0].on && c[0].phase === 'p1' && c[0].card === '1 500' && c[0].liqNum === '1 500' && !c[1].on && !c[2].on, `${c[0].card} ${c[0].phase}`)
   ok('пока наливается — «на карте» в тени', Number(cs(c[0].el.querySelector('.seg-b')).opacity) < 0.5, cs(c[0].el.querySelector('.seg-b')).opacity)
+  // Плашка бонуса «наливается», только когда «на карте» налито хотя бы
+  // наполовину (решение владельца 01.10): заливка .fliq видна (opacity 1).
+  const faceBg = (i) => (cs(c[i].el.querySelector('.face.on .fliq')).opacity === '1' ? 'залита' : 'не залита')
+  ok('пока «на карте» пусто — плашка бонуса не залита', !c[0].el.classList.contains('half') && faceBg(0) === 'не залита', faceBg(0))
   await wait(700)    // t≈1,9 с — p2
   c = r.cards()
-  ok('дальше — переливание: фаза p2, верхний наклонён, оба сосуда не в тени',
-     c[0].phase === 'p2' && /rotate/.test(cs(c[0].el.querySelector('.seg-a')).transform)
+  ok('дальше — перелив по каналу: фаза p2, без наклона, оба сосуда не в тени',
+     c[0].phase === 'p2' && !/rotate/.test(cs(c[0].el.querySelector('.seg-a')).transform || '')
        && Number(cs(c[0].el.querySelector('.seg-a')).opacity || 1) === 1 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1,
      `${c[0].phase} ${cs(c[0].el.querySelector('.seg-a')).transform}`)
+  ok('стык: углы между сосудами спрямлены под канал',
+     cs(c[0].el.querySelector('.seg-a')).borderBottomRightRadius === '4px' && cs(c[0].el.querySelector('.seg-b')).borderTopRightRadius === '4px',
+     `${cs(c[0].el.querySelector('.seg-a')).borderBottomRightRadius} / ${cs(c[0].el.querySelector('.seg-b')).borderTopRightRadius}`)
+  ok('в начале перелива «на карте» меньше половины — плашка ещё не залита', !c[0].el.classList.contains('half') && faceBg(0) === 'не залита', faceBg(0))
   await wait(2200)   // t≈4,1 с — досчитано
   c = r.cards()
   ok('долит бонус, число досчиталось до 2 025 (и в «жидкости» тоже)',
      c[0].on && c[0].phase === 'p3' && c[0].card === '2 025' && c[0].liqNum === '2 025' && c[0].el.classList.contains('done'), `${c[0].card} ${c[0].phase}`)
+  ok('«на карте» налито — плашка бонуса залита цветом карточки', c[0].el.classList.contains('half') && faceBg(0) === 'залита', faceBg(0))
+  {
+    // 01.10: копия текста в заливке плашки вышла лаймом по лайму — правило
+    // .face .fs-face перебивало .fliq .fs-face. Буквы в заливке — тёмные.
+    const fq = c[0].el.querySelector('.face.on .fliq .fs-face')
+    const col = (n) => (cs(n).getPropertyValue('color') || '').trim()
+    ok('в залитой плашке буквы тёмные', ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq)) && ['var(--dark)', 'rgb(13, 10, 46)'].includes(col(fq.querySelector('small'))),
+       `${col(fq)} / ${col(fq.querySelector('small'))}`)
+  }
+  ok('у спокойных карточек плашка не залита', [1, 2].every((i) => !c[i].el.classList.contains('half') && faceBg(i) === 'не залита'))
   ok('пустое «пополнение» — в тени, «на карте» — нет',
      Number(cs(c[0].el.querySelector('.seg-a')).opacity) < 0.5 && Number(cs(c[0].el.querySelector('.seg-b')).opacity || 1) === 1)
   ok('грань сменилась на игры у всех трёх', c.every((x) => x.faces.find((f) => f.on)?.kind === 'games'), c.map((x) => x.faces.find((f) => f.on)?.kind).join())
@@ -377,6 +396,7 @@ console.log('\n── Движение: «перелей воду» по оче�
   c = r.cards()
   ok('следом — 3 000, у первой итог на месте, сосуды спокойные',
      !c[0].on && !c[0].phase && c[1].on && c[1].phase === 'p1' && c[0].card === '2 025' && c[0].liqNum === '2 025', c.map((x) => x.phase || '-').join())
+  ok('у погасшей карточки плашка снова не залита, у новой — пока тоже', !c[0].el.classList.contains('half') && !c[1].el.classList.contains('half'))
   ok('шаг тикетов: у 5 000 — тикеты, у остальных снова бонус (не сбиваются)',
      c[2].faces.find((f) => f.on)?.kind === 'tickets' && c[0].faces.find((f) => f.on)?.kind === 'gift' && c[1].faces.find((f) => f.on)?.kind === 'gift',
      c.map((x) => x.faces.find((f) => f.on)?.kind).join())
@@ -449,7 +469,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   ok('переключателя парков нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v1.5 · собрано ДД.ММ»', /^v1\.5 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v1.6 · собрано ДД.ММ»', /^v1\.6 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
