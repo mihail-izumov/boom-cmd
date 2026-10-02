@@ -10,6 +10,9 @@
    скрипт или стиль страницы — через 3 с перезагрузка в обход кэша (метка
    ?r=… в адресе). Не больше 3 попыток подряд: при настоящей поломке панель
    не крутится в перезагрузках. Удачная загрузка счётчик обнуляет.
+   Считаются только файлы самого сайта: шрифты Google перезагрузкой не
+   починить, а три пустые попытки из-за них выключали страховку до конца
+   сеанса — и настоящую поломку после публикации она бы уже не поймала.
    ⚠ Стоит ПЕРВЫМ в <head>, до скриптов, которые вставляет Vite. */
 (function () {
   var KEY = 'boom-retry:' + location.pathname, failed = false
@@ -25,8 +28,8 @@
     }, 3000)
   }
   window.addEventListener('error', function (e) {
-    var t = e.target
-    if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) retry()
+    var t = e.target, u = t && (t.src || t.href) || ''
+    if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && u.indexOf(location.origin + '/') === 0) retry()
   }, true)
   window.addEventListener('load', function () {
     if (!failed) { try { sessionStorage.removeItem(KEY) } catch (e) {} }
@@ -99,7 +102,7 @@
 
   ШАПКА И ПОДВАЛ — те же, что у турбо и «Твоей карты», в тех же координатах
   (экраны будут чередоваться на одной панели). Отличия намеренные:
-    · справа в шапке — плеер экранов «Твоя карта ⇄ Заряди карту»
+    · справа в шапке — плеер экранов «Статус → Зарядка → Турбо»
       (media/shared/screens.js), парк выбирается списком на плашке слева;
     · посередине — слоган «Играй больше — плати меньше», как на всех
       страницах ТВ-панели (решение владельца 01.10);
@@ -114,6 +117,7 @@
   ПАРАМЕТРЫ URL (те же, что у турбо)
     ?park=ohta|piterland|iyun  — парк экрана; неизвестный код — «Парк не найден»
     &tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
+    &play=0                    — плеер экранов стартует на паузе
     &demo=1                    — песочница: видно настройки парка и пустой слот;
                                  &online=0|1 — посмотреть экран с выключенным
                                  или включённым онлайном, не правя данные
@@ -201,8 +205,8 @@
   .head .slogan b{color:var(--lime)}
   body.portrait .head .slogan{position:absolute;right:26px;font-size:24px}
   body.portrait.has-screens .head .slogan{display:none}
-  /* Слот плеера экранов (loyalty ⇄ kassa) — на месте переключателя парков
-     турбо. Разметку кладёт media/shared/screens.js. */
+  /* Слот плеера экранов (Статус → Зарядка → Турбо) — справа в шапке, как
+     у соседних экранов. Разметку кладёт media/shared/screens.js. */
   .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%);height:46px;min-width:280px;border-radius:14px}
   body.sandbox .slot{outline:2px dashed rgba(255,255,255,.22);outline-offset:-2px}
   body.sandbox .slot::after{content:'слот: переключатель экранов';position:absolute;inset:0;display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--muted)}

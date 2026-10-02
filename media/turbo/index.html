@@ -2,6 +2,40 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<script>
+/* Страховка ТВ-панели (решение владельца 01.10). GitHub Pages разрешает
+   браузеру держать страницу до 10 минут, а при публикации старые файлы
+   скриптов удаляются. Взял браузер страницу из кэша — её скриптов уже нет,
+   и экран стоит сломанным до суточного перезапуска. Поэтому: не загрузился
+   скрипт или стиль страницы — через 3 с перезагрузка в обход кэша (метка
+   ?r=… в адресе). Не больше 3 попыток подряд: при настоящей поломке панель
+   не крутится в перезагрузках. Удачная загрузка счётчик обнуляет.
+   Считаются только файлы самого сайта: шрифты Google перезагрузкой не
+   починить, а три пустые попытки из-за них выключали страховку до конца
+   сеанса — и настоящую поломку после публикации она бы уже не поймала.
+   ⚠ Стоит ПЕРВЫМ в <head>, до скриптов, которые вставляет Vite. */
+(function () {
+  var KEY = 'boom-retry:' + location.pathname, failed = false
+  function retry() {
+    if (failed) return
+    failed = true
+    var n = 0
+    try { n = +(sessionStorage.getItem(KEY) || 0); if (n >= 3) return; sessionStorage.setItem(KEY, n + 1) } catch (e) {}
+    setTimeout(function () {
+      var u = new URL(location.href)
+      u.searchParams.set('r', Date.now())
+      location.replace(u.toString())
+    }, 3000)
+  }
+  window.addEventListener('error', function (e) {
+    var t = e.target, u = t && (t.src || t.href) || ''
+    if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && u.indexOf(location.origin + '/') === 0) retry()
+  }, true)
+  window.addEventListener('load', function () {
+    if (!failed) { try { sessionStorage.removeItem(KEY) } catch (e) {} }
+  })
+})()
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0d0a2e">
@@ -50,9 +84,18 @@
   ⚠ Машина состояний таймера, расчёт окон и работа с часами панели НЕ
     трогались: v3.0 — переработка вида, а не логики расписания.
 
+  ─── v3.1 · третий экран плеера панели ─────────────────────────────────────
+  «Турбо» встал в плеер к «Твоей карте» и экрану у кассы: Статус → Зарядка →
+  Турбо. Выбор парка — список на плашке «БУМБАСТИК // парк», справа в шапке —
+  плеер, между экранами — заставка, автообновление и суточный перезапуск —
+  общие, media/shared/screens.js. Ряд кнопок парков справа снят: его место
+  занял плеер. Первым скриптом в <head> — страховка загрузки, как у соседей.
+
   ПАРАМЕТРЫ URL
-    ?park=ohta|piterland|iyun  — жёстко фиксирует парк, переключатель скрыт
+    ?park=ohta|piterland|iyun  — парк панели; сменить — списком на плашке
+                                 (адрес и выбор запоминаются)
     ?tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
+    ?play=0                    — плеер экранов стартует на паузе
     ?demo=1                    — песочница: панель предпросмотра состояний
     ?mockError=1               — принудительная ошибка источника (отладка)
 
@@ -144,8 +187,9 @@
   .head .slogan{font-family:'Unbounded';font-weight:700;font-size:30px;color:var(--white);letter-spacing:.5px}
   .head .slogan b{color:var(--lime)}
   /* Гость у кассы Питерленда должен видеть, что цифры на экране — про ЕГО
-     парк. На панели переключателя нет (скрыт при ?park=), поэтому бейдж —
-     единственное место, где парк вообще назван. */
+     парк. Бейдж — единственное место, где парк вообще назван; с v3.1 он же
+     открывает список парков (media/shared/screens.js), как у соседних
+     экранов плеера. */
   .brand{position:absolute;left:22px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:14px}
   .brand-icon{width:44px;height:auto;flex:none;color:var(--white)}
   .brand-badge{
@@ -155,17 +199,10 @@
     border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
   .brand-badge .sep{color:var(--lime)}
-  .parks{
-    position:absolute;right:18px;top:50%;transform:translateY(-50%);
-    display:flex;gap:5px;background:rgba(255,255,255,.06);border-radius:14px;padding:5px;
-  }
-  .parks button{
-    background:transparent;border:none;color:var(--muted);
-    font-family:'Inter';font-weight:700;font-size:15px;
-    padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;
-  }
-  .parks button.on{background:var(--blue);color:#fff}
-  .parks[hidden]{display:none}
+  /* Справа — плеер экранов (Статус → Зарядка → Турбо), разметку кладёт
+     media/shared/screens.js. Парк выбирается списком на плашке слева —
+     как у «Твоей карты» и экрана у кассы. */
+  .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%)}
 
   /* ── ТАЙМЕР: вся левая колонка ──────────────────────────────────────────
      Прежде делил колонку с «Как это работает» и получал ~300px высоты при
@@ -626,7 +663,8 @@
       </span>
     </div>
     <div class="slogan" id="slogan">Играй больше — <b>плати меньше</b></div>
-    <div class="parks" id="parks"></div>
+    <!-- Плеер экранов — заполняет media/shared/screens.js -->
+    <div class="slot" id="screens" aria-hidden="true"></div>
   </header>
 
   <!-- ТАЙМЕР -->
@@ -736,7 +774,7 @@
   <div class="fineband">
     <div class="hint" id="hint"></div>
     <div class="svc">
-      <a class="powered" href="https://runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
+      <a class="powered" href="https://ultra.runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
       <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
         <i class="dot"></i>
         <span class="when" id="stamp-when">—</span>

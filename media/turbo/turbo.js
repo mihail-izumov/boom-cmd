@@ -9,6 +9,14 @@
  *  Контракт источника: boom-cmd/docs/DATA-CONTRACT-turbo.md
  *  Обоснование блоков:  boom-cmd-data/drivers/DRV-06-turbo/mehanika/ТУРБО-веб-страница.md
  *  Расписание-мастер:   boom-cmd-data/drivers/DRV-06-turbo/ЖУРНАЛ-турбо-часов.md
+ *
+ *  С v3.1 «Турбо» — третий экран плеера панели (Статус → Зарядка → Турбо):
+ *  выбор парка списком на плашке «БУМБАСТИК // парк», плеер в шапке,
+ *  заставка между экранами, автообновление и суточный перезапуск в 05:00 —
+ *  общие для всех трёх, media/shared/screens.js. Своего механизма здесь
+ *  больше нет: прежний ряд кнопок парков справа в шапке снят, на его месте
+ *  плеер. Расписание при этом живое, как и было: страница сама перечитывает
+ *  его и тогда, когда скрыта в плеере за другим экраном.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -26,7 +34,8 @@
    про числа. Заведут новую категорию в таблице без картинки — она отрисуется
    эмодзи из ячейки, а не сломает блок. */
 import { TURBO_QR } from './turbo-qr.js'
-import { initBday } from './turbo-bday.js'
+import { initBday, BALLOONS_MS } from './turbo-bday.js'
+import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, BUILT_DAY } from '../shared/screens.js'
 import iconRace from './icons/race.webp'
 import iconShoot from './icons/shoot.webp'
 import iconMusic from './icons/music.webp'
@@ -63,13 +72,34 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v3.0'
+const PAGE_VERSION = 'v3.1'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
 const DEFAULT_REFRESH_SEC = 300
 const DEFAULT_OPEN = '10:00'
 const DEFAULT_CLOSE = '22:00'
+
+/* Парки — для списка на плашке «БУМБАСТИК // парк» (media/shared/
+   screens.js). Коды и названия — те же, что у источника (park / park_ru) и
+   у «Твоей карты» с экраном у кассы: при смене экрана плашка не меняется ни
+   на букву. Название на самой плашке по-прежнему приходит из источника
+   (renderBrand): пока расписания нет, парк на экране не называем. */
+const PARKS = {
+  ohta:      { name: 'Охта Молл' },
+  piterland: { name: 'Питерленд' },
+  iyun:      { name: 'ТЦ Июнь' },
+}
+const PARK_ORDER = ['ohta', 'piterland', 'iyun']
+
+/* В плеере экранов «Турбо» стоит два круга шаров над плашкой «+50»
+   (BALLOONS_MS — 18 с, turbo-bday.js): 36 с — столько же, сколько у соседей,
+   и сцена праздника заканчивается там, где началась. */
+const SCREEN_MS = 2 * BALLOONS_MS
+
+/* Витрина не помещается — вместо неё заглушка «Экран для ТВ-панели» (те же
+   пороги, что у .toosmall в index.html). Плеер такой экран пропускает. */
+const TOO_SMALL = '(max-width:899px), (max-height:559px), (orientation:portrait)'
 
 if (TV) document.body.classList.add('tv')
 if (DEMO) document.getElementById('demo').classList.add('on')
@@ -307,7 +337,14 @@ function normalize(j) {
    GET без заголовков и без redirect:'manual' — иначе CORS-preflight, на который
    Apps Script не отвечает (грабли дневного слоя). cache:'no-store' — расписание
    правят управляющие в течение дня. */
-const parkParam = () => FIXED || D.park || localStorage.getItem('boom-turbo-park') || ''
+/* Парк, с которым страница открылась: ?park= или выбранный на соседнем
+   экране (тот же ключ boom-turbo-park), иначе первый. Тот же расчёт, что у
+   «Твоей карты» и экрана у кассы — все три экрана плеера на одном парке. */
+function storedPark() {
+  try { return localStorage.getItem('boom-turbo-park') || '' } catch { return '' }
+}
+const park = FIXED || (PARKS[storedPark()] ? storedPark() : PARK_ORDER[0])
+const parkParam = () => FIXED || D.park || park
 
 function readCache() {
   try {
@@ -326,13 +363,17 @@ function writeCache(data) {
 const stampEl = document.getElementById('stamp')
 const stampWhen = document.getElementById('stamp-when')
 
-/* «МСК» приписываем явно: браузер форматирует в поясе панели, а моноблок в
-   зале может стоять с чужим поясом — тогда без подписи не понять, чьё это
-   время. Ровно на этом мы уже спотыкались с таблицей (пояс был лос-анджелесский). */
-const fmtWhen = (ms) =>
-  new Date(ms).toLocaleString('ru-RU', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  }).replace(',', '') + ' МСК'
+/* «МСК» приписываем явно, и время по Москве считаем явно (timeZone), а не
+   в поясе панели: моноблок в зале может стоять с чужим поясом. Ровно на
+   этом мы уже спотыкались с таблицей (пояс был лос-анджелесский). До v3.1
+   здесь был пояс панели с подписью «МСК» — и в плеере экранов подвал турбо
+   расходился бы с соседними экранами на разницу поясов. */
+const fmtWhen = (ms) => {
+  const opt = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }
+  let s
+  try { s = new Date(ms).toLocaleString('ru-RU', { ...opt, timeZone: 'Europe/Moscow' }) } catch { s = new Date(ms).toLocaleString('ru-RU', opt) }
+  return s.replace(',', '') + ' МСК'
+}
 
 /**
  * Служебный бейдж внизу справа. Заменил плавающую метку «нет связи»: две
@@ -345,7 +386,9 @@ function setStamp(stale, at) {
   stampEl.classList.toggle('stale', !!stale)
   stampWhen.textContent = at ? fmtWhen(at) : '—'
 }
-document.getElementById('stamp-ver').textContent = PAGE_VERSION
+/* «v3.1 · собрано 02.10» — как у «Твоей карты» и экрана у кассы: дата
+   сборки одна на все три экрана (BUILT_DAY, media/shared/screens.js). */
+document.getElementById('stamp-ver').textContent = BUILT_DAY ? `${PAGE_VERSION} · собрано ${BUILT_DAY}` : PAGE_VERSION
 
 /* Что означает точка. На панели нет курсора, поэтому hover-подсказка там
    недоступна — нужен клик. Персоналу это единственный способ понять, живые
@@ -359,8 +402,8 @@ function toggleHint() {
       'данные, время рядом — когда они получены. Расписание могло с тех пор ' +
       'измениться. Нажми ⟳ справа, чтобы перезагрузить.'
     : '<b>Зелёная точка</b> — данные свежие. Рядом время последнего ответа сервера ' +
-      'по Москве и версия страницы. Панель сама перечитывает расписание каждые ' +
-      'несколько минут.'
+      'по Москве, версия страницы и дата сборки. Панель сама перечитывает расписание ' +
+      'каждые несколько минут.'
   hintEl.classList.toggle('on')
   clearTimeout(hintTimer)
   if (hintEl.classList.contains('on')) hintTimer = setTimeout(() => hintEl.classList.remove('on'), 12000)
@@ -423,29 +466,10 @@ async function load() {
   render()
 }
 
-/* ── 5. Рендер блоков ────────────────────────────────────────────────────── */
-function renderParks() {
-  const box = document.getElementById('parks')
-  // Панель прибита к парку через ?park= — переключатель не нужен и опасен:
-  // случайное касание оставит экран с чужими цифрами до перезагрузки.
-  if (FIXED || D.parks.length < 2) {
-    box.hidden = true
-    box.innerHTML = ''
-    return
-  }
-  box.hidden = false
-  box.innerHTML = D.parks
-    .map((p) => `<button data-park="${esc(p.park)}"${p.park === D.park ? ' class="on"' : ''}>${esc(p.park_ru || p.park)}</button>`)
-    .join('')
-  box.querySelectorAll('button').forEach((b) => {
-    b.addEventListener('click', () => {
-      try { localStorage.setItem('boom-turbo-park', b.dataset.park) } catch {}
-      D = { ...D, park: b.dataset.park }
-      load()
-    })
-  })
-}
-
+/* ── 5. Рендер блоков ──────────────────────────────────────────────────────
+   Ряда кнопок парков справа в шапке с v3.1 нет: парк выбирается списком на
+   плашке «БУМБАСТИК // парк», как у соседних экранов (media/shared/
+   screens.js), а на месте кнопок — плеер экранов. */
 function renderMachines() {
   document.getElementById('apps').innerHTML = D.machines
     .filter((m) => Number(m.count) > 0)
@@ -770,7 +794,6 @@ function render() {
     page.classList.add('bc-fade-in')
   }
   renderBrand()
-  renderParks()
   renderMachines()
   renderPacks()
   renderSteps()
@@ -829,7 +852,9 @@ try {
   if (import.meta.env.DEV) console.warn('[turbo] декор ДР не запустился', e)
 }
 setInterval(tick, 1000)
-load()
+/* Первое расписание — то, чего плеер экранов ждёт под заставкой, прежде
+   чем показать «Турбо» (без него на экране были бы скелетоны). */
+const firstLoad = load()
 
 // Автообновление расписания: управляющий поправил часы в таблице — панель
 // подхватывает сама, без деплоя и без похода в зал.
@@ -842,15 +867,9 @@ setInterval(() => {
   }
 }, 30000)
 
-// Панель работает месяцами без перезагрузки: раз в сутки ночью перезагружаем
-// вкладку — забрать новую сборку страницы и не копить утечки.
-if (TV) {
-  setInterval(() => {
-    const h = Math.floor(wallMin() / 60)
-    const m = Math.floor(wallMin() % 60)
-    if (h === 5 && m === 0) location.reload()
-  }, 60000)
-}
+// Суточный перезапуск панели в 05:00 по Москве — с v3.1 общий для трёх
+// экранов, у хозяина плеера (media/shared/screens.js): под заставкой и в
+// обход кэша. Свой таймер здесь перезагружал бы одну вкладку посреди круга.
 
 /* ── 8. Перезагрузка для персонала ──────────────────────────────────────────
    Иконка в служебном бейдже. «Жёсткая» здесь означает «гарантированно свежая»,
@@ -862,10 +881,20 @@ if (TV) {
    Модалка email убрана вместе с кнопкой: собирать адрес на экране, к которому
    нельзя прикоснуться, невозможно, а приём подписки всё равно был моком —
    страница обещала письмо, которое никто не отправлял. Теперь подписка живёт
-   там, куда ведёт QR. */
+   там, куда ведёт QR.
+
+   С v3.1 саму перезагрузку ведёт плеер экранов (media/shared/screens.js):
+   под заставкой и в обход кэша браузера. Он перехватывает нажатие раньше
+   этой кнопки, поэтому кэш расписания чистим ещё раньше — на подходе
+   нажатия к документу. Без плеера (парк не найден) работает обычный
+   reload ниже. */
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.closest && e.target.closest('#reload')) {
+    try { localStorage.removeItem(CACHE_KEY) } catch {}
+  }
+}, true)
 document.getElementById('reload').addEventListener('click', () => {
   setBusy(true)
-  try { localStorage.removeItem(CACHE_KEY) } catch {}
   location.reload()
 })
 
@@ -880,3 +909,40 @@ document.querySelectorAll('.demo button').forEach((b) => {
     applyMode(forcedMode || computeMode())
   })
 })
+
+/* ── 10. Плеер экранов, выбор парка, автообновление — media/shared/screens.js
+   Экран стоит SCREEN_MS (два круга шаров). Пауза замораживает анимации и
+   конфетти; расписание и отсчёт идут дальше — это данные, а не анимация:
+   после «▶» на экране должно быть верное время, а не то, на котором стали.
+   ⚠ try/catch по той же причине, что у initBday выше: плеер — не повод
+     оставить панель без расписания. Страница отрисована до этой строки,
+     заставку при сбое снимет страховка плеера. */
+try {
+  initScreens({
+    id: 'turbo',
+    park,
+    parks: PARKS,
+    parkOrder: PARK_ORDER,
+    ready: firstLoad,
+    cycleMs: () => SCREEN_MS,
+    available: () => !(window.matchMedia && window.matchMedia(TOO_SMALL).matches),
+    restart: () => {
+      /* Мягкое появление (bc-fade-in) нужно один раз, на первой отрисовке.
+         Плеер ставит все анимации «с начала» и держит первый кадр 3 с — с
+         появлением это был бы кадр с нулевой прозрачностью: пустой экран. */
+      const page = document.querySelector('.page')
+      if (page) page.classList.remove('bc-fade-in')
+      restartAnimations()
+    },
+    pause: () => {
+      pauseAnimations()
+      if (bday) bday.pause()
+    },
+    resume: () => {
+      resumeAnimations()
+      if (bday) bday.resume()
+    },
+  })
+} catch (e) {
+  if (import.meta.env.DEV) console.warn('[turbo] плеер экранов не поднялся', e)
+}

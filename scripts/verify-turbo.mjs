@@ -45,10 +45,27 @@ if (!bundleName) {
   process.exit(1)
 }
 // Бандл — ES-модуль и начинается с импорта modulepreload-полифила. Для eval в
-// jsdom импорт срезаем: полифил влияет только на предзагрузку чанков, а чанк
-// у носителя один. Остальной код исполняется ровно тот, что поедет на панель.
-const bundle = readFileSync(resolve(OUT, 'assets', bundleName), 'utf8')
-  .replace(/import\s*["'][^"']+["'];?/g, '')
+// jsdom импорт срезаем: полифил влияет только на предзагрузку чанков.
+// С v3.1 у носителя есть общий чанк — плеер экранов (media/shared/screens.js,
+// общий с «Твоей картой» и экраном у кассы). Его вклеиваем как в
+// verify-kassa: код чанка — в замыкание, его export — в объект, импорт
+// бандла — в разбор этого объекта. Исполняется ровно тот код, что поедет на
+// панель.
+const strip = (code) => code.replace(/import\s*["'][^"']+["'];?/g, '')
+const chunk = (file) => {
+  const code = strip(readFileSync(resolve(OUT, 'assets', file), 'utf8'))
+  const m = code.match(/export\s*\{([^}]*)\}\s*;?\s*$/)
+  if (!m) throw new Error(`чанк ${file}: не нашёл export`)
+  const pairs = m[1].split(',').map((x) => x.trim()).filter(Boolean).map((x) => {
+    const [local, as] = x.split(/\s+as\s+/)
+    return `${JSON.stringify(as || local)}: ${local}`
+  })
+  return `(() => { ${code.slice(0, m.index)}; return { ${pairs.join(', ')} } })()`
+}
+const bundle = strip(readFileSync(resolve(OUT, 'assets', bundleName), 'utf8')).replace(
+  /import\s*\{([^}]*)\}\s*from\s*["']\.\/([^"']+)["'];?/g,
+  (_, names, file) => `const {${names.replace(/\s+as\s+/g, ': ')}} = ${chunk(file)};`,
+)
 
 // ── эталонный ответ источника ───────────────────────────────────────────────
 const base = {
@@ -108,7 +125,9 @@ async function run(query, payload) {
     brandPark: $('brand-park').textContent,
     brandSep: $('brand-sep').style.display,
     brandIcon: !!$('brand-park').closest('.head').querySelector('.brand-icon path'),
-    parksHidden: $('parks').hidden,
+    parksRow: !!$('parks'),
+    slot: $('screens')?.textContent ?? '',
+    parkMenu: [...window.document.querySelectorAll('.brand-badge .sc-menu button')].map((b) => b.dataset.park),
     stampStale: $('stamp').className.includes('stale'),
     stampWhen: $('stamp-when').textContent,
     stampVer: $('stamp-ver').textContent,
@@ -260,11 +279,22 @@ console.log('\n── Блоки ──')
   ok('победители недели переехали в плитку подписки', r.steps === 'Победители недели', r.steps)
   ok('победители: имя и приз отрисованы',
      r.winners.includes('Александр К.') && r.winners.includes('15 турбо-игр'))
-  ok('?park= скрывает переключатель парков', r.parksHidden === true)
+  // С v3.1 «Турбо» — третий экран плеера (media/shared/screens.js): ряда
+  // кнопок парков справа больше нет, парк выбирается списком на плашке
+  // «БУМБАСТИК // парк» — как у «Твоей карты» и экрана у кассы.
+  ok('ряда кнопок парков в шапке нет', !r.parksRow)
+  ok('парк — списком на плашке бренда, три парка', r.parkMenu.join() === 'ohta,piterland,iyun', r.parkMenu.join())
+  {
+    const src = readFileSync(resolve(ROOT, 'media/shared/screens.js'), 'utf8')
+    const names = [...src.matchAll(/\{\s*id:\s*'(?:loyalty|kassa|turbo)',\s*name:\s*'([^']+)'/g)].map((m) => m[1])
+    ok(`в слоте шапки — плеер экранов («${names.join('» → «')}»)`,
+       names.length === 3 && names.includes('Турбо') && names.every((n) => r.slot.includes(n)), r.slot)
+  }
   ok('?tv=1 включает режим панели', r.window.document.body.className.includes('tv'))
   ok('свежие данные — точка бейджа зелёная', !r.stampStale)
   ok('бейдж: время с явным поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: версия носителя', /^v\d+\.\d+$/.test(r.stampVer), r.stampVer)
+  // «v3.1 · собрано ДД.ММ» — как у соседних экранов плеера
+  ok('бейдж: версия носителя и дата сборки', /^v\d+\.\d+ · собрано \d{2}\.\d{2}$/.test(r.stampVer), r.stampVer)
   ok('QR вшит в блок подписки', r.qr.length > 1000, `${r.qr.length} симв. пути`)
   // Длина пути ничего не доказывает: чужой QR такой же длинный. Сверяем адрес.
   ok('QR ведёт на парк, показанный на экране',
@@ -470,8 +500,9 @@ console.log('\n── Гигиена сборки ──')
   ok('заголовок вкладки — «Турбо-игры // Бумбастик»',
      html.includes('<title>Турбо-игры // Бумбастик</title>'))
   ok('фавикон — общий с приложением', html.includes('href="/favicon.svg"'))
+  // Адрес — как у «Твоей карты» (v6.3) и экрана у кассы: ultra.runscale.ru
   ok('бейдж «Работает на Ранскеил» со ссылкой',
-     html.includes('href="https://runscale.ru"') && html.includes('Работает на Ранскеил'))
+     html.includes('href="https://ultra.runscale.ru"') && html.includes('Работает на Ранскеил'))
   ok('старого написания через «й» на странице нет (D-23)', !/Ранскей/.test(html))
   // Высоту не фиксируем числом: она росла вместе с кеглем подвала. Держим
   // само требование — бейджи в одной группе и одной высоты.
@@ -497,6 +528,11 @@ console.log('\n── Гигиена сборки ──')
   const sw = readFileSync(resolve(OUT, 'sw.js'), 'utf8')
   ok('/media/ исключён из service worker', sw.includes("BASE + 'media/'"))
   ok('аппшелл собран', existsSync(resolve(OUT, 'index.html')))
+  // Загрузка — как у соседних экранов плеера
+  ok('страховка загрузки — первым скриптом в <head>',
+     html.indexOf('boom-retry:') > 0 && html.indexOf('boom-retry:') < html.indexOf('<meta name="viewport"'))
+  ok('суточный перезапуск — общий, у плеера экранов (05:00, в обход кэша)',
+     bundle.includes('05:00') && bundle.includes('location.replace') && !/h === 5 && m === 0/.test(bundle))
 }
 
 rmSync(OUT, { recursive: true, force: true })

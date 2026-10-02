@@ -158,10 +158,13 @@ const MAIN = loadBuild(OUT)
 const OFF = loadBuild(OUT_OFF)
 const { html, bundle } = MAIN
 
-/** Текст узла без скрытых потомков — то, что видит гость. */
+/** Текст узла без скрытых потомков — то, что видит гость. Плеер экранов в
+    шапке (#screens) — служебная навигация, не содержание экрана: с 02.10
+    в нём кнопка «Турбо» соседнего экрана, и запрет слова «турбо» на
+    экране у кассы относится к тексту для гостя, а не к ней. */
 function visibleText(root) {
   const c = root.cloneNode(true)
-  c.querySelectorAll('[hidden], .liq, .fliq').forEach((n) => n.remove())
+  c.querySelectorAll('[hidden], .liq, .fliq, #screens').forEach((n) => n.remove())
   return sp(c.textContent)
 }
 
@@ -442,7 +445,7 @@ console.log('\n── Движение: «перелей воду» по оче�
   //   ОДИН круг: после X4–6 карточка гаснет, ход к X1 не возвращается —
   //   экран стоит «между ходами» 5 с (TAIL_MS, решение владельца 01.10), и
   //   только тогда плеер
-  //   уводит на «Твою карту» (~+21,6 и заставка).
+  //   уводит на следующий экран круга — «Турбо» (~+21,6 и заставка).
   // Гаснет карточка — заливка стекает, значение плашки остаётся.
   const r = await run('?park=ohta&tv=1')
   const w = r.window
@@ -454,12 +457,14 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('до старта все числа — итог, сосуды спокойные',
      cards0.map((c) => c.card).join(' / ') === '2 025 / 4 500 / 8 000' && cards0.every((c) => !c.phase && !c.on))
   ok('у каждой карточки свой цвет', new Set(cards0.map((c) => c.tone)).size === 3, cards0.map((c) => c.tone).join())
-  // Плеер экранов (media/shared/screens.js) на старте ждёт вторую страницу —
-  // «Твою карту» в скрытом iframe — и держит заставку. В jsdom iframe не
-  // грузится: отвечаем за неё сами, как это делает встроенная страница
-  // (window.parent.boomScreens.register). Время дальше — от старта карточек.
+  // Плеер экранов (media/shared/screens.js) на старте ждёт остальные
+  // страницы — «Твою карту» и «Турбо», каждую в скрытом iframe — и держит
+  // заставку. В jsdom iframe не грузится: отвечаем за них сами, как это
+  // делает встроенная страница (window.parent.boomScreens.register). Время
+  // дальше — от старта карточек.
   ok('плеер экранов поднят (window.boomScreens)', !!w.boomScreens)
   w.boomScreens?.register({ id: 'loyalty', cycleMs: () => 42400, restart() {}, pause() {}, resume() {}, update() {} })
+  w.boomScreens?.register({ id: 'turbo', cycleMs: () => 36000, restart() {}, pause() {}, resume() {}, update() {} })
   const t0 = Date.now()
   while (!r.cards()[0].on && Date.now() - t0 < 10000) await wait(20)
   ok('после заставки плеера пошли карточки', r.cards()[0].on, `${Date.now() - t0} мс`)
@@ -538,8 +543,9 @@ console.log('\n── Движение: «перелей воду» по оче�
   ok('круг сыгран: 5 000 погасла, к 1 500 ход не вернулся, плашки стоят на своём', c.every((x) => !x.on && !x.phase) && kinds(c) === 'games,games,tickets', `${c.map((x) => x.on).join()} ${kinds(c)}`)
   await wait(1200)   // X1 +18,2 — ещё стоим (хвост 5 с)
   ok('последний кадр стоит — плеер ещё не уводит', !r.d.querySelector('.sc-frame.on'))
-  await wait(4800)   // X1 +23,0 — хвост отстоял, плеер увёл на «Твою карту»
-  ok('после круга и 5 с на последнем кадре плеер переключил на «Твою карту»', !!r.d.querySelector('.sc-frame.on'))
+  await wait(4800)   // X1 +23,0 — хвост отстоял, плеер увёл на «Турбо»
+  ok('после круга и 5 с на последнем кадре плеер переключил на «Турбо» (следующий по кругу)',
+     r.d.querySelector('.sc-frame.on')?.title === 'Турбо', r.d.querySelector('.sc-frame.on')?.title || 'нет')
   r.window.close()
 
   const z = await run('?park=ohta', { reduced: true })
@@ -556,6 +562,7 @@ console.log('\n── Счётчик баланса и табло «онлайн
   // часы экрана стоят на заставке плеера, и сдвиг старта плавает.
   const r = await run('?park=ohta&tv=1')
   r.window.boomScreens?.register({ id: 'loyalty', cycleMs: () => 42400, restart() {}, pause() {}, resume() {}, update() {} })
+  r.window.boomScreens?.register({ id: 'turbo', cycleMs: () => 36000, restart() {}, pause() {}, resume() {}, update() {} })
   const meter = () => ({ v: Number(r.d.getElementById('meter').dataset.v), cls: r.d.getElementById('meter').className })
   const word = () => sp(r.d.querySelector('#offer b').textContent)
   const until = async (pred, ms) => { const t0 = Date.now(); while (!pred() && Date.now() - t0 < ms) await wait(20); return pred() }
@@ -635,14 +642,14 @@ console.log('\n── Шапка, подвал, штамп ──')
   // плеера: 01.10 стали «Статус» / «Зарядка») — сверяем с ним, не с текстом.
   {
     const src = readFileSync(resolve(ROOT, 'media/shared/screens.js'), 'utf8')
-    const names = [...src.matchAll(/\{\s*id:\s*'(?:loyalty|kassa)',\s*name:\s*'([^']+)'/g)].map((m) => m[1])
-    ok(`в слоте шапки — плеер экранов («${names.join('» ⇄ «')}»)`,
-       !!r.slot && names.length === 2 && names.every((n) => r.slot.textContent.includes(n)), sp(r.slot?.textContent))
+    const names = [...src.matchAll(/\{\s*id:\s*'(?:loyalty|kassa|turbo)',\s*name:\s*'([^']+)'/g)].map((m) => m[1])
+    ok(`в слоте шапки — плеер экранов («${names.join('» → «')}»)`,
+       !!r.slot && names.length === 3 && names.every((n) => r.slot.textContent.includes(n)), sp(r.slot?.textContent))
   }
   ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
   // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
   ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.10 · собрано ДД.ММ»', /^v2\.10 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
+  ok('бейдж: «v2.11 · собрано ДД.ММ»', /^v2\.11 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
   ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
@@ -708,7 +715,9 @@ console.log('\n── Канва: механизм турбо ──')
   const e = await run('?park=ohta', { view: [2560, 1080] })
   ok('широкая панель → канва шире эталона, без полей', e.stageW === '2560px' && e.stageH === '1080px', `${e.stageW}×${e.stageH}`)
   ok('заглушка для малых экранов', html.includes('class="toosmall"') && html.includes('Экран для ТВ-панели'))
-  ok('суточный перезапуск в режиме ТВ', bundle.includes('05:00') && bundle.includes('location.reload'))
+  // С 02.10 перезапуск общий для трёх экранов — у хозяина плеера
+  // (media/shared/screens.js): под заставкой и в обход кэша (location.replace)
+  ok('суточный перезапуск в режиме ТВ', bundle.includes('05:00') && bundle.includes('location.replace'))
   const sw = readFileSync(resolve(OUT, 'sw.js'), 'utf8')
   ok('/media/ исключён из service worker', sw.includes("BASE + 'media/'"))
   ok('все входы собраны (app, turbo, loyalty, kassa)',

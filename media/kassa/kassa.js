@@ -9,8 +9,9 @@
  *
  *  Механика канвы, подгона кеглей, шапки, подвала и режима ТВ — из
  *  media/turbo/turbo.js и media/loyalty/loyalty.js (fitStage, fitCount,
- *  стамп, режим ТВ, суточный перезапуск). Экраны будут чередоваться на одной
- *  панели — поведение обязано совпадать. Своего механизма не изобретаем.
+ *  стамп, режим ТВ). Экраны чередуются на одной панели — поведение обязано
+ *  совпадать. Своего механизма не изобретаем: плеер, выбор парка,
+ *  автообновление и суточный перезапуск — общие, media/shared/screens.js.
  *
  *  ⚠ У ГОСТЯ НА ЭКРАНЕ НИЧЕГО НЕ НАЖИМАЕТСЯ. Клики слушает только служебный
  *    бейдж в подвале (подсказка и ⟳ «обновить») — как у турбо и «Твоей
@@ -19,7 +20,7 @@
  */
 import DATA from './kassa.data.json'
 import { KASSA_QR } from './kassa-qr.js'
-import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnimations } from '../shared/screens.js'
+import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, BUILT_DAY } from '../shared/screens.js'
 
 /* ── 0. Конфиг ───────────────────────────────────────────────────────────── */
 
@@ -27,12 +28,7 @@ import { initScreens, isEmbedded, pauseAnimations, resumeAnimations, restartAnim
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.10'
-
-/* Метка сборки — та же, что у приложения (define __APP_BUILD__ в
-   vite.config.js, «ГГГГ-ММ-ДД ЧЧ:ММ» по UTC). Вне сборки её нет. */
-// eslint-disable-next-line no-undef
-const BUILT = typeof __APP_BUILD__ !== 'undefined' ? __APP_BUILD__ : ''
+const PAGE_VERSION = 'v2.11'
 
 const PARKS = DATA.parks
 const T = DATA.text
@@ -425,29 +421,27 @@ function render() {
    У турбо время в бейдже — свежесть расписания. Здесь данных из сети нет,
    поэтому время — момент загрузки страницы по Москве (видно, что панель жива
    и суточный перезапуск отработал), а «собрано» — дата СБОРКИ: доехала ли
-   до панели последняя выкладка. ⟳ — перезагрузить страницу для персонала. */
+   до панели последняя выкладка (BUILT_DAY — один на все три экрана, из
+   media/shared/screens.js). ⟳ — перезагрузить страницу для персонала. */
 function mskStamp(d) {
   try {
     const s = d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     return `${s.replace(',', '')} МСК`
   } catch { return '' }
 }
-function builtDay(s) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(s || ''))
-  if (!m) return ''
-  try {
-    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]))
-    return d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit' })
-  } catch { return `${m[3]}.${m[2]}` }
-}
-const day = builtDay(BUILT)
+const day = BUILT_DAY
 document.getElementById('stamp-when').textContent = mskStamp(new Date())
 document.getElementById('stamp-ver').textContent = day ? `${PAGE_VERSION} · собрано ${day}` : PAGE_VERSION
 
+/* Подсказка гаснет сама через 12 с — как у турбо: на панели её некому
+   закрыть, а открытой она висела бы поверх подвала до перезагрузки. */
 const hintEl = document.getElementById('hint')
+let hintTimer = 0
 function toggleHint() {
   hintEl.innerHTML = `<b>Зелёная точка</b> — страница загружена в это время (по Москве). Экран статичный, данных из таблиц не берёт. <b>${PAGE_VERSION}</b> — версия экрана${day ? `, собран ${day}` : ''}.`
   hintEl.classList.toggle('on')
+  clearTimeout(hintTimer)
+  if (hintEl.classList.contains('on')) hintTimer = setTimeout(() => hintEl.classList.remove('on'), 12000)
 }
 document.getElementById('stamp').addEventListener('click', (e) => {
   if (e.target.closest('#reload')) return   // кнопка перезагрузки — не подсказка
@@ -838,16 +832,20 @@ if (REDUCED) {
   requestAnimationFrame(frame)
 }
 
-/* ── Плеер экранов (loyalty ⇄ kassa) и выбор парка — media/shared/screens.js.
+/* ── Плеер экранов (Статус → Зарядка → Турбо), выбор парка, автообновление
+   и суточный перезапуск в 05:00 — media/shared/screens.js, один механизм на
+   все три экрана.
    Полный круг экрана = все карточки по очереди (cardMs каждой) + стартовая
    пауза 700 мс. Пауза — часы и CSS-анимации замирают, продолжение — с того
-   же места; показ экрана — круг с первой карточки. */
+   же места; показ экрана — круг с первой карточки.
+   Парк не найден — плеер не поднимается, но заставку убирает: видна плашка
+   «Парк не найден». */
 function stopCards() {
   cancel(cycleTimer)
   timers.forEach(cancel)
   timers = []
 }
-if (PARKS[park]) {
+{
   initScreens({
     id: 'kassa',
     park,
@@ -872,17 +870,4 @@ if (PARKS[park]) {
       resumeAnimations()
     },
   })
-}
-
-/* Суточный самоперезапуск в 05:00 по Москве — как у турбо и «Твоей карты»:
-   забрать новую сборку и не копить утечки. */
-function mskHm(d) {
-  try {
-    return d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
-  } catch { return '' }
-}
-if (TV && !isEmbedded()) {   // встроенную в плеер перезапускает хозяин
-  setInterval(() => {
-    if (mskHm(new Date()) === '05:00') location.reload()
-  }, 60000)
 }

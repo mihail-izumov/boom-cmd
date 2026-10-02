@@ -10,6 +10,9 @@
    скрипт или стиль страницы — через 3 с перезагрузка в обход кэша (метка
    ?r=… в адресе). Не больше 3 попыток подряд: при настоящей поломке панель
    не крутится в перезагрузках. Удачная загрузка счётчик обнуляет.
+   Считаются только файлы самого сайта: шрифты Google перезагрузкой не
+   починить, а три пустые попытки из-за них выключали страховку до конца
+   сеанса — и настоящую поломку после публикации она бы уже не поймала.
    ⚠ Стоит ПЕРВЫМ в <head>, до скриптов, которые вставляет Vite. */
 (function () {
   var KEY = 'boom-retry:' + location.pathname, failed = false
@@ -25,8 +28,8 @@
     }, 3000)
   }
   window.addEventListener('error', function (e) {
-    var t = e.target
-    if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) retry()
+    var t = e.target, u = t && (t.src || t.href) || ''
+    if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && u.indexOf(location.origin + '/') === 0) retry()
   }, true)
   window.addEventListener('load', function () {
     if (!failed) { try { sessionStorage.removeItem(KEY) } catch (e) {} }
@@ -70,9 +73,11 @@
   КАНВА — механизм турбо: эталон 1920×1080, k = min(vw/1920, vh/1080),
   кегли — замером (fitCount). Вертикаль: эталон 1080×1920.
 
-  ПАРАМЕТРЫ URL (те же, что у турбо)
-    ?park=ohta|piterland|iyun  — жёстко фиксирует парк, переключатель скрыт
+  ПАРАМЕТРЫ URL (те же, что у турбо и экрана у кассы)
+    ?park=ohta|piterland|iyun  — парк панели; сменить — списком на плашке
+                                 (адрес и выбор запоминаются)
     &tv=1                      — режим ТВ: курсор скрыт, суточный самоперезапуск
+    &play=0                    — плеер экранов стартует на паузе
     &demo=1                    — песочница: «цифры статусов» вкл/выкл
   ═══════════════════════════════════════════════════════════════════════════
 -->
@@ -150,7 +155,7 @@
     border-radius:12px;padding:8px 15px;color:var(--white);white-space:nowrap;
   }
   .brand-badge .sep{color:var(--lime)}
-  /* Справа — плеер экранов (loyalty ⇄ kassa), разметку кладёт
+  /* Справа — плеер экранов (Статус → Зарядка → Турбо), разметку кладёт
      media/shared/screens.js. Парк выбирается списком на плашке слева. */
   .slot{position:absolute;right:18px;top:50%;transform:translateY(-50%)}
   body.portrait .head .slogan{position:absolute;right:26px;font-size:24px}

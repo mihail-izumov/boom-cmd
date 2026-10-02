@@ -46,6 +46,10 @@ const LIFE_MS = 150000
 const MAX_PARTS = 430
 const BIN = 24 // ширина колонки в карте высот сугроба
 
+/* Круг сценария шаров (DUR ниже). По нему плеер экранов держит «Турбо» на
+   панели: экран показывается кругами шаров, а не на случайном кадре. */
+export const BALLOONS_MS = 18000
+
 export function initBday() {
   const tile = document.getElementById('bdaytile')
   const box = document.getElementById('confetti')
@@ -102,7 +106,7 @@ export function initBday() {
      Нет движения — блок просто стоит статикой, это полностью рабочий вид. */
   const canAnimate =
     typeof bal.animate === 'function' && typeof window.requestAnimationFrame === 'function'
-  if (noMotion || !canAnimate) return
+  if (noMotion || !canAnimate) return { reset() {}, pause() {}, resume() {} }
 
   /* ── СЦЕНАРИЙ ШАРОВ: 18 секунд пряток с плашкой «+50» ──────────────────────
      Шары то уходят ЗА плашку, то выныривают ПЕРЕД ней, на мгновение её
@@ -112,7 +116,7 @@ export function initBday() {
        на панели, которая не перезагружается месяцами, независимый таймер
        неминуемо разъедется с CSS-анимацией, и шары начнут менять слой на
        виду. Одни часы — одна правда. */
-  const DUR = 18000
+  const DUR = BALLOONS_MS
   const anim = bal.animate(
     [
       { offset: 0.0, transform: 'translate(0px, 0px) rotate(0deg)' },
@@ -281,10 +285,15 @@ export function initBday() {
   }
 
   let lastCycle = -1
+  /* Пауза плеера экранов (media/shared/screens.js): шары и хлопушка — это
+     анимации, их замораживает сам плеер; конфетти считается здесь, кадр за
+     кадром, — его замораживаем флагом. Иначе на паузе и пока экран скрыт
+     частицы летели бы дальше, а залп из замершей хлопушки — нет. */
+  let frozen = false
   function frame(now) {
     // Вкладка свёрнута (ночной режим панели, переключение окна) — не считаем
     // вовсе: иначе после разворачивания вывалится пачка «догоняющих» залпов.
-    if (!document.hidden) {
+    if (!document.hidden && !frozen) {
       const t = popAnim.currentTime || 0
       const c = Math.floor(t / CYCLE_MS)
       if (c !== lastCycle && (t % CYCLE_MS) / CYCLE_MS >= 0.04) {
@@ -304,5 +313,9 @@ export function initBday() {
 
   // Смена геометрии панели (поворот, смена разрешения) — пересобрать карту
   // высот: колонок стало другое количество, старые сугробы к ней не относятся.
-  return { reset }
+  return {
+    reset,
+    pause() { frozen = true },
+    resume() { frozen = false },
+  }
 }

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = dirname(fileURLToPath(import.meta.url))
 
-// Номер сборки ТВ-экранов (/media/loyalty, /media/kassa). Один и тот же —
+// Номер сборки ТВ-экранов (/media/loyalty, /media/kassa, /media/turbo). Один и тот же —
 // вшит в страницы (__MEDIA_BUILD__) и лежит рядом файлом media/build.json.
 // Панель раз в минуту сверяет свой номер с файлом и, если вышла новая
 // сборка, сама перезагружается на ближайшей заставке (media/shared/
