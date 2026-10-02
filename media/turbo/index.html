@@ -540,16 +540,6 @@
     letter-spacing:.3px;white-space:nowrap;text-decoration:none;
   }
   .powered:hover{filter:brightness(1.1)}
-  /* Подсказка по точке. На панели нет курсора и нет hover, поэтому title=""
-     там бесполезен — нужен именно клик. */
-  .hint{
-    position:absolute;left:150px;bottom:calc(100% + 8px);max-width:min(620px,70vw);
-    background:var(--tile2);border:1px solid rgba(255,255,255,.16);
-    border-radius:12px;padding:12px 15px;font-size:15px;font-weight:600;color:var(--white);line-height:1.4;
-    box-shadow:0 12px 30px rgba(0,0,0,.45);display:none;z-index:20;text-align:left;white-space:normal;
-  }
-  .hint.on{display:block}
-  .hint b{color:var(--lime)}
 
   /* ── Запрошенный парк не найден ─────────────────────────────────────────
      Источник при неизвестном коде молча отдаёт первый парк по сортировке —
@@ -772,7 +762,6 @@
   <!-- УСЛОВИЯ. Порядок: служебный бейдж СЛЕВА, юридическая строка справа —
        так техническая метка не соседствует с QR-блоком над ней. -->
   <div class="fineband">
-    <div class="hint" id="hint"></div>
     <div class="svc">
       <a class="powered" href="https://ultra.runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
       <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">

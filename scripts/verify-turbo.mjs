@@ -142,7 +142,6 @@ async function run(query, payload) {
     bday: $('bdaytile')?.textContent ?? '',
     stageW: $('stage')?.style.width ?? '',
     stageTransform: $('stage')?.style.transform ?? '',
-    hintText: $('hint').textContent,
     parkErr: $('parkerr').className.includes('on'),
     parkErrAsked: $('parkerr-asked').textContent,
     skeletons: $('packs-body').ownerDocument.querySelectorAll('.bc-skeleton').length,
@@ -294,7 +293,8 @@ console.log('\n── Блоки ──')
   ok('свежие данные — точка бейджа зелёная', !r.stampStale)
   ok('бейдж: время с явным поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
   // «v3.1 · собрано ДД.ММ» — как у соседних экранов плеера
-  ok('бейдж: версия носителя и дата сборки', /^v\d+\.\d+ · собрано \d{2}\.\d{2}$/.test(r.stampVer), r.stampVer)
+  // С 02.10 блок в подвале общий для трёх экранов: «● состояние · время МСК · версия»
+  ok('блок: версия носителя', /^v\d+\.\d+$/.test(r.stampVer), r.stampVer)
   ok('QR вшит в блок подписки', r.qr.length > 1000, `${r.qr.length} симв. пути`)
   // Длина пути ничего не доказывает: чужой QR такой же длинный. Сверяем адрес.
   ok('QR ведёт на парк, показанный на экране',
@@ -556,8 +556,16 @@ console.log('\n── Защита источника и восстановле�
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
   const d = dom.window.document
   ok('сбой источника — точка розовая', d.getElementById('stamp').className.includes('stale'))
+  ok('блок в подвале — красный «Расписание устарело» / «Нет расписания»',
+     /lvl-bad/.test(d.getElementById('stamp').className) && /Расписание устарело|Нет расписания/.test(d.querySelector('#stamp .sc-word').textContent),
+     d.querySelector('#stamp .sc-word')?.textContent)
   d.getElementById('stamp').dispatchEvent(new dom.window.Event('click', { bubbles: true }))
-  ok('в подсказке — причина сбоя', /источник недоступен \(код 500\)/.test(d.getElementById('hint').textContent), d.getElementById('hint').textContent.slice(-90))
+  {
+    const t = (d.querySelector('.sc-info')?.textContent || '').replace(/\s+/g, ' ')
+    ok('в окне «Состояние экрана» — причина сбоя и следующая попытка',
+       /источник недоступен \(код 500\)/.test(t) && /следующая попытка в \d{2}:\d{2} МСК/.test(t), t.slice(0, 200))
+    d.querySelector('.sc-info [data-info="close"]')?.dispatchEvent(new dom.window.Event('click', { bubbles: true }))
+  }
   await new Promise((r) => setTimeout(r, 15600))
   ok('через 15 с повтор — данные свежие, точка зелёная', !d.getElementById('stamp').className.includes('stale') && n === 2, `${n} запроса`)
 }

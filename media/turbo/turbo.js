@@ -35,7 +35,7 @@
    эмодзи из ячейки, а не сломает блок. */
 import { TURBO_QR } from './turbo-qr.js'
 import { initBday, BALLOONS_MS } from './turbo-bday.js'
-import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, BUILT_DAY } from '../shared/screens.js'
+import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, msk } from '../shared/screens.js'
 import iconRace from './icons/race.webp'
 import iconShoot from './icons/shoot.webp'
 import iconMusic from './icons/music.webp'
@@ -72,7 +72,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v3.3'
+const PAGE_VERSION = 'v3.4'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -368,58 +368,27 @@ function writeCache(data) {
 const stampEl = document.getElementById('stamp')
 const stampWhen = document.getElementById('stamp-when')
 
-/* «МСК» приписываем явно, и время по Москве считаем явно (timeZone), а не
-   в поясе панели: моноблок в зале может стоять с чужим поясом. Ровно на
-   этом мы уже спотыкались с таблицей (пояс был лос-анджелесский). До v3.1
-   здесь был пояс панели с подписью «МСК» — и в плеере экранов подвал турбо
-   расходился бы с соседними экранами на разницу поясов. */
-const fmtWhen = (ms) => {
-  const opt = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }
-  let s
-  try { s = new Date(ms).toLocaleString('ru-RU', { ...opt, timeZone: 'Europe/Moscow' }) } catch { s = new Date(ms).toLocaleString('ru-RU', opt) }
-  return s.replace(',', '') + ' МСК'
-}
+/* Время — по Москве с «МСК» (msk из media/shared/screens.js, общий для трёх
+   экранов). До v3.1 здесь был пояс панели с подписью «МСК» — и в плеере
+   подвал турбо расходился бы с соседними экранами на разницу поясов. */
+const fmtWhen = (ms) => msk(ms)
 
 /**
- * Служебный бейдж внизу справа. Заменил плавающую метку «нет связи»: две
- * индикации одного и того же состояния в разных углах — лишний шум на экране,
- * который персонал всё равно будет читать в одном месте.
- *   stale=false → зелёная точка и время последнего успешного ответа
- *   stale=true  → розовая точка и время данных, которые сейчас показываются
+ * Состояние расписания для служебного блока в подвале и окна «Состояние
+ * экрана» (media/shared/screens.js, status ниже). Блок и окно с v3.4 общие
+ * для трёх экранов; здесь — только факты:
+ *   stale=false → расписание свежее, at — когда получено;
+ *   stale=true  → источник не отвечает, at — когда получено то, что сейчас
+ *                 на экране (null — показывать нечего).
+ * Класс stale и время на метке — для первого кадра, до старта плеера.
  */
+let stampState = { stale: true, at: null }
 function setStamp(stale, at) {
+  stampState = { stale: !!stale, at: at || null }
   stampEl.classList.toggle('stale', !!stale)
   stampWhen.textContent = at ? fmtWhen(at) : '—'
 }
-/* «v3.1 · собрано 02.10» — как у «Твоей карты» и экрана у кассы: дата
-   сборки одна на все три экрана (BUILT_DAY, media/shared/screens.js). */
-document.getElementById('stamp-ver').textContent = BUILT_DAY ? `${PAGE_VERSION} · собрано ${BUILT_DAY}` : PAGE_VERSION
-
-/* Что означает точка. На панели нет курсора, поэтому hover-подсказка там
-   недоступна — нужен клик. Персоналу это единственный способ понять, живые
-   данные на экране или последние сохранённые. */
-const hintEl = document.getElementById('hint')
-let hintTimer = null
-function toggleHint() {
-  const stale = stampEl.classList.contains('stale')
-  const fail = lastFail
-    ? `<br>Последняя попытка — ${esc(fmtWhen(lastFail.at))}: ${esc(lastFail.why)}. Панель повторяет попытки сама: через 15 с, 30 с, минуту, две.`
-    : ''
-  hintEl.innerHTML = stale
-    ? '<b>Розовая точка</b> — источник не отвечает. На экране последние сохранённые ' +
-      'данные, время рядом — когда они получены. Расписание могло с тех пор ' +
-      'измениться. Нажми ⟳ справа, чтобы перезагрузить.' + fail
-    : '<b>Зелёная точка</b> — данные свежие. Рядом время последнего ответа сервера ' +
-      'по Москве, версия страницы и дата сборки. Панель сама перечитывает расписание ' +
-      'каждые несколько минут.'
-  hintEl.classList.toggle('on')
-  clearTimeout(hintTimer)
-  if (hintEl.classList.contains('on')) hintTimer = setTimeout(() => hintEl.classList.remove('on'), 12000)
-}
-stampEl.addEventListener('click', (e) => {
-  if (e.target.closest('#reload')) return   // кнопка перезагрузки — не подсказка
-  toggleHint()
-})
+document.getElementById('stamp-ver').textContent = PAGE_VERSION
 
 /* ── Защита источника и быстрое восстановление (v3.3, 02.10) ───────────────
    Июнь показывал розовую точку: источник не отвечал, на экране — кэш.
@@ -435,7 +404,7 @@ stampEl.addEventListener('click', (e) => {
      3) МЕДЛЕННОЕ ВОССТАНОВЛЕНИЕ. После сбоя следующая попытка была только
         через refresh_sec (5 минут) — всё это время точка розовая. Теперь
         повтор через 15 с, 30 с, 1 мин, 2 мин, дальше — по расписанию.
-   Причина последнего сбоя видна в подсказке по точке (нажать на бейдж). */
+   Причина последнего сбоя — в окне «Состояние экрана» (нажать на блок в подвале). */
 const FETCH_TIMEOUT_MS = 25000
 const RETRY_MS = [15000, 30000, 60000, 120000]
 const TICK_LOAD_MS = 60000
@@ -443,7 +412,8 @@ let inflight = null
 let retryN = 0
 let retryTimer = 0
 let tickLoadAt = 0
-let lastFail = null   // { at, why } — для подсказки по точке
+let lastFail = null   // { at, why } — для окна «Состояние экрана»
+let retryAt = 0       // когда следующая попытка после сбоя
 
 function load() {
   if (inflight) return inflight          // запрос уже идёт — второй не шлём
@@ -510,10 +480,13 @@ async function loadOnce() {
     retryN = 0
     clearTimeout(retryTimer)
     lastFail = null
+    retryAt = 0
   } catch (e) {
     lastFail = { at: Date.now(), why: failWhy(e) }
     clearTimeout(retryTimer)
-    retryTimer = setTimeout(load, RETRY_MS[Math.min(retryN, RETRY_MS.length - 1)])
+    const wait = RETRY_MS[Math.min(retryN, RETRY_MS.length - 1)]
+    retryAt = Date.now() + wait
+    retryTimer = setTimeout(load, wait)
     retryN++
     // Сеть отвалилась — показываем последнее известное, но честно помечаем, что
     // данные не свежие. Кэш старше суток не берём: расписание за ночь наверняка
@@ -1005,6 +978,16 @@ document.querySelectorAll('.demo button').forEach((b) => {
 try {
   initScreens({
     id: 'turbo',
+    version: PAGE_VERSION,
+    /* Расписание — для служебного блока и окна «Состояние экрана» */
+    status: () => ({
+      kind: 'schedule',
+      fresh: !stampState.stale,
+      at: stampState.at,
+      fail: lastFail,
+      retryAt: stampState.stale ? retryAt : 0,
+      everyMin: Math.round((Number(D.settings?.refresh_sec) || DEFAULT_REFRESH_SEC) / 60),
+    }),
     park,
     parks: PARKS,
     parkOrder: PARK_ORDER,

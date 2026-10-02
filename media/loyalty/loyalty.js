@@ -15,13 +15,13 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { LOYALTY_QR } from './loyalty-qr.js'
-import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, BUILT_DAY } from '../shared/screens.js'
+import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, msk } from '../shared/screens.js'
 
 /* ── 0. Конфиг ───────────────────────────────────────────────────────────── */
 
 /* Версия НОСИТЕЛЯ — в служебном бейдже внизу слева, как у турбо. Поднимать
    при любой правке вида или текстов. */
-const PAGE_VERSION = 'v7.7'
+const PAGE_VERSION = 'v7.8'
 
 /* Парки. Коды и названия — те же, что у турбо (park / park_ru источника),
    чтобы бейдж и переключатель при смене экрана не менялись ни на букву.
@@ -184,35 +184,15 @@ function render() {
   fitStage()
 }
 
-/* ── 3. Служебный бейдж — как у турбо и экрана у кассы ─────────────────────
-   «● 02.10 08:15 МСК   v7.7 · собрано 02.10   ⟳»
-   У турбо время в бейдже — свежесть расписания. Здесь данных нет, поэтому
-   это время загрузки страницы по Москве: по нему персонал видит, что
-   панель жива и суточный перезапуск отработал. «Собрано» — дата сборки,
-   одна на все три экрана (BUILT_DAY, media/shared/screens.js). */
-function mskStamp(d) {
-  try {
-    const s = d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    return `${s.replace(',', '')} МСК`
-  } catch { return '' }
-}
-document.getElementById('stamp-when').textContent = mskStamp(new Date())
-document.getElementById('stamp-ver').textContent = BUILT_DAY ? `${PAGE_VERSION} · собрано ${BUILT_DAY}` : PAGE_VERSION
-
-/* Подсказка гаснет сама через 12 с — как у турбо: на панели её некому
-   закрыть, а открытой она висела бы поверх подвала до перезагрузки. */
-const hintEl = document.getElementById('hint')
-let hintTimer = 0
-function toggleHint() {
-  hintEl.innerHTML = `<b>Зелёная точка</b> — страница загружена в это время (по Москве). Экран статичный, данных из таблиц не берёт. <b>${PAGE_VERSION}</b> — версия экрана${BUILT_DAY ? `, собран ${BUILT_DAY}` : ''}.`
-  hintEl.classList.toggle('on')
-  clearTimeout(hintTimer)
-  if (hintEl.classList.contains('on')) hintTimer = setTimeout(() => hintEl.classList.remove('on'), 12000)
-}
-document.getElementById('stamp').addEventListener('click', (e) => {
-  if (e.target.closest('#reload')) return   // кнопка перезагрузки — не подсказка
-  toggleHint()
-})
+/* ── 3. Служебный блок в подвале ─────────────────────────────────────────
+   «● Всё в порядке · 02.10 08:15 МСК · v7.8 ⟳» и окно «Состояние экрана»
+   по нажатию — общие для трёх экранов: media/shared/screens.js
+   (setupService, openInfo). До 02.10 здесь были своя метка, своя подсказка
+   и отдельный бейдж версии — два блока дублировали друг друга. Здесь —
+   только первое заполнение до старта плеера и обычный ⟳ на случай, если
+   плеер не поднялся (плеер перехватывает ⟳ раньше и грузит в обход кэша). */
+document.getElementById('stamp-when').textContent = msk(Date.now())
+document.getElementById('stamp-ver').textContent = PAGE_VERSION
 document.getElementById('reload').addEventListener('click', () => {
   document.getElementById('reload').classList.add('spin')
   location.reload()
@@ -326,6 +306,7 @@ render()
 {
   initScreens({
     id: 'loyalty',
+    version: PAGE_VERSION,
     park,
     parks: PARKS,
     parkOrder: PARK_ORDER,

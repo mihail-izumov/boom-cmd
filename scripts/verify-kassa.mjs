@@ -647,14 +647,26 @@ console.log('\n── Шапка, подвал, штамп ──')
        !!r.slot && names.length === 3 && names.every((n) => r.slot.textContent.includes(n)), sp(r.slot?.textContent))
   }
   ok('переключателя парков турбо нет', !r.d.getElementById('parks'))
-  // Бейдж — как у турбо и «Твоей карты»: время МСК, версия, дата сборки, ⟳
-  ok('бейдж: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('бейдж: «v2.11 · собрано ДД.ММ»', /^v2\.11 · собрано \d{2}\.\d{2}$/.test(sp(r.stampVer)), r.stampVer)
-  ok('бейдж: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
-  ok('бейдж: подсказка по нажатию', !!r.d.getElementById('hint'))
+  // С 02.10 служебный блок один на экран и общий для трёх (media/shared/
+  // screens.js): «● состояние · время МСК · версия ⟳»; нажатие — окно
+  // «Состояние экрана» с объяснением обычными словами.
+  ok('блок: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
+  ok('блок: версия «v2.12»', sp(r.stampVer) === 'v2.12', r.stampVer)
+  ok('блок: состояние словом', !!r.d.querySelector('#stamp .sc-word') && r.d.querySelector('#stamp .sc-word').textContent.length > 0,
+     r.d.querySelector('#stamp .sc-word')?.textContent)
+  ok('блок: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
+  ok('второго блока (бейджа версии) нет', !r.d.querySelector('.sc-ver') && !r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
-  ok('бейдж: нажатие показывает подсказку', r.d.getElementById('hint').className.includes('on') &&
-     /Зелёная точка/.test(r.d.getElementById('hint').textContent))
+  {
+    const box = r.d.querySelector('.sc-info')
+    const t = sp(box?.textContent)
+    ok('нажатие на блок — окно «Состояние экрана»', !!box && /Состояние экрана/.test(t), t.slice(0, 60))
+    ok('в окне: экран, версия, проверка, загрузка, перезапуск — время с «МСК»',
+       /Экран«Зарядка» · Охта Молл/.test(t) && /Версияv2\.12/.test(t) && /Загружен\d{2}\.\d{2} \d{2}:\d{2} МСК/.test(t) && /Перезапуск/.test(t), t.slice(0, 220))
+    ok('в окне: расшифровка цветов и «Обновить сейчас»', /Зелёный/.test(t) && /Красный/.test(t) && !!box.querySelector('[data-info="fresh"]'))
+    box.querySelector('[data-info="close"]').dispatchEvent(new r.window.Event('click', { bubbles: true }))
+    ok('окно закрывается', !r.d.querySelector('.sc-info'))
+  }
   ok('иконка бренда инлайном в шапке', !!r.d.querySelector('.head .brand-icon path'))
   const turboHtml = readFileSync(resolve(OUT, 'media/turbo/index.html'), 'utf8')
   const fonts = (h) => (h.match(/fonts\.googleapis\.com\/css2\?[^"]+/) || [''])[0]

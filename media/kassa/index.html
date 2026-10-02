@@ -686,14 +686,6 @@
   @keyframes bc-spin{to{transform:rotate(360deg)}}
   .powered{flex:none;display:inline-flex;align-items:center;background:var(--blue);color:var(--white);border-radius:11px;padding:0 15px;font-family:'Inter';font-weight:800;font-size:15px;letter-spacing:.3px;white-space:nowrap;text-decoration:none}
   .powered:hover{filter:brightness(1.1)}
-  .hint{
-    position:absolute;left:150px;bottom:calc(100% + 8px);max-width:min(620px,70vw);
-    background:var(--tile2);border:1px solid rgba(255,255,255,.16);
-    border-radius:12px;padding:12px 15px;font-size:15px;font-weight:600;color:var(--white);line-height:1.4;
-    box-shadow:0 12px 30px rgba(0,0,0,.45);display:none;z-index:20;text-align:left;white-space:normal;
-  }
-  .hint.on{display:block}
-  .hint b{color:var(--lime)}
 
   .parkerr{position:fixed;inset:0;z-index:60;background:rgba(6,4,26,.86);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px}
   .parkerr.on{display:flex}
@@ -804,7 +796,6 @@
   <!-- ПОДВАЛ — разметка как у турбо и «Твоей карты»: служебный бейдж
        с временем загрузки, версией и кнопкой обновления ⟳ -->
   <div class="fineband">
-    <div class="hint" id="hint"></div>
     <div class="svc">
       <a class="powered" href="https://ultra.runscale.ru" target="_blank" rel="noopener">Работает на Ранскеил</a>
       <span class="stamp" id="stamp" role="button" tabindex="0" title="Что показывает эта метка">
