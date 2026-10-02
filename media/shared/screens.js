@@ -49,22 +49,19 @@
  *  6. Служебный блок в подвале — ОДИН на экран, одинаковый у всех трёх
  *     (до 02.10 их было два: метка с временем и версией + бейдж версии,
  *     они дублировали друг друга, и было непонятно, куда смотреть):
- *       ● <состояние> · <время МСК> · <версия> ⟳
- *     Цвет точки и слово — общий итог: зелёный «Всё в порядке», жёлтый
- *     «Обновится сам», красный «Нужно обновить» / «Расписание устарело»,
- *     серый «Нет связи». Время — у статичных экранов когда загружен экран,
- *     у турбо — когда получено расписание. ВСЕ времена — по Москве, «МСК».
- *     Нажатие на блок — окно «Состояние экрана»: что сейчас происходит и
- *     что делать, обычными словами, плюс расшифровка цветов. Пока окно
- *     открыто, плеер стоит; закрывается само через минуту.
- *
- *  5. Суточный перезапуск (только режим ТВ, ?tv=1). Раз в сутки, в 05:00 по
- *     Москве, панель перезагружается в обход кэша — не копить утечки за
- *     месяцы работы. Один механизм на все три экрана, у хозяина: встроенные
- *     страницы перезагружаются вместе с ним. Играет — на ближайшей смене
- *     экрана под заставкой; на паузе — сразу (пауза до утра не живёт).
- *     Считается по дате «с 05:00 до 05:00», а не по совпадению минуты:
- *     пропущенная проверка (панель задумалась) перезапуск не отменяет.
+ *       [состояние] 02.10 08:35 МСК [v7.8] ⟳
+ *     Состояние — плашка, закрашенная своим цветом: зелёная «Всё в
+ *     порядке», жёлтая «Обновится сам», красная «Нужно обновить» /
+ *     «Расписание устарело» / «Турбо пропущен» / «Экран не загрузился»,
+ *     серая «Нет связи». Это итог ВСЕЙ ПАНЕЛИ (трёх экранов и версии), а не
+ *     одной страницы: что бы ни было на экране, плашка одна и та же.
+ *     Время — когда загружена панель. Версия — бейджем, у каждого экрана
+ *     своя. ВСЕ времена — по Москве, «МСК».
+ *     Нажатие на блок на любом экране — одно окно «Состояние панели»: итог и
+ *     что делать обычными словами, по строке на каждый из трёх экранов,
+ *     общие сведения (парк, проверка версии, загрузка, перезапуск, плеер)
+ *     и расшифровка цветов. Пока окно открыто, плеер стоит; закрывается
+ *     само через минуту.
  *
  *  ⚠ Новый экран в ротацию: строка в SCREENS ниже + initScreens() в его js
  *    + слот <div class="slot" id="screens"> в шапке + страховка загрузки
@@ -97,9 +94,9 @@ const DAY_FROM = '05:00'             // суточный перезапуск, �
 const Q = new URLSearchParams(location.search)
 const EMBED = Q.get('embed') === '1' && window.parent !== window
 const TV = Q.get('tv') === '1'
-const INFO_MS = 60000                // окно «Состояние экрана» закрывается само
+const INFO_MS = 60000                // окно «Состояние панели» закрывается само
 
-/* Когда и почему загружена страница — для окна «Состояние экрана».
+/* Когда и почему загружена страница — для окна «Состояние панели».
    Причину кладёт сам плеер перед перезагрузкой (reloadFresh, setPark);
    встроенные экраны грузятся вместе с хозяином, им причина не нужна. */
 const LOADED_AT = Date.now()
@@ -221,39 +218,48 @@ body.portrait .sc-btn{width:52px;height:52px}
 .sc-curtain.out{opacity:0;transition:opacity ${OUT_MS}ms cubic-bezier(.4,0,.2,1)}
 .sc-curtain.out .sc-say{opacity:0;transform:scale(.96);transition:opacity ${Math.round(OUT_MS * 0.25)}ms ease,transform ${Math.round(OUT_MS * 0.25)}ms ease}
 .sc-curtain.out img{animation:sc-shoot ${OUT_MS}ms cubic-bezier(.5,0,.75,0) forwards}
-/* Служебный блок в подвале: ● состояние · время МСК · версия ⟳ — один на
-   экран. Цвет — итог: ok зелёный, warn жёлтый, bad красный, off серый. */
-.stamp.sc-st{gap:10px}
-.stamp.sc-st .dot{width:10px;height:10px;background:#3fe06c}
-.stamp.sc-st .sc-word{font-weight:800;white-space:nowrap}
+/* Служебный блок в подвале: [состояние] время МСК [версия] ⟳. Состояние —
+   плашка, закрашенная цветом итога: ok зелёный, warn жёлтый, bad красный,
+   off серый. Версия — бейдж. Точка страницы не нужна: цвет несёт плашка. */
+.stamp.sc-st{gap:10px;padding-left:5px}
+.stamp.sc-st .dot{display:none}
 .stamp.sc-st .when{color:#cfcae8}
-.stamp.sc-st.lvl-ok{background:rgba(33,196,90,.12);border-color:rgba(33,196,90,.4)}
-.stamp.sc-st.lvl-ok .sc-word{color:#7ee2a2}
-.stamp.sc-st.lvl-warn{background:rgba(255,176,32,.14);border-color:rgba(255,176,32,.5)}
-.stamp.sc-st.lvl-warn .dot{background:#ffb020}
-.stamp.sc-st.lvl-warn .sc-word{color:#ffc964}
-.stamp.sc-st.lvl-bad{background:rgba(255,61,104,.18);border-color:#ff3d68}
-.stamp.sc-st.lvl-bad .dot{background:#ff3d68}
-.stamp.sc-st.lvl-bad .sc-word{color:#ff9db4}
-.stamp.sc-st.lvl-off .dot{background:#8f88bd}
-.stamp.sc-st.lvl-off .sc-word{color:#cfcae8}
+.sc-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:8px;font-weight:800;white-space:nowrap;line-height:1.3}
+.sc-chip.ok{background:#3fe06c;color:#06340f}
+.sc-chip.warn{background:#ffb020;color:#2b1a00}
+.sc-chip.bad{background:#ff3d68;color:#fff}
+.sc-chip.off{background:#8f88bd;color:#0d0a2e}
+.sc-vb{display:inline-flex;align-items:center;padding:2px 8px;border-radius:7px;white-space:nowrap;line-height:1.3;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#e9e6ff;font-weight:800}
+.stamp.sc-st .ver.sc-vb{color:#e9e6ff;font-size:14px}
 
-/* Окно «Состояние экрана» — поверх всего, в единицах окна (не канвы):
+/* Окно «Состояние панели» — поверх всего, в единицах окна (не канвы):
    читается и на панели, и на ноутбуке */
 .sc-info{position:fixed;inset:0;z-index:9700;display:flex;align-items:center;justify-content:center;padding:3vmin;
-  background:rgba(6,4,26,.6);font-family:'Inter',system-ui,sans-serif;font-size:clamp(14px,1.9vmin,22px);color:#fff}
-.sc-info .box{position:relative;width:min(62em,94vw);max-height:92vh;overflow:auto;background:#16143f;
+  background:rgba(6,4,26,.6);font-family:'Inter',system-ui,sans-serif;font-size:clamp(13px,1.6vmin,20px);color:#fff}
+.sc-info .box{position:relative;width:min(74em,94vw);max-height:94vh;overflow:auto;background:#16143f;
   border:1px solid rgba(255,255,255,.18);border-radius:1.1em;padding:1.4em 1.6em 1.2em;box-shadow:0 2em 4em rgba(0,0,0,.6);line-height:1.45}
 .sc-info .x{position:absolute;right:.7em;top:.6em;width:2em;height:2em;border:none;border-radius:.6em;cursor:pointer;
   background:rgba(255,255,255,.08);color:#fff;font-size:1em;font-weight:800}
 .sc-info .cap{font-size:.8em;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9b94d0}
 .sc-info h2{display:flex;align-items:center;gap:.5em;margin:.25em 2.2em .35em 0;font-family:'Unbounded',sans-serif;font-weight:700;font-size:1.45em;line-height:1.2}
-.sc-info h2 i{flex:none;width:.6em;height:.6em;border-radius:50%}
 .sc-info .lead{margin:0 0 1em;font-size:1.05em;color:#e9e6ff}
-.sc-info dl{display:grid;grid-template-columns:max-content 1fr;gap:.45em 1.2em;margin:0 0 1.1em;padding:1em 1.1em;
+.sc-info dl{display:grid;grid-template-columns:max-content 1fr;gap:.45em 1.1em;margin:.55em 0 0;padding:1em 1.1em;
   background:rgba(255,255,255,.05);border-radius:.8em}
 .sc-info dt{color:#9b94d0;font-weight:700;white-space:nowrap}
 .sc-info dd{margin:0;font-weight:600}
+/* Две колонки на широкой панели: экраны слева, сведения о панели справа */
+.sc-info .cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.2em;margin:0 0 1.1em;align-items:start}
+.sc-info .scr{display:grid;gap:.55em}
+.sc-info .cols h3,.sc-info .scr h3{margin:0;font-size:.8em;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9b94d0}
+.sc-info .row{padding:.7em 1em;border-radius:.8em;background:rgba(255,255,255,.05);border:1px solid transparent}
+.sc-info .row.now{border-color:rgba(198,245,46,.55)}
+.sc-info .row .hd{display:flex;align-items:center;gap:.6em;flex-wrap:wrap}
+.sc-info .row .hd b{font-size:1.05em}
+.sc-info .row .hd em{font-style:normal;font-size:.82em;font-weight:800;color:#c6f52e}
+.sc-info .row .ln{margin-top:.3em;color:#cfcae8;font-size:.95em}
+.sc-info h2 .sc-chip{font-family:'Inter',sans-serif;font-size:.62em}
+.sc-info h2 .sc-chip:only-child{font-size:.8em;padding:.25em .6em}
 .sc-info .legend{display:grid;grid-template-columns:1fr 1fr;gap:.35em 1.2em;margin:0 0 1.1em;font-size:.88em;color:#cfcae8}
 .sc-info .legend span{display:flex;align-items:center;gap:.5em}
 .sc-info .legend i{flex:none;width:.65em;height:.65em;border-radius:50%}
@@ -263,6 +269,7 @@ body.portrait .sc-btn{width:52px;height:52px}
 .sc-info .acts .no{background:rgba(255,255,255,.1);color:#fff}
 .sc-info .acts small{margin-left:auto;color:#8f88bd;font-size:.82em}
 .sc-info .c-ok{background:#3fe06c}.sc-info .c-warn{background:#ffb020}.sc-info .c-bad{background:#ff3d68}.sc-info .c-off{background:#8f88bd}
+@media (max-width:1100px),(orientation:portrait){.sc-info .cols{grid-template-columns:1fr}}
 @media (max-width:640px){.sc-info dl{grid-template-columns:1fr}.sc-info dt{margin-top:.4em}.sc-info .legend{grid-template-columns:1fr}}
 @keyframes sc-shoot{0%{transform:scale(1);opacity:1}100%{transform:scale(9);opacity:0}}
 `
@@ -328,21 +335,27 @@ function curtainOut() {
  *               false — плеер его пропускает (турбо в портрете: заглушка)
  *   version   — версия экрана для служебного блока («v3.4»)
  *   status    — (необязательно) () => состояние данных экрана для блока и
- *               окна «Состояние экрана». Только у турбо: { kind: 'schedule',
+ *               окна «Состояние панели». Только у турбо: { kind: 'schedule',
  *               fresh, at, fail: { at, why } | null, retryAt, everyMin }
+ *   offWhy    — (необязательно) () => почему экран сейчас не показать:
+ *               { text, problem } — problem=true, если это надо чинить
+ *               (турбо: парка нет в таблице турбо), false — так задумано
+ *               (турбо на вертикальной панели)
  */
 export function initScreens(o) {
   if (EMBED) addStyle()
   const host = EMBED ? safeParent() : null
   /* Без плеера: парк не найден (экран уже закрыт плашкой «Парк не найден»)
      или страницу встроили не в наш плеер. Служебный блок и окно
-     «Состояние экрана» работают и так — сами по себе. */
+     «Состояние панели» работают и так — сами по себе. */
   const alone = !o.parks[o.park] || (EMBED && !host)
   const page = {
     id: o.id,
     version: o.version || '',
     parkName: (o.parks[o.park] || {}).name || '',
     status: o.status || null,
+    available: o.available || (() => true),
+    offWhy: o.offWhy || null,
   }
   const act = (action, arg) => {
     if (alone) return aloneAct(page, action)
@@ -355,9 +368,9 @@ export function initScreens(o) {
        сразу: до 02.10 панель с опечаткой в ?park= навсегда оставалась на
        заставке, и плашку с ошибкой никто не видел. */
     curtainOut()
-    const st = { ver: { state: 'none' } }
-    service(st)
-    setInterval(() => service(st), 1000)
+    const tick = () => service({ panel: aloneModel(page).panel, loadedAt: LOADED_AT })
+    tick()
+    setInterval(tick, 1000)
     return
   }
   const api = {
@@ -365,6 +378,7 @@ export function initScreens(o) {
     version: page.version,
     parkName: page.parkName,
     status: page.status,
+    offWhy: page.offWhy,
     cycleMs: o.cycleMs,
     restart: o.restart,
     pause: o.pause,
@@ -466,21 +480,42 @@ function setupPlayer(act) {
   }
 }
 
-/* ── Служебный блок в подвале + ⟳ в обход кэша ──────────────────────────
-   Берёт готовую метку страницы (.stamp: точка, #stamp-when, #stamp-ver,
-   ⟳) и делает из неё единый блок «● состояние · время МСК · версия».
-   Нажатие на блок — окно «Состояние экрана» (у хозяина плеера). */
-const LEVELS = ['lvl-ok', 'lvl-warn', 'lvl-bad', 'lvl-off']
+/* ── Состояние панели: по экрану и итог ──────────────────────────────────
+   Один расчёт на блок в подвале и окно «Состояние панели». Уровни:
+   ok — всё в порядке, warn — само пройдёт, bad — нужна помощь, off — нет
+   связи / ещё проверяем. Итог панели — худший из версии и трёх экранов. */
+const RANK = { ok: 0, off: 1, warn: 2, bad: 3 }
+const LOAD_FAIL_MS = 20000           // экран так и не загрузился — после стольких с от старта панели
 
 function safeStatus(page) {
   try { return page && page.status ? page.status() : null } catch { return null }
 }
 
-/** Итог для точки и слова: [уровень, слово]. Данные турбо важнее версии:
-    гость видит расписание, а не номер сборки. */
-function levelOf(ver, s) {
-  if (s && s.kind === 'schedule' && !s.fresh) return ['bad', s.at ? 'Расписание устарело' : 'Нет расписания']
-  switch (ver && ver.state) {
+/** Состояние одного экрана по его api (или странице без плеера).
+    { lvl, word, line } — слово для плашки и строка для окна. */
+function rowOf(a) {
+  const s = safeStatus(a)
+  let avail = true
+  try { avail = typeof a.available !== 'function' || a.available() !== false } catch { avail = false }
+  if (!avail) {
+    let why = null
+    try { why = a.offWhy ? a.offWhy() : null } catch {}
+    if (why && why.problem) return { lvl: 'bad', word: 'Турбо пропущен', line: why.text }
+    return { lvl: 'ok', word: 'Пропускается', line: (why && why.text) || 'сейчас не показывается — плеер его пропускает' }
+  }
+  if (s && s.kind === 'schedule') {
+    if (s.fresh) return { lvl: 'ok', word: 'Всё в порядке', line: `расписание получено ${msk(s.at)}, обновляется само каждые ${s.everyMin || 5} мин` }
+    const tail = `${s.fail ? `; источник не отвечает с ${msk(s.fail.at)}: ${s.fail.why}` : '; источник не отвечает'}${s.retryAt ? `; следующая попытка в ${msk(s.retryAt, false)}` : ''}`
+    return s.at
+      ? { lvl: 'bad', word: 'Расписание устарело', line: `на экране расписание, полученное ${msk(s.at)}${tail}` }
+      : { lvl: 'bad', word: 'Нет расписания', line: `расписания нет, экран показывает общий вид без часов${tail}` }
+  }
+  return { lvl: 'ok', word: 'Всё в порядке', line: 'готов: тексты и цифры входят в версию, из сети ничего не берёт' }
+}
+
+/** Версия панели: [уровень, слово] */
+function verLevel(v) {
+  switch (v && v.state) {
     case 'stale': return ['bad', 'Нужно обновить']
     case 'pending': return ['warn', 'Обновится сам']
     case 'off': return ['off', 'Нет связи']
@@ -489,18 +524,68 @@ function levelOf(ver, s) {
   }
 }
 
+/** Итог: худшее из версии и экранов. При равенстве — версия, потом экраны
+    по порядку круга. */
+function worstOf(ver, rows) {
+  const [vl, vw] = verLevel(ver)
+  let w = { lvl: vl, word: vw, from: null }
+  for (const r of rows) if (RANK[r.lvl] > RANK[w.lvl]) w = { lvl: r.lvl, word: r.word, from: r }
+  return w
+}
+
+/* Модель для хозяина: все три экрана */
+function hostModel() {
+  const rows = SCREENS.map((sc) => {
+    const a = apiOf(sc.id)
+    const base = { id: sc.id, name: sc.name, now: sc.id === H.current }
+    if (!a) {
+      return Date.now() - LOADED_AT > LOAD_FAIL_MS
+        ? { ...base, version: '', lvl: 'bad', word: 'Экран не загрузился', line: 'не загрузился — плеер его пропускает, остальные экраны работают' }
+        : { ...base, version: '', lvl: 'off', word: 'Загружается…', line: 'загружается…' }
+    }
+    return { ...base, version: a.version || '', ...rowOf(a) }
+  })
+  const self = H.self
+  return {
+    rows,
+    panel: worstOf(H.ver, rows),
+    ver: H.ver,
+    park: self.parkName,
+    playing: H.playing,
+    held: !!(info && info.paused),
+    current: screenName(H.current),
+    next: screenName(nextId()),
+    alone: false,
+  }
+}
+
+/* Модель без плеера (парк не найден): только эта страница */
+function aloneModel(page) {
+  const rows = [{ id: page.id, name: screenName(page.id), now: true, version: page.version, ...rowOf(page) }]
+  const ver = { state: 'none' }
+  return { rows, panel: worstOf(ver, rows), ver, park: page.parkName, playing: true, held: false, current: '', next: '', alone: true }
+}
+
+/* ── Служебный блок в подвале + ⟳ в обход кэша ──────────────────────────
+   Берёт готовую метку страницы (.stamp: точка, #stamp-when, #stamp-ver,
+   ⟳) и делает из неё единый блок «[состояние] время МСК [версия] ⟳».
+   Состояние — итог всей панели (st.panel от хозяина), время — загрузка
+   панели, версия — этого экрана. Нажатие — окно «Состояние панели». */
+const LEVELS = ['lvl-ok', 'lvl-warn', 'lvl-bad', 'lvl-off']
+
 function setupService(page, act) {
   const stamp = document.getElementById('stamp')
   if (!stamp) return () => {}
   stamp.classList.add('sc-st')
-  stamp.setAttribute('title', 'Состояние экрана — нажмите, чтобы узнать подробности')
-  const word = document.createElement('b')
-  word.className = 'sc-word'
+  stamp.setAttribute('title', 'Состояние панели — нажмите, чтобы узнать подробности')
+  const chip = document.createElement('b')
+  chip.className = 'sc-chip sc-word'
   const dot = stamp.querySelector('.dot')
-  if (dot) dot.after(word)
-  else stamp.prepend(word)
+  if (dot) dot.after(chip)
+  else stamp.prepend(chip)
   const when = document.getElementById('stamp-when')
   const ver = document.getElementById('stamp-ver')
+  if (ver) ver.classList.add('sc-vb')
   stamp.addEventListener('click', (e) => {
     if (e.target.closest('#reload')) return
     act('info')
@@ -517,24 +602,25 @@ function setupService(page, act) {
   }
   let shown = ''
   return (st) => {
-    const s = safeStatus(page)
-    const [lvl, w] = levelOf(st.ver, s)
-    const t = s && s.kind === 'schedule' ? msk(s.at) : msk(LOADED_AT)
-    const key = `${lvl}|${w}|${t}|${page.version}`
+    const p = st.panel || { lvl: 'off', word: 'Проверка…' }
+    const t = msk(st.loadedAt || LOADED_AT)
+    const key = `${p.lvl}|${p.word}|${t}|${page.version}`
     if (key === shown) return
     shown = key
-    LEVELS.forEach((c) => stamp.classList.toggle(c, c === `lvl-${lvl}`))
-    word.textContent = w
+    LEVELS.forEach((c) => stamp.classList.toggle(c, c === `lvl-${p.lvl}`))
+    chip.className = `sc-chip sc-word ${p.lvl}`
+    chip.textContent = p.word
     if (when) when.textContent = t
     if (ver && page.version) ver.textContent = page.version
   }
 }
 
-/* ── Окно «Состояние экрана» ──────────────────────────────────────────────
-   Обычными словами: что сейчас с экраном, что делать (или что ничего не
-   нужно), подробности и расшифровка цветов. Открывается у хозяина — поверх
-   всех экранов; пока открыто, плеер стоит. Закрывается само через минуту:
-   на панели его может быть некому закрыть. */
+/* ── Окно «Состояние панели» ──────────────────────────────────────────────
+   Одно на всю панель, с какого экрана ни нажми: итог и что делать обычными
+   словами, строка на каждый из трёх экранов, общие сведения и расшифровка
+   цветов. Открывается у хозяина — поверх всех экранов; пока открыто, плеер
+   стоит. Закрывается само через минуту: на панели его может быть некому
+   закрыть. */
 let info = null
 
 function screenName(id) {
@@ -542,75 +628,85 @@ function screenName(id) {
   return s ? s.name : ''
 }
 
-function headOf(c) {
-  const s = c.status
-  if (s && s.kind === 'schedule' && !s.fresh) {
-    return s.at
-      ? ['Расписание турбо не обновляется', `Источник расписания не отвечает. На экране — расписание, полученное ${msk(s.at)}; с тех пор оно могло измениться. Панель сама повторяет попытки — ничего делать не нужно. Если так дольше получаса — сообщите тому, кто ведёт таблицу турбо.`]
-      : ['Нет расписания турбо', 'Источник расписания не отвечает, а сохранённого расписания этого парка на панели нет — экран показывает общий вид без часов. Панель сама повторяет попытки. Если так дольше получаса — сообщите тому, кто ведёт таблицу турбо.']
+/** Заголовок и что делать — по худшему из версии и экранов */
+function headOf(m) {
+  const w = m.panel
+  const r = w.from
+  if (r) {
+    if (r.word === 'Экран не загрузился') {
+      return [`«${r.name}» не загрузился`, 'Плеер его пропускает, остальные экраны работают. Нажмите «Обновить сейчас». Не помогло — проверьте интернет на панели.']
+    }
+    if (r.word === 'Турбо пропущен') {
+      return ['«Турбо» в этом парке не показывается', `Источник расписания турбо не знает парк «${m.park}» и отдаёт данные другого парка. Чтобы гости не увидели чужое расписание, плеер пропускает «Турбо». Нужно завести парк в таблице турбо — после этого экран начнёт показываться сам.`]
+    }
+    if (r.word === 'Расписание устарело') {
+      return ['Расписание турбо не обновляется', 'Источник расписания не отвечает, и на экране «Турбо» — последнее полученное расписание; с тех пор оно могло измениться. Панель сама повторяет попытки — ничего делать не нужно. Если так дольше получаса — сообщите тому, кто ведёт таблицу турбо.']
+    }
+    if (r.word === 'Нет расписания') {
+      return ['Нет расписания турбо', 'Источник расписания не отвечает, а сохранённого расписания этого парка на панели нет — «Турбо» показывает общий вид без часов. Панель сама повторяет попытки. Если так дольше получаса — сообщите тому, кто ведёт таблицу турбо.']
+    }
   }
-  switch (c.ver.state) {
+  switch (m.ver.state) {
     case 'stale':
-      return ['Версия экрана устарела', 'Вышла новая версия, но браузер панели отдаёт старую. Нажмите «Обновить сейчас». Не помогло — подождите 10 минут и нажмите ещё раз.']
+      return ['Версия панели устарела', 'Вышла новая версия, но браузер панели отдаёт старую. Нажмите «Обновить сейчас». Не помогло — подождите 10 минут и нажмите ещё раз.']
     case 'pending':
-      return ['Вышла новая версия', c.playing || c.held
-        ? 'Экран обновится сам на ближайшей смене экрана — ничего делать не нужно.'
-        : 'Экран обновится сам, как только плеер снова запустят (▶ в шапке).']
+      return ['Вышла новая версия', m.playing || m.held
+        ? 'Панель обновится сама на ближайшей смене экрана — ничего делать не нужно.'
+        : 'Панель обновится сама, как только плеер снова запустят (▶ в шапке).']
     case 'off':
-      return ['Нет связи с сайтом панелей', 'Экран работает и показывает то, что уже загрузил, но не может проверить, последняя ли у него версия. Проверьте интернет на панели.']
+      return ['Нет связи с сайтом панелей', 'Экраны работают и показывают то, что уже загрузили, но панель не может проверить, последняя ли у неё версия. Проверьте интернет на панели.']
     case 'check':
-      return ['Проверяем версию…', 'Экран только что загрузился и сверяет версию с сайтом — это несколько секунд.']
+      return ['Проверяем версию…', 'Панель только что загрузилась и сверяет версию с сайтом — это несколько секунд.']
     default:
-      return ['Всё в порядке', `На экране последняя версия${s && s.kind === 'schedule' ? ', расписание турбо свежее' : ''}. Панель сама проверяет обновления раз в минуту${TV ? ' и перезагружается каждый день в 05:00 МСК' : ''}. Ничего делать не нужно.`]
+      return ['Всё в порядке', m.alone
+        ? 'Экран работает. Ничего делать не нужно.'
+        : `Все экраны работают, версия последняя. Панель сама проверяет обновления раз в минуту${TV ? ' и перезагружается каждый день в 05:00 МСК' : ''}. Ничего делать не нужно.`]
   }
 }
 
 function verLine(v) {
   const latest = v.latest ? `сборка от ${msk(Number(v.latest))}` : 'новая сборка'
   switch (v.state) {
-    case 'ok': return `${msk(v.checkedAt)} — совпадает с сайтом. Проверка раз в минуту`
+    case 'ok': return `${msk(v.checkedAt)} — совпадает с сайтом; проверка раз в минуту`
     case 'pending': return `${msk(v.checkedAt)} — на сайте ${latest}`
     case 'stale': return `${msk(v.checkedAt)} — на сайте ${latest}, а браузер панели отдал старую`
-    case 'off': return `${msk(v.checkedAt)} — сайт панелей не ответил. Повтор через минуту`
+    case 'off': return `${msk(v.checkedAt)} — сайт панелей не ответил; повтор через минуту`
     case 'check': return 'идёт…'
-    default: return 'не проводится (тестовая сборка)'
+    default: return 'не проводится'
   }
 }
 
-function infoHtml(c) {
-  const [lvl] = levelOf(c.ver, c.status)
-  const [title, lead] = headOf(c)
-  const s = c.status
-  const built = BUILD && Number(BUILD) ? ` · собрана ${msk(Number(BUILD))}` : ''
-  const rows = [
-    ['Экран', `«${c.screen}»${c.park ? ` · ${c.park}` : ''}`],
-    ['Версия', `${c.version || '—'}${built}`],
-    ['Проверка версии', verLine(c.ver)],
-    ['Загружен', `${msk(LOADED_AT)} — ${WHY[RELOAD_WHY] || WHY['']}`],
-  ]
-  if (s && s.kind === 'schedule') {
-    rows.push(['Расписание', s.fresh
-      ? `получено ${msk(s.at)} · обновляется само каждые ${s.everyMin || 5} мин`
-      : `${s.at ? `получено ${msk(s.at)}` : 'ещё не получено'} · источник не отвечает${s.fail ? ` с ${msk(s.fail.at)}: ${s.fail.why}` : ''}${s.retryAt ? ` · следующая попытка в ${msk(s.retryAt, false)}` : ''}`])
-  } else {
-    rows.push(['Данные', 'экран ничего не загружает — тексты и цифры входят в версию'])
+function infoHtml(m, closeAt) {
+  const [title, lead] = headOf(m)
+  const rows = m.rows.map((r) => `
+      <div class="row${r.now ? ' now' : ''}">
+        <div class="hd"><b>«${esc(r.name)}»</b>${r.version ? `<span class="sc-vb">${esc(r.version)}</span>` : ''}<span class="sc-chip ${r.lvl}">${esc(r.word)}</span>${r.now && !m.alone ? '<em>сейчас на экране</em>' : ''}</div>
+        <div class="ln">${esc(r.line)}</div>
+      </div>`).join('')
+  const facts = [['Парк', m.park || '—']]
+  if (BUILD && Number(BUILD)) facts.push(['Сборка', msk(Number(BUILD))])
+  if (!m.alone) facts.push(['Проверка версии', verLine(m.ver)])
+  facts.push(['Панель загружена', `${msk(LOADED_AT)} — ${WHY[RELOAD_WHY] || WHY['']}`])
+  facts.push(['Перезапуск', TV ? 'каждый день в 05:00 МСК, сам' : 'выключен — в адресе панели нет &tv=1 (так бывает, когда экран открыт на компьютере)'])
+  if (!m.alone) {
+    const next = m.next && m.next !== m.current ? `дальше «${m.next}»` : 'другие экраны сейчас не показываются'
+    facts.push(['Плеер', `на экране «${m.current}», ${next}; ${m.held ? 'стоит, пока открыто это окно' : m.playing ? 'играет' : 'на паузе (▶ в шапке — запустить)'}`])
   }
-  rows.push(['Перезапуск', TV ? 'каждый день в 05:00 МСК, сам' : 'выключен — в адресе панели нет &tv=1 (так бывает, когда экран открыт на компьютере)'])
-  if (c.next) {
-    rows.push(['Плеер', `${c.held ? 'стоит, пока открыто это окно' : c.playing ? 'играет' : 'на паузе (▶ в шапке — запустить)'} · дальше — «${c.next}»`])
-  }
-  const left = Math.max(0, Math.ceil((c.closeAt - Date.now()) / 1000))
-  return `<div class="box" role="dialog" aria-modal="true" aria-label="Состояние экрана">
+  const left = Math.max(0, Math.ceil((closeAt - Date.now()) / 1000))
+  return `<div class="box" role="dialog" aria-modal="true" aria-label="Состояние панели">
     <button class="x" data-info="close" aria-label="Закрыть">✕</button>
-    <div class="cap">Состояние экрана</div>
-    <h2><i class="c-${lvl}"></i>${esc(title)}</h2>
+    <div class="cap">Состояние панели</div>
+    <h2><span class="sc-chip ${m.panel.lvl}">${esc(m.panel.word)}</span>${title !== m.panel.word ? esc(title) : ''}</h2>
     <p class="lead">${esc(lead)}</p>
-    <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <div class="cols">
+      <div class="scr"><h3>${m.alone ? 'Экран' : 'Экраны панели'}</h3>${rows}</div>
+      <div><h3>Панель</h3><dl>${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
+    </div>
     <div class="legend">
-      <span><i class="c-ok"></i>Зелёный — всё в порядке, ничего делать не нужно</span>
-      <span><i class="c-warn"></i>Жёлтый — вышла новая версия, экран обновится сам</span>
-      <span><i class="c-bad"></i>Красный — нужна помощь: что делать, написано выше</span>
-      <span><i class="c-off"></i>Серый — нет связи с сайтом: проверьте интернет</span>
+      <span><b class="sc-chip ok">Зелёный</b>всё в порядке, ничего делать не нужно</span>
+      <span><b class="sc-chip warn">Жёлтый</b>вышла новая версия, панель обновится сама</span>
+      <span><b class="sc-chip bad">Красный</b>нужна помощь — что делать, написано выше</span>
+      <span><b class="sc-chip off">Серый</b>нет связи с сайтом — проверьте интернет</span>
     </div>
     <div class="acts">
       <button class="go" data-info="fresh">Обновить сейчас</button>
@@ -620,16 +716,16 @@ function infoHtml(c) {
   </div>`
 }
 
-/** Открыть окно. ctx() — свежее состояние на каждый кадр (раз в секунду). */
-function openInfo(ctx, onFresh) {
+/** Открыть окно. model() — свежее состояние на каждый кадр (раз в секунду). */
+function openInfo(model, onFresh) {
   if (info) return
   const el = document.createElement('div')
   el.className = 'sc-info'
   const closeAt = Date.now() + INFO_MS
-  const paint = () => { el.innerHTML = infoHtml({ ...ctx(), closeAt }) }
   info = { el, timer: 0, paused: false }
   /* Пока окно открыто, экран не сменится под читающим */
   if (H && H.playing && !H.busy) { hostAct('toggle'); info.paused = true }
+  const paint = () => { el.innerHTML = infoHtml(model(), closeAt) }
   paint()
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-info]')
@@ -650,11 +746,8 @@ function closeInfo() {
 
 /* Без плеера (парк не найден): окно и ⟳ — у самой страницы */
 function aloneAct(page, action) {
-  if (action === 'info') {
-    openInfo(() => ({ screen: screenName(page.id), park: page.parkName, version: page.version, status: safeStatus(page), ver: { state: 'none' }, playing: true, held: false, next: '' }), () => reloadFresh('manual'))
-  } else if (action === 'fresh') {
-    reloadFresh('manual')
-  }
+  if (action === 'info') openInfo(() => aloneModel(page), () => reloadFresh('manual'))
+  else if (action === 'fresh') reloadFresh('manual')
 }
 
 /* ── Хозяин ────────────────────────────────────────────────────────────── */
@@ -785,7 +878,7 @@ function checkBuild() {
     })
 }
 /** Перезагрузка в обход кэша — вызывается, когда заставка уже закрыла экран.
-    why — причина для окна «Состояние экрана» после загрузки (WHY). */
+    why — причина для окна «Состояние панели» после загрузки (WHY). */
 function reloadFresh(why) {
   try { if (H && H.update) sessionStorage.setItem('boom-upd', H.update) } catch {}
   try { sessionStorage.setItem('boom-why', why || 'fresh') } catch {}
@@ -894,8 +987,8 @@ function hostAct(action, arg) {
     curtainIn().then(() => reloadFresh('manual'))
     return
   }
-  if (action === 'info') {             // нажали на служебный блок — окно «Состояние экрана»
-    openInfo(hostCtx, () => hostAct('fresh'))
+  if (action === 'info') {             // нажали на служебный блок — окно «Состояние панели»
+    openInfo(hostModel, () => hostAct('fresh'))
     broadcast()
     return
   }
@@ -927,26 +1020,16 @@ function hostAct(action, arg) {
   broadcast()   // кнопка меняется сразу, не ждёт следующего тика
 }
 
-/* Что показать в окне «Состояние экрана»: про экран, который сейчас на панели */
-function hostCtx() {
-  const a = apiOf(H.current) || H.self
-  return {
-    screen: screenName(H.current),
-    park: a.parkName,
-    version: a.version,
-    status: safeStatus(a),
-    ver: H.ver,
-    playing: H.playing,
-    held: !!(info && info.paused),
-    next: screenName(nextId()),
-  }
-}
-
 function broadcast() {
   if (!H) return
   const run = H.elapsed + (H.playing && H.startedAt ? performance.now() - H.startedAt : 0)
   const off = SCREENS.filter((s) => apiOf(s.id) && !canShow(s.id)).map((s) => s.id)
-  const st = { current: H.current, playing: H.playing, progress: H.dwell ? Math.min(1, run / H.dwell) : 0, ver: H.ver, off }
+  const m = hostModel()
+  const st = {
+    current: H.current, playing: H.playing, progress: H.dwell ? Math.min(1, run / H.dwell) : 0, ver: H.ver, off,
+    panel: { lvl: m.panel.lvl, word: m.panel.word },   // итог панели — для блока в подвале на всех экранах
+    loadedAt: LOADED_AT,
+  }
   H.self.update(st)
   for (const kid of Object.values(H.kids)) {
     if (kid.api) { try { kid.api.update(st) } catch { kid.api = null } }

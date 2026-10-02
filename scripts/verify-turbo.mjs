@@ -515,7 +515,16 @@ console.log('\n── Отказ источника ──')
   const d = dom.window.document
   ok('источник молчит → состояние none', d.getElementById('timer').className.includes('none'))
   ok('бейдж пометил данные несвежими', d.getElementById('stamp').className.includes('stale'))
-  ok('нет данных → время не выдумывается', d.getElementById('stamp-when').textContent === '—')
+  // С 02.10 время в блоке — когда загружена панель (оно всегда настоящее), а
+  // время расписания — в окне «Состояние панели». Нет данных — окно так и
+  // пишет, времени расписания не выдумывает.
+  d.getElementById('stamp').dispatchEvent(new dom.window.Event('click', { bubbles: true }))
+  {
+    const row = [...d.querySelectorAll('.sc-info .row')].find((x) => x.textContent.includes('«Турбо»'))
+    ok('нет данных → время расписания не выдумывается', !!row && /расписания нет/.test(row.textContent) && !/получен/.test(row.textContent),
+       row?.querySelector('.ln')?.textContent)
+    d.querySelector('.sc-info [data-info="close"]')?.dispatchEvent(new dom.window.Event('click', { bubbles: true }))
+  }
   ok('страница не упала', d.querySelector('.turbo').textContent === 'ТУРБО')
   ok('состояние none: «Когда следующие / турбо-часы?» с переносом',
      d.getElementById('t-state').innerHTML === 'Когда следующие<br>турбо-часы?',
@@ -562,7 +571,7 @@ console.log('\n── Защита источника и восстановле�
   d.getElementById('stamp').dispatchEvent(new dom.window.Event('click', { bubbles: true }))
   {
     const t = (d.querySelector('.sc-info')?.textContent || '').replace(/\s+/g, ' ')
-    ok('в окне «Состояние экрана» — причина сбоя и следующая попытка',
+    ok('в окне «Состояние панели» — у «Турбо» причина сбоя и следующая попытка',
        /источник недоступен \(код 500\)/.test(t) && /следующая попытка в \d{2}:\d{2} МСК/.test(t), t.slice(0, 200))
     d.querySelector('.sc-info [data-info="close"]')?.dispatchEvent(new dom.window.Event('click', { bubbles: true }))
   }

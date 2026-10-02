@@ -651,18 +651,26 @@ console.log('\n── Шапка, подвал, штамп ──')
   // screens.js): «● состояние · время МСК · версия ⟳»; нажатие — окно
   // «Состояние экрана» с объяснением обычными словами.
   ok('блок: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('блок: версия «v2.12»', sp(r.stampVer) === 'v2.12', r.stampVer)
-  ok('блок: состояние словом', !!r.d.querySelector('#stamp .sc-word') && r.d.querySelector('#stamp .sc-word').textContent.length > 0,
-     r.d.querySelector('#stamp .sc-word')?.textContent)
+  ok('блок: версия «v2.13» — бейджем', sp(r.stampVer) === 'v2.13' && r.d.getElementById('stamp-ver').classList.contains('sc-vb'), r.stampVer)
+  {
+    const chip = r.d.querySelector('#stamp .sc-word')
+    ok('блок: состояние — плашка, закрашенная цветом уровня', !!chip && /sc-chip/.test(chip.className) && /\b(ok|warn|bad|off)\b/.test(chip.className) && chip.textContent.length > 0,
+       `${chip?.className} «${chip?.textContent}»`)
+  }
   ok('блок: кнопка обновления ⟳', !!r.d.querySelector('.fineband .stamp button#reload'))
   ok('второго блока (бейджа версии) нет', !r.d.querySelector('.sc-ver') && !r.d.getElementById('hint'))
   r.d.getElementById('stamp').dispatchEvent(new r.window.Event('click', { bubbles: true }))
   {
+    // Окно одно на всю панель: строка на каждый из трёх экранов, с какого ни нажми
     const box = r.d.querySelector('.sc-info')
     const t = sp(box?.textContent)
-    ok('нажатие на блок — окно «Состояние экрана»', !!box && /Состояние экрана/.test(t), t.slice(0, 60))
-    ok('в окне: экран, версия, проверка, загрузка, перезапуск — время с «МСК»',
-       /Экран«Зарядка» · Охта Молл/.test(t) && /Версияv2\.12/.test(t) && /Загружен\d{2}\.\d{2} \d{2}:\d{2} МСК/.test(t) && /Перезапуск/.test(t), t.slice(0, 220))
+    ok('нажатие на блок — окно «Состояние панели»', !!box && /Состояние панели/.test(t), t.slice(0, 60))
+    const rows = [...(box?.querySelectorAll('.row') || [])]
+    ok('в окне — все три экрана, у каждого версия и состояние',
+       rows.length === 3 && ['Статус', 'Зарядка', 'Турбо'].every((n, i) => rows[i].textContent.includes(`«${n}»`)) &&
+       rows.every((x) => x.querySelector('.sc-chip')), rows.map((x) => sp(x.querySelector('.hd')?.textContent)).join(' / '))
+    ok('в окне отмечен экран, который сейчас на панели', rows[1]?.classList.contains('now') && /сейчас на экране/.test(rows[1]?.textContent))
+    ok('в окне — парк и время загрузки панели с «МСК»', /ПаркОхта Молл/.test(t) && /Панель загружена\d{2}\.\d{2} \d{2}:\d{2} МСК/.test(t), t.slice(-420, -200))
     ok('в окне: расшифровка цветов и «Обновить сейчас»', /Зелёный/.test(t) && /Красный/.test(t) && !!box.querySelector('[data-info="fresh"]'))
     box.querySelector('[data-info="close"]').dispatchEvent(new r.window.Event('click', { bubbles: true }))
     ok('окно закрывается', !r.d.querySelector('.sc-info'))

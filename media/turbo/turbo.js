@@ -72,7 +72,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v3.4'
+const PAGE_VERSION = 'v3.5'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -404,7 +404,7 @@ document.getElementById('stamp-ver').textContent = PAGE_VERSION
      3) МЕДЛЕННОЕ ВОССТАНОВЛЕНИЕ. После сбоя следующая попытка была только
         через refresh_sec (5 минут) — всё это время точка розовая. Теперь
         повтор через 15 с, 30 с, 1 мин, 2 мин, дальше — по расписанию.
-   Причина последнего сбоя — в окне «Состояние экрана» (нажать на блок в подвале). */
+   Причина последнего сбоя — в окне «Состояние панели» (нажать на блок в подвале). */
 const FETCH_TIMEOUT_MS = 25000
 const RETRY_MS = [15000, 30000, 60000, 120000]
 const TICK_LOAD_MS = 60000
@@ -412,7 +412,7 @@ let inflight = null
 let retryN = 0
 let retryTimer = 0
 let tickLoadAt = 0
-let lastFail = null   // { at, why } — для окна «Состояние экрана»
+let lastFail = null   // { at, why } — для окна «Состояние панели»
 let retryAt = 0       // когда следующая попытка после сбоя
 
 function load() {
@@ -979,7 +979,7 @@ try {
   initScreens({
     id: 'turbo',
     version: PAGE_VERSION,
-    /* Расписание — для служебного блока и окна «Состояние экрана» */
+    /* Расписание — для служебного блока и окна «Состояние панели» */
     status: () => ({
       kind: 'schedule',
       fresh: !stampState.stale,
@@ -996,6 +996,12 @@ try {
     /* Не показываем, когда вместо витрины заглушка (портрет) и когда
        источник турбо отдал не тот парк (checkPark) */
     available: () => !parkBad && !(window.matchMedia && window.matchMedia(TOO_SMALL).matches),
+    /* Почему «Турбо» сейчас пропускается — строка в окне «Состояние панели».
+       Парка нет в таблице турбо — это надо чинить (problem), вертикальная
+       панель — так задумано. */
+    offWhy: () => (parkBad
+      ? { problem: true, text: `источник турбо не знает парк «${(PARKS[FIXED] || {}).name || FIXED}» и отдаёт данные «${D.park_ru || D.park}» — плеер пропускает «Турбо», пока парк не заведут в таблице турбо` }
+      : { problem: false, text: 'вертикальная или маленькая панель — у «Турбо» нет такой раскладки, плеер его пропускает' }),
     restart: () => {
       /* Мягкое появление (bc-fade-in) нужно один раз, на первой отрисовке.
          Плеер ставит все анимации «с начала» и держит первый кадр 3 с — с
