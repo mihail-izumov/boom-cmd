@@ -28,7 +28,7 @@ import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, msk 
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.14'
+const PAGE_VERSION = 'v2.15'
 
 const PARKS = DATA.parks
 const T = DATA.text
@@ -814,8 +814,9 @@ if (REDUCED) {
 /* ── Плеер экранов (Статус → Зарядка → Турбо), выбор парка, автообновление
    и суточный перезапуск в 05:00 — media/shared/screens.js, один механизм на
    все три экрана.
-   Полный круг экрана = все карточки по очереди (cardMs каждой) + стартовая
-   пауза 700 мс. Пауза — часы и CSS-анимации замирают, продолжение — с того
+   Полный круг экрана = все карточки по очереди (cardMs каждой) + 5 с между
+   ходами в конце; первая карточка — сразу после стоп-кадра плеера (1 с).
+   Пауза — часы и CSS-анимации замирают, продолжение — с того
    же места; показ экрана — круг с первой карточки.
    Парк не найден — плеер не поднимается, но заставку убирает: видна плашка
    «Парк не найден». */
@@ -831,7 +832,7 @@ function stopCards() {
     park,
     parks: PARKS,
     parkOrder: DATA.park_order,
-    cycleMs: () => 700 + [...document.querySelectorAll('#cards .card')].reduce((t, c) => t + cardMs(c), 0) + TAIL_MS,
+    cycleMs: () => [...document.querySelectorAll('#cards .card')].reduce((t, c) => t + cardMs(c), 0) + TAIL_MS,
     restart: () => {
       stopCards()
       clockResume()
@@ -839,7 +840,9 @@ function stopCards() {
       frameT0 = null           // табло и счётчик — тоже с начала
       roundLeft = document.querySelectorAll('#cards .card').length
       restartAnimations()
-      if (!REDUCED) cycleTimer = later(cycleCards, 700)
+      /* Первая карточка — сразу после стоп-кадра плеера (1 с, общий для
+         трёх экранов): своей задержки 0,7 с в плеере больше нет (02.10) */
+      if (!REDUCED) cycleTimer = later(cycleCards, 0)
     },
     pause: () => {
       clockPause()

@@ -12,13 +12,16 @@
  *     полностью готова (шрифты, картинки, остальные экраны плеера, у турбо —
  *     ещё и первое расписание).
  *  2. Справа в шапке — плеер: ❚❚/▶ и три экрана; под активным — полоса
- *     времени до смены. После перехода экран 3 с стоит на первом кадре,
+ *     времени до смены. После перехода экран 1 с стоит на первом кадре
+ *     (до 02.10 было 3 с — решение владельца: «везде 1 секунду»),
  *     потом играет ровно один полный круг своей анимации (у «Статуса» —
  *     сцена 42,4 с с кадра «Заряжено», у «Зарядки» — все карточки по очереди,
  *     у «Турбо» — два круга шаров над плашкой «+50», 36 с).
  *     Пауза замораживает экран вместе с полосой; «▶» продолжает с того же
- *     места. Пауза живёт до перезагрузки: после 05:00 и после смены парка
- *     плеер снова играет (?play=0 в адресе — стартовать на паузе).
+ *     места. Пауза держится не дольше часа — потом плеер сам запускается
+ *     (решение владельца 02.10: чтобы забытая пауза не оставила панель на
+ *     одном экране на весь день). Перезагрузка, 05:00 и смена парка тоже
+ *     снимают паузу (?play=0 в адресе — стартовать на паузе, тот же час).
  *     Экран, который сейчас показать нельзя (у турбо в портрете и в маленьком
  *     окне вместо витрины — заглушка), плеер пропускает, а его кнопку гасит.
  *  3. Заставка — фраза «Играй больше — плати меньше» во всю ширину и
@@ -87,7 +90,8 @@ const OUT_MS = 750                   // «выстрел» глаз и проя�
 // eslint-disable-next-line no-undef
 const BUILD = typeof __MEDIA_BUILD__ !== 'undefined' ? __MEDIA_BUILD__ : ''
 const CHECK_MS = 60000               // как часто сверять номер сборки с сервером
-const FIRST_MS = 3000                // после перехода экран стоит на первом кадре (решение владельца 01.10)
+const FIRST_MS = 1000                // после перехода экран стоит на первом кадре (01.10 — 3 с, 02.10 владелец: 1 с)
+const PAUSE_MAX_MS = 60 * 60 * 1000  // пауза плеера держится не дольше часа (решение владельца 02.10)
 const READY_MS = 8000                // дольше этого первое открытие не ждёт ни один экран
 const SAFETY_MS = 20000              // заставка, которую никто не убрал, уходит сама
 const DAY_FROM = '05:00'             // суточный перезапуск, по Москве
@@ -560,6 +564,7 @@ function hostModel() {
     park: self.parkName,
     playing: H.playing,
     held: !!(info && info.paused),
+    pauseUntil: H.pauseUntil,
     current: screenName(H.current),
     next: screenName(nextId()),
     alone: false,
@@ -700,7 +705,10 @@ function infoHtml(m, closeAt) {
   facts.push(['Перезапуск', TV ? 'каждый день в 05:00 МСК, сам' : 'выключен — в адресе панели нет &tv=1 (так бывает, когда экран открыт на компьютере)'])
   if (!m.alone) {
     const next = m.next && m.next !== m.current ? `дальше «${m.next}»` : 'другие экраны сейчас не показываются'
-    facts.push(['Плеер', `на экране «${m.current}», ${next}; ${m.held ? 'стоит, пока открыто это окно' : m.playing ? 'играет' : 'на паузе (▶ в шапке — запустить)'}`])
+    const state = m.held ? 'стоит, пока открыто это окно'
+      : m.playing ? 'играет'
+      : `на паузе до ${msk(m.pauseUntil, false)} — потом запустится сам (▶ в шапке — запустить сейчас)`
+    facts.push(['Плеер', `на экране «${m.current}», ${next}; ${state}`])
   }
   const left = Math.max(0, Math.ceil((closeAt - Date.now()) / 1000))
   return `<div class="box" role="dialog" aria-modal="true" aria-label="Состояние панели">
@@ -776,6 +784,8 @@ function becomeHost(o, selfApi) {
     timer: 0,
     busy: true,           // пока открывается первый раз
     holding: false,       // экран стоит на первом кадре после перехода
+    pauseTimer: 0,        // снимет паузу через PAUSE_MAX_MS
+    pauseUntil: 0,        // когда пауза снимется сама (для окна «Состояние панели»)
     update: '',           // номер новой сборки, если вышла
     daily: false,         // пора суточного перезапуска
     ver: { state: BUILD ? 'check' : 'none', checkedAt: 0, latest: '' },   // для блока в подвале и окна
@@ -830,6 +840,7 @@ function becomeHost(o, selfApi) {
     return curtainOut()
   }).then(() => { H.busy = false; afterHold(apiOf(H.current)) })
 
+  if (!H.playing) armPauseLimit()     // ?play=0 — тоже не дольше часа
   setInterval(broadcast, 200)
   broadcast()
   if (BUILD) {
@@ -980,12 +991,28 @@ async function switchTo(id) {
   showFrame(id)
   H.current = id
   H.playing = true                     // переход всегда играет
+  armPauseLimit()
   await wait(HOLD_MS - 300)
   present(target)
   broadcast()
   await curtainOut()
   H.busy = false
   afterHold(target)
+}
+
+/* Пауза — не дольше часа: поставили на паузу — заводим таймер, запустили —
+   снимаем. Забытая пауза не оставит панель на одном экране до вечера. Окно
+   «Состояние панели» тоже ставит паузу, но закрывается само через минуту. */
+function armPauseLimit() {
+  clearTimeout(H.pauseTimer)
+  H.pauseTimer = 0
+  H.pauseUntil = 0
+  if (H.playing) return
+  H.pauseUntil = Date.now() + PAUSE_MAX_MS
+  H.pauseTimer = setTimeout(() => {
+    H.pauseTimer = 0
+    if (!H.playing) hostAct('toggle')
+  }, PAUSE_MAX_MS)
 }
 
 function hostAct(action, arg) {
@@ -1004,10 +1031,12 @@ function hostAct(action, arg) {
   }
   if (action === 'toggle' && H.holding) {
     H.playing = !H.playing             // экран ещё стоит на первом кадре — запомним, играть ли потом
+    armPauseLimit()
   } else if (action === 'toggle') {
     const a = apiOf(H.current)
     if (H.playing) {                   // пауза: замираем вместе с полосой
       H.playing = false
+      armPauseLimit()
       clearTimeout(H.timer)
       H.elapsed += performance.now() - H.startedAt
       if (a) a.pause()
@@ -1018,6 +1047,7 @@ function hostAct(action, arg) {
       }
     } else {                           // пуск: с того же места
       H.playing = true
+      armPauseLimit()
       H.startedAt = performance.now()
       if (a) a.resume()
       if (!H.busy) H.timer = setTimeout(() => switchTo(nextId()), Math.max(0, H.dwell - H.elapsed))

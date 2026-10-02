@@ -651,7 +651,7 @@ console.log('\n── Шапка, подвал, штамп ──')
   // screens.js): «● состояние · время МСК · версия ⟳»; нажатие — окно
   // «Состояние экрана» с объяснением обычными словами.
   ok('блок: время загрузки с поясом МСК', /^\d{2}\.\d{2} \d{2}:\d{2} МСК$/.test(r.stampWhen), r.stampWhen)
-  ok('блок: версия «v2.14» — бейджем', sp(r.stampVer) === 'v2.14' && r.d.getElementById('stamp-ver').classList.contains('sc-vb'), r.stampVer)
+  ok('блок: версия «v2.15» — бейджем', sp(r.stampVer) === 'v2.15' && r.d.getElementById('stamp-ver').classList.contains('sc-vb'), r.stampVer)
   {
     const chip = r.d.querySelector('#stamp .sc-word')
     ok('блок: состояние — плашка, закрашенная цветом уровня', !!chip && /sc-chip/.test(chip.className) && /\b(ok|warn|bad|off)\b/.test(chip.className) && chip.textContent.length > 0,
