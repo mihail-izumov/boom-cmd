@@ -525,6 +525,43 @@ console.log('\n── Отказ источника ──')
      d.getElementById('t-note').textContent)
 }
 
+console.log('\n── Защита источника и восстановление (v3.3) ──')
+{
+  // 02.10, Июнь: окно «следующих турбо-часов» по часам панели уже наступило,
+  // а источник отдаёт его как будущее. До v3.3 каждый ответ тут же звал
+  // следующий запрос — лавина, источник начинал отвечать ошибками.
+  const dom = new JSDOM(html, { url: 'https://b00m-cmd.ru/media/turbo/?park=ohta', runScripts: 'outside-only', pretendToBeVisual: true })
+  let calls = 0
+  dom.window.fetch = async (u) => {
+    if (String(u).includes('build.json')) return { ok: true, json: async () => ({}) }
+    calls++
+    return { ok: true, status: 200, json: async () => ({ ...base, today: [], server_time: at('2026-08-08T14:00:00+03:00'),
+      next_window: { from: '09:00', days_ahead: 0, dow: 5, all_day: false } }) }
+  }
+  dom.window.eval(bundle)
+  await new Promise((r) => setTimeout(r, 3000))
+  ok('прошедшее «следующее окно» не порождает лавину запросов', calls <= 2, `${calls} запрос(а) за 3 с`)
+}
+{
+  // Сбой источника: повтор через 15 с, а не через 5 минут; причина — в подсказке
+  const dom = new JSDOM(html, { url: 'https://b00m-cmd.ru/media/turbo/?park=ohta', runScripts: 'outside-only', pretendToBeVisual: true })
+  let n = 0
+  dom.window.fetch = async (u) => {
+    if (String(u).includes('build.json')) return { ok: true, json: async () => ({}) }
+    n++
+    if (n === 1) return { ok: false, status: 500, json: async () => ({}) }
+    return { ok: true, status: 200, json: async () => ({ ...base, server_time: at('2026-08-08T14:00:00+03:00') }) }
+  }
+  dom.window.eval(bundle)
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+  const d = dom.window.document
+  ok('сбой источника — точка розовая', d.getElementById('stamp').className.includes('stale'))
+  d.getElementById('stamp').dispatchEvent(new dom.window.Event('click', { bubbles: true }))
+  ok('в подсказке — причина сбоя', /источник недоступен \(код 500\)/.test(d.getElementById('hint').textContent), d.getElementById('hint').textContent.slice(-90))
+  await new Promise((r) => setTimeout(r, 15600))
+  ok('через 15 с повтор — данные свежие, точка зелёная', !d.getElementById('stamp').className.includes('stale') && n === 2, `${n} запроса`)
+}
+
 console.log('\n── Гигиена сборки ──')
 {
   ok('мок вырезан из прод-бандла', !bundle.includes('МАКСИМУМ ФАНА') && !bundle.includes('turbo.mock'))

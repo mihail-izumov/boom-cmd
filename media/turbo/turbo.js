@@ -72,7 +72,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v3.2'
+const PAGE_VERSION = 'v3.3'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -402,10 +402,13 @@ const hintEl = document.getElementById('hint')
 let hintTimer = null
 function toggleHint() {
   const stale = stampEl.classList.contains('stale')
+  const fail = lastFail
+    ? `<br>Последняя попытка — ${esc(fmtWhen(lastFail.at))}: ${esc(lastFail.why)}. Панель повторяет попытки сама: через 15 с, 30 с, минуту, две.`
+    : ''
   hintEl.innerHTML = stale
     ? '<b>Розовая точка</b> — источник не отвечает. На экране последние сохранённые ' +
       'данные, время рядом — когда они получены. Расписание могло с тех пор ' +
-      'измениться. Нажми ⟳ справа, чтобы перезагрузить.'
+      'измениться. Нажми ⟳ справа, чтобы перезагрузить.' + fail
     : '<b>Зелёная точка</b> — данные свежие. Рядом время последнего ответа сервера ' +
       'по Москве, версия страницы и дата сборки. Панель сама перечитывает расписание ' +
       'каждые несколько минут.'
@@ -418,7 +421,52 @@ stampEl.addEventListener('click', (e) => {
   toggleHint()
 })
 
-async function load() {
+/* ── Защита источника и быстрое восстановление (v3.3, 02.10) ───────────────
+   Июнь показывал розовую точку: источник не отвечал, на экране — кэш.
+   Нашлись три слабых места, все — на стороне страницы:
+     1) ЛАВИНА ЗАПРОСОВ. Окно «следующих турбо-часов» по часам панели уже
+        наступило, а источник ещё отдаёт его как будущее — tick() звал load()
+        на каждом тике, а каждый ответ через render → applyMode → tick звал
+        следующий. Запросы шли без остановки, один за другим, и Apps Script
+        начинал отвечать ошибками. Теперь запрос один за раз (inflight), а
+        «окно наступило» перечитывает расписание не чаще раза в минуту.
+     2) ЗАВИСШИЙ ЗАПРОС. У fetch не было предела: подвисший ответ держал
+        экран без обновления. Теперь — 25 с, потом попытка считается неудачной.
+     3) МЕДЛЕННОЕ ВОССТАНОВЛЕНИЕ. После сбоя следующая попытка была только
+        через refresh_sec (5 минут) — всё это время точка розовая. Теперь
+        повтор через 15 с, 30 с, 1 мин, 2 мин, дальше — по расписанию.
+   Причина последнего сбоя видна в подсказке по точке (нажать на бейдж). */
+const FETCH_TIMEOUT_MS = 25000
+const RETRY_MS = [15000, 30000, 60000, 120000]
+const TICK_LOAD_MS = 60000
+let inflight = null
+let retryN = 0
+let retryTimer = 0
+let tickLoadAt = 0
+let lastFail = null   // { at, why } — для подсказки по точке
+
+function load() {
+  if (inflight) return inflight          // запрос уже идёт — второй не шлём
+  inflight = loadOnce().finally(() => { inflight = null })
+  return inflight
+}
+/* Перечитать из tick(): окно наступило или прошла полночь. Не чаще раза в
+   минуту — иначе, пока источник отдаёт прошедшее окно, это лавина. */
+function loadFromTick() {
+  if (Date.now() - tickLoadAt < TICK_LOAD_MS) return
+  tickLoadAt = Date.now()
+  load()
+}
+/* Причина сбоя человеческими словами — для подсказки персоналу */
+function failWhy(e) {
+  const m = String((e && e.message) || e || '')
+  if (e && e.name === 'AbortError') return `источник не ответил за ${FETCH_TIMEOUT_MS / 1000} с`
+  if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) return 'нет связи с источником'
+  if (/JSON|Unexpected token|not valid/i.test(m)) return 'источник ответил не расписанием (ошибка на его стороне)'
+  return m.slice(0, 140) || 'неизвестная ошибка'
+}
+
+async function loadOnce() {
   const park = parkParam()
   if (!hasData) showSkeleton()
   setBusy(true)
@@ -440,10 +488,17 @@ async function load() {
     }
 
     const url = `${API}?action=turbo${park ? `&park=${encodeURIComponent(park)}` : ''}`
-    const res = await fetch(url, { cache: 'no-store' })
-    if (!res.ok) throw new Error(`Источник недоступен (${res.status})`)
-    const j = await res.json()
-    if (j && j.error) throw new Error(String(j.error))
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null
+    const stop = ctl ? setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS) : 0
+    let j
+    try {
+      const res = await fetch(url, ctl ? { cache: 'no-store', signal: ctl.signal } : { cache: 'no-store' })
+      if (!res.ok) throw new Error(`источник недоступен (код ${res.status})`)
+      j = await res.json()
+    } finally {
+      clearTimeout(stop)
+    }
+    if (j && j.error) throw new Error(`источник вернул ошибку: ${String(j.error)}`)
 
     // якорь настенного времени парка — до первого рендера
     setAnchor(j?.server_time)
@@ -452,7 +507,14 @@ async function load() {
     if (D.park) { try { localStorage.setItem('boom-turbo-park', D.park) } catch {} }
     hasData = true
     setStamp(false, Date.now())
+    retryN = 0
+    clearTimeout(retryTimer)
+    lastFail = null
   } catch (e) {
+    lastFail = { at: Date.now(), why: failWhy(e) }
+    clearTimeout(retryTimer)
+    retryTimer = setTimeout(load, RETRY_MS[Math.min(retryN, RETRY_MS.length - 1)])
+    retryN++
     // Сеть отвалилась — показываем последнее известное, но честно помечаем, что
     // данные не свежие. Кэш старше суток не берём: расписание за ночь наверняка
     // сменилось, а неверное окно на экране хуже пустого.
@@ -791,7 +853,7 @@ function tick() {
   if (nextAt) {
     const left = msUntilWindow(nextAt)
     paintCount(fmtLong(left))
-    if (left <= 0) load()   // окно наступило — перечитать расписание
+    if (left <= 0) loadFromTick()   // окно наступило — перечитать расписание (не чаще раза в минуту)
   }
   const target = endMin !== null ? endMin : startMin
   if (target !== null) {
@@ -803,7 +865,7 @@ function tick() {
   // Настенное время прыгнуло назад — прошла полночь. Панель работает месяцами,
   // и без этого она до следующего опроса показывала бы вчерашние окна.
   const w = wallMin()
-  if (lastWall !== null && w < lastWall - 1) load()
+  if (lastWall !== null && w < lastWall - 1) loadFromTick()
   lastWall = w
 }
 
