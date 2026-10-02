@@ -28,7 +28,7 @@ import { initScreens, pauseAnimations, resumeAnimations, restartAnimations, msk 
    при любой правке вида, текстов, цифр или переключателей парков (в том
    числе правке kassa.data.json): по ней с трёх метров видно, что именно
    открыто на панели. */
-const PAGE_VERSION = 'v2.13'
+const PAGE_VERSION = 'v2.14'
 
 const PARKS = DATA.parks
 const T = DATA.text

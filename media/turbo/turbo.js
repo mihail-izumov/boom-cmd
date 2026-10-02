@@ -72,7 +72,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v3.5'
+const PAGE_VERSION = 'v3.6'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -400,12 +400,18 @@ document.getElementById('stamp-ver').textContent = PAGE_VERSION
         начинал отвечать ошибками. Теперь запрос один за раз (inflight), а
         «окно наступило» перечитывает расписание не чаще раза в минуту.
      2) ЗАВИСШИЙ ЗАПРОС. У fetch не было предела: подвисший ответ держал
-        экран без обновления. Теперь — 25 с, потом попытка считается неудачной.
+        экран без обновления. Теперь — 90 с, потом попытка считается
+        неудачной. (В v3.3 было 25 с — мало: 02.10 источник турбо отвечал
+        Июню дольше, и нормальный, но медленный ответ обрывался как сбой.)
      3) МЕДЛЕННОЕ ВОССТАНОВЛЕНИЕ. После сбоя следующая попытка была только
         через refresh_sec (5 минут) — всё это время точка розовая. Теперь
         повтор через 15 с, 30 с, 1 мин, 2 мин, дальше — по расписанию.
    Причина последнего сбоя — в окне «Состояние панели» (нажать на блок в подвале). */
-const FETCH_TIMEOUT_MS = 25000
+const FETCH_TIMEOUT_MS = 90000
+/* Сколько сохранённое расписание считается свежим, если очередной запрос не
+   прошёл. Часы турбо за минуты не меняются: пока данным меньше 15 минут,
+   гости видят верное расписание — это жёлтое «Ждём расписание», не красное. */
+const STALE_AFTER_MS = 15 * 60 * 1000
 const RETRY_MS = [15000, 30000, 60000, 120000]
 const TICK_LOAD_MS = 60000
 let inflight = null
@@ -986,6 +992,7 @@ try {
       at: stampState.at,
       fail: lastFail,
       retryAt: stampState.stale ? retryAt : 0,
+      recent: stampState.stale && !!stampState.at && Date.now() - stampState.at < STALE_AFTER_MS,
       everyMin: Math.round((Number(D.settings?.refresh_sec) || DEFAULT_REFRESH_SEC) / 60),
     }),
     park,
