@@ -72,7 +72,7 @@ const API = import.meta.env.VITE_TURBO_API || ''
 
    Полное правило и история: boom-cmd-data/docs/changelog/media-turbo.md
    Не поднял — бейдж врёт, и доверять ему больше нельзя никогда. */
-const PAGE_VERSION = 'v3.1'
+const PAGE_VERSION = 'v3.2'
 
 const CACHE_KEY = 'boom-turbo-cache-v1'
 const CACHE_MAX_MS = 24 * 3600 * 1000 // кэш старше суток не используем
@@ -346,10 +346,15 @@ function storedPark() {
 const park = FIXED || (PARKS[storedPark()] ? storedPark() : PARK_ORDER[0])
 const parkParam = () => FIXED || D.park || park
 
-function readCache() {
+/* Кэш берём, только если он про ТОТ ЖЕ парк. Кэш один на браузер, а с v3.1
+   парк меняется списком на плашке: до 02.10 Июнь при сбое источника
+   показывал сохранённое расписание Охты — с плашкой «Парк не найден» поверх. */
+function readCache(park) {
   try {
     const o = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')
-    return o && o.data ? o : null
+    if (!o || !o.data) return null
+    if (park && o.data.park && o.data.park !== park) return null
+    return o
   } catch {
     return null
   }
@@ -451,7 +456,7 @@ async function load() {
     // Сеть отвалилась — показываем последнее известное, но честно помечаем, что
     // данные не свежие. Кэш старше суток не берём: расписание за ночь наверняка
     // сменилось, а неверное окно на экране хуже пустого.
-    const c = readCache()
+    const c = readCache(park)
     if (c && Date.now() - c.at < CACHE_MAX_MS) {
       D = normalize(c.data)
       hasData = true
@@ -554,12 +559,30 @@ function renderSteps() {
  * Поймано в бою 08.08 владельцем. Лечим на фронте, а не в скрипте: только
  * страница знает, какой парк у неё в URL.
  */
+/* С v3.1 сверка ещё и решает, показывать ли «Турбо» в плеере экранов:
+   парк в адресе настоящий (он есть в списке на плашке), а источник турбо
+   отдал другой — значит, в таблице турбо этого парка нет. Плашку с ошибкой
+   гостям в круге не показываем: плеер пропускает экран и гасит его кнопку
+   (available ниже), а сама плашка объясняет персоналу, в чём дело, если
+   открыть турбо этого парка отдельно. */
+let parkBad = false
 function checkPark() {
   const el = document.getElementById('parkerr')
   const bad = !!FIXED && hasData && D.park && FIXED !== D.park
-  el.classList.toggle('on', bad)
-  if (bad) document.getElementById('parkerr-asked').textContent = `?park=${FIXED}`
-  return bad
+  parkBad = !!bad
+  el.classList.toggle('on', parkBad)
+  if (parkBad) {
+    document.getElementById('parkerr-asked').textContent = `?park=${FIXED}`
+    const what = document.getElementById('parkerr-what')
+    if (what) what.textContent = PARKS[FIXED] ? 'в таблице турбо этого парка нет' : 'такого парка нет'
+    const why = document.getElementById('parkerr-why')
+    if (why) {
+      why.textContent = PARKS[FIXED]
+        ? `Источник турбо не знает парк «${PARKS[FIXED].name}» и отдал данные «${D.park_ru || D.park}». В плеере экранов «Турбо» для этого парка пропускается, пока парк не заведут в таблице турбо.`
+        : 'Экран показывал бы данные другого парка — расписание и число автоматов не совпали бы.'
+    }
+  }
+  return parkBad
 }
 
 function renderBrand() {
@@ -925,7 +948,9 @@ try {
     parkOrder: PARK_ORDER,
     ready: firstLoad,
     cycleMs: () => SCREEN_MS,
-    available: () => !(window.matchMedia && window.matchMedia(TOO_SMALL).matches),
+    /* Не показываем, когда вместо витрины заглушка (портрет) и когда
+       источник турбо отдал не тот парк (checkPark) */
+    available: () => !parkBad && !(window.matchMedia && window.matchMedia(TOO_SMALL).matches),
     restart: () => {
       /* Мягкое появление (bc-fade-in) нужно один раз, на первой отрисовке.
          Плеер ставит все анимации «с начала» и держит первый кадр 3 с — с

@@ -468,6 +468,39 @@ console.log('\n── Опечатка в адресе панели ──')
   })
   ok('корректный парк — плашки нет', !r.parkErr)
 }
+{
+  // 02.10: Июнь в плеере экранов показал плашку «Парк не найден». Парк в
+  // адресе настоящий (он есть в списке на плашке), а источник отдал другой —
+  // значит, в таблице турбо этого парка нет. Гостям в круге плашку не
+  // показываем: плеер пропускает «Турбо» и гасит его кнопку; сама плашка
+  // называет причину для персонала.
+  const r = await run('?park=iyun', { ...base, server_time: at('2026-08-08T14:00:00+03:00') })
+  ok('источник отдал другой парк → плашка с причиной',
+     r.parkErr && /в таблице турбо этого парка нет/.test(r.window.document.getElementById('parkerr').textContent))
+  await new Promise((res) => setTimeout(res, 300))   // плеер раздаёт состояние 5 раз в секунду
+  const tab = r.window.document.querySelector('.sc-tab[data-id="turbo"]')
+  ok('в плеере «Турбо» этого парка погашен и пропускается', !!tab && tab.classList.contains('off'), tab?.className)
+}
+{
+  // Кэш один на браузер. Источник молчит, а в кэше — расписание ДРУГОГО
+  // парка: его не показываем (до 02.10 Июнь показывал Охту с плашкой ошибки).
+  const mk = (cache) => {
+    const dom = new JSDOM(html, { url: 'https://b00m-cmd.ru/media/turbo/?park=iyun', runScripts: 'outside-only', pretendToBeVisual: true })
+    dom.window.localStorage.setItem('boom-turbo-cache-v1', JSON.stringify({ at: Date.now() - 60000, data: cache }))
+    dom.window.fetch = async () => { throw new Error('offline') }
+    dom.window.eval(bundle)
+    return dom.window.document
+  }
+  let d = mk({ ...base, park: 'ohta', park_ru: 'Охта Молл' })
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+  ok('чужой кэш (Охта) для Июня не берётся — плашки нет, данных нет',
+     !d.getElementById('parkerr').className.includes('on') && d.getElementById('timer').className.includes('none') &&
+     d.getElementById('brand-park').textContent === '', d.getElementById('brand-park').textContent)
+  d = mk({ ...base, park: 'iyun', park_ru: 'ТЦ Июнь' })
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+  ok('свой кэш (Июнь) берётся, помечен несвежим',
+     d.getElementById('brand-park').textContent === 'ТЦ Июнь' && d.getElementById('stamp').className.includes('stale'))
+}
 
 console.log('\n── Отказ источника ──')
 {
