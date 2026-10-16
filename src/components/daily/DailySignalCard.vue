@@ -11,6 +11,7 @@ import { L, ddmm } from '../../i18n/daily.js'
 import DailyDayProgress from './DailyDayProgress.vue'
 import SignalRateSheet from './SignalRateSheet.vue'
 import SignalMarkButton from './SignalMarkButton.vue'
+import SignalCommentBox from './SignalCommentBox.vue'
 
 // «Сигнал Дня» + «Как идёт день» в ОДНОЙ окрашенной карточке, «Ранее» — отдельным
 // блоком под ней. ТОЛЬКО рендерит payload (ТЗ §5); текст монохромный.
@@ -234,6 +235,15 @@ const cardEdge = computed(() =>
           :local-read="localRead(latest.date)" :now="now"
           @rate="onRate"
         />
+      </div>
+
+      <!-- NET-235: «Что было в парке сегодня». Под текстом сигнала, но ПОД кнопкой
+           отметки — первым действием карточки остаётся «Прочитать и оценить» (в NET-61
+           соседнее действие уже стоило оценок). От отметки поле не зависит: свой
+           запрос signal_comment, свой лист, любое число отправок за день.
+           :key по дате — пришёл свежий разбор, поле и журнал переключаются на него. -->
+      <div class="mt-4">
+        <SignalCommentBox :key="`${park}:${latest.date}`" :park="park" :signal-date="latest.date" :now="now" />
       </div>
 
       <SignalRateSheet
