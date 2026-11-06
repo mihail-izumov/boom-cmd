@@ -684,7 +684,7 @@ console.log('\n── Шапка, подвал, штамп ──')
 console.log('\n── У гостя ничего не нажимается, ничего не грузится ──')
 {
   // Нажимается только служебный подвал (как у турбо и «Твоей карты»):
-  // ссылка «Работает на Ранскеил», бейдж с подсказкой и ⟳. Всё остальное —
+  // ссылка «Технологии Ранскеил», бейдж с подсказкой и ⟳. Всё остальное —
   // содержание для гостя, там ни ссылок, ни кнопок быть не должно.
   const body = html.slice(html.indexOf('<body')).replace(/<!--[\s\S]*?-->/g, '')
   const r = await run('?park=ohta')
@@ -695,9 +695,13 @@ console.log('\n── У гостя ничего не нажимается, ни
   page.querySelector('.head').remove()
   ok('в содержании для гостя нет ссылок', !page.querySelector('a'))
   ok('в содержании для гостя нет кнопок и полей (служебное — только шапка и подвал)', !page.querySelector('button, input, select, textarea, form, [role=button]'))
-  const fineLinks = [...r.d.querySelectorAll('.fineband a')].map((a) => a.getAttribute('href'))
+  const fineAs = [...r.d.querySelectorAll('.fineband a')]
   // Адрес — как у «Твоей карты» v6.3 (ultra.runscale.ru)
-  ok('в подвале одна ссылка — «Работает на Ранскеил»', fineLinks.join() === 'https://ultra.runscale.ru', fineLinks.join())
+  ok('в подвале одна ссылка — «Технологии Ранскеил»',
+     fineAs.length === 1 &&
+     fineAs[0].getAttribute('href') === 'https://ultra.runscale.ru' &&
+     fineAs[0].textContent.trim() === 'Технологии Ранскеил',
+     fineAs.map((a) => `${a.textContent.trim()} ${a.getAttribute('href')}`).join())
   ok('в подвале одна кнопка — ⟳', [...r.d.querySelectorAll('.fineband button')].map((b) => b.id).join() === 'reload')
   ok('нет обработчиков в разметке', !/\son[a-z]+=/i.test(body))
   ok('в коде нет обработчиков касаний и клавиш', !/addEventListener\(\s*["'](pointerdown|touchstart|keydown)/.test(bundle))
